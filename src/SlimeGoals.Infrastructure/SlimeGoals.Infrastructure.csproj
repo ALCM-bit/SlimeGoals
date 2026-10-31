@@ -1,5 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <EmbeddedResource Include="Data\Migrations\*.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Dapper" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\SlimeGoals.Core\SlimeGoals.Core.csproj" />
   </ItemGroup>
+
 </Project>
