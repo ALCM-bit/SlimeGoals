@@ -1,6 +1,7 @@
 using Avalonia;
 using Microsoft.Extensions.DependencyInjection;
-using SlimeGoals.App.ViewModels;
+using SlimeGoals.Infrastructure.Data;
+using SlimeGoals.Platform.Linux;
 
 namespace SlimeGoals.Desktop;
 
@@ -10,21 +11,14 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        using var services = BuildServices();
-        BuildAvaloniaApp(services).StartWithClassicDesktopLifetime(args);
-    }
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var databasePath = XdgPaths.DatabasePath(Environment.GetEnvironmentVariable, home);
 
-    /// <summary>Raiz de composição do head Linux (spec §5: DI só nos heads).</summary>
-    private static ServiceProvider BuildServices()
-    {
-        var services = new ServiceCollection();
-        // Ordem de registro = ordem na navegação (spec §7)
-        services.AddSingleton<PageViewModel, TodayPageViewModel>();
-        services.AddSingleton<PageViewModel, GoalsPageViewModel>();
-        services.AddSingleton<PageViewModel, ReportsPageViewModel>();
-        services.AddSingleton<PageViewModel, SettingsPageViewModel>();
-        services.AddSingleton<ShellViewModel>();
-        return services.BuildServiceProvider();
+        using var services = CompositionRoot.Build(databasePath);
+        using (var connection = services.GetRequiredService<SqliteConnectionFactory>().Open())
+            MigrationRunner.Migrate(connection);
+
+        BuildAvaloniaApp(services).StartWithClassicDesktopLifetime(args);
     }
 
     private static AppBuilder BuildAvaloniaApp(IServiceProvider services)

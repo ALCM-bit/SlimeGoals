@@ -10,5 +10,6 @@
     <Project Path="tests/SlimeGoals.App.Tests/SlimeGoals.App.Tests.csproj" />
     <Project Path="tests/SlimeGoals.Core.Tests/SlimeGoals.Core.Tests.csproj" />
     <Project Path="tests/SlimeGoals.Infrastructure.Tests/SlimeGoals.Infrastructure.Tests.csproj" />
+    <Project Path="tests/SlimeGoals.Platform.Linux.Tests/SlimeGoals.Platform.Linux.Tests.csproj" />
   </Folder>
 </Solution>
