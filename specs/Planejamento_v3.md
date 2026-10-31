@@ -41,14 +41,14 @@ Aplicação multiplataforma para cadastrar metas (tarefas únicas, hábitos diá
 | Camada        | Tecnologia                                                                                                                                                  |
 |---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Runtime       | .NET 10 (LTS), suportado até nov/2028 (SDK 10.0.113 já instalado no ambiente de desenvolvimento)                                                           |
-| UI            | Avalonia (XAML) com MVVM — versão estável mais recente, confirmada na Fase 0 (a v1.2 citava a 11)                                                           |
+| UI            | Avalonia 12 (XAML) com MVVM — 12.1.4 na data do plano das Fases 0–1                                                           |
 | MVVM          | CommunityToolkit.Mvvm (`[ObservableProperty]`, `[RelayCommand]`)                                                                                            |
 | DI            | Microsoft.Extensions.DependencyInjection                                                                                                                    |
 | Banco         | SQLite com Microsoft.Data.Sqlite + Dapper                                                                                                                   |
 | Migrações     | Scripts SQL numerados + `PRAGMA user_version`                                                                                                               |
 | Gráficos      | Barras desenhadas em XAML no MVP; LiveCharts2 só se surgirem gráficos que o justifiquem                                                                     |
 | Fonte         | Figtree (OFL), embutida no app como recurso Avalonia                                                                                                        |
-| Testes        | xUnit + FluentAssertions + `Microsoft.Extensions.TimeProvider.Testing` (`FakeTimeProvider`)                                                                 |
+| Testes        | xUnit v3 + AwesomeAssertions (fork Apache-2.0 do FluentAssertions, que passou a ter licença comercial na v8) + `Microsoft.Extensions.TimeProvider.Testing` (`FakeTimeProvider`)                                                                 |
 | Empacotamento | `dotnet publish` por RID (linux-x64); AppImage ou binário *self-contained* com arquivo `.desktop` no Linux (PKGBUILD opcional); APK/AAB assinado no Android |
 
 **Justificativa das escolhas:**
@@ -379,7 +379,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 - `specs/` versionada no repositório git junto com o código.
 - Forma de trabalho: o assistente implementa e explica; o autor revisa e aprova por fase.
 
-**Pendências:** versão mínima do Android (Fase 7c); versão do Avalonia (Fase 0); sincronização entre dispositivos (fora do MVP).
+**Pendências:** versão mínima do Android (Fase 7c); sincronização entre dispositivos (fora do MVP).
 
 **Próximos passos imediatos:**
 
