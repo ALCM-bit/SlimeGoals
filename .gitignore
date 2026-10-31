@@ -1,0 +1,22 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.idea/
+*.DotSettings.user
+TestResults/
+*.trx
+artifacts/
+publish/
+
+# Android
+*.keystore
+*.jks
+
+# SO / editores
+.DS_Store
+*.swp
+.vscode/*
+!.vscode/extensions.json
