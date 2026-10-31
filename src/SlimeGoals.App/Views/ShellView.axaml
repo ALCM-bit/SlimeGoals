@@ -1,0 +1,25 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SlimeGoals.App.ViewModels"
+             x:Class="SlimeGoals.App.Views.ShellView"
+             x:DataType="vm:ShellViewModel">
+  <!-- Layout bento v4: barra lateral de 220px + conteúdo, espaçamento de 14px -->
+  <Grid ColumnDefinitions="220,*" Margin="14" ColumnSpacing="14">
+    <Border Classes="panel" Padding="14,20">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="SlimeGoals" FontSize="17" FontWeight="ExtraBold"
+                   Margin="12,0,0,18" />
+        <ListBox Classes="nav" ItemsSource="{Binding Pages}" SelectionMode="Single,AlwaysSelected"
+                 SelectedItem="{Binding CurrentPage, Mode=TwoWay}"
+                 AutomationProperties.Name="Navegação principal">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:PageViewModel">
+              <TextBlock Text="{Binding Title}" />
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Border>
+    <ContentControl Grid.Column="1" Content="{Binding CurrentPage}" />
+  </Grid>
+</UserControl>

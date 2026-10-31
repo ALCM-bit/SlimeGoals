@@ -20,3 +20,6 @@ publish/
 *.swp
 .vscode/*
 !.vscode/extensions.json
+
+# Workspace de execução de planos (superpowers)
+.superpowers/

@@ -1,0 +1,28 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SlimeGoals.App.ViewModels"
+             xmlns:views="using:SlimeGoals.App.Views"
+             x:Class="SlimeGoals.App.App"
+             RequestedThemeVariant="Dark">
+
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://SlimeGoals.App/Styles/Theme.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+
+  <!-- Uma View por tipo de página, sem ViewLocator por reflexão (bindings compilados) -->
+  <Application.DataTemplates>
+    <DataTemplate DataType="vm:TodayPageViewModel"><views:TodayView /></DataTemplate>
+    <DataTemplate DataType="vm:GoalsPageViewModel"><views:GoalsView /></DataTemplate>
+    <DataTemplate DataType="vm:ReportsPageViewModel"><views:ReportsView /></DataTemplate>
+    <DataTemplate DataType="vm:SettingsPageViewModel"><views:SettingsView /></DataTemplate>
+  </Application.DataTemplates>
+
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://SlimeGoals.App/Styles/Controls.axaml" />
+  </Application.Styles>
+</Application>

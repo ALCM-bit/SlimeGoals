@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>slimegoals</AssemblyName>
+    <RootNamespace>SlimeGoals.Desktop</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SlimeGoals.App\SlimeGoals.App.csproj" />
+    <ProjectReference Include="..\SlimeGoals.Core\SlimeGoals.Core.csproj" />
+    <ProjectReference Include="..\SlimeGoals.Infrastructure\SlimeGoals.Infrastructure.csproj" />
+    <ProjectReference Include="..\SlimeGoals.Platform.Linux\SlimeGoals.Platform.Linux.csproj" />
+  </ItemGroup>
+
+</Project>

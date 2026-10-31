@@ -1,0 +1,8 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SlimeGoals.App.ViewModels"
+             x:Class="SlimeGoals.App.Views.SettingsView"
+             x:DataType="vm:SettingsPageViewModel">
+  <!-- Placeholder da Fase 0: conteúdo real nas próximas fases -->
+  <TextBlock Classes="page-title" Text="{Binding Title}" Margin="8,4" />
+</UserControl>
