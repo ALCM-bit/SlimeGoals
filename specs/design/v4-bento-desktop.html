@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SlimeGoals — Hoje (v4, bento)</title>
+
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.app{display:grid;grid-template-columns:220px 1fr;gap:14px;padding:14px;min-height:800px;box-sizing:border-box;background:#0C0A11;color:#E8E4F0;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;line-height:1.4}
+.pn{background:#15121C;border:1px solid #241F30;border-radius:22px}
+.side{padding:20px 14px;display:flex;flex-direction:column;gap:4px}
+.side a{display:flex;gap:10px;align-items:center;min-height:44px;padding:0 12px;border-radius:14px;color:#A39DB8;text-decoration:none;font-weight:500}
+.side a:hover{background:#1D1928;color:#E8E4F0}
+.side a[aria-current]{background:#2A2145;color:#fff;font-weight:700}
+a:focus-visible,button:focus-visible{outline:2px solid #B9A3F0;outline-offset:2px}
+.main{display:flex;flex-direction:column;gap:14px;min-width:0}
+.bento{flex:1;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:118px 1fr 1fr;gap:14px;min-height:0}
+.t{border-radius:22px;background:#1A1722;border:1px solid #2A2538;padding:16px;display:flex;flex-direction:column;min-width:0}
+.lb{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#C9C3D6}
+.lb svg{flex:none}
+.big{margin-top:auto;font-size:34px;font-weight:800;line-height:1}
+.big small{font-size:15px;font-weight:600;color:#A39DB8;margin-left:6px}
+.mt{color:#A39DB8;font-size:12px}
+.hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.hd a{color:#A39DB8;font-size:12px;text-decoration:none}
+.g{display:grid;grid-template-columns:40px 1fr 40px;gap:12px;align-items:center;padding:9px 0;border-top:1px solid #2A2538}
+.ic{width:40px;height:40px;border-radius:14px;display:grid;place-items:center}
+.ck{all:unset;box-sizing:border-box;width:40px;height:40px;border-radius:50%;border:2px solid #9B7BEA;display:grid;place-items:center;color:#B9A3F0;cursor:pointer}
+.sg{display:flex;gap:3px;margin-top:6px}.sg i{height:6px;width:22px;border-radius:3px;background:#3A3350}.sg i.f{background:#9B7BEA}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px 0;text-align:center;font-weight:500}
+.cal b{font-weight:500;padding:5px 0;border-radius:50%;width:28px;margin:0 auto;display:block}
+.cal .h{color:#A39DB8;font-size:11px}.cal .o{color:#6F6985}.cal .d{color:#7FD1AE}
+.cal .n{background:#9B7BEA;color:#14101D;font-weight:800}
+.ev{display:grid;grid-template-columns:46px 4px 1fr;gap:10px;align-items:center;padding:7px 0}
+.ev i{height:30px;border-radius:2px}
+</style>
+
+<style>:root{color-scheme:dark}</style>
+</head>
+<body>
+<div class="app">
+<nav class="pn side" aria-label="Principal">
+<div style="display:flex;gap:10px;align-items:center;padding:2px 10px 18px;font-weight:700;font-size:15px"><svg width="26" height="26" viewBox="0 0 200 200" aria-hidden="true"><path d="M20 146C20 98 56 66 100 66C144 66 180 98 180 146C180 165 158 174 100 174C42 174 20 165 20 146Z" fill="#9B7BEA"/><ellipse cx="68" cy="128" rx="9" ry="11" fill="#1A1226"/><ellipse cx="132" cy="128" rx="9" ry="11" fill="#1A1226"/></svg>SlimeGoals</div>
+<a href="#" aria-current="page"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Hoje</a>
+<a href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Metas</a>
+<a href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Relatórios</a>
+<div style="flex:1"></div>
+<div style="border-radius:20px;padding:16px;background:linear-gradient(150deg,#7656D0,#43347F);color:#fff">
+<svg width="64" height="64" viewBox="0 0 200 200" aria-hidden="true"><path d="M20 146C20 98 56 66 100 66C144 66 180 98 180 146C180 165 158 174 100 174C42 174 20 165 20 146Z" fill="#C9B6F7"/><path d="M59 130Q68 138 77 130M123 130Q132 138 141 130" fill="none" stroke="#1A1226" stroke-width="4" stroke-linecap="round"/><path d="M94 147Q100 150 106 147" fill="none" stroke="#1A1226" stroke-width="3" stroke-linecap="round"/></svg>
+<div style="font-weight:800;font-size:15px;margin:8px 0 2px">Hora do soninho?</div><div style="font-size:12px;color:#EDE6FD;margin-bottom:12px">Pause os lembretes quando precisar.</div>
+<button type="button" style="all:unset;box-sizing:border-box;cursor:pointer;display:block;text-align:center;width:100%;min-height:40px;line-height:40px;border-radius:12px;background:#fff;color:#2B2150;font-weight:800;font-size:13px">Pausar lembretes</button></div>
+<a href="#" style="margin-top:6px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3"/></svg>Configurações</a>
+</nav>
+<main class="main">
+<header style="display:flex;justify-content:space-between;align-items:center;padding:6px 6px 0 8px">
+<div><h1 style="margin:0;font-size:26px;font-weight:800">Olá, Felipe</h1><div class="mt">Bem-vindo de volta ao seu painel de metas</div></div>
+<div style="display:flex;align-items:center;gap:10px"><button type="button" aria-label="Buscar" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:50%;background:#1A1722;border:1px solid #2A2538;display:grid;place-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg></button><div style="text-align:right"><div style="font-weight:700">Felipe</div><div class="mt">Semana 4 do mês</div></div><div style="width:44px;height:44px;border-radius:50%;background:#3A2F63;display:grid;place-items:center;font-weight:800;color:#D6C8FA">F</div></div>
+</header>
+<div class="bento">
+<section class="t" style="background:linear-gradient(150deg,#7656D0,#5B43AE);border-color:#7656D0;color:#fff"><div class="lb" style="color:#fff"><span style="width:20px;height:20px;border-radius:50%;background:#fff;color:#5B43AE;display:grid;place-items:center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>Progresso da semana</div><div class="big">76<small style="color:#EDE6FD">% · 16/21</small></div></section>
+<section class="t"><div class="lb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Em andamento</div><div class="big">3<small>metas</small></div></section>
+<section class="t"><div class="lb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7FD1AE" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>Concluídas</div><div class="big">1<small>meta</small></div></section>
+<section class="t"><div class="lb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8B86D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c1 4 5 5 5 10a5 5 0 01-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z"/></svg>Sequência</div><div class="big">3<small>semanas</small></div></section>
+
+<section class="t" style="grid-row:2/4;grid-column:1/3"><div class="hd"><div class="lb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Metas de hoje</div><a href="#">Ver todas</a></div>
+<div class="g" style="border-top:0"><div class="ic" style="background:#2A2145;color:#B9A3F0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h6a2 2 0 012 2v12a2 2 0 00-2-2H4zM20 5h-6a2 2 0 00-2 2v12a2 2 0 012-2h6z"/></svg></div><div><div style="font-weight:700">Estudar inglês</div><div class="mt">3 de 5 · 14:00</div><div class="sg"><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i></div></div><button class="ck" type="button" aria-label="Registrar check-in: Estudar inglês"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></button></div>
+<div class="g"><div class="ic" style="background:#3A2133;color:#F0A3C4"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M3 9v6M7 6v12M17 6v12M21 9v6M7 12h10"/></svg></div><div><div style="font-weight:700">Treino</div><div class="mt">2 de 4 · 16:00</div><div class="sg"><i class="f"></i><i class="f"></i><i></i><i></i></div></div><button class="ck" type="button" aria-label="Registrar check-in: Treino"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></button></div>
+<div class="g"><div class="ic" style="background:#382E1A;color:#E8B86D"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg></div><div><div style="font-weight:700">Leitura (30 min)</div><div class="mt">4 de 5 · 20:00</div><div class="sg"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i></div></div><button class="ck" type="button" aria-label="Registrar check-in: Leitura"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></button></div>
+<div class="g"><div class="ic" style="background:#1E3B33;color:#7FD1AE"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3s6 6 6 10a6 6 0 01-12 0c0-4 6-10 6-10z"/></svg></div><div><div style="font-weight:700">Beber água</div><div class="mt">7 de 7 · concluída</div></div><span class="ck" style="background:#7FD1AE;border-color:#7FD1AE;color:#0C0A11" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></span></div>
+<div style="margin-top:auto;border-radius:16px;background:#221D2E;padding:12px"><div class="mt" style="margin-bottom:4px">Última nota · Estudar inglês</div><div style="font-size:12px;color:#E8E4F0">Revisei 20 palavras novas antes do almoço.</div><div style="display:flex;gap:6px;margin-top:8px"><span style="padding:2px 8px;border-radius:6px;background:#3A2F63;color:#D6C8FA;font-size:11px;font-weight:600">Inglês</span><span style="padding:2px 8px;border-radius:6px;background:#382E1A;color:#E8B86D;font-size:11px;font-weight:600">Foco</span></div></div></section>
+
+<section class="t" style="grid-column:3/5"><div class="hd"><div class="lb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Calendário de check-ins</div><span class="mt">Outubro 2026</span></div>
+<div class="cal"><b class="h">S</b><b class="h">T</b><b class="h">Q</b><b class="h">Q</b><b class="h">S</b><b class="h">S</b><b class="h">D</b>
+<b class="o">28</b><b class="o">29</b><b class="o">30</b><b>1</b><b class="d">2</b><b>3</b><b>4</b>
+<b class="d">5</b><b class="d">6</b><b class="d">7</b><b>8</b><b class="d">9</b><b>10</b><b>11</b>
+<b class="d">12</b><b>13</b><b class="d">14</b><b class="d">15</b><b>16</b><b>17</b><b>18</b>
+<b class="d">19</b><b class="d">20</b><b class="d">21</b><b class="d">22</b><b class="d">23</b><b>24</b><b>25</b>
+<b class="n">26</b><b>27</b><b>28</b><b>29</b><b>30</b><b>31</b><b class="o">1</b></div></section>
+
+<section class="t"><div class="lb" style="margin-bottom:4px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 17V11a6 6 0 0112 0v6l2 2H4zM10 21h4"/></svg>Próximos lembretes</div>
+<div style="font-size:26px;font-weight:800;margin:4px 0 6px">02:35:51</div><div class="mt" style="margin-bottom:6px">para o próximo, às 14:00</div>
+<div class="ev"><b>14:00</b><i style="background:#9B7BEA"></i><span>Estudar inglês</span></div><div class="ev"><b>16:00</b><i style="background:#F0A3C4"></i><span>Treino</span></div><div class="ev"><b>20:00</b><i style="background:#E8B86D"></i><span>Leitura</span></div></section>
+
+<section class="t"><div class="lb" style="margin-bottom:auto"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Onde você mais rende</div>
+<div style="display:flex;gap:4px;height:34px;margin:14px 0"><div style="flex:19;border-radius:10px;background:#9B7BEA"></div><div style="flex:12;border-radius:10px;background:#F0A3C4"></div><div style="flex:25;border-radius:10px;background:#E8B86D"></div><div style="flex:44;border-radius:10px;background:#7FD1AE"></div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;font-size:12px"><span><b style="color:#9B7BEA">●</b> Inglês 19%</span><span><b style="color:#F0A3C4">●</b> Treino 12%</span><span><b style="color:#E8B86D">●</b> Leitura 25%</span><span><b style="color:#7FD1AE">●</b> Água 44%</span></div></section>
+</div>
+</main>
+</div>
+</body>
+</html>

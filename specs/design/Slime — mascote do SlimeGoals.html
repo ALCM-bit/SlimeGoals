@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Slime — mascote do SlimeGoals</title>
+<style>
+:root{--bg:#0F0D15;--surface:#17141F;--surface2:#1F1B2B;--border:#2A2538;--text:#E8E4F0;--muted:#8C86A0;--primary:#9B7BEA;--soft:#B9A3F0;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font-family:Inter,"Segoe UI",system-ui,sans-serif;min-height:100vh;display:flex;justify-content:center;padding:28px 16px}
+.wrap{width:100%;max-width:520px;text-align:center}
+h1{font-size:22px;font-weight:600}
+.sub{color:var(--muted);font-size:14px;margin:4px 0 18px}
+.stage{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:18px 10px 8px}
+svg{width:100%;max-width:300px;height:auto;overflow:visible}
+.label{margin:6px 0 14px;font-size:14px;color:var(--soft);min-height:20px}
+.btns{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:16px}
+button{all:unset;cursor:pointer;padding:9px 16px;border-radius:10px;background:var(--surface2);color:var(--text);font-size:14px;border:1px solid var(--border);transition:.15s}
+button:hover{background:var(--border)}
+button.on{background:rgba(155,123,234,.18);border-color:var(--primary);color:var(--soft)}
+
+/* base */
+.hop,.body,.eyes,.eyes-closed{transform-box:fill-box}
+.body{transform-origin:50% 100%}
+.eyes{transform-origin:50% 50%}
+.m,.eyes-closed,.zzz,.excl,.confetti,.writing{display:none}
+
+/* idle */
+svg[data-s="idle"] .body{animation:squash 2.6s ease-in-out infinite}
+svg[data-s="idle"] .eyes{animation:blink 4s infinite}
+svg[data-s="idle"] .m-idle{display:inline}
+
+/* happy */
+svg[data-s="happy"] .hop{animation:hop .7s ease-out 3}
+svg[data-s="happy"] .body{animation:squash .7s ease-in-out 3}
+svg[data-s="happy"] .eyes{animation:blink 3s infinite}
+svg[data-s="happy"] .m-happy{display:inline}
+svg[data-s="happy"] .cheeks{opacity:.8}
+
+/* alert */
+svg[data-s="alert"] .hop{animation:shake .5s ease-in-out infinite}
+svg[data-s="alert"] .m-alert,svg[data-s="alert"] .excl{display:inline}
+svg[data-s="alert"] .eyes{transform:scale(1.15)}
+svg[data-s="alert"] .excl{animation:pulse .8s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}
+
+/* sleeping */
+svg[data-s="sleeping"] .body{animation:breathe 4s ease-in-out infinite}
+svg[data-s="sleeping"] .eyes{display:none}
+svg[data-s="sleeping"] .eyes-closed,svg[data-s="sleeping"] .m-sleep,svg[data-s="sleeping"] .zzz{display:inline}
+svg[data-s="sleeping"] .z1{animation:floatz 3s ease-out infinite}
+svg[data-s="sleeping"] .z2{animation:floatz 3s ease-out 1s infinite}
+
+/* celebrating */
+svg[data-s="celebrating"] .hop{animation:hop .6s ease-out infinite}
+svg[data-s="celebrating"] .body{animation:squash .6s ease-in-out infinite}
+svg[data-s="celebrating"] .m-happy,svg[data-s="celebrating"] .confetti{display:inline}
+svg[data-s="celebrating"] .cheeks{opacity:.8}
+svg[data-s="celebrating"] .c{animation:fall 1.6s linear infinite}
+svg[data-s="celebrating"] .c:nth-child(2n){animation-delay:.4s}
+svg[data-s="celebrating"] .c:nth-child(3n){animation-delay:.9s}
+
+/* writing */
+svg[data-s="writing"] .body{animation:squash 3s ease-in-out infinite}
+svg[data-s="writing"] .m-idle,svg[data-s="writing"] .writing{display:inline}
+svg[data-s="writing"] .eyes{transform:translate(0,-20px)}
+svg[data-s="writing"] .m-idle,svg[data-s="writing"] .cheeks{transform:translateY(-22px)}
+svg[data-s="writing"] .penmove{animation:drift 3.4s ease-in-out infinite}
+svg[data-s="writing"] .penscribble{transform-origin:64px 158px;animation:scribble .3s ease-in-out infinite alternate}
+svg[data-s="writing"] .motion{animation:motion .9s ease-in-out infinite alternate}
+
+@keyframes drift{0%{transform:translate(-3px,0)}68%{transform:translate(7px,1px)}74%{transform:translate(8px,-4px)}90%{transform:translate(-3px,-4px)}100%{transform:translate(-3px,0)}}
+@keyframes scribble{from{transform:rotate(-3.5deg) translateY(0)}to{transform:rotate(3.5deg) translateY(1.5px)}}
+@keyframes motion{from{opacity:.15}to{opacity:.9}}
+@keyframes squash{0%,100%{transform:scale(1,1)}50%{transform:scale(1.07,.92)}}
+@keyframes breathe{0%,100%{transform:scale(1,1)}50%{transform:scale(1.03,.96)}}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}96%{transform:scaleY(.08)}}
+@keyframes hop{0%,100%{transform:translateY(0)}45%{transform:translateY(-30px)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.25)}}
+@keyframes floatz{0%{opacity:0;transform:translate(0,0)}30%{opacity:1}100%{opacity:0;transform:translate(14px,-26px)}}
+@keyframes fall{0%{transform:translateY(-10px);opacity:0}15%{opacity:1}100%{transform:translateY(110px);opacity:0}}
+@media (prefers-reduced-motion:reduce){svg *{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Slime</h1>
+  <p class="sub">Mascote do SlimeGoals · escolha um estado</p>
+  <div class="stage">
+    <svg id="slime" data-s="writing" viewBox="0 0 200 200" role="img" aria-label="Slime roxo animado">
+      <defs>
+        <radialGradient id="g" cx="40%" cy="30%" r="80%">
+          <stop offset="0%" stop-color="#B9A3F0"/>
+          <stop offset="55%" stop-color="#9B7BEA"/>
+          <stop offset="100%" stop-color="#6F56C4"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="100" cy="177" rx="66" ry="9" fill="#000" opacity=".35"/>
+      <g class="confetti">
+        <circle class="c" cx="40" cy="30" r="4" fill="#7FD1AE"/>
+        <circle class="c" cx="70" cy="20" r="3.5" fill="#E8B86D"/>
+        <circle class="c" cx="105" cy="26" r="4" fill="#B9A3F0"/>
+        <circle class="c" cx="140" cy="18" r="3.5" fill="#7FD1AE"/>
+        <circle class="c" cx="165" cy="32" r="4" fill="#E8B86D"/>
+        <circle class="c" cx="55" cy="44" r="3" fill="#B9A3F0"/>
+      </g>
+      <g class="hop">
+        <g class="body">
+          <path d="M20 146 C20 98 56 66 100 66 C144 66 180 98 180 146 C180 165 158 174 100 174 C42 174 20 165 20 146 Z" fill="url(#g)"/>
+          <ellipse cx="64" cy="94" rx="17" ry="9" transform="rotate(-28 64 94)" fill="#fff" opacity=".4"/>
+          <circle cx="86" cy="80" r="3.5" fill="#fff" opacity=".35"/>
+          <ellipse class="cheeks" cx="50" cy="143" rx="9" ry="5" fill="#E58FB5" opacity=".5"/>
+          <ellipse class="cheeks" cx="150" cy="143" rx="9" ry="5" fill="#E58FB5" opacity=".5"/>
+          <g class="eyes">
+            <ellipse cx="68" cy="128" rx="7.5" ry="9" fill="#1A1226"/>
+            <ellipse cx="132" cy="128" rx="7.5" ry="9" fill="#1A1226"/>
+            <circle cx="70.5" cy="124.5" r="2.8" fill="#fff"/>
+            <circle cx="134.5" cy="124.5" r="2.8" fill="#fff"/>
+          </g>
+          <g class="eyes-closed" fill="none" stroke="#1A1226" stroke-width="3.5" stroke-linecap="round">
+            <path d="M59 130 Q68 138 77 130"/>
+            <path d="M123 130 Q132 138 141 130"/>
+          </g>
+          <path class="m m-idle" d="M87 143 Q93.5 151 100 143 Q106.5 151 113 143" fill="none" stroke="#1A1226" stroke-width="3.5" stroke-linecap="round"/>
+          <path class="m m-happy" d="M87 139 Q100 162 113 139 Z" fill="#1A1226"/>
+          <ellipse class="m m-alert" cx="100" cy="147" rx="5" ry="6.5" fill="#1A1226"/>
+          <path class="m m-sleep" d="M94 147 Q100 150 106 147" fill="none" stroke="#1A1226" stroke-width="3" stroke-linecap="round"/>
+        </g>
+      </g>
+      <g class="writing">
+        <g class="motion" fill="none" stroke="#B9A3F0" stroke-width="3" stroke-linecap="round">
+          <path d="M14 98 Q7 112 14 126"/>
+          <path d="M5 94 Q-3 112 5 130"/>
+        </g>
+        <g class="penmove"><g class="penscribble"><g transform="translate(64 158) rotate(-14)">
+          <rect x="-4" y="-40" width="8" height="34" fill="#E8B86D"/>
+          <rect x="-4" y="-44" width="8" height="5" fill="#C9C3D6"/>
+          <rect x="-4" y="-51" width="8" height="8" rx="3" fill="#E58FB5"/>
+          <polygon points="-4,-6 4,-6 0,4" fill="#F0D2A0"/>
+          <polygon points="-1.3,0 1.3,0 0,4" fill="#1A1226"/>
+          <ellipse cx="0" cy="-16" rx="7.5" ry="6.5" fill="#8A68DB"/>
+        </g></g></g>
+        <g stroke-linejoin="round" stroke-width="1.5">
+          <path d="M56 142 Q78 141 99 148 L99 190 Q78 185 56 184 Z" fill="#7A5CD6" stroke="#5A45A8"/>
+          <path d="M144 142 Q122 141 101 148 L101 190 Q122 185 144 184 Z" fill="#8F70E6" stroke="#5A45A8"/>
+        </g>
+        <path d="M58 141.5 Q79 140.5 99 147.5 L99 150 Q79 144 58 145 Z" fill="#F4F1FA"/>
+        <path d="M142 141.5 Q121 140.5 101 147.5 L101 150 Q121 144 142 145 Z" fill="#F4F1FA"/>
+        <rect x="98.5" y="147" width="3" height="44" fill="#4B3A8F"/>
+        <ellipse cx="147" cy="161" rx="7.5" ry="10" fill="#8A68DB"/>
+      </g>
+      <g class="excl"><text x="152" y="66" font-size="40" font-weight="700" fill="#E8B86D" text-anchor="middle">!</text></g>
+      <g class="zzz" fill="#B9A3F0" font-weight="700">
+        <text class="z1" x="142" y="80" font-size="22">z</text>
+        <text class="z2" x="158" y="62" font-size="16">z</text>
+      </g>
+    </svg>
+    <p class="label" id="label">Anotando: criando ou editando uma meta</p>
+  </div>
+  <div class="btns" id="btns">
+    <button data-s="idle">Parado</button>
+    <button data-s="happy">Feliz</button>
+    <button data-s="alert">Lembrete</button>
+    <button data-s="sleeping">Dormindo</button>
+    <button data-s="celebrating">Comemorando</button>
+    <button class="on" data-s="writing">Anotando</button>
+  </div>
+</div>
+<script>
+var labels={
+  idle:"Parado: respira e pisca de vez em quando",
+  happy:"Feliz: meta marcada como feita",
+  alert:"Lembrete: balança e mostra um aviso",
+  sleeping:"Dormindo: fora do horário ativo ou lembretes pausados",
+  celebrating:"Comemorando: meta semanal concluída",
+  writing:"Anotando: criando ou editando uma meta"
+};
+var svg=document.getElementById('slime'),label=document.getElementById('label'),timer=null;
+function setState(s){
+  svg.setAttribute('data-s',s);
+  label.textContent=labels[s];
+  document.querySelectorAll('#btns button').forEach(function(b){b.classList.toggle('on',b.dataset.s===s)});
+  clearTimeout(timer);
+  if(s==='happy'){timer=setTimeout(function(){setState('idle')},2300)}
+}
+document.querySelectorAll('#btns button').forEach(function(b){
+  b.addEventListener('click',function(){setState(b.dataset.s)});
+});
+</script>
+</body>
+</html>

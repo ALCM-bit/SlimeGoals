@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SlimeGoals — Semana (v3, mobile)</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ph{width:390px;height:844px;box-sizing:border-box;background:#0F0D15;color:#E8E4F0;font-family:Figtree,system-ui,sans-serif;font-size:15px;line-height:1.4;display:flex;flex-direction:column;overflow:hidden}
+.sc{flex:1;padding:24px 20px 0;display:flex;flex-direction:column;gap:20px;overflow:hidden}
+.m{color:#A39DB8;font-size:13px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:#1F1B2B;border-radius:16px;padding:4px}
+.seg button{all:unset;box-sizing:border-box;min-height:40px;display:grid;place-items:center;border-radius:12px;font-weight:700;color:#A39DB8;cursor:pointer}
+.seg button[aria-pressed="true"]{background:#3A2F63;color:#fff}
+.seg button:focus-visible,.nv a:focus-visible{outline:2px solid #B9A3F0;outline-offset:2px}
+.card{background:#17141F;border-radius:24px;padding:20px}
+.bars{display:flex;justify-content:space-between;align-items:flex-end;height:150px;margin-top:14px}
+.bars div{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;height:100%;font-size:12px;font-weight:600;color:#A39DB8;position:relative}
+.bars i{width:30px;border-radius:12px;background:#3A3350}
+.bars .hi{color:#fff}.bars .hi i{background:#9B7BEA}
+.tip{position:absolute;top:-8px;padding:3px 10px;border-radius:10px;background:#9B7BEA;color:#14101D;font-size:12px;font-weight:800;white-space:nowrap}
+.a{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;padding:8px 0}
+.a .t{width:44px;height:44px;border-radius:15px;display:grid;place-items:center}
+.nv{margin:0 16px 16px;border-radius:28px;background:#1F1B2B;display:grid;grid-template-columns:repeat(4,1fr);padding:6px}
+.nv a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:56px;border-radius:22px;color:#A39DB8;text-decoration:none;font-size:12px;font-weight:600}
+.nv a[aria-current]{background:#3A2F63;color:#fff}
+</style>
+
+<style>:root{color-scheme:dark}body{background:#07050b;display:flex;justify-content:center}</style>
+</head>
+<body>
+<div class="ph">
+<div class="sc">
+<header><h1 style="margin:0;font-size:26px;font-weight:800">Sua semana</h1><div class="m">26 out a 1 nov · você está 8% acima da semana passada</div></header>
+<div class="seg" role="group" aria-label="Período"><button type="button" aria-pressed="true">Semana</button><button type="button" aria-pressed="false">Mês</button></div>
+<section class="card" aria-label="Check-ins por dia">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><div><div class="m">Check-ins feitos</div><div style="font-size:34px;font-weight:800;line-height:1.1">16<span style="font-size:18px;color:#A39DB8;font-weight:600"> de 21</span></div></div><span style="padding:4px 12px;border-radius:99px;background:#1E3B33;color:#7FD1AE;font-weight:700;font-size:13px">76%</span></div>
+<div class="bars">
+<div><i style="height:55px"></i>Seg</div><div><i style="height:80px"></i>Ter</div><div class="hi"><span class="tip">5 check-ins</span><i style="height:110px"></i>Qua</div><div><i style="height:65px"></i>Qui</div><div><i style="height:75px"></i>Sex</div><div><i style="height:25px"></i>Sáb</div><div><i style="height:15px"></i>Dom</div>
+</div>
+</section>
+<section style="display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="margin:0;font-size:18px;font-weight:800">Atividade recente</h2><span class="m">Ver tudo</span></div>
+<div class="a"><div class="t" style="background:#2A2145;color:#B9A3F0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h6a2 2 0 012 2v12a2 2 0 00-2-2H4zM20 5h-6a2 2 0 00-2 2v12a2 2 0 012-2h6z"/></svg></div><div><div style="font-weight:700">Estudar inglês</div><div class="m">Hoje, 09:12</div></div><b style="color:#7FD1AE">+1</b></div>
+<div class="a"><div class="t" style="background:#3A2133;color:#F0A3C4"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M3 9v6M7 6v12M17 6v12M21 9v6M7 12h10"/></svg></div><div><div style="font-weight:700">Treino</div><div class="m">Ontem, 18:40</div></div><b style="color:#7FD1AE">+1</b></div>
+<div class="a"><div class="t" style="background:#382E1A;color:#E8B86D"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg></div><div><div style="font-weight:700">Leitura (30 min)</div><div class="m">Ontem, 21:05</div></div><b style="color:#7FD1AE">+1</b></div>
+</section>
+</div>
+<nav class="nv" aria-label="Principal">
+<a href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Hoje</a>
+<a href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Metas</a>
+<a href="#" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Semana</a>
+<a href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3"/></svg>Ajustes</a>
+</nav>
+</div>
+</body>
+</html>

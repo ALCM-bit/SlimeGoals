@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Metas — Design inicial</title>
+<style>
+:root{
+  --bg:#0F0D15; --surface:#17141F; --surface2:#1F1B2B; --border:#2A2538;
+  --text:#E8E4F0; --muted:#8C86A0; --primary:#9B7BEA; --primary-soft:#B9A3F0;
+  --success:#7FD1AE; --warning:#E8B86D; --radius:14px;
+  color-scheme:dark;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font-family:Inter,"Segoe UI",system-ui,sans-serif;font-size:15px;line-height:1.45;min-height:100vh}
+.app{display:grid;grid-template-columns:220px 1fr;max-width:1100px;margin:24px auto;min-height:620px;background:var(--surface);border:1px solid var(--border);border-radius:18px;overflow:hidden}
+nav{padding:22px 14px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:6px;background:#13101a}
+.brand{font-weight:600;padding:4px 12px 18px;display:flex;gap:10px;align-items:center}
+.dot{width:26px;height:26px;border-radius:9px;background:linear-gradient(135deg,var(--primary),#6f56c4)}
+nav button{all:unset;cursor:pointer;padding:10px 12px;border-radius:10px;color:var(--muted);display:flex;gap:10px;align-items:center;transition:.15s}
+nav button:hover{background:var(--surface2);color:var(--text)}
+nav button.on{background:rgba(155,123,234,.14);color:var(--primary-soft)}
+nav .sp{flex:1}
+main{padding:28px 32px;background:var(--bg)}
+header h1{font-size:24px;font-weight:600}
+header p{color:var(--muted);margin-top:2px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:22px 0}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
+.stat b{display:block;font-size:28px;font-weight:600;color:var(--primary-soft)}
+.stat span{color:var(--muted);font-size:13px}
+h2{font-size:15px;font-weight:600;margin:6px 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.goals{display:flex;flex-direction:column;gap:12px}
+.goal{display:grid;grid-template-columns:1fr auto;gap:10px 16px;align-items:center}
+.goal h3{font-size:16px;font-weight:500}
+.goal small{color:var(--muted)}
+.bar{grid-column:1/-1;height:8px;border-radius:99px;background:var(--surface2);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px;background:var(--primary)}
+.goal.done .bar i{background:var(--success)}
+.btn{all:unset;cursor:pointer;padding:8px 16px;border-radius:10px;background:var(--primary);color:#14101d;font-weight:600;font-size:14px;transition:.15s}
+.btn:hover{background:var(--primary-soft)}
+.btn.ghost{background:var(--surface2);color:var(--text);font-weight:500}
+.btn.ghost:hover{background:var(--border)}
+.btn.ok{background:rgba(127,209,174,.14);color:var(--success);cursor:default}
+.pop{position:fixed;right:max(20px,env(safe-area-inset-right,0px));bottom:max(20px,env(safe-area-inset-bottom,0px));width:300px;max-width:calc(100% - 40px);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.pop p{color:var(--muted);font-size:13px;margin-bottom:2px}
+.pop h4{font-size:15px;font-weight:600;margin-bottom:12px}
+.pop .row{display:flex;gap:8px}
+.chart{display:flex;align-items:flex-end;gap:10px;height:110px;margin-top:8px}
+.chart div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;height:100%;font-size:12px;color:var(--muted)}
+.chart i{width:100%;border-radius:8px 8px 4px 4px;background:rgba(155,123,234,.35)}
+.chart .hi i{background:var(--primary)}
+.view{display:none}.view.on{display:block}
+@media(max-width:720px){.app{grid-template-columns:1fr;margin:0;border-radius:0;border:0}nav{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--border);padding:10px}.brand,.sp{display:none}.stats{grid-template-columns:1fr}main{padding:20px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav>
+    <div class="brand"><span class="dot"></span>Metas</div>
+    <button class="on" data-v="hoje">◉ Hoje</button>
+    <button data-v="metas">☰ Metas</button>
+    <button data-v="rel">▥ Relatórios</button>
+    <span class="sp"></span>
+    <button data-v="cfg">⚙ Configurações</button>
+  </nav>
+  <main>
+    <section class="view on" id="hoje">
+      <header><h1>Hoje</h1><p>Semana de 28 set a 4 out · você está no caminho certo</p></header>
+      <div class="stats">
+        <div class="card stat"><b>68%</b><span>Progresso da semana</span></div>
+        <div class="card stat"><b>5 dias</b><span>Sequência atual</span></div>
+        <div class="card stat"><b>1 / 4</b><span>Metas concluídas</span></div>
+      </div>
+      <h2>Metas da semana</h2>
+      <div class="goals">
+        <div class="card goal"><div><h3>Estudar inglês</h3><small>3 de 5 vezes · lembrete a cada 2 h</small></div><button class="btn">Feito</button><div class="bar"><i style="width:60%"></i></div></div>
+        <div class="card goal"><div><h3>Treino</h3><small>2 de 4 vezes · lembrete a cada 3 h</small></div><button class="btn">Feito</button><div class="bar"><i style="width:50%"></i></div></div>
+        <div class="card goal"><div><h3>Leitura (30 min)</h3><small>4 de 5 vezes · lembrete a cada 4 h</small></div><button class="btn">Feito</button><div class="bar"><i style="width:80%"></i></div></div>
+        <div class="card goal done"><div><h3>Beber água</h3><small>7 de 7 · meta cumprida</small></div><span class="btn ok">Concluída</span><div class="bar"><i style="width:100%"></i></div></div>
+      </div>
+    </section>
+
+    <section class="view" id="metas">
+      <header><h1>Metas</h1><p>Crie, edite e arquive suas metas</p></header>
+      <div class="card" style="margin-top:22px;display:grid;gap:14px;max-width:460px">
+        <div><small style="color:var(--muted)">Título</small><div class="card" style="padding:10px 14px;background:var(--surface2);margin-top:4px">Estudar inglês</div></div>
+        <div><small style="color:var(--muted)">Vezes por semana</small><div class="card" style="padding:10px 14px;background:var(--surface2);margin-top:4px">5</div></div>
+        <div><small style="color:var(--muted)">Lembrar a cada</small><div class="card" style="padding:10px 14px;background:var(--surface2);margin-top:4px">2 horas · 09:00 às 18:00 · seg a sex</div></div>
+        <div style="display:flex;gap:8px"><button class="btn">Salvar</button><button class="btn ghost">Cancelar</button></div>
+      </div>
+    </section>
+
+    <section class="view" id="rel">
+      <header><h1>Relatórios</h1><p>Semanal · 28 set a 4 out</p></header>
+      <div class="card" style="margin-top:22px">
+        <h2>Check-ins por dia</h2>
+        <div class="chart">
+          <div><i style="height:55%"></i>Seg</div><div><i style="height:80%"></i>Ter</div><div class="hi"><i style="height:100%"></i>Qua</div><div><i style="height:65%"></i>Qui</div><div><i style="height:75%"></i>Sex</div><div><i style="height:25%"></i>Sáb</div><div><i style="height:15%"></i>Dom</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="cfg">
+      <header><h1>Configurações</h1><p>Preferências do aplicativo</p></header>
+      <div class="card" style="margin-top:22px;max-width:460px;display:grid;gap:12px">
+        <div style="display:flex;justify-content:space-between"><span>Iniciar com o sistema</span><span style="color:var(--primary-soft)">Ativado</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Adiar lembrete por</span><span style="color:var(--muted)">10 min</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Início da semana</span><span style="color:var(--muted)">Segunda</span></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="pop" role="dialog" aria-label="Lembrete">
+  <p>Lembrete · agora</p>
+  <h4>Hora de estudar inglês</h4>
+  <div class="row"><button class="btn">Feito</button><button class="btn ghost">Adiar</button><button class="btn ghost">Ignorar</button></div>
+</div>
+
+<script>
+document.querySelectorAll('nav button').forEach(function(b){
+  b.addEventListener('click',function(){
+    document.querySelectorAll('nav button').forEach(function(x){x.classList.remove('on')});
+    document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on')});
+    b.classList.add('on');
+    document.getElementById(b.dataset.v).classList.add('on');
+  });
+});
+</script>
+</body>
+</html>
