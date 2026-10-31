@@ -1,10 +1,13 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/SlimeGoals.App/SlimeGoals.App.csproj" />
     <Project Path="src/SlimeGoals.Core/SlimeGoals.Core.csproj" />
+    <Project Path="src/SlimeGoals.Desktop/SlimeGoals.Desktop.csproj" />
     <Project Path="src/SlimeGoals.Infrastructure/SlimeGoals.Infrastructure.csproj" />
     <Project Path="src/SlimeGoals.Platform.Linux/SlimeGoals.Platform.Linux.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/SlimeGoals.App.Tests/SlimeGoals.App.Tests.csproj" />
     <Project Path="tests/SlimeGoals.Core.Tests/SlimeGoals.Core.Tests.csproj" />
     <Project Path="tests/SlimeGoals.Infrastructure.Tests/SlimeGoals.Infrastructure.Tests.csproj" />
   </Folder>

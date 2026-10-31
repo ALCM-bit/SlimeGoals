@@ -1,0 +1,70 @@
+<!--
+  Tokens do design system (spec §11). Use sempre via DynamicResource.
+  Nomes em PascalCase espelham os tokens da spec (bg → Bg, surface-2 → Surface2...).
+  Para cada cor há a Color (sufixo Color) e o Brush (sem sufixo).
+-->
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Cores base -->
+  <Color x:Key="BgColor">#0F0D15</Color>
+  <Color x:Key="BgDeepColor">#0C0A11</Color>
+  <Color x:Key="PanelColor">#15121C</Color>
+  <Color x:Key="SurfaceColor">#17141F</Color>
+  <Color x:Key="TileColor">#1A1722</Color>
+  <Color x:Key="Surface2Color">#1F1B2B</Color>
+  <Color x:Key="BorderColor">#2A2538</Color>
+  <Color x:Key="TextColor">#E8E4F0</Color>
+  <Color x:Key="MutedColor">#A39DB8</Color>
+  <Color x:Key="PrimaryColor">#9B7BEA</Color>
+  <Color x:Key="PrimarySoftColor">#B9A3F0</Color>
+  <Color x:Key="PrimaryTintColor">#D6C8FA</Color>
+  <Color x:Key="SelectedColor">#2A2145</Color>
+  <Color x:Key="SelectedStrongColor">#3A2F63</Color>
+  <Color x:Key="BarIdleColor">#3A3350</Color>
+  <Color x:Key="OnPrimaryColor">#14101D</Color>
+  <Color x:Key="SuccessColor">#7FD1AE</Color>
+  <Color x:Key="WarningColor">#E8B86D</Color>
+
+  <SolidColorBrush x:Key="Bg" Color="{StaticResource BgColor}" />
+  <SolidColorBrush x:Key="BgDeep" Color="{StaticResource BgDeepColor}" />
+  <SolidColorBrush x:Key="Panel" Color="{StaticResource PanelColor}" />
+  <SolidColorBrush x:Key="Surface" Color="{StaticResource SurfaceColor}" />
+  <SolidColorBrush x:Key="Tile" Color="{StaticResource TileColor}" />
+  <SolidColorBrush x:Key="Surface2" Color="{StaticResource Surface2Color}" />
+  <SolidColorBrush x:Key="Border" Color="{StaticResource BorderColor}" />
+  <SolidColorBrush x:Key="Text" Color="{StaticResource TextColor}" />
+  <SolidColorBrush x:Key="Muted" Color="{StaticResource MutedColor}" />
+  <SolidColorBrush x:Key="Primary" Color="{StaticResource PrimaryColor}" />
+  <SolidColorBrush x:Key="PrimarySoft" Color="{StaticResource PrimarySoftColor}" />
+  <SolidColorBrush x:Key="PrimaryTint" Color="{StaticResource PrimaryTintColor}" />
+  <SolidColorBrush x:Key="Selected" Color="{StaticResource SelectedColor}" />
+  <SolidColorBrush x:Key="SelectedStrong" Color="{StaticResource SelectedStrongColor}" />
+  <SolidColorBrush x:Key="BarIdle" Color="{StaticResource BarIdleColor}" />
+  <SolidColorBrush x:Key="OnPrimary" Color="{StaticResource OnPrimaryColor}" />
+  <SolidColorBrush x:Key="Success" Color="{StaticResource SuccessColor}" />
+  <SolidColorBrush x:Key="Warning" Color="{StaticResource WarningColor}" />
+
+  <!-- Cartão de destaque (hero): gradiente 145° -->
+  <LinearGradientBrush x:Key="HeroBrush" StartPoint="0%,0%" EndPoint="100%,100%">
+    <GradientStop Offset="0" Color="#7656D0" />
+    <GradientStop Offset="1" Color="#43347F" />
+  </LinearGradientBrush>
+
+  <!-- Paleta de metas (campo goals.color): fundo suave + ícone -->
+  <SolidColorBrush x:Key="GoalPurpleBg" Color="#2A2145" />
+  <SolidColorBrush x:Key="GoalPurpleFg" Color="#B9A3F0" />
+  <SolidColorBrush x:Key="GoalPinkBg" Color="#3A2133" />
+  <SolidColorBrush x:Key="GoalPinkFg" Color="#F0A3C4" />
+  <SolidColorBrush x:Key="GoalAmberBg" Color="#382E1A" />
+  <SolidColorBrush x:Key="GoalAmberFg" Color="#E8B86D" />
+  <SolidColorBrush x:Key="GoalGreenBg" Color="#1E3B33" />
+  <SolidColorBrush x:Key="GoalGreenFg" Color="#7FD1AE" />
+
+  <!-- Forma -->
+  <CornerRadius x:Key="RadiusControl">14</CornerRadius>
+  <CornerRadius x:Key="RadiusCard">22</CornerRadius>
+
+  <!-- Tipografia: Figtree embutida (OFL) -->
+  <FontFamily x:Key="FigtreeFont">avares://SlimeGoals.App/Assets/Fonts#Figtree</FontFamily>
+</ResourceDictionary>
