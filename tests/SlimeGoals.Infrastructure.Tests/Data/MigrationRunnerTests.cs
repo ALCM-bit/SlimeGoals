@@ -58,3 +58,46 @@ public class MigrationRunnerTests
         act.Should().Throw<SqliteException>().Where(e => e.Message.Contains("FOREIGN KEY"));
     }
 }
+
+public class MigrationRunnerConcurrencyTests
+{
+    // Revisão final #5a: dois processos abrindo um banco novo ao mesmo tempo.
+    [Fact]
+    public async Task Concurrent_first_run_migrates_once_without_errors()
+    {
+        for (var round = 0; round < 10; round++)
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"slimegoals-race-{Guid.NewGuid():N}.db");
+            try
+            {
+                var factory = new SqliteConnectionFactory($"Data Source={path}");
+                using var gate = new Barrier(4);
+                var runs = Enumerable.Range(0, 4).Select(_ => Task.Run(() =>
+                {
+                    using var c = factory.Open();
+                    gate.SignalAndWait();
+                    return MigrationRunner.Migrate(c);
+                }));
+
+                (await Task.WhenAll(runs)).Should().AllBeEquivalentTo(1);
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                File.Delete(path);
+            }
+        }
+    }
+
+    // Revisão final #5b: banco criado por uma versão mais nova do app.
+    [Fact]
+    public void Database_newer_than_app_is_rejected()
+    {
+        using var db = new TestDatabase(migrate: false);
+        db.Anchor.Execute("PRAGMA user_version = 99");
+
+        var act = () => MigrationRunner.Migrate(db.Anchor);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*99*");
+    }
+}

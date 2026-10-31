@@ -16,26 +16,41 @@ public static partial class MigrationRunner
 
     public static int Migrate(SqliteConnection connection)
     {
-        var version = ReadVersion(connection);
+        var scripts = Scripts().ToList();
+        var latest = scripts.Count == 0 ? 0 : scripts[^1].Number;
+        EnsureNotNewer(ReadVersion(connection, tx: null), latest);
 
-        foreach (var (number, resource) in Scripts().Where(s => s.Number > version))
+        foreach (var (number, resource) in scripts)
         {
-            using var tx = connection.BeginTransaction();
+            // IMMEDIATE trava o banco para escrita já no BEGIN: se outro processo migrou primeiro,
+            // a versão relida aqui dentro já reflete isso e o script é pulado.
+            using var tx = connection.BeginTransaction(deferred: false);
+            if (ReadVersion(connection, tx) >= number)
+                continue;
+
             using var cmd = connection.CreateCommand();
             cmd.Transaction = tx;
             // PRAGMA não aceita parâmetros; o número vem do nome do recurso, não do usuário.
             cmd.CommandText = ReadResource(resource) + $"\nPRAGMA user_version = {number.ToString(CultureInfo.InvariantCulture)};";
             cmd.ExecuteNonQuery();
             tx.Commit();
-            version = number;
         }
 
-        return version;
+        return ReadVersion(connection, tx: null);
     }
 
-    private static int ReadVersion(SqliteConnection connection)
+    /// <summary>Banco criado por uma versão mais nova do app: abrir com o esquema antigo arriscaria corromper dados.</summary>
+    private static void EnsureNotNewer(int version, int latest)
+    {
+        if (version > latest)
+            throw new InvalidOperationException(
+                $"O banco está na versão {version}, mais nova que a suportada por este app ({latest}). Atualize o SlimeGoals.");
+    }
+
+    private static int ReadVersion(SqliteConnection connection, SqliteTransaction? tx)
     {
         using var cmd = connection.CreateCommand();
+        cmd.Transaction = tx;
         cmd.CommandText = "PRAGMA user_version;";
         return Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
     }

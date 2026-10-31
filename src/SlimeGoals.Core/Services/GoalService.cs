@@ -12,6 +12,7 @@ public sealed class GoalService(IGoalRepository goals, TimeProvider time)
 {
     public async Task<Goal> CreateAsync(GoalDraft draft, CancellationToken ct = default)
     {
+        draft = Normalize(draft);
         EnsureValid(draft);
         var now = time.GetUtcNow();
         var goal = Apply(new Goal
@@ -37,6 +38,7 @@ public sealed class GoalService(IGoalRepository goals, TimeProvider time)
 
     public async Task<Goal> UpdateAsync(Guid id, GoalDraft draft, CancellationToken ct = default)
     {
+        draft = Normalize(draft);
         EnsureValid(draft);
         var current = await GetExistingAsync(id, ct);
         var updated = Apply(current, draft) with { UpdatedAt = time.GetUtcNow() };
@@ -65,6 +67,13 @@ public sealed class GoalService(IGoalRepository goals, TimeProvider time)
 
     public Task<IReadOnlyList<Goal>> ListAsync(bool includeArchived = false, CancellationToken ct = default) =>
         goals.ListAsync(includeArchived, ct);
+
+    /// <summary>O banco guarda horários como HH:mm: descarta segundos antes de validar e salvar.</summary>
+    private static GoalDraft Normalize(GoalDraft draft) => draft with
+    {
+        ActiveFrom = new TimeOnly(draft.ActiveFrom.Hour, draft.ActiveFrom.Minute),
+        ActiveUntil = new TimeOnly(draft.ActiveUntil.Hour, draft.ActiveUntil.Minute),
+    };
 
     private static void EnsureValid(GoalDraft draft)
     {

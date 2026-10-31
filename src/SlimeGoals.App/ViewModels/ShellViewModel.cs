@@ -19,8 +19,25 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public IReadOnlyList<PageViewModel> Pages { get; }
 
-    [ObservableProperty]
     private PageViewModel _currentPage;
+
+    /// <summary>
+    /// Página atual. Ignora null: o ListBox pode desmarcar o item (Ctrl+clique) e o binding
+    /// TwoWay tentaria apagar a página. Notifica mesmo assim para a View voltar à seleção válida.
+    /// </summary>
+    public PageViewModel CurrentPage
+    {
+        get => _currentPage;
+        set
+        {
+            if (value is null)
+            {
+                OnPropertyChanged();
+                return;
+            }
+            SetProperty(ref _currentPage, value);
+        }
+    }
 
     [RelayCommand]
     private void Navigate(PageViewModel page) => CurrentPage = page;

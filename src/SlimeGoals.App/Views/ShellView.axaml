@@ -9,7 +9,7 @@
       <DockPanel>
         <TextBlock DockPanel.Dock="Top" Text="SlimeGoals" FontSize="17" FontWeight="ExtraBold"
                    Margin="12,0,0,18" />
-        <ListBox Classes="nav" ItemsSource="{Binding Pages}"
+        <ListBox Classes="nav" ItemsSource="{Binding Pages}" SelectionMode="Single,AlwaysSelected"
                  SelectedItem="{Binding CurrentPage, Mode=TwoWay}"
                  AutomationProperties.Name="Navegação principal">
           <ListBox.ItemTemplate>

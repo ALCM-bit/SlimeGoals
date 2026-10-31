@@ -45,3 +45,26 @@ public class DateRangeUtcTests
         new DateRange(DateOnly.MinValue, DateOnly.MaxValue).ToUtc(Fixed(-3))
             .Should().Be((DateTimeOffset.MinValue, DateTimeOffset.MaxValue));
 }
+
+public class DateRangeUtcRealZoneTests
+{
+    // Revisão final #1: em America/Asuncion o horário de verão começou em 01/10/2023 à 00:00 (-04 → -03).
+    // O .NET diz que 00:00 é válido com offset -03, mas 03:00Z é 30/09 23:00 local.
+    // O primeiro instante do dia 01/10 é 01:00 (-03) = 04:00Z.
+    [Fact]
+    public void Asuncion_dst_start_maps_to_first_instant_of_the_local_day()
+    {
+        Assert.SkipUnless(TimeZoneInfo.TryFindSystemTimeZoneById("America/Asuncion", out var zone), "tzdata ausente");
+
+        var start = DateRange.LocalMidnightToUtc(new DateOnly(2023, 10, 1), zone!);
+
+        start.Should().Be(new DateTimeOffset(2023, 10, 1, 4, 0, 0, TimeSpan.Zero));
+        DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(start.AddTicks(-1), zone!).DateTime)
+            .Should().Be(new DateOnly(2023, 9, 30));
+    }
+
+    [Fact]
+    public void Sao_paulo_midnight_is_03z() =>
+        DateRange.LocalMidnightToUtc(new DateOnly(2026, 11, 2), TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"))
+            .Should().Be(new DateTimeOffset(2026, 11, 2, 3, 0, 0, TimeSpan.Zero));
+}

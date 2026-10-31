@@ -91,3 +91,22 @@ public class GoalServiceTests
         (await Service.GetAsync(active.Id)).Should().NotBeNull();
     }
 }
+
+public class GoalServiceTimeNormalizationTests
+{
+    private readonly GoalService _service = new(new InMemoryGoalRepository(), new FakeTimeProvider());
+
+    // Revisão final #3: o banco guarda HH:mm; segundos não podem sobreviver nem burlar "início < fim".
+    [Fact]
+    public async Task Seconds_are_truncated_before_validation_and_storage()
+    {
+        var sameMinute = () => _service.CreateAsync(GoalValidatorTests.Valid() with
+            { ActiveFrom = new TimeOnly(9, 0, 10), ActiveUntil = new TimeOnly(9, 0, 50) });
+        await sameMinute.Should().ThrowAsync<GoalValidationException>();
+
+        var goal = await _service.CreateAsync(GoalValidatorTests.Valid() with
+            { ActiveFrom = new TimeOnly(9, 0, 30), ActiveUntil = new TimeOnly(18, 0, 59) });
+        goal.ActiveFrom.Should().Be(new TimeOnly(9, 0));
+        goal.ActiveUntil.Should().Be(new TimeOnly(18, 0));
+    }
+}

@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Infrastructure.Data;
@@ -13,7 +14,9 @@ public static class InfrastructureServiceCollectionExtensions
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
 
-        services.AddSingleton(new SqliteConnectionFactory($"Data Source={databasePath}"));
+        // O builder escapa o caminho (ex.: diretórios com ';'), ao contrário de interpolar a string.
+        var connectionString = new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString();
+        services.AddSingleton(new SqliteConnectionFactory(connectionString));
         services.AddSingleton<IGoalRepository, GoalRepository>();
         return services;
     }

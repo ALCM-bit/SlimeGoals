@@ -25,3 +25,18 @@ public class ShellViewModelTests
         monitor.Should().RaisePropertyChangeFor(s => s.CurrentPage);
     }
 }
+
+public class ShellViewModelNullSelectionTests
+{
+    // Revisão final #2: Ctrl+clique no item ativo do ListBox desmarca e o binding TwoWay empurra null.
+    [Fact]
+    public void Setting_current_page_to_null_keeps_previous_page()
+    {
+        var shell = new ShellViewModel([new TodayPageViewModel(), new GoalsPageViewModel()]);
+        shell.CurrentPage = shell.Pages[1];
+
+        shell.CurrentPage = null!;
+
+        shell.CurrentPage.Should().BeSameAs(shell.Pages[1]);
+    }
+}
