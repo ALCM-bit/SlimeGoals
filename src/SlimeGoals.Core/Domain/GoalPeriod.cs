@@ -13,12 +13,12 @@ public static class GoalPeriod
         (goal.StartDate is not { } start || date >= start) &&
         (goal.EndDate is not { } end || date <= end);
 
-    /// <summary>Aparece na tela Hoje: diária só nos dias ativos; semanal e única em qualquer dia do período.</summary>
+    /// <summary>Aparece na tela Hoje: diária só nos dias ativos; semanal em qualquer dia do período.</summary>
     public static bool IsShownOn(Goal goal, DateOnly date) =>
         IsInPeriod(goal, date) &&
         (goal.Recurrence != Recurrence.Daily || goal.ActiveDays.Includes(date.DayOfWeek));
 
-    /// <summary>Gera lembretes na data: dentro do período e em dia ativo, para os três tipos.</summary>
+    /// <summary>Gera lembretes na data: dentro do período e em dia ativo, para os dois tipos.</summary>
     public static bool RemindsOn(Goal goal, DateOnly date) =>
         IsInPeriod(goal, date) && goal.ActiveDays.Includes(date.DayOfWeek);
 
@@ -33,7 +33,6 @@ public static class GoalPeriod
 
         return goal.Recurrence switch
         {
-            Recurrence.Once => new DateRange(periodStart, periodEnd),
             Recurrence.Daily => new DateRange(date, NextDay(date)),
             Recurrence.Weekly => Clip(new DateRange(WeekMath.StartOfWeek(date), WeekMath.StartOfWeek(date).AddDays(7)),
                                       periodStart, periodEnd),

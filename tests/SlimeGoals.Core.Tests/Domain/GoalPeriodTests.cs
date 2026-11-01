@@ -21,15 +21,6 @@ public class GoalPeriodTests
         GoalPeriod.EvaluationPeriod(G(Recurrence.Daily), D("2026-11-05"))
             .Should().Be(new DateRange(D("2026-11-05"), D("2026-11-06")));
 
-    [Fact]
-    public void Once_period_spans_start_to_end_inclusive() =>
-        GoalPeriod.EvaluationPeriod(G(Recurrence.Once, start: "2026-11-01", end: "2026-11-15"), D("2026-11-05"))
-            .Should().Be(new DateRange(D("2026-11-01"), D("2026-11-16")));
-
-    [Fact]
-    public void Once_without_dates_is_open() =>
-        GoalPeriod.EvaluationPeriod(G(Recurrence.Once), D("2026-11-05"))
-            .Should().Be(new DateRange(DateOnly.MinValue, DateOnly.MaxValue));
 
     [Theory]
     [InlineData("2026-11-03")]
@@ -54,7 +45,7 @@ public class GoalPeriodTests
         GoalPeriod.IsInPeriod(G(Recurrence.Daily, end: "2026-11-10"), D("2026-11-10")).Should().BeTrue();
 
     [Fact]
-    public void Once_ending_on_max_date_does_not_overflow() =>
-        GoalPeriod.EvaluationPeriod(G(Recurrence.Once, end: DateOnly.MaxValue.ToString("yyyy-MM-dd")), D("2026-11-05"))
-            .Should().Be(new DateRange(DateOnly.MinValue, DateOnly.MaxValue));
+    public void Weekly_ending_on_max_date_does_not_overflow() =>
+        GoalPeriod.EvaluationPeriod(G(Recurrence.Weekly, end: DateOnly.MaxValue.ToString("yyyy-MM-dd")), D("2026-11-05"))
+            .Should().Be(new DateRange(D("2026-11-02"), D("2026-11-09")));
 }

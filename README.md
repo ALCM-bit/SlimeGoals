@@ -1,7 +1,7 @@
 # SlimeGoals
 
 Gestor de metas pessoais com lembretes, para **Linux (GNOME)** e, em seguida, **Android**.
-Você cadastra tarefas únicas, hábitos diários ou metas semanais, recebe lembretes até cumpri-las,
+Você cadastra hábitos diários ou metas semanais, recebe lembretes até cumpri-las,
 registra o progresso com um check-in e acompanha relatórios semanais e mensais. Funciona offline,
 com os dados guardados localmente em SQLite.
 
@@ -12,7 +12,7 @@ com os dados guardados localmente em SQLite.
 
 ## Funcionalidades do MVP
 
-- **Três tipos de meta:** única (um check-in conclui), diária (alvo por dia nos dias escolhidos) e semanal (alvo por semana, de segunda a domingo)
+- **Dois tipos de meta:** diária (alvo por dia nos dias escolhidos) e semanal (alvo por semana, de segunda a domingo)
 - **Lembretes** dentro de uma janela de horário, com as ações **Feito**, **Adiar** e **Ignorar** direto na notificação do sistema
 - **Tela Hoje** com o progresso do período atual e check-in rápido
 - **Relatórios** semanais e mensais, com sequências em dias ou semanas

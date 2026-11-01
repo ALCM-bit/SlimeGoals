@@ -12,7 +12,7 @@ internal static class Goals
         Id = Guid.NewGuid(),
         Title = "Meta de teste",
         Recurrence = r,
-        Target = r == Recurrence.Once ? 1 : 3,
+        Target = 3,
         Icon = "book",
         Color = GoalColor.Purple,
         ReminderEveryMinutes = 120,

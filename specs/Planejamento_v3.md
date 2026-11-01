@@ -2,11 +2,11 @@
 
 > Versão 1.3 · Alvos iniciais: Linux (desktop) e Android · .NET 10 LTS · Dark mode roxo suave
 >
-> Substitui a v1.2 (`Planejamento_v2.md`, mantida como histórico). Mudanças principais: três tipos de recorrência (`once`, `daily`, `weekly`) unificados pelo conceito de **período de avaliação**; semana fixa de segunda a domingo; referência visual v4 (desktop) e v3 (mobile); ícone e cor por meta. Ver seção 15.
+> Substitui a v1.2 (`Planejamento_v2.md`, mantida como histórico). Mudanças principais: tipos de recorrência (`daily`, `weekly`; a tarefa única `once` foi removida em 01/11/2026) unificados pelo conceito de **período de avaliação**; semana fixa de segunda a domingo; referência visual v4 (desktop) e v3 (mobile); ícone e cor por meta. Ver seção 15.
 
 ## 1. Visão geral
 
-Aplicação multiplataforma para cadastrar metas (tarefas únicas, hábitos diários e metas semanais), receber lembretes periódicos até cumpri-las, registrar o progresso e gerar relatórios semanais e mensais sob demanda. Interface convencional com telas, tema escuro roxo/preto suave. O mascote (slime) fica como melhoria futura.
+Aplicação multiplataforma para cadastrar metas (hábitos diários e metas semanais), receber lembretes periódicos até cumpri-las, registrar o progresso e gerar relatórios semanais e mensais sob demanda. Interface convencional com telas, tema escuro roxo/preto suave. O mascote (slime) fica como melhoria futura.
 
 **Dentro do escopo do MVP:** Linux (desktop, primeiro) e Android (em seguida), dados locais, lembretes, relatórios.
 
@@ -16,16 +16,16 @@ Aplicação multiplataforma para cadastrar metas (tarefas únicas, hábitos diá
 
 | ID   | Requisito                                                                                                                                                                                                                       |
 |------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| RF01 | CRUD de metas: título, tipo de recorrência (`once`, `daily`, `weekly`), alvo do período, ícone e cor, intervalo de lembrete, horário e dias ativos, início e fim opcionais                                                       |
-| RF02 | Tela "Hoje": metas com progresso **no período atual de cada uma** (dia, semana ou tarefa única pendente) e botão de check-in rápido                                                                                              |
+| RF01 | CRUD de metas: título, tipo de recorrência (`daily`, `weekly`), alvo do período, ícone e cor, intervalo de lembrete, horário e dias ativos, início e fim opcionais                                                       |
+| RF02 | Tela "Hoje": metas com progresso **no período atual de cada uma** (dia ou semana) e botão de check-in rápido                                                                                              |
 | RF03 | Registrar check-in (quantidade e nota opcional) e desfazer o último                                                                                                                                                             |
 | RF04 | Lembretes periódicos por meta, respeitando horário e dias ativos; ações **Feito**, **Adiar**, **Ignorar**                                                                                                                       |
-| RF05 | Meta cumprida no período atual não gera mais lembretes até o próximo período (diária: dia seguinte ativo; semanal: próxima semana; única: nunca mais)                                                                            |
-| RF06 | Relatório semanal e mensal por solicitação (progresso por meta, % cumprido, sequências na unidade de cada tipo, tarefas únicas concluídas)                                                                                      |
+| RF05 | Meta cumprida no período atual não gera mais lembretes até o próximo período (diária: dia seguinte ativo; semanal: próxima semana)                                                                            |
+| RF06 | Relatório semanal e mensal por solicitação (progresso por meta, % cumprido, sequências na unidade de cada tipo)                                                                                      |
 | RF07 | Ícone na bandeja: abrir, pausar lembretes, sair                                                                                                                                                                                 |
 | RF08 | Configurações: iniciar com o sistema, duração padrão do "adiar", ao fechar a janela (ocultar em segundo plano, padrão, ou encerrar; só desktop)                                                                                 |
 | RF09 | Arquivar meta sem perder histórico                                                                                                                                                                                              |
-| RF10 | Período e recorrência: início e fim opcionais. Fora do período, a meta não aparece em "Hoje" nem gera lembretes; ao passar o fim, é arquivada automaticamente. Tarefa única é concluída e arquivada automaticamente no check-in |
+| RF10 | Período e recorrência: início e fim opcionais. Fora do período, a meta não aparece em "Hoje" nem gera lembretes; ao passar o fim, é arquivada automaticamente |
 | RF11 | No Android, lembretes agendados pelo sistema (`AlarmManager`), com as ações funcionando mesmo com o app fechado                                                                                                                 |
 
 ## 3. Requisitos não funcionais
@@ -111,7 +111,6 @@ public interface IReportService { Task<Report> BuildAsync(ReportPeriod period, D
 
 | Tipo               | Período de avaliação                                  | Alvo (`target`)           | Cumprida quando                 | Lembretes param quando                                    | Sequência                                                  |
 |--------------------|-------------------------------------------------------|---------------------------|---------------------------------|-----------------------------------------------------------|------------------------------------------------------------|
-| `once` (única)     | de `start_date` (ou criação) até `end_date` (ou aberto) | sempre 1 (campo oculto)   | 1 check-in                      | concluída (`completed_at` preenchido e meta arquivada)    | não tem; só "concluída" ou "pendente"                      |
 | `daily` (diária)   | o dia local                                           | check-ins por dia (≥ 1)   | soma do dia ≥ `target`          | alvo do dia atingido; voltam no próximo dia ativo         | dias ativos consecutivos cumpridos; dias inativos não quebram |
 | `weekly` (semanal) | a semana local, **segunda a domingo** (fixo)          | check-ins por semana (≥ 1) | soma da semana ≥ `target`       | alvo da semana atingido; voltam na próxima semana         | semanas consecutivas cumpridas                             |
 
@@ -120,7 +119,6 @@ Regras comuns:
 - `active_days` na meta diária define **quais dias contam** (dias inativos não aparecem em "Hoje", não geram lembretes e não entram no cálculo de sequência). Na semanal, define **em quais dias o app lembra**; check-ins em qualquer dia contam para a semana.
 - O período de avaliação é sempre recortado por `start_date`/`end_date`. Semanas e dias parciais **não** proporcionalizam o alvo.
 - O período atual (ou o dia de hoje) ainda em andamento não quebra a sequência; ela é avaliada até o último período fechado, somando o atual se já estiver cumprido.
-- Meta `once` concluída: o `CheckinService` preenche `completed_at` e `archived_at` na mesma transação. Desfazer o check-in reverte os dois.
 
 ## 6. Estrutura da solução
 
@@ -161,14 +159,14 @@ Ponto de partida: `dotnet new install Avalonia.Templates` e `dotnet new avalonia
 |-------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Hoje**          | Resumo da semana (% e check-ins), metas em andamento/concluídas, sequência; lista "Metas de hoje" com progresso no período atual e botão de check-in; próximos lembretes do dia |
 | **Metas**         | Lista (filtro ativas/arquivadas), criar, editar, arquivar, desarquivar. Meta arquivada é somente leitura (só desarquivar ou excluir)                            |
-| **Editar meta**   | Título, tipo (única/diária/semanal), alvo (oculto em única), ícone e cor, intervalo, horário ativo, dias da semana, início e fim opcionais. Abre como página no lugar da lista (desktop e celular); excluir com confirmação na própria página |
+| **Editar meta**   | Título, tipo (diária/semanal), alvo, ícone e cor, intervalo, horário ativo, dias da semana, início e fim opcionais. Abre como página no lugar da lista (desktop e celular); excluir com confirmação na própria página |
 | **Relatórios**    | Alternar semanal/mensal, navegar entre períodos, barras por dia/semana + tabela por meta                                                                       |
 | **Configurações** | Autostart, duração do "adiar", ao fechar a janela (desktop)                                                                                                     |
 | **Lembrete**      | Notificação nativa do SO com as três ações (janela própria do Avalonia só como fallback)                                                                       |
 
 Navegação: barra lateral à esquerda no desktop (v4) e navegação inferior no Android (v3) com **Hoje, Metas, Relatórios, Configurações** (o protótipo v3 usa "Semana" e "Ajustes"; o MVP padroniza os nomes acima). Os ViewModels são compartilhados; só o shell de navegação muda. O breakpoint de 720 px é o ponto de partida do layout adaptativo.
 
-Na tela Hoje, as metas aparecem assim: diária → "3 de 8 hoje"; semanal → "3 de 5 na semana"; única → "Pendente · até 15/11" (ou sem prazo).
+Na tela Hoje, as metas aparecem assim: diária → "3 de 8 hoje"; semanal → "3 de 5 na semana".
 
 ## 8. Modelo de dados (SQLite)
 
@@ -176,8 +174,8 @@ Na tela Hoje, as metas aparecem assim: diária → "3 de 8 hoje"; semanal → "3
 CREATE TABLE goals (
   id TEXT PRIMARY KEY,                -- GUID
   title TEXT NOT NULL,
-  recurrence TEXT NOT NULL,           -- 'once' | 'daily' | 'weekly'
-  target INTEGER NOT NULL DEFAULT 1,  -- alvo por período; sempre 1 em 'once'
+  recurrence TEXT NOT NULL,           -- 'daily' | 'weekly'
+  target INTEGER NOT NULL DEFAULT 1,  -- alvo por período
   icon TEXT NOT NULL,                 -- chave de um conjunto fixo de ícones do app
   color TEXT NOT NULL,                -- chave da paleta de metas (seção 11)
   reminder_every_min INTEGER NOT NULL,
@@ -188,13 +186,13 @@ CREATE TABLE goals (
   end_date TEXT,                      -- 'YYYY-MM-DD' (data local), opcional
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  completed_at TEXT,                  -- só 'once': instante da conclusão
   archived_at TEXT,
   deleted_at TEXT,                    -- exclusão lógica
-  CHECK (recurrence IN ('once','daily','weekly')),
-  CHECK (target >= 1),
-  CHECK (recurrence <> 'once' OR target = 1)
+  CHECK (recurrence IN ('daily','weekly')),
+  CHECK (target >= 1)
 );
+-- Esquema atual (001_init + 002_remove_once). A 002 recriou goals sem 'once' e sem completed_at,
+-- excluindo as tarefas únicas existentes com seus check-ins e lembretes.
 
 CREATE TABLE checkins (
   id TEXT PRIMARY KEY,                -- GUID
@@ -248,10 +246,9 @@ Calculados por query + Core (`GoalPeriod`), sem tabela própria. Pontos obrigat�
 |----------|------------------------------------------------------------------------------------|
 | `weekly` | check-ins vs. alvo, % cumprido, melhor dia                                         |
 | `daily`  | dias cumpridos / dias ativos da semana, %                                          |
-| `once`   | tarefas concluídas na semana e pendentes com prazo na semana                       |
 | Geral    | check-ins por dia (barras), lembretes disparados vs. respondidos                   |
 
-**Mensal:** por meta, períodos cumpridos no mês (semanas para `weekly`, dias para `daily`), evolução semana a semana, sequência atual e maior sequência na unidade do tipo; tarefas únicas concluídas no mês. Só contam os períodos em que a meta estava ativa. Semanas que cruzam a virada do mês pertencem ao mês da sua segunda-feira.
+**Mensal:** por meta, períodos cumpridos no mês (semanas para `weekly`, dias para `daily`), evolução semana a semana, sequência atual e maior sequência na unidade do tipo. Só contam os períodos em que a meta estava ativa. Semanas que cruzam a virada do mês pertencem ao mês da sua segunda-feira.
 
 A query abaixo é **ilustrativa** (base para metas semanais) e será refinada na Fase 5:
 
@@ -315,10 +312,10 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 | Fase   | Entrega                  | Tarefas principais                                                                                                                                                                                                                                                                                                   | Critério de pronto                                                                               |
 |--------|--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
 | **0**  | Fundação + spikes        | Repositório git, solução em `net10.0`, projetos, DI, `Theme.axaml` com Figtree, navegação lateral. Spikes descartáveis: (a) notificação com ações no GNOME via DBus, com arquivo `.desktop` e dica `desktop-entry`, testada com a janela oculta e com Não Perturbe ativo; (b) *hello world* Avalonia no Android com alarme + notificação com ação | App abre com o tema; notificação com ação responde no Linux; build Android roda e dispara alarme |
-| **1**  | Metas (domínio + dados)  | Entidades, `Recurrence`, `GoalPeriod` (once/daily/weekly, segunda a domingo, UTC↔local), `001_init.sql`, repositórios, `GoalService`, testes                                                                                                                                                                         | CRUD e `GoalPeriod` passam nos testes; dados persistem após reiniciar                            |
+| **1**  | Metas (domínio + dados)  | Entidades, `Recurrence`, `GoalPeriod` (daily/weekly, segunda a domingo, UTC↔local), `001_init.sql`, repositórios, `GoalService`, testes                                                                                                                                                                         | CRUD e `GoalPeriod` passam nos testes; dados persistem após reiniciar                            |
 | **2**  | Telas de metas           | `GoalsView`, `GoalEditView` (tipo, alvo, ícone/cor, período), validação, arquivamento automático ao fim                                                                                                                                                                                                              | Criar, editar e arquivar pela interface                                                          |
-| **3**  | Check-ins e tela Hoje    | `CheckinService` (`amount` soma; `once` conclui e arquiva), `ProgressService`, `TodayView`, desfazer                                                                                                                                                                                                                 | Check-in atualiza o progresso na hora, nos três tipos                                            |
-| **4a** | Planejador               | `ReminderPlanner`: regras da seção 9 escritas antes, testes com `FakeTimeProvider` para os três tipos                                                                                                                                                                                                               | Testes cobrem virada de dia e de semana, dias inativos, meta cumprida, adiar e ignorar           |
+| **3**  | Check-ins e tela Hoje    | `CheckinService` (`amount` soma), `ProgressService`, `TodayView`, desfazer                                                                                                                                                                                                                 | Check-in atualiza o progresso na hora, nos dois tipos                                             |
+| **4a** | Planejador               | `ReminderPlanner`: regras da seção 9 escritas antes, testes com `FakeTimeProvider` para os dois tipos                                                                                                                                                                                                                | Testes cobrem virada de dia e de semana, dias inativos, meta cumprida, adiar e ignorar           |
 | **4b** | Agendador + resposta     | Scheduler Linux (timer único), `ReminderResponseHandler`                                                                                                                                                                                                                                                             | Disparo no horário e 3 ações funcionando                                                         |
 | **4c** | Notificação nativa Linux | Adaptador DBus + fallback em janela; expiração = ignorado                                                                                                                                                                                                                                                            | Funciona com a janela principal fechada                                                          |
 | **4d** | Segundo plano            | Fechar = ocultar, instância única, bandeja opcional (extensão AppIndicator no GNOME)                                                                                                                                                                                                                                 | Reabrir o app não duplica o processo                                                             |
@@ -335,7 +332,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 
 ## 13. Estratégia de testes
 
-- **Core (unitários):** `GoalPeriod` (três tipos, recorte por início/fim, virada de semana, horário de verão), `ReminderPlanner`, progresso, sequências, `ReportService`. Use `FakeTimeProvider` e fuso explícito nos testes.
+- **Core (unitários):** `GoalPeriod` (dois tipos, recorte por início/fim, virada de semana, horário de verão), `ReminderPlanner`, progresso, sequências, `ReportService`. Use `FakeTimeProvider` e fuso explícito nos testes.
 - **Infrastructure (integração):** SQLite em memória (`Data Source=:memory:`) para repositórios e migrações, incluindo as restrições `CHECK`.
 - **UI:** testes de ViewModel (sem renderizar); validação visual manual contra os protótipos.
 
@@ -369,8 +366,8 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 
 **Decisões da versão 1.3 (novas):**
 
-- Recorrência `once` (tarefa única, um check-in conclui e arquiva), `daily` (alvo por dia + dias ativos) e `weekly` (alvo por semana); `target_per_week` vira `target`.
-- Sequências na unidade de cada tipo: dias (diária), semanas (semanal), sem sequência (única).
+- Recorrência `once` (tarefa única; removida na Fase 2, ver abaixo), `daily` (alvo por dia + dias ativos) e `weekly` (alvo por semana); `target_per_week` vira `target`.
+- Sequências na unidade de cada tipo: dias (diária), semanas (semanal).
 - Período de avaliação centralizado em `GoalPeriod` no Core.
 - Semana fixa de segunda a domingo; a configuração "início da semana" foi removida.
 - Configuração "Tema" removida do MVP (só existe tema escuro).
@@ -384,12 +381,14 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 **Decisões da Fase 2 (01/11/2026):**
 
 - O tipo de recorrência pode ser alterado a qualquer momento; relatórios passados passam a ser calculados com o tipo atual.
-- Meta arquivada é somente leitura: só pode ser desarquivada ou excluída. Assim uma tarefa única concluída (sempre arquivada) nunca é editada.
-- Desarquivar é permitido, exceto para tarefa única concluída (desfazer a conclusão é pelo "desfazer check-in", Fase 3) e para meta cujo fim já passou (seria arquivada de novo; cria-se outra meta).
+- Meta arquivada é somente leitura: só pode ser desarquivada ou excluída (a exclusão fica no próprio cartão da lista de arquivadas).
+- Desarquivar é permitido, exceto para meta cujo fim já passou (seria arquivada de novo; cria-se outra meta).
 - Data de fim no passado é recusada ao criar ou editar.
 - O arquivamento automático por fim do período roda ao abrir a tela Metas; a virada de dia em tempo real fica para a Fase 4.
 - Ícones: subconjunto fixo de 16 ícones de traço do Lucide (licença ISC), embutidos como geometria; chave desconhecida no banco cai no ícone padrão `target`.
 - Formulário de meta como página dentro da tela Metas (mesma solução no desktop e no celular).
+- **Tarefa única (`once`) removida** a pedido do autor: simplifica domínio, telas, lembretes e relatórios. A migração `002` recria `goals` sem `'once'` e sem `completed_at` e **exclui** as tarefas únicas existentes (com check-ins e lembretes). As migrações rodam com chaves estrangeiras desligadas e conferidas por `PRAGMA foreign_key_check` antes do `COMMIT`.
+- Linux: o app define `AVALONIA_IM_MODULE=none` (se não definido) para usar XIM; o IME via DBus do Avalonia perdia a composição de teclas mortas (`ç` no layout US internacional).
 
 **Pendências:** versão mínima do Android (Fase 7c; sugestão do spike: Android 8.0, API 26); sincronização entre dispositivos (fora do MVP).
 

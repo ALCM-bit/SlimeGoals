@@ -24,7 +24,6 @@ public sealed partial class GoalEditViewModel : ObservableObject
     private readonly Action<bool> _close;
     private readonly Dictionary<string, string> _errors = [];
     private bool _submitted;
-    private int _rememberedTarget;
     private bool _targetMissing;
 
     public GoalEditViewModel(GoalService service, Goal? existing, Action<bool> close)
@@ -53,7 +52,6 @@ public sealed partial class GoalEditViewModel : ObservableObject
         Title = existing?.Title ?? "";
         Recurrence = existing?.Recurrence ?? Recurrence.Daily;
         Target = existing?.Target ?? 1;
-        _rememberedTarget = Target;
         SelectedIcon = IconOption.From(GoalIcons.Get(existing?.Icon ?? GoalIcons.DefaultKey));
         SelectedColor = Colors.Single(c => c.Color == (existing?.Color ?? GoalColor.Purple));
         SelectedInterval = new IntervalOption(interval);
@@ -82,7 +80,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
     [ObservableProperty] public partial string Title { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsTarget), nameof(TargetSuffix), nameof(IsOnce), nameof(IsDaily), nameof(IsWeekly))]
+    [NotifyPropertyChangedFor(nameof(TargetSuffix), nameof(IsDaily), nameof(IsWeekly))]
     public partial Recurrence Recurrence { get; set; }
 
     [ObservableProperty] public partial int Target { get; set; }
@@ -122,11 +120,9 @@ public sealed partial class GoalEditViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(DeleteCommand))]
     public partial bool IsConfirmingDelete { get; set; }
 
-    public bool ShowsTarget => Recurrence != Recurrence.Once;
     public string TargetSuffix => Recurrence == Recurrence.Weekly ? "por semana" : "por dia";
 
     // Atalhos para os botões de segmento da View.
-    public bool IsOnce { get => Recurrence == Recurrence.Once; set { if (value) Recurrence = Recurrence.Once; } }
     public bool IsDaily { get => Recurrence == Recurrence.Daily; set { if (value) Recurrence = Recurrence.Daily; } }
     public bool IsWeekly { get => Recurrence == Recurrence.Weekly; set { if (value) Recurrence = Recurrence.Weekly; } }
 
@@ -140,20 +136,6 @@ public sealed partial class GoalEditViewModel : ObservableObject
     public string? IconError => ErrorFor(nameof(GoalDraft.Icon));
 
     public string? ErrorFor(string field) => _errors.GetValueOrDefault(field);
-
-    /// <summary>Única: alvo fixo em 1, lembrando o anterior para quando voltar a diária/semanal.</summary>
-    partial void OnRecurrenceChanged(Recurrence oldValue, Recurrence newValue)
-    {
-        if (newValue == Recurrence.Once && oldValue != Recurrence.Once)
-        {
-            _rememberedTarget = Target;
-            Target = 1;
-        }
-        else if (oldValue == Recurrence.Once && newValue != Recurrence.Once)
-        {
-            Target = _rememberedTarget;
-        }
-    }
 
     [RelayCommand]
     private async Task SaveAsync()
@@ -243,7 +225,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
     private bool Revalidate(out GoalDraft draft)
     {
         draft = new GoalDraft(
-            Title, Recurrence, Recurrence == Recurrence.Once ? 1 : Target, SelectedIcon.Key, SelectedColor.Color,
+            Title, Recurrence, Target, SelectedIcon.Key, SelectedColor.Color,
             SelectedInterval.Minutes,
             TimeOnly.FromTimeSpan(ActiveFrom ?? TimeSpan.Zero),
             TimeOnly.FromTimeSpan(ActiveUntil ?? new TimeSpan(23, 59, 0)),
@@ -260,7 +242,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
             if (ActiveUntil is null) errors.Add((nameof(GoalDraft.ActiveUntil), MissingTime));
         }
 
-        if (ShowsTarget && _targetMissing)
+        if (_targetMissing)
         {
             errors.RemoveAll(x => x.Field == nameof(GoalDraft.Target));
             errors.Add((nameof(GoalDraft.Target), MissingTarget));

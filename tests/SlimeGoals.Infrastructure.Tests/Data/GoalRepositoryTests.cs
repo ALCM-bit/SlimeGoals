@@ -35,7 +35,7 @@ public class GoalRepositoryTests : IDisposable
     [Fact]
     public async Task Add_then_Get_round_trips_every_field()
     {
-        var goal = NewGoal() with { CompletedAt = null, ArchivedAt = new DateTimeOffset(2026, 11, 3, 0, 0, 0, TimeSpan.Zero) };
+        var goal = NewGoal() with { ArchivedAt = new DateTimeOffset(2026, 11, 3, 0, 0, 0, TimeSpan.Zero) };
         await Repo.AddAsync(goal);
 
         (await Repo.GetAsync(goal.Id)).Should().Be(goal);
@@ -119,8 +119,8 @@ public class GoalRepositoryTests : IDisposable
             var reopened = new SqliteConnectionFactory($"Data Source={path}");
             using (var c = reopened.Open())
             {
-                MigrationRunner.Migrate(c).Should().Be(1);
-                c.ExecuteScalar<long>("PRAGMA user_version").Should().Be(1);
+                MigrationRunner.Migrate(c).Should().Be(2);
+                c.ExecuteScalar<long>("PRAGMA user_version").Should().Be(2);
             }
             (await new GoalRepository(reopened).GetAsync(goal.Id)).Should().Be(goal);
         }

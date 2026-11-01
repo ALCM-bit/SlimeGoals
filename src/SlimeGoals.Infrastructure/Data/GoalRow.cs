@@ -28,7 +28,6 @@ internal sealed class GoalRow
     public string? EndDate { get; init; }
     public required string CreatedAt { get; init; }
     public required string UpdatedAt { get; init; }
-    public string? CompletedAt { get; init; }
     public string? ArchivedAt { get; init; }
     public string? DeletedAt { get; init; }
 
@@ -38,7 +37,6 @@ internal sealed class GoalRow
         Title = g.Title,
         Recurrence = g.Recurrence switch
         {
-            Core.Domain.Recurrence.Once => "once",
             Core.Domain.Recurrence.Daily => "daily",
             Core.Domain.Recurrence.Weekly => "weekly",
             _ => throw new ArgumentOutOfRangeException(nameof(g), g.Recurrence, null),
@@ -54,7 +52,6 @@ internal sealed class GoalRow
         EndDate = g.EndDate?.ToString(DateFormat, Inv),
         CreatedAt = Instant(g.CreatedAt),
         UpdatedAt = Instant(g.UpdatedAt),
-        CompletedAt = g.CompletedAt is { } c ? Instant(c) : null,
         ArchivedAt = g.ArchivedAt is { } a ? Instant(a) : null,
         DeletedAt = g.DeletedAt is { } d ? Instant(d) : null,
     };
@@ -65,7 +62,6 @@ internal sealed class GoalRow
         Title = Title,
         Recurrence = Recurrence switch
         {
-            "once" => Core.Domain.Recurrence.Once,
             "daily" => Core.Domain.Recurrence.Daily,
             "weekly" => Core.Domain.Recurrence.Weekly,
             _ => throw new FormatException($"Recorrência desconhecida no banco: '{Recurrence}'."),
@@ -81,7 +77,6 @@ internal sealed class GoalRow
         EndDate = EndDate is null ? null : DateOnly.ParseExact(EndDate, DateFormat, Inv),
         CreatedAt = ParseInstant(CreatedAt),
         UpdatedAt = ParseInstant(UpdatedAt),
-        CompletedAt = CompletedAt is null ? null : ParseInstant(CompletedAt),
         ArchivedAt = ArchivedAt is null ? null : ParseInstant(ArchivedAt),
         DeletedAt = DeletedAt is null ? null : ParseInstant(DeletedAt),
     };

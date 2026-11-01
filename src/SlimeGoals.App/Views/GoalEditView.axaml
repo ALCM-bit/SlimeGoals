@@ -50,14 +50,13 @@
           <TextBlock Classes="field-label" Text="Tipo" />
           <Border Classes="segment" HorizontalAlignment="Left">
             <StackPanel Orientation="Horizontal">
-              <RadioButton Classes="segment" GroupName="goal-type" Content="Única" IsChecked="{Binding IsOnce}" />
               <RadioButton Classes="segment" GroupName="goal-type" Content="Diária" IsChecked="{Binding IsDaily}" />
               <RadioButton Classes="segment" GroupName="goal-type" Content="Semanal" IsChecked="{Binding IsWeekly}" />
             </StackPanel>
           </Border>
         </StackPanel>
 
-        <StackPanel Classes="field" IsVisible="{Binding ShowsTarget}">
+        <StackPanel Classes="field">
           <TextBlock Classes="field-label" Text="Alvo" />
           <StackPanel Orientation="Horizontal" Spacing="10">
             <NumericUpDown Value="{Binding TargetInput}" Minimum="1" Maximum="99" Increment="1" FormatString="0"
