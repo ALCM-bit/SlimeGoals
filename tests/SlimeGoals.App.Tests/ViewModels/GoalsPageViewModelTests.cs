@@ -17,7 +17,7 @@ public class GoalsPageViewModelTests
 
     public GoalsPageViewModelTests()
     {
-        _service = new GoalService(_repo, _time);
+        _service = new GoalService(_repo, new InMemoryCheckinRepository(), new InMemoryTimerRepository(), _time);
         _vm = new GoalsPageViewModel(_service, _time);
     }
 

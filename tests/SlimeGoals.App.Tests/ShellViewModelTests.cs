@@ -10,7 +10,7 @@ public class ShellViewModelTests
     private static GoalsPageViewModel Goals()
     {
         var time = new FakeTimeProvider();
-        return new GoalsPageViewModel(new GoalService(new InMemoryGoalRepository(), time), time);
+        return new GoalsPageViewModel(new GoalService(new InMemoryGoalRepository(), new InMemoryCheckinRepository(), new InMemoryTimerRepository(), time), time);
     }
 
     private static ShellViewModel Create() => new(new PageViewModel[]

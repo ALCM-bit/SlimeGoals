@@ -15,7 +15,7 @@ public class GoalServiceStateTests
     private static readonly DateOnly Today = new(2026, 11, 2);
     private readonly FakeTimeProvider _time = new(T0);
     private readonly InMemoryGoalRepository _repo = new();
-    private GoalService Service => new(_repo, _time);
+    private GoalService Service => new(_repo, new InMemoryCheckinRepository(), new InMemoryTimerRepository(), _time);
 
     public GoalServiceStateTests() =>
         _time.SetLocalTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));

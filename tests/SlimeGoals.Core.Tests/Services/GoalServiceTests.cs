@@ -12,7 +12,7 @@ public class GoalServiceTests
     private static readonly DateTimeOffset T0 = new(2026, 11, 2, 12, 0, 0, TimeSpan.Zero);
     private readonly FakeTimeProvider _time = new(T0);
     private readonly InMemoryGoalRepository _repo = new();
-    private GoalService Service => new(_repo, _time);
+    private GoalService Service => new(_repo, new InMemoryCheckinRepository(), new InMemoryTimerRepository(), _time);
 
     [Fact]
     public async Task Create_assigns_id_timestamps_and_trims_title()
@@ -95,7 +95,7 @@ public class GoalServiceTests
 
 public class GoalServiceTimeNormalizationTests
 {
-    private readonly GoalService _service = new(new InMemoryGoalRepository(), new FakeTimeProvider());
+    private readonly GoalService _service = new(new InMemoryGoalRepository(), new InMemoryCheckinRepository(), new InMemoryTimerRepository(), new FakeTimeProvider());
 
     // Revisão final #3: o banco guarda HH:mm; segundos não podem sobreviver nem burlar "início < fim".
     [Fact]
@@ -115,7 +115,7 @@ public class GoalServiceTimeNormalizationTests
 public class GoalServiceMeasureNormalizationTests
 {
     private readonly InMemoryGoalRepository _repo = new();
-    private GoalService Service => new(_repo, new FakeTimeProvider());
+    private GoalService Service => new(_repo, new InMemoryCheckinRepository(), new InMemoryTimerRepository(), new FakeTimeProvider());
 
     [Fact]
     public async Task Create_normalizes_completion_and_duration()

@@ -12,7 +12,7 @@ public class GoalEditViewModelTests
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 11, 2, 12, 0, 0, TimeSpan.Zero));
     private readonly InMemoryGoalRepository _repo = new();
     private readonly List<bool> _closed = [];
-    private GoalService Service => new(_repo, _time);
+    private GoalService Service => new(_repo, new InMemoryCheckinRepository(), new InMemoryTimerRepository(), _time);
 
     private GoalEditViewModel New() => new(Service, null, _closed.Add);
     private GoalEditViewModel Edit(Goal goal) => new(Service, goal, _closed.Add);
