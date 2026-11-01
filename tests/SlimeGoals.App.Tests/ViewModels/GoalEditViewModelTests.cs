@@ -74,18 +74,16 @@ public class GoalEditViewModelTests
     }
 
     [Fact]
-    public void Switching_to_once_forces_target_1_and_hides_it_then_restores_previous_target()
+    public void Switching_type_keeps_target()
     {
         var vm = New();
         vm.Target = 5;
 
-        vm.Recurrence = Recurrence.Once;
-        vm.Target.Should().Be(1);
-        vm.ShowsTarget.Should().BeFalse();
-
-        vm.Recurrence = Recurrence.Weekly;
+        vm.IsWeekly = true;
         vm.Target.Should().Be(5);
-        vm.ShowsTarget.Should().BeTrue();
+        vm.IsDaily = true;
+        vm.Recurrence.Should().Be(Recurrence.Daily);
+        vm.Target.Should().Be(5);
     }
 
     [Fact]

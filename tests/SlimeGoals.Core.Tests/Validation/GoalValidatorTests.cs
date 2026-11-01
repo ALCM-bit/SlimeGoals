@@ -31,11 +31,6 @@ public class GoalValidatorTests
             nameof(GoalDraft.Title), "O título deve ter até 80 caracteres.");
     }
 
-    [Fact]
-    public void Once_requires_target_1() =>
-        ShouldHaveSingleError(Valid() with { Recurrence = Recurrence.Once, Target = 2 },
-            nameof(GoalDraft.Target), "Tarefa única tem alvo 1.");
-
     [Theory]
     [InlineData(0)]
     [InlineData(100)]

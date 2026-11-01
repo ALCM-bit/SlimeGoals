@@ -127,7 +127,7 @@
     <Setter Property="Foreground" Value="{DynamicResource Warning}" />
   </Style>
 
-  <!-- Segmento (Ativas | Arquivadas, Única | Diária | Semanal) -->
+  <!-- Segmento (Ativas | Arquivadas, Diária | Semanal) -->
   <Style Selector="Border.segment">
     <Setter Property="Background" Value="{DynamicResource Surface2}" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />

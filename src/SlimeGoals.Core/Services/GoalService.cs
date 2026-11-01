@@ -60,16 +60,14 @@ public sealed class GoalService(IGoalRepository goals, TimeProvider time)
     }
 
     /// <summary>
-    /// Volta a meta para a lista ativa. Idempotente. Recusa tarefa única concluída
-    /// (desfaz-se pelo check-in) e meta cujo período já terminou (seria arquivada de novo).
+    /// Volta a meta para a lista ativa. Idempotente. Recusa meta cujo período já terminou
+    /// (seria arquivada de novo).
     /// </summary>
     public async Task UnarchiveAsync(Guid id, CancellationToken ct = default)
     {
         var goal = await GetExistingAsync(id, ct);
         if (goal.ArchivedAt is null)
             return;
-        if (goal.Recurrence == Recurrence.Once && goal.CompletedAt is not null)
-            throw new GoalStateException(id, "Tarefa concluída não pode ser desarquivada.");
         if (goal.EndDate is { } end && end < Today())
             throw new GoalStateException(id,
                 $"O período desta meta terminou em {end.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)}. Crie uma nova meta para continuar.");

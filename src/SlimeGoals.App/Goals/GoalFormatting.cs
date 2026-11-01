@@ -17,7 +17,6 @@ public static class GoalFormatting
 
     public static string Target(Recurrence recurrence, int target) => recurrence switch
     {
-        Recurrence.Once => "Uma vez",
         Recurrence.Daily => $"{target}× por dia",
         Recurrence.Weekly => $"{target}× por semana",
         _ => throw new ArgumentOutOfRangeException(nameof(recurrence), recurrence, null),

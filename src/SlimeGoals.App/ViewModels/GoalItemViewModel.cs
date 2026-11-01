@@ -17,15 +17,9 @@ public sealed partial class GoalItemViewModel(Goal goal, TimeZoneInfo zone) : Ob
     public GoalColor Color => Goal.Color;
     public string Summary { get; } = GoalFormatting.Summary(goal);
     public bool IsArchived => Goal.ArchivedAt is not null;
-    public bool IsCompletedOnce => Goal is { Recurrence: Recurrence.Once, CompletedAt: not null };
-    public bool CanUnarchive => IsArchived && !IsCompletedOnce;
+    public bool CanUnarchive => IsArchived;
 
-    public string? Status => Goal switch
-    {
-        { Recurrence: Recurrence.Once, CompletedAt: { } done } => $"Concluída em {LocalDay(done)}",
-        { ArchivedAt: { } archived } => $"Arquivada em {LocalDay(archived)}",
-        _ => null,
-    };
+    public string? Status => Goal.ArchivedAt is { } archived ? $"Arquivada em {LocalDay(archived)}" : null;
 
     private string LocalDay(DateTimeOffset instant) =>
         TimeZoneInfo.ConvertTime(instant, zone).ToString("dd/MM", CultureInfo.InvariantCulture);

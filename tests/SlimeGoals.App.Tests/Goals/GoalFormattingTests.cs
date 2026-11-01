@@ -6,7 +6,6 @@ namespace SlimeGoals.App.Tests.Goals;
 public class GoalFormattingTests
 {
     [Theory]
-    [InlineData(Recurrence.Once, 1, "Uma vez")]
     [InlineData(Recurrence.Daily, 1, "1× por dia")]
     [InlineData(Recurrence.Weekly, 5, "5× por semana")]
     public void Target(Recurrence r, int target, string expected) =>

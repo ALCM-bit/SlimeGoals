@@ -24,15 +24,8 @@ public static class GoalValidator
         else if (title.Length > MaxTitleLength)
             Add(nameof(GoalDraft.Title), $"O título deve ter até {MaxTitleLength} caracteres.");
 
-        if (draft.Recurrence == Recurrence.Once)
-        {
-            if (draft.Target != 1)
-                Add(nameof(GoalDraft.Target), "Tarefa única tem alvo 1.");
-        }
-        else if (draft.Target is < 1 or > MaxTarget)
-        {
+        if (draft.Target is < 1 or > MaxTarget)
             Add(nameof(GoalDraft.Target), $"O alvo deve ser entre 1 e {MaxTarget}.");
-        }
 
         if (draft.ReminderEveryMinutes is < MinReminderMinutes or > MaxReminderMinutes)
             Add(nameof(GoalDraft.ReminderEveryMinutes), "O intervalo deve ser entre 5 minutos e 24 horas.");

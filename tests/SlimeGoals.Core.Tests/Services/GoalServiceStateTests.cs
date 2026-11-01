@@ -22,7 +22,7 @@ public class GoalServiceStateTests
 
     private static GoalDraft Draft() => GoalValidatorTests.Valid();
 
-    /// <summary>Grava direto no repositório (ex.: estados que só a Fase 3 produz, como CompletedAt).</summary>
+    /// <summary>Grava direto no repositório estados que o serviço não produz sozinho (ex.: arquivada no passado).</summary>
     private async Task<Goal> Seed(Func<Goal, Goal> change)
     {
         var goal = change(await Service.CreateAsync(Draft()));
@@ -97,17 +97,6 @@ public class GoalServiceStateTests
         await Service.UnarchiveAsync(goal.Id);
 
         (await _repo.GetAsync(goal.Id)).Should().Be(goal);
-    }
-
-    [Fact]
-    public async Task Unarchive_of_completed_once_throws()
-    {
-        var goal = await Seed(g => g with
-            { Recurrence = Recurrence.Once, Target = 1, CompletedAt = T0, ArchivedAt = T0 });
-
-        var act = () => Service.UnarchiveAsync(goal.Id);
-
-        await act.Should().ThrowAsync<GoalStateException>().WithMessage("Tarefa concluída não pode ser desarquivada.");
     }
 
     [Fact]

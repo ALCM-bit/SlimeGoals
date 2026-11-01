@@ -22,7 +22,7 @@ public class GoalsPageViewModelTests
     }
 
     private Task<Goal> Create(string title, Recurrence r = Recurrence.Daily, DateOnly? end = null) =>
-        _service.CreateAsync(new GoalDraft(title, r, r == Recurrence.Once ? 1 : 3, "book", GoalColor.Purple, 120,
+        _service.CreateAsync(new GoalDraft(title, r, 3, "book", GoalColor.Purple, 120,
             new TimeOnly(9, 0), new TimeOnly(18, 0), WeekDays.Weekdays, null, end));
 
     private async Task Load() => await _vm.LoadCommand.ExecuteAsync(null);
@@ -109,17 +109,6 @@ public class GoalsPageViewModelTests
     }
 
     [Fact]
-    public async Task Unarchive_of_completed_once_is_not_offered()
-    {
-        var goal = await Create("Tarefa", Recurrence.Once);
-        await _repo.UpdateAsync(goal with { CompletedAt = T0, ArchivedAt = T0 });
-        _vm.ShowArchived = true;
-        await _vm.LoadCommand.ExecutionTask!;
-
-        _vm.Goals.Single().CanUnarchive.Should().BeFalse();
-    }
-
-    [Fact]
     public async Task Unarchive_error_from_service_shows_ErrorMessage()
     {
         var goal = await Create("Expirada", end: Today);
@@ -193,8 +182,6 @@ public class GoalsPageViewModelTests
         new GoalItemViewModel(goal, zone).Summary.Should().Be("3× por semana · a cada 2 h · 09:00–18:00 · Seg a sex");
         new GoalItemViewModel(goal, zone).Status.Should().BeNull();
         new GoalItemViewModel(goal with { ArchivedAt = at }, zone).Status.Should().Be("Arquivada em 02/11");
-        new GoalItemViewModel(goal with { Recurrence = Recurrence.Once, Target = 1, CompletedAt = at, ArchivedAt = at }, zone)
-            .Status.Should().Be("Concluída em 02/11");
     }
 
     [Fact]

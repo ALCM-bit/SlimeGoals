@@ -20,7 +20,6 @@ public sealed record Goal
     public DateOnly? EndDate { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }
-    public DateTimeOffset? CompletedAt { get; init; }
     public DateTimeOffset? ArchivedAt { get; init; }
     public DateTimeOffset? DeletedAt { get; init; }
 }
