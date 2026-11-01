@@ -1,10 +1,11 @@
+using SlimeGoals.Core;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Domain;
 
-namespace SlimeGoals.Core.Tests.Fakes;
+namespace SlimeGoals.Testing;
 
 /// <summary>Implementação em memória que respeita o contrato de <see cref="IGoalRepository"/>.</summary>
-internal sealed class InMemoryGoalRepository : IGoalRepository
+public sealed class InMemoryGoalRepository : IGoalRepository
 {
     private readonly Dictionary<Guid, Goal> _goals = new();
 

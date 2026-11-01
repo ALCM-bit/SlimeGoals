@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Apoio compartilhado pelos projetos de teste (fakes); não contém testes. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SlimeGoals.Core\SlimeGoals.Core.csproj" />
+  </ItemGroup>
+
+</Project>
