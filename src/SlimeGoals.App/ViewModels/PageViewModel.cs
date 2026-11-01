@@ -6,4 +6,7 @@ namespace SlimeGoals.App.ViewModels;
 public abstract class PageViewModel : ObservableObject
 {
     public abstract string Title { get; }
+
+    /// <summary>Chamado pelo shell quando a página passa a ser exibida (ex.: recarregar dados).</summary>
+    public virtual void Activate() { }
 }

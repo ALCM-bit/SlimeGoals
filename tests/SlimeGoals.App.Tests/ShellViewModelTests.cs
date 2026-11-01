@@ -1,11 +1,20 @@
+using Microsoft.Extensions.Time.Testing;
 using SlimeGoals.App.ViewModels;
+using SlimeGoals.Core.Services;
+using SlimeGoals.Testing;
 
 namespace SlimeGoals.App.Tests;
 
 public class ShellViewModelTests
 {
+    private static GoalsPageViewModel Goals()
+    {
+        var time = new FakeTimeProvider();
+        return new GoalsPageViewModel(new GoalService(new InMemoryGoalRepository(), time), time);
+    }
+
     private static ShellViewModel Create() => new(new PageViewModel[]
-        { new TodayPageViewModel(), new GoalsPageViewModel(), new ReportsPageViewModel(), new SettingsPageViewModel() });
+        { new TodayPageViewModel(), Goals(), new ReportsPageViewModel(), new SettingsPageViewModel() });
 
     [Fact]
     public void Pages_follow_spec_order_and_start_on_today()
@@ -32,11 +41,53 @@ public class ShellViewModelNullSelectionTests
     [Fact]
     public void Setting_current_page_to_null_keeps_previous_page()
     {
-        var shell = new ShellViewModel([new TodayPageViewModel(), new GoalsPageViewModel()]);
+        var shell = new ShellViewModel([new TodayPageViewModel(), new SettingsPageViewModel()]);
         shell.CurrentPage = shell.Pages[1];
 
         shell.CurrentPage = null!;
 
         shell.CurrentPage.Should().BeSameAs(shell.Pages[1]);
+    }
+}
+
+public class ShellViewModelActivationTests
+{
+    private sealed class CountingPage(string title) : PageViewModel
+    {
+        public override string Title => title;
+        public int Activations { get; private set; }
+        public override void Activate() => Activations++;
+    }
+
+    private readonly CountingPage _a = new("A");
+    private readonly CountingPage _b = new("B");
+
+    [Fact]
+    public void Initial_page_is_activated_once()
+    {
+        _ = new ShellViewModel([_a, _b]);
+        _a.Activations.Should().Be(1);
+        _b.Activations.Should().Be(0);
+    }
+
+    [Fact]
+    public void Navigating_activates_target_page()
+    {
+        var shell = new ShellViewModel([_a, _b]);
+        shell.NavigateCommand.Execute(_b);
+        shell.NavigateCommand.Execute(_a);
+
+        _b.Activations.Should().Be(1);
+        _a.Activations.Should().Be(2);
+    }
+
+    [Fact]
+    public void Reselecting_current_page_or_null_does_not_activate()
+    {
+        var shell = new ShellViewModel([_a, _b]);
+        shell.CurrentPage = _a;
+        shell.CurrentPage = null!;
+
+        _a.Activations.Should().Be(1);
     }
 }

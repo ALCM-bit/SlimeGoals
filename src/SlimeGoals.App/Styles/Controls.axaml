@@ -53,4 +53,188 @@
     <Setter Property="BorderBrush" Value="{DynamicResource PrimarySoft}" />
     <Setter Property="BorderThickness" Value="2" />
   </Style>
+
+  <!-- ===== Fase 2: componentes das telas de metas (tokens da spec §11) ===== -->
+
+  <!-- Botões: primário (ação principal), fantasma (secundária), perigo (excluir) -->
+  <Style Selector="Button.primary, Button.ghost, Button.danger, Button.danger-solid">
+    <Setter Property="MinHeight" Value="44" />
+    <Setter Property="Padding" Value="18,0" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="{DynamicResource Primary}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnPrimary}" />
+  </Style>
+  <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PrimarySoft}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnPrimary}" />
+  </Style>
+  <Style Selector="Button.ghost">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+  </Style>
+  <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+  </Style>
+  <Style Selector="Button.back">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="Padding" Value="8,0" />
+  </Style>
+  <Style Selector="Button.danger">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Warning}" />
+  </Style>
+  <Style Selector="Button.danger-solid">
+    <Setter Property="Background" Value="{DynamicResource Warning}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnPrimary}" />
+  </Style>
+  <Style Selector="Button:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimarySoft}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+
+  <!-- Cartão de meta (tile do bento v4) e quadrado do ícone -->
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource Tile}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
+    <Setter Property="Padding" Value="16,14" />
+  </Style>
+  <Style Selector="Border.icon-tile">
+    <Setter Property="Width" Value="44" />
+    <Setter Property="Height" Value="44" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+  </Style>
+  <Style Selector="Path.goal-icon">
+    <Setter Property="StrokeThickness" Value="2" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+    <Setter Property="StrokeJoin" Value="Round" />
+  </Style>
+
+  <!-- Faixa de aviso -->
+  <Style Selector="Border.warning-band">
+    <Setter Property="Background" Value="{DynamicResource GoalAmberBg}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Padding" Value="14,10" />
+  </Style>
+  <Style Selector="Border.warning-band TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Warning}" />
+  </Style>
+
+  <!-- Segmento (Ativas | Arquivadas, Única | Diária | Semanal) -->
+  <Style Selector="Border.segment">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Padding" Value="4" />
+  </Style>
+  <Style Selector="RadioButton.segment">
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" CornerRadius="11" Padding="18,0" MinHeight="40"
+                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+          <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center"
+                            HorizontalAlignment="Center" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="RadioButton.segment:pointerover">
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+  </Style>
+  <Style Selector="RadioButton.segment:checked">
+    <Setter Property="Background" Value="{DynamicResource SelectedStrong}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="RadioButton.segment:focus-visible">
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimarySoft}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+
+  <!-- Campos do formulário -->
+  <Style Selector="StackPanel.field">
+    <Setter Property="Spacing" Value="6" />
+  </Style>
+  <Style Selector="TextBlock.field-label">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="TextBlock.field-error">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource Warning}" />
+  </Style>
+  <Style Selector="TextBox, NumericUpDown, ComboBox, TimePicker, CalendarDatePicker">
+    <Setter Property="MinHeight" Value="44" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+  </Style>
+
+  <!-- Seletor de ícones e de cores: ListBox em grade, item selecionado com anel PrimarySoft -->
+  <Style Selector="ListBox.icon-picker, ListBox.color-picker">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="ListBox.icon-picker ListBoxItem">
+    <Setter Property="Width" Value="48" />
+    <Setter Property="Height" Value="48" />
+    <Setter Property="Margin" Value="0,0,8,8" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="ListBox.color-picker ListBoxItem">
+    <Setter Property="Width" Value="44" />
+    <Setter Property="Height" Value="44" />
+    <Setter Property="Margin" Value="0,0,10,0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="ListBox.icon-picker ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+  </Style>
+  <Style Selector="ListBox.color-picker ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="CornerRadius" Value="22" />
+  </Style>
+  <Style Selector="ListBox.icon-picker ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.color-picker ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+  </Style>
+  <Style Selector="ListBox.icon-picker ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter, ListBox.color-picker ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimarySoft}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+
+  <!-- Dias da semana: botões circulares de 44px -->
+  <Style Selector="ToggleButton.day">
+    <Setter Property="Width" Value="44" />
+    <Setter Property="Height" Value="44" />
+    <Setter Property="CornerRadius" Value="22" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="ToggleButton.day:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Primary}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnPrimary}" />
+  </Style>
+  <Style Selector="ToggleButton.day:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PrimarySoft}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnPrimary}" />
+  </Style>
+  <Style Selector="ToggleButton.day:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimarySoft}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
 </Styles>

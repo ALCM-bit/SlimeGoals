@@ -1,0 +1,172 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SlimeGoals.App.ViewModels"
+             x:Class="SlimeGoals.App.Views.GoalEditView"
+             x:DataType="vm:GoalEditViewModel">
+  <DockPanel Margin="8,4,8,0">
+    <!-- Cabeçalho: voltar = cancelar -->
+    <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,16">
+      <Button Classes="ghost back" Content="← Metas" Command="{Binding CancelCommand}" HorizontalAlignment="Left" />
+      <TextBlock Classes="page-title" Text="{Binding PageTitle}" />
+    </StackPanel>
+
+    <!-- Rodapé fixo com as ações -->
+    <Border DockPanel.Dock="Bottom" Padding="0,12,0,14" MaxWidth="640" HorizontalAlignment="Left">
+      <StackPanel Spacing="10">
+        <Border Classes="warning-band"
+                IsVisible="{Binding GeneralError, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <TextBlock Text="{Binding GeneralError}" TextWrapping="Wrap" />
+        </Border>
+        <Grid ColumnDefinitions="*,Auto" Width="640">
+          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <Button Classes="danger" Content="Excluir" Command="{Binding DeleteCommand}"
+                    IsVisible="{Binding !IsNew}" />
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsConfirmingDelete}">
+              <TextBlock Text="Excluir esta meta?" VerticalAlignment="Center" Foreground="{DynamicResource Warning}" />
+              <Button Classes="ghost" Content="Cancelar" Command="{Binding CancelDeleteCommand}" />
+              <Button Classes="danger-solid" Content="Excluir" Command="{Binding ConfirmDeleteCommand}" />
+            </StackPanel>
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+            <Button Classes="ghost" Content="Cancelar" Command="{Binding CancelCommand}" />
+            <Button Classes="primary" Content="Salvar" Command="{Binding SaveCommand}" IsDefault="True" />
+          </StackPanel>
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <ScrollViewer>
+      <StackPanel Spacing="18" MaxWidth="640" HorizontalAlignment="Left" Width="640" Margin="0,0,0,8">
+
+        <StackPanel Classes="field">
+          <TextBlock Classes="field-label" Text="Título" />
+          <TextBox Text="{Binding Title}" MaxLength="80" PlaceholderText="Ex.: Estudar inglês"
+                   AutomationProperties.Name="Título" />
+          <TextBlock Classes="field-error" Text="{Binding TitleError}"
+                     IsVisible="{Binding TitleError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+
+        <StackPanel Classes="field">
+          <TextBlock Classes="field-label" Text="Tipo" />
+          <Border Classes="segment" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal">
+              <RadioButton Classes="segment" GroupName="goal-type" Content="Única" IsChecked="{Binding IsOnce}" />
+              <RadioButton Classes="segment" GroupName="goal-type" Content="Diária" IsChecked="{Binding IsDaily}" />
+              <RadioButton Classes="segment" GroupName="goal-type" Content="Semanal" IsChecked="{Binding IsWeekly}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <StackPanel Classes="field" IsVisible="{Binding ShowsTarget}">
+          <TextBlock Classes="field-label" Text="Alvo" />
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <NumericUpDown Value="{Binding TargetInput}" Minimum="1" Maximum="99" Increment="1" FormatString="0"
+                           Width="130" AutomationProperties.Name="Alvo" />
+            <TextBlock Text="{Binding TargetSuffix}" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
+          </StackPanel>
+          <TextBlock Classes="field-error" Text="{Binding TargetError}"
+                     IsVisible="{Binding TargetError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+
+        <StackPanel Classes="field">
+          <TextBlock Classes="field-label" Text="Ícone" />
+          <ListBox Classes="icon-picker" ItemsSource="{Binding Icons}" SelectedItem="{Binding SelectedIcon}"
+                   SelectionMode="Single,AlwaysSelected" AutomationProperties.Name="Ícone">
+            <ListBox.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:IconOption">
+                <Viewbox Width="22" Height="22" ToolTip.Tip="{Binding Name}" AutomationProperties.Name="{Binding Name}">
+                  <Canvas Width="24" Height="24">
+                    <Path Classes="goal-icon" Stroke="{DynamicResource PrimaryTint}"
+                          Data="{Binding Key, Converter={StaticResource IconGeometry}}" />
+                  </Canvas>
+                </Viewbox>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </StackPanel>
+
+        <StackPanel Classes="field">
+          <TextBlock Classes="field-label" Text="Cor" />
+          <ListBox Classes="color-picker" ItemsSource="{Binding Colors}" SelectedItem="{Binding SelectedColor}"
+                   SelectionMode="Single,AlwaysSelected" AutomationProperties.Name="Cor">
+            <ListBox.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:ColorOption">
+                <Ellipse Width="28" Height="28" ToolTip.Tip="{Binding Name}" AutomationProperties.Name="{Binding Name}"
+                         Fill="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </StackPanel>
+
+        <StackPanel Classes="field">
+          <TextBlock Classes="field-label" Text="Lembrar a cada" />
+          <ComboBox ItemsSource="{Binding Intervals}" SelectedItem="{Binding SelectedInterval}" MinWidth="160"
+                    AutomationProperties.Name="Lembrar a cada">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:IntervalOption">
+                <TextBlock Text="{Binding Label}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <TextBlock Classes="field-error" Text="{Binding ReminderError}"
+                     IsVisible="{Binding ReminderError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+
+        <StackPanel Classes="field">
+          <TextBlock Classes="field-label" Text="Horário dos lembretes" />
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock Text="Das" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
+            <TimePicker SelectedTime="{Binding ActiveFrom}" ClockIdentifier="24HourClock" MinuteIncrement="5"
+                        AutomationProperties.Name="Início do horário" />
+            <TextBlock Text="às" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
+            <TimePicker SelectedTime="{Binding ActiveUntil}" ClockIdentifier="24HourClock" MinuteIncrement="5"
+                        AutomationProperties.Name="Fim do horário" />
+          </StackPanel>
+          <TextBlock Classes="field-error" Text="{Binding ActiveFromError}"
+                     IsVisible="{Binding ActiveFromError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <TextBlock Classes="field-error" Text="{Binding ActiveUntilError}"
+                     IsVisible="{Binding ActiveUntilError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+
+        <StackPanel Classes="field">
+          <TextBlock Classes="field-label" Text="Dias" />
+          <ItemsControl ItemsSource="{Binding Days}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:DayOption">
+                <ToggleButton Classes="day" Content="{Binding Label}" IsChecked="{Binding IsSelected}"
+                              ToolTip.Tip="{Binding Name}" AutomationProperties.Name="{Binding Name}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Classes="field-error" Text="{Binding ActiveDaysError}"
+                     IsVisible="{Binding ActiveDaysError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+
+        <StackPanel Classes="field">
+          <TextBlock Classes="field-label" Text="Período (opcional)" />
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock Text="Início" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
+            <CalendarDatePicker SelectedDate="{Binding StartDate}" SelectedDateFormat="Custom"
+                                CustomDateFormatString="dd/MM/yyyy" PlaceholderText="Sem início" Width="150"
+                                AutomationProperties.Name="Data de início" />
+            <TextBlock Text="Fim" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
+            <CalendarDatePicker SelectedDate="{Binding EndDate}" SelectedDateFormat="Custom"
+                                CustomDateFormatString="dd/MM/yyyy" PlaceholderText="Sem fim" Width="150"
+                                AutomationProperties.Name="Data de fim" />
+          </StackPanel>
+          <TextBlock Classes="field-error" Text="{Binding EndDateError}"
+                     IsVisible="{Binding EndDateError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

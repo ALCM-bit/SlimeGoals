@@ -160,8 +160,8 @@ Ponto de partida: `dotnet new install Avalonia.Templates` e `dotnet new avalonia
 | Tela              | Conteúdo                                                                                                                                                       |
 |-------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Hoje**          | Resumo da semana (% e check-ins), metas em andamento/concluídas, sequência; lista "Metas de hoje" com progresso no período atual e botão de check-in; próximos lembretes do dia |
-| **Metas**         | Lista (filtro ativas/arquivadas), criar, editar, arquivar                                                                                                       |
-| **Editar meta**   | Título, tipo (única/diária/semanal), alvo (oculto em única), ícone e cor, intervalo, horário ativo, dias da semana, início e fim opcionais                      |
+| **Metas**         | Lista (filtro ativas/arquivadas), criar, editar, arquivar, desarquivar. Meta arquivada é somente leitura (só desarquivar ou excluir)                            |
+| **Editar meta**   | Título, tipo (única/diária/semanal), alvo (oculto em única), ícone e cor, intervalo, horário ativo, dias da semana, início e fim opcionais. Abre como página no lugar da lista (desktop e celular); excluir com confirmação na própria página |
 | **Relatórios**    | Alternar semanal/mensal, navegar entre períodos, barras por dia/semana + tabela por meta                                                                       |
 | **Configurações** | Autostart, duração do "adiar", ao fechar a janela (desktop)                                                                                                     |
 | **Lembrete**      | Notificação nativa do SO com as três ações (janela própria do Avalonia só como fallback)                                                                       |
@@ -380,6 +380,16 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 - Navegação padronizada: Hoje, Metas, Relatórios, Configurações.
 - `specs/` versionada no repositório git junto com o código.
 - Forma de trabalho: o assistente implementa e explica; o autor revisa e aprova por fase.
+
+**Decisões da Fase 2 (01/11/2026):**
+
+- O tipo de recorrência pode ser alterado a qualquer momento; relatórios passados passam a ser calculados com o tipo atual.
+- Meta arquivada é somente leitura: só pode ser desarquivada ou excluída. Assim uma tarefa única concluída (sempre arquivada) nunca é editada.
+- Desarquivar é permitido, exceto para tarefa única concluída (desfazer a conclusão é pelo "desfazer check-in", Fase 3) e para meta cujo fim já passou (seria arquivada de novo; cria-se outra meta).
+- Data de fim no passado é recusada ao criar ou editar.
+- O arquivamento automático por fim do período roda ao abrir a tela Metas; a virada de dia em tempo real fica para a Fase 4.
+- Ícones: subconjunto fixo de 16 ícones de traço do Lucide (licença ISC), embutidos como geometria; chave desconhecida no banco cai no ícone padrão `target`.
+- Formulário de meta como página dentro da tela Metas (mesma solução no desktop e no celular).
 
 **Pendências:** versão mínima do Android (Fase 7c; sugestão do spike: Android 8.0, API 26); sincronização entre dispositivos (fora do MVP).
 

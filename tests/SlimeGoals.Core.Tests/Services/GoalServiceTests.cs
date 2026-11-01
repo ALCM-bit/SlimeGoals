@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Time.Testing;
 using SlimeGoals.Core.Services;
-using SlimeGoals.Core.Tests.Fakes;
+using SlimeGoals.Testing;
 using SlimeGoals.Core.Tests.Validation;
 using SlimeGoals.Core.Validation;
 
