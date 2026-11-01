@@ -59,7 +59,7 @@ Aplicação multiplataforma para cadastrar metas (tarefas únicas, hábitos diá
 - **CommunityToolkit.Mvvm e DI da Microsoft:** padrões do ecossistema, com source generators e pouca cerimônia.
 - **Sem biblioteca de gráficos no início:** menos dependência e menos risco de incompatibilidade com o Avalonia.
 
-**Ambiente:** o workload Android (`dotnet workload install android`), o JDK e o Android SDK ainda não estão instalados; a instalação faz parte do spike Android da Fase 0.
+**Ambiente:** workload Android instalado no SDK da distro (`sudo dotnet workload install android`), JDK 21 do `pacman` e Android SDK em `~/Android/Sdk`; comandos em `specs/spikes/android-alarme.md`.
 
 ## 5. Arquitetura hexagonal (portas e adaptadores), versão pragmática
 
@@ -235,7 +235,7 @@ No Linux, o arquivo fica em `$XDG_DATA_HOME` (padrão `~/.local/share/SlimeGoals
 6.  Notificação sem resposta conta como ignorada ao expirar. O prazo é controlado pelo app: o GNOME ignora `expire_timeout` e mantém a notificação na central (confirmado no spike, `specs/spikes/gnome-notificacoes.md`). Fechar a notificação no X (`NotificationClosed`, motivo 2, sem `ActionInvoked` antes) também conta como ignorada.
 7.  **Entrega das ações no Linux:** o GNOME envia `ActionInvoked` apenas para a conexão D-Bus que criou a notificação; com o processo encerrado, o clique é perdido sem aviso. Por isso o adaptador mantém uma única conexão de vida longa e, ao encerrar o app, retira as notificações pendentes (`CloseNotification`). A ativação via D-Bus (`org.gtk.Notifications` ou portal) é avaliada na Fase 4c.
 8.  **Linux (GNOME):** o app continua em segundo plano com a janela fechada; fechar oculta por padrão (configurável). O GNOME não exibe ícone de bandeja por padrão, então a bandeja é opcional (extensão AppIndicator). Sem ela, o app é reaberto pelo atalho do aplicativo (instância única) ou pela notificação. No Wayland, clicar na notificação e chamar `Show()` + `Activate()` trouxe a janela à frente (spike); o GNOME também envia `ActivationToken` (xdg-activation), disponível se for preciso.
-9.  **Android:** exige permissão de notificações (Android 13+), permissão de alarme exato (Android 12+) e tratamento do modo Doze, a validar no spike.
+9.  **Android:** exige permissão de notificações (Android 13+) e de alarme exato (Android 12+); no Android 16 as duas vêm **negadas** num app recém-instalado e são pedidas num fluxo de primeira execução (`ACTION_REQUEST_SCHEDULE_EXACT_ALARM` abre direto a página do app). `SetExactAndAllowWhileIdle` dispara no horário mesmo com o processo morto e em Doze profundo; o Android cria o processo só para o receiver, e a ação da notificação chega a um `BroadcastReceiver` sem UI (confirmado no spike, `specs/spikes/android-alarme.md`). Desligar a permissão de alarme exato cancela os alarmes: reagendar quando ela voltar e avisar na tela Hoje se faltar alguma permissão.
 10. Tratar suspensão do computador (Linux: recalcular ao retomar, via sinal do systemd-logind).
 
 ## 10. Relatórios
@@ -348,8 +348,8 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 | Wayland (padrão do GNOME) pode impedir trazer a janela para a frente; o Avalonia roda via XWayland       | **Validado no spike:** a janela volta à frente ao clicar na notificação                                   |
 | Ação de notificação perdida quando o processo do app não está rodando                                    | Retirar notificações pendentes ao sair; avaliar ativação D-Bus (`org.gtk.Notifications`/portal) na Fase 4c |
 | Modo Não Perturbe do GNOME silencia os banners                                                           | Documentar; lembretes continuam na central de notificações; avaliar aviso na tela Hoje                    |
-| Android: o sistema encerra o processo e restringe alarmes (Doze, alarme exato, permissão de notificação) | Alarme do sistema + receiver de boot; handler de resposta sem UI; validar no spike da Fase 0 e na Fase 7b |
-| Suporte mobile do Avalonia menos maduro                                                                  | Spike Android já na Fase 0, antes de investir nas telas                                                   |
+| Android: o sistema encerra o processo e restringe alarmes (Doze, alarme exato, permissão de notificação) | **Validado no emulador (Android 16):** alarme exato e ação funcionam com o processo morto e em Doze. Falta validar restrições de fabricantes num aparelho real e o receiver de boot (Fase 7b) |
+| Suporte mobile do Avalonia menos maduro                                                                  | **Validado no spike:** abertura a frio de 1,0–1,2 s (Debug, emulador); no Android o ciclo de vida é `IActivityApplicationLifetime` |
 | Fuso horário e horário de verão                                                                          | Instantes em UTC, datas de calendário locais, conversão na borda via `GoalPeriod`                         |
 | Três tipos de recorrência multiplicam casos de borda                                                     | Regra centralizada em `GoalPeriod`; testes por tipo antes de qualquer tela                                |
 | Semanas e dias parciais                                                                                  | Alvo não proporcionalizado; arquivamento automático ao fim                                                |
@@ -381,7 +381,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 - `specs/` versionada no repositório git junto com o código.
 - Forma de trabalho: o assistente implementa e explica; o autor revisa e aprova por fase.
 
-**Pendências:** versão mínima do Android (Fase 7c); sincronização entre dispositivos (fora do MVP).
+**Pendências:** versão mínima do Android (Fase 7c; sugestão do spike: Android 8.0, API 26); sincronização entre dispositivos (fora do MVP).
 
 **Próximos passos imediatos:**
 
