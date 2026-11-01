@@ -1,11 +1,20 @@
+using Microsoft.Extensions.Time.Testing;
 using SlimeGoals.App.ViewModels;
+using SlimeGoals.Core.Services;
+using SlimeGoals.Testing;
 
 namespace SlimeGoals.App.Tests;
 
 public class ShellViewModelTests
 {
+    private static GoalsPageViewModel Goals()
+    {
+        var time = new FakeTimeProvider();
+        return new GoalsPageViewModel(new GoalService(new InMemoryGoalRepository(), time), time);
+    }
+
     private static ShellViewModel Create() => new(new PageViewModel[]
-        { new TodayPageViewModel(), new GoalsPageViewModel(), new ReportsPageViewModel(), new SettingsPageViewModel() });
+        { new TodayPageViewModel(), Goals(), new ReportsPageViewModel(), new SettingsPageViewModel() });
 
     [Fact]
     public void Pages_follow_spec_order_and_start_on_today()
@@ -32,7 +41,7 @@ public class ShellViewModelNullSelectionTests
     [Fact]
     public void Setting_current_page_to_null_keeps_previous_page()
     {
-        var shell = new ShellViewModel([new TodayPageViewModel(), new GoalsPageViewModel()]);
+        var shell = new ShellViewModel([new TodayPageViewModel(), new SettingsPageViewModel()]);
         shell.CurrentPage = shell.Pages[1];
 
         shell.CurrentPage = null!;
