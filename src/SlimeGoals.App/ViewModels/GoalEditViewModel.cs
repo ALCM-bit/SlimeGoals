@@ -17,6 +17,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
 {
     private static readonly int[] StandardIntervals = [15, 30, 60, 90, 120, 180, 240, 360, 720, 1440];
     private const string MissingTime = "Informe o horário.";
+    private const string MissingTarget = "Informe o alvo.";
 
     private readonly GoalService _service;
     private readonly Goal? _existing;
@@ -24,6 +25,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
     private readonly Dictionary<string, string> _errors = [];
     private bool _submitted;
     private int _rememberedTarget;
+    private bool _targetMissing;
 
     public GoalEditViewModel(GoalService service, Goal? existing, Action<bool> close)
     {
@@ -84,6 +86,29 @@ public sealed partial class GoalEditViewModel : ObservableObject
     public partial Recurrence Recurrence { get; set; }
 
     [ObservableProperty] public partial int Target { get; set; }
+
+    /// <summary>
+    /// Ponte para o NumericUpDown, que trabalha com decimal? e devolve null quando o campo é apagado.
+    /// Sem ela, o null não chegaria a <see cref="Target"/> e a meta seria salva com o alvo anterior.
+    /// </summary>
+    public decimal? TargetInput
+    {
+        get => _targetMissing ? null : Target;
+        set
+        {
+            _targetMissing = value is null;
+            if (value is { } v)
+                Target = (int)Math.Round(v, MidpointRounding.AwayFromZero);
+            OnPropertyChanged();
+            RevalidateIfSubmitted();
+        }
+    }
+
+    partial void OnTargetChanged(int value)
+    {
+        _targetMissing = false;
+        OnPropertyChanged(nameof(TargetInput));
+    }
     [ObservableProperty] public partial IconOption SelectedIcon { get; set; }
     [ObservableProperty] public partial ColorOption SelectedColor { get; set; }
     [ObservableProperty] public partial IntervalOption SelectedInterval { get; set; }
@@ -158,6 +183,11 @@ public sealed partial class GoalEditViewModel : ObservableObject
         {
             GeneralError = "Esta meta não existe mais.";
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Erro inesperado (banco travado, disco cheio): exceção solta num AsyncRelayCommand derrubaria o app.
+            GeneralError = "Não foi possível salvar a meta.";
+        }
     }
 
     [RelayCommand]
@@ -184,6 +214,10 @@ public sealed partial class GoalEditViewModel : ObservableObject
         catch (GoalNotFoundException)
         {
             GeneralError = "Esta meta não existe mais.";
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            GeneralError = "Não foi possível excluir a meta.";
         }
     }
 
@@ -224,6 +258,12 @@ public sealed partial class GoalEditViewModel : ObservableObject
             errors.RemoveAll(x => x.Field == nameof(GoalDraft.ActiveUntil));
             if (ActiveFrom is null) errors.Add((nameof(GoalDraft.ActiveFrom), MissingTime));
             if (ActiveUntil is null) errors.Add((nameof(GoalDraft.ActiveUntil), MissingTime));
+        }
+
+        if (ShowsTarget && _targetMissing)
+        {
+            errors.RemoveAll(x => x.Field == nameof(GoalDraft.Target));
+            errors.Add((nameof(GoalDraft.Target), MissingTarget));
         }
 
         SetErrors(errors);

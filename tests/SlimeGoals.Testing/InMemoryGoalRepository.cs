@@ -11,14 +11,19 @@ public sealed class InMemoryGoalRepository : IGoalRepository
 
     public int Count => _goals.Count;
 
+    /// <summary>Quando definido, toda escrita lança esta exceção (simula banco travado, disco cheio...).</summary>
+    public Exception? FailWritesWith { get; set; }
+
     public Task AddAsync(Goal goal, CancellationToken ct = default)
     {
+        if (FailWritesWith is not null) throw FailWritesWith;
         _goals.Add(goal.Id, goal);
         return Task.CompletedTask;
     }
 
     public Task UpdateAsync(Goal goal, CancellationToken ct = default)
     {
+        if (FailWritesWith is not null) throw FailWritesWith;
         if (!_goals.ContainsKey(goal.Id)) throw new GoalNotFoundException(goal.Id);
         _goals[goal.Id] = goal;
         return Task.CompletedTask;

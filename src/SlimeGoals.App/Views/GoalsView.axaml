@@ -61,9 +61,23 @@
                       <Button Classes="ghost" Content="Arquivar" IsVisible="{Binding !IsArchived}"
                               Command="{Binding $parent[ItemsControl].((vm:GoalsPageViewModel)DataContext).ArchiveCommand}"
                               CommandParameter="{Binding}" />
-                      <Button Classes="ghost" Content="Desarquivar" IsVisible="{Binding CanUnarchive}"
-                              Command="{Binding $parent[ItemsControl].((vm:GoalsPageViewModel)DataContext).UnarchiveCommand}"
-                              CommandParameter="{Binding}" />
+                      <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsConfirmingDelete}">
+                        <Button Classes="ghost" Content="Desarquivar" IsVisible="{Binding CanUnarchive}"
+                                Command="{Binding $parent[ItemsControl].((vm:GoalsPageViewModel)DataContext).UnarchiveCommand}"
+                                CommandParameter="{Binding}" />
+                        <Button Classes="danger" Content="Excluir" IsVisible="{Binding IsArchived}"
+                                Command="{Binding $parent[ItemsControl].((vm:GoalsPageViewModel)DataContext).RequestDeleteCommand}"
+                                CommandParameter="{Binding}" />
+                      </StackPanel>
+                      <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsConfirmingDelete}">
+                        <TextBlock Text="Excluir esta meta?" VerticalAlignment="Center" Foreground="{DynamicResource Warning}" />
+                        <Button Classes="ghost" Content="Cancelar"
+                                Command="{Binding $parent[ItemsControl].((vm:GoalsPageViewModel)DataContext).CancelDeleteCommand}"
+                                CommandParameter="{Binding}" />
+                        <Button Classes="danger-solid" Content="Excluir"
+                                Command="{Binding $parent[ItemsControl].((vm:GoalsPageViewModel)DataContext).ConfirmDeleteCommand}"
+                                CommandParameter="{Binding}" />
+                      </StackPanel>
                     </StackPanel>
                   </Grid>
                 </Border>

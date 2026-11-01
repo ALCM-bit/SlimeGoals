@@ -84,6 +84,23 @@ public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider
     private Task UnarchiveAsync(GoalItemViewModel? item) =>
         RunAsync(item, id => service.UnarchiveAsync(id));
 
+    // Meta arquivada só pode ser desarquivada ou excluída (spec §15); a exclusão pede confirmação no cartão.
+    [RelayCommand]
+    private static void RequestDelete(GoalItemViewModel? item)
+    {
+        if (item is not null) item.IsConfirmingDelete = true;
+    }
+
+    [RelayCommand]
+    private static void CancelDelete(GoalItemViewModel? item)
+    {
+        if (item is not null) item.IsConfirmingDelete = false;
+    }
+
+    [RelayCommand]
+    private Task ConfirmDeleteAsync(GoalItemViewModel? item) =>
+        RunAsync(item, id => service.DeleteAsync(id));
+
     /// <summary>
     /// Executa a ação e recarrega. Erro de estado: mostra a mensagem sem recarregar (a lista continua certa).
     /// Meta sumiu: recarrega e só depois mostra a mensagem, porque a recarga limpa <see cref="ErrorMessage"/>.
@@ -106,6 +123,12 @@ public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider
         catch (GoalNotFoundException)
         {
             error = "Esta meta não existe mais.";
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Erro inesperado do banco: mostra a mensagem em vez de derrubar o app.
+            ErrorMessage = "Não foi possível concluir a ação.";
+            return;
         }
         await LoadCommand.ExecuteAsync(null);
         ErrorMessage ??= error;

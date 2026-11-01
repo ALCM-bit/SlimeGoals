@@ -60,7 +60,7 @@
         <StackPanel Classes="field" IsVisible="{Binding ShowsTarget}">
           <TextBlock Classes="field-label" Text="Alvo" />
           <StackPanel Orientation="Horizontal" Spacing="10">
-            <NumericUpDown Value="{Binding Target}" Minimum="1" Maximum="99" Increment="1" FormatString="0"
+            <NumericUpDown Value="{Binding TargetInput}" Minimum="1" Maximum="99" Increment="1" FormatString="0"
                            Width="130" AutomationProperties.Name="Alvo" />
             <TextBlock Text="{Binding TargetSuffix}" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
           </StackPanel>

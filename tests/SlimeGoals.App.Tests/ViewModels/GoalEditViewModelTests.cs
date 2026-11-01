@@ -227,4 +227,59 @@ public class GoalEditViewModelTests
         (await _repo.ListAsync(includeArchived: false)).Single().ActiveDays
             .Should().Be(WeekDays.Saturday | WeekDays.Sunday);
     }
+
+    // Revisão final #2: NumericUpDown devolve null quando o campo é apagado.
+    [Fact]
+    public async Task Cleared_target_reports_error_and_saves_nothing()
+    {
+        var vm = New();
+        vm.Title = "Ler";
+        vm.Target = 5;
+
+        vm.TargetInput = null;
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        vm.TargetError.Should().Be("Informe o alvo.");
+        _repo.Count.Should().Be(0);
+        _closed.Should().BeEmpty();
+
+        vm.TargetInput = 3;
+        vm.TargetError.Should().BeNull();
+        vm.Target.Should().Be(3);
+    }
+
+    [Fact]
+    public void Target_input_follows_target_changes()
+    {
+        var vm = New();
+        vm.Target = 4;
+        vm.TargetInput.Should().Be(4);
+    }
+
+    // Revisão final #3: erro inesperado do banco não pode derrubar o app.
+    [Fact]
+    public async Task Unexpected_error_on_save_shows_general_error()
+    {
+        var vm = New();
+        vm.Title = "Ler";
+        _repo.FailWritesWith = new IOException("disco cheio");
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        vm.GeneralError.Should().Be("Não foi possível salvar a meta.");
+        _closed.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Unexpected_error_on_delete_shows_general_error()
+    {
+        var vm = Edit(await Existing());
+        _repo.FailWritesWith = new IOException("disco cheio");
+
+        vm.DeleteCommand.Execute(null);
+        await vm.ConfirmDeleteCommand.ExecuteAsync(null);
+
+        vm.GeneralError.Should().Be("Não foi possível excluir a meta.");
+        _closed.Should().BeEmpty();
+    }
 }

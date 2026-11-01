@@ -209,4 +209,39 @@ public class GoalsPageViewModelTests
         _vm.ErrorMessage.Should().Be("Esta meta não existe mais.");
         _vm.Goals.Should().BeEmpty();
     }
+
+    // Revisão final #1: arquivada só pode ser desarquivada ou excluída (spec §15).
+    [Fact]
+    public async Task Archived_goal_can_be_deleted_after_confirmation()
+    {
+        var goal = await Create("Vencida", end: Today);
+        _time.Advance(TimeSpan.FromDays(1));
+        _vm.ShowArchived = true;
+        await _vm.LoadCommand.ExecutionTask!;
+        var item = _vm.Goals.Single();
+
+        _vm.RequestDeleteCommand.Execute(item);
+        item.IsConfirmingDelete.Should().BeTrue();
+        _vm.CancelDeleteCommand.Execute(item);
+        item.IsConfirmingDelete.Should().BeFalse();
+
+        _vm.RequestDeleteCommand.Execute(item);
+        await _vm.ConfirmDeleteCommand.ExecuteAsync(item);
+
+        _vm.Goals.Should().BeEmpty();
+        (await _service.GetAsync(goal.Id)).Should().BeNull();
+    }
+
+    // Revisão final #3
+    [Fact]
+    public async Task Unexpected_error_on_action_shows_message_instead_of_crashing()
+    {
+        await Create("Ativa");
+        await Load();
+        _repo.FailWritesWith = new IOException("banco travado");
+
+        await _vm.ArchiveCommand.ExecuteAsync(_vm.Goals.Single());
+
+        _vm.ErrorMessage.Should().Be("Não foi possível concluir a ação.");
+    }
 }
