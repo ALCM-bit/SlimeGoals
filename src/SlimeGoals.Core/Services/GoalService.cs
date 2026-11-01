@@ -101,11 +101,16 @@ public sealed class GoalService(IGoalRepository goals, TimeProvider time)
     public Task<IReadOnlyList<Goal>> ListAsync(bool includeArchived = false, CancellationToken ct = default) =>
         goals.ListAsync(includeArchived, ct);
 
-    /// <summary>O banco guarda horários como HH:mm: descarta segundos antes de validar e salvar.</summary>
+    /// <summary>
+    /// O banco guarda horários como HH:mm: descarta segundos. Unidade só existe na quantidade;
+    /// conclusão tem sempre alvo 1 (spec §5.2).
+    /// </summary>
     private static GoalDraft Normalize(GoalDraft draft) => draft with
     {
         ActiveFrom = new TimeOnly(draft.ActiveFrom.Hour, draft.ActiveFrom.Minute),
         ActiveUntil = new TimeOnly(draft.ActiveUntil.Hour, draft.ActiveUntil.Minute),
+        Target = draft.Measure == Measure.Completion ? 1 : draft.Target,
+        Unit = draft.Measure == Measure.Quantity ? draft.Unit?.Trim() : null,
     };
 
     /// <summary>Data de hoje no fuso local do relógio injetado.</summary>
@@ -123,12 +128,14 @@ public sealed class GoalService(IGoalRepository goals, TimeProvider time)
     private async Task<Goal> GetExistingAsync(Guid id, CancellationToken ct) =>
         await goals.GetAsync(id, ct) ?? throw new GoalNotFoundException(id);
 
-    /// <summary>Copia os campos editáveis do rascunho; preserva id, criação, conclusão e arquivamento.</summary>
+    /// <summary>Copia os campos editáveis do rascunho; preserva id, criação e arquivamento.</summary>
     private static Goal Apply(Goal goal, GoalDraft draft) => goal with
     {
         Title = draft.Title.Trim(),
         Recurrence = draft.Recurrence,
         Target = draft.Target,
+        Measure = draft.Measure,
+        Unit = draft.Unit,
         Icon = draft.Icon,
         Color = draft.Color,
         ReminderEveryMinutes = draft.ReminderEveryMinutes,

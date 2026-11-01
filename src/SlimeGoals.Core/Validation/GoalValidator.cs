@@ -9,7 +9,10 @@ namespace SlimeGoals.Core.Validation;
 public static class GoalValidator
 {
     public const int MaxTitleLength = 80;
-    public const int MaxTarget = 99;
+    public const int MaxQuantityTarget = 9999;
+    public const int MaxDailyMinutes = 24 * 60;
+    public const int MaxWeeklyMinutes = 7 * 24 * 60;
+    public const int MaxUnitLength = 20;
     public const int MinReminderMinutes = 5;
     public const int MaxReminderMinutes = 24 * 60;
 
@@ -24,8 +27,7 @@ public static class GoalValidator
         else if (title.Length > MaxTitleLength)
             Add(nameof(GoalDraft.Title), $"O título deve ter até {MaxTitleLength} caracteres.");
 
-        if (draft.Target is < 1 or > MaxTarget)
-            Add(nameof(GoalDraft.Target), $"O alvo deve ser entre 1 e {MaxTarget}.");
+        ValidateTarget(draft, Add);
 
         if (draft.ReminderEveryMinutes is < MinReminderMinutes or > MaxReminderMinutes)
             Add(nameof(GoalDraft.ReminderEveryMinutes), "O intervalo deve ser entre 5 minutos e 24 horas.");
@@ -43,5 +45,33 @@ public static class GoalValidator
             Add(nameof(GoalDraft.Icon), "Escolha um ícone.");
 
         return errors;
+    }
+
+    private static void ValidateTarget(GoalDraft draft, Action<string, string> add)
+    {
+        const string target = nameof(GoalDraft.Target);
+        switch (draft.Measure)
+        {
+            case Measure.Completion:
+                if (draft.Target != 1)
+                    add(target, "Meta de conclusão tem alvo 1.");
+                break;
+            case Measure.Quantity:
+                if (draft.Target is < 1 or > MaxQuantityTarget)
+                    add(target, $"O alvo deve ser entre 1 e {MaxQuantityTarget}.");
+                var unit = draft.Unit?.Trim() ?? "";
+                if (unit.Length == 0)
+                    add(nameof(GoalDraft.Unit), "Informe a unidade.");
+                else if (unit.Length > MaxUnitLength)
+                    add(nameof(GoalDraft.Unit), $"A unidade deve ter até {MaxUnitLength} caracteres.");
+                break;
+            case Measure.Duration:
+                var (max, label) = draft.Recurrence == Recurrence.Daily ? (MaxDailyMinutes, "24 h") : (MaxWeeklyMinutes, "168 h");
+                if (draft.Target < 1 || draft.Target > max)
+                    add(target, $"O tempo deve ser entre 1 min e {label}.");
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(draft), draft.Measure, "Medida desconhecida.");
+        }
     }
 }

@@ -10,6 +10,12 @@ public sealed record Goal
     public required string Title { get; init; }
     public required Recurrence Recurrence { get; init; }
     public required int Target { get; init; }
+
+    /// <summary>Padrão = metas anteriores à v1.4 (mesmo DEFAULT da migração 003).</summary>
+    public Measure Measure { get; init; } = Measure.Quantity;
+
+    /// <summary>Unidade livre; só em <see cref="Measure.Quantity"/>, nula nas outras medidas.</summary>
+    public string? Unit { get; init; } = "vezes";
     public required string Icon { get; init; }
     public required GoalColor Color { get; init; }
     public required int ReminderEveryMinutes { get; init; }

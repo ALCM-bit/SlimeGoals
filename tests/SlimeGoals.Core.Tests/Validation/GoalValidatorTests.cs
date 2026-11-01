@@ -33,10 +33,51 @@ public class GoalValidatorTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(100)]
-    public void Recurring_target_must_be_1_to_99(int target) =>
+    [InlineData(10000)]
+    public void Quantity_target_must_be_1_to_9999(int target) =>
         ShouldHaveSingleError(Valid() with { Target = target },
-            nameof(GoalDraft.Target), "O alvo deve ser entre 1 e 99.");
+            nameof(GoalDraft.Target), "O alvo deve ser entre 1 e 9999.");
+
+    [Fact]
+    public void Quantity_target_accepts_9999_and_rejects_10000()
+    {
+        GoalValidator.Validate(Valid() with { Target = 9999 }).Should().BeEmpty();
+        ShouldHaveSingleError(Valid() with { Target = 10000 }, nameof(GoalDraft.Target), "O alvo deve ser entre 1 e 9999.");
+    }
+
+    [Fact]
+    public void Duration_target_limit_depends_on_recurrence()
+    {
+        var daily = Valid() with { Measure = Measure.Duration, Unit = null, Recurrence = Recurrence.Daily };
+        var weekly = daily with { Recurrence = Recurrence.Weekly };
+
+        GoalValidator.Validate(daily with { Target = 1440 }).Should().BeEmpty();
+        ShouldHaveSingleError(daily with { Target = 1441 }, nameof(GoalDraft.Target), "O tempo deve ser entre 1 min e 24 h.");
+        GoalValidator.Validate(weekly with { Target = 10080 }).Should().BeEmpty();
+        ShouldHaveSingleError(weekly with { Target = 10081 }, nameof(GoalDraft.Target), "O tempo deve ser entre 1 min e 168 h.");
+        ShouldHaveSingleError(weekly with { Target = 0 }, nameof(GoalDraft.Target), "O tempo deve ser entre 1 min e 168 h.");
+    }
+
+    [Fact]
+    public void Completion_requires_target_1()
+    {
+        var completion = Valid() with { Measure = Measure.Completion, Unit = null, Target = 1 };
+        GoalValidator.Validate(completion).Should().BeEmpty();
+        ShouldHaveSingleError(completion with { Target = 2 }, nameof(GoalDraft.Target), "Meta de conclusão tem alvo 1.");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("   ")]
+    public void Quantity_requires_unit(string? unit) =>
+        ShouldHaveSingleError(Valid() with { Unit = unit }, nameof(GoalDraft.Unit), "Informe a unidade.");
+
+    [Fact]
+    public void Unit_longer_than_20_is_rejected()
+    {
+        GoalValidator.Validate(Valid() with { Unit = " " + new string('a', 20) + " " }).Should().BeEmpty();
+        ShouldHaveSingleError(Valid() with { Unit = new string('a', 21) }, nameof(GoalDraft.Unit), "A unidade deve ter até 20 caracteres.");
+    }
 
     [Theory]
     [InlineData(4)]

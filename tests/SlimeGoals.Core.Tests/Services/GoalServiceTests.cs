@@ -1,3 +1,4 @@
+using SlimeGoals.Core.Domain;
 using Microsoft.Extensions.Time.Testing;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Testing;
@@ -108,5 +109,23 @@ public class GoalServiceTimeNormalizationTests
             { ActiveFrom = new TimeOnly(9, 0, 30), ActiveUntil = new TimeOnly(18, 0, 59) });
         goal.ActiveFrom.Should().Be(new TimeOnly(9, 0));
         goal.ActiveUntil.Should().Be(new TimeOnly(18, 0));
+    }
+}
+
+public class GoalServiceMeasureNormalizationTests
+{
+    private readonly InMemoryGoalRepository _repo = new();
+    private GoalService Service => new(_repo, new FakeTimeProvider());
+
+    [Fact]
+    public async Task Create_normalizes_completion_and_duration()
+    {
+        var completion = await Service.CreateAsync(GoalValidatorTests.Valid() with { Measure = Measure.Completion, Target = 5, Unit = "x" });
+        var duration = await Service.CreateAsync(GoalValidatorTests.Valid() with { Measure = Measure.Duration, Target = 90, Unit = "x" });
+        var quantity = await Service.CreateAsync(GoalValidatorTests.Valid() with { Unit = " copos " });
+
+        (completion.Measure, completion.Target, completion.Unit).Should().Be((Measure.Completion, 1, (string?)null));
+        (duration.Measure, duration.Target, duration.Unit).Should().Be((Measure.Duration, 90, (string?)null));
+        (quantity.Measure, quantity.Unit).Should().Be((Measure.Quantity, "copos"));
     }
 }
