@@ -18,6 +18,8 @@ internal sealed class GoalRow
     public required string Title { get; init; }
     public required string Recurrence { get; init; }
     public required int Target { get; init; }
+    public required string Measure { get; init; }
+    public string? Unit { get; init; }
     public required string Icon { get; init; }
     public required string Color { get; init; }
     public required int ReminderEveryMin { get; init; }
@@ -42,6 +44,14 @@ internal sealed class GoalRow
             _ => throw new ArgumentOutOfRangeException(nameof(g), g.Recurrence, null),
         },
         Target = g.Target,
+        Measure = g.Measure switch
+        {
+            Core.Domain.Measure.Completion => "completion",
+            Core.Domain.Measure.Quantity => "quantity",
+            Core.Domain.Measure.Duration => "duration",
+            _ => throw new ArgumentOutOfRangeException(nameof(g), g.Measure, null),
+        },
+        Unit = g.Unit,
         Icon = g.Icon,
         Color = g.Color.ToString().ToLowerInvariant(),
         ReminderEveryMin = g.ReminderEveryMinutes,
@@ -67,6 +77,14 @@ internal sealed class GoalRow
             _ => throw new FormatException($"Recorrência desconhecida no banco: '{Recurrence}'."),
         },
         Target = Target,
+        Measure = Measure switch
+        {
+            "completion" => Core.Domain.Measure.Completion,
+            "quantity" => Core.Domain.Measure.Quantity,
+            "duration" => Core.Domain.Measure.Duration,
+            _ => throw new FormatException($"Medida desconhecida no banco: '{Measure}'."),
+        },
+        Unit = Unit,
         Icon = Icon,
         Color = Enum.Parse<GoalColor>(Color, ignoreCase: true),
         ReminderEveryMinutes = ReminderEveryMin,
@@ -81,9 +99,7 @@ internal sealed class GoalRow
         DeletedAt = DeletedAt is null ? null : ParseInstant(DeletedAt),
     };
 
-    /// <summary>ISO 8601 round-trip em UTC: ordena corretamente como texto.</summary>
-    private static string Instant(DateTimeOffset value) => value.ToUniversalTime().ToString("O", Inv);
+    private static string Instant(DateTimeOffset value) => SqlText.Instant(value);
 
-    private static DateTimeOffset ParseInstant(string value) =>
-        DateTimeOffset.ParseExact(value, "O", Inv, DateTimeStyles.RoundtripKind);
+    private static DateTimeOffset ParseInstant(string value) => SqlText.ParseInstant(value);
 }

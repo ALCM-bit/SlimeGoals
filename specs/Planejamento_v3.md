@@ -125,8 +125,9 @@ A medida é independente da recorrência: diz **o que** se conta no período; a 
 | `duration` (tempo)       | minutos ≥ 1 (o formulário mostra horas + minutos)       | inteiro com sinal, em minutos      | "2 h 30 de 5 h na semana"    |
 
 - **Registros com sinal:** o usuário ajusta o total do período com **+** e **−** (ou digitando um valor e escolhendo Adicionar/Remover). Cada ajuste é um registro em `checkins`; o progresso é a soma do período. Assim os relatórios sabem quando cada coisa aconteceu. O total do período **nunca fica negativo**: remover mais do que existe é recusado. Não há edição nem "desfazer" de registros individuais no MVP.
+- **Limites:** alvo da quantidade 1–9999; alvo do tempo 1 min–24 h na diária e 1 min–168 h na semanal; unidade até 20 caracteres; nota até 200; valor de um registro: ±1 na conclusão, até 9999 na quantidade e até 24 h no tempo (em módulo).
 - **Só inteiros:** sem frações (quem precisa usa uma unidade menor, como ml). Evita arredondamento no SQLite.
-- **Cronômetro (só `duration`):** um por vez em todo o app, gravado em `active_timer` (instante de início em UTC), para sobreviver ao fechamento do app e ao processo morto no Android. Ao parar, o tempo é arredondado para minutos e mostrado para conferência; o usuário registra (pode ajustar) ou descarta. Iniciar outro cronômetro pede para parar o atual.
+- **Cronômetro (só `duration`):** um por vez em todo o app, gravado em `active_timer` (instante de início em UTC), para sobreviver ao fechamento do app e ao processo morto no Android. Ao parar, o tempo é arredondado para minutos (`stopped_at` gravado, para não se perder se o app fechar) e mostrado para conferência; o usuário registra (pode ajustar) ou descarta. Iniciar outro cronômetro pede para parar o atual.
 - **Trocar a medida** só é permitido enquanto a meta não tem registros (30 "copos" não viram 30 minutos). A recorrência continua podendo ser trocada sempre.
 - Cumprida quando a soma do período ≥ `target` (conclusão: ≥ 1). A soma pode passar do alvo.
 
@@ -241,7 +242,8 @@ CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE active_timer (            -- no máximo uma linha (v1.4)
   id INTEGER PRIMARY KEY CHECK (id = 1),
   goal_id TEXT NOT NULL REFERENCES goals(id),
-  started_at TEXT NOT NULL            -- ISO 8601 (UTC)
+  started_at TEXT NOT NULL,           -- ISO 8601 (UTC)
+  stopped_at TEXT                     -- preenchido = parado, aguardando registrar ou descartar
 );
 CREATE INDEX idx_checkins_goal_date ON checkins(goal_id, done_at);
 CREATE INDEX idx_reminder_log_goal ON reminder_log(goal_id, fired_at);

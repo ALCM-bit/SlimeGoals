@@ -18,6 +18,8 @@ public static class InfrastructureServiceCollectionExtensions
         var connectionString = new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString();
         services.AddSingleton(new SqliteConnectionFactory(connectionString));
         services.AddSingleton<IGoalRepository, GoalRepository>();
+        services.AddSingleton<ICheckinRepository, CheckinRepository>();
+        services.AddSingleton<ITimerRepository, TimerRepository>();
         return services;
     }
 }
