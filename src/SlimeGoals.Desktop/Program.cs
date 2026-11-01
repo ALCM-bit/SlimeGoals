@@ -11,6 +11,8 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        InputMethodEnvironment.Apply(Environment.GetEnvironmentVariable, Environment.SetEnvironmentVariable);
+
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var databasePath = XdgPaths.DatabasePath(Environment.GetEnvironmentVariable, home);
 
