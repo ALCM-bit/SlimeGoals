@@ -1,8 +1,8 @@
 # Gestor de Metas — Especificação e Plano de Implementação (Avalonia + C#)
 
-> Versão 1.3 · Alvos iniciais: Linux (desktop) e Android · .NET 10 LTS · Dark mode roxo suave
+> Versão 1.4 · Alvos iniciais: Linux (desktop) e Android · .NET 10 LTS · Dark mode roxo suave
 >
-> Substitui a v1.2 (`Planejamento_v2.md`, mantida como histórico). Mudanças principais: tipos de recorrência (`daily`, `weekly`; a tarefa única `once` foi removida em 01/11/2026) unificados pelo conceito de **período de avaliação**; semana fixa de segunda a domingo; referência visual v4 (desktop) e v3 (mobile); ícone e cor por meta. Ver seção 15.
+> Substitui a v1.2 (`Planejamento_v2.md`, mantida como histórico). Mudanças principais: tipos de recorrência (`daily`, `weekly`; a tarefa única `once` foi removida em 01/11/2026) unificados pelo conceito de **período de avaliação**; semana fixa de segunda a domingo; referência visual v4 (desktop) e v3 (mobile); ícone e cor por meta; **medida** por meta (conclusão, quantidade ou tempo, v1.4). Ver seção 15.
 
 ## 1. Visão geral
 
@@ -16,9 +16,9 @@ Aplicação multiplataforma para cadastrar metas (hábitos diários e metas sema
 
 | ID   | Requisito                                                                                                                                                                                                                       |
 |------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| RF01 | CRUD de metas: título, tipo de recorrência (`daily`, `weekly`), alvo do período, ícone e cor, intervalo de lembrete, horário e dias ativos, início e fim opcionais                                                       |
-| RF02 | Tela "Hoje": metas com progresso **no período atual de cada uma** (dia ou semana) e botão de check-in rápido                                                                                              |
-| RF03 | Registrar check-in (quantidade e nota opcional) e desfazer o último                                                                                                                                                             |
+| RF01 | CRUD de metas: título, tipo de recorrência (`daily`, `weekly`), medida (`completion`, `quantity` com unidade, `duration`), alvo do período, ícone e cor, intervalo de lembrete, horário e dias ativos, início e fim opcionais                                                       |
+| RF02 | Tela "Hoje": metas com progresso **no período atual de cada uma** (dia ou semana) e registro rápido conforme a medida (Feito, −/+, cronômetro)                                                                                             |
+| RF03 | Registrar progresso com nota opcional: adicionar ou remover valor (o total do período nunca fica negativo); metas de tempo com lançamento manual ou cronômetro que sobrevive ao fechamento do app |
 | RF04 | Lembretes periódicos por meta, respeitando horário e dias ativos; ações **Feito**, **Adiar**, **Ignorar**                                                                                                                       |
 | RF05 | Meta cumprida no período atual não gera mais lembretes até o próximo período (diária: dia seguinte ativo; semanal: próxima semana)                                                                            |
 | RF06 | Relatório semanal e mensal por solicitação (progresso por meta, % cumprido, sequências na unidade de cada tipo)                                                                                      |
@@ -105,18 +105,34 @@ public interface IReportService { Task<Report> BuildAsync(ReportPeriod period, D
 **Componentes do Core obrigatórios:**
 
 - `GoalPeriod` (puro, sem I/O): dado uma meta e uma data local, devolve o **período de avaliação** `[início, fim)` em datas locais (ver seção 5.1). É a única fonte da regra "qual intervalo conta para o progresso" e é usado pela tela Hoje, pelo `ReminderPlanner` e pelo `ReportService`.
-- `ReminderResponseHandler`: recebe a ação (Feito → check-in; Adiar → +N min; Ignorar → próximo intervalo) e pede reagendamento. Usa só repositórios, sem UI. No Linux é chamado pelo evento `ActionReceived`; no Android, diretamente pelo `BroadcastReceiver`, inclusive com o app fechado.
+- `ReminderResponseHandler`: recebe a ação (ação principal → registro conforme a medida, ver seção 9 item 11; Adiar → +N min; Ignorar → próximo intervalo) e pede reagendamento. Usa só repositórios, sem UI. No Linux é chamado pelo evento `ActionReceived`; no Android, diretamente pelo `BroadcastReceiver`, inclusive com o app fechado.
 
 ### 5.1 Tipos de recorrência e período de avaliação
 
 | Tipo               | Período de avaliação                                  | Alvo (`target`)           | Cumprida quando                 | Lembretes param quando                                    | Sequência                                                  |
 |--------------------|-------------------------------------------------------|---------------------------|---------------------------------|-----------------------------------------------------------|------------------------------------------------------------|
-| `daily` (diária)   | o dia local                                           | check-ins por dia (≥ 1)   | soma do dia ≥ `target`          | alvo do dia atingido; voltam no próximo dia ativo         | dias ativos consecutivos cumpridos; dias inativos não quebram |
-| `weekly` (semanal) | a semana local, **segunda a domingo** (fixo)          | check-ins por semana (≥ 1) | soma da semana ≥ `target`       | alvo da semana atingido; voltam na próxima semana         | semanas consecutivas cumpridas                             |
+| `daily` (diária)   | o dia local                                           | por dia (≥ 1)             | soma do dia ≥ `target`          | alvo do dia atingido; voltam no próximo dia ativo         | dias ativos consecutivos cumpridos; dias inativos não quebram |
+| `weekly` (semanal) | a semana local, **segunda a domingo** (fixo)          | por semana (≥ 1)          | soma da semana ≥ `target`       | alvo da semana atingido; voltam na próxima semana         | semanas consecutivas cumpridas                             |
+
+### 5.2 Medida da meta (v1.4)
+
+A medida é independente da recorrência: diz **o que** se conta no período; a recorrência diz **qual** é o período.
+
+| Medida                  | Alvo (`target`)                                        | Valor de cada registro (`amount`)  | Progresso no Hoje            |
+|-------------------------|--------------------------------------------------------|------------------------------------|------------------------------|
+| `completion` (conclusão) | sempre 1 (campo oculto): feito ou não feito no período | 1 = feito; −1 = desmarcar          | "Feito hoje" / "Pendente"    |
+| `quantity` (quantidade)  | inteiro ≥ 1 na **unidade livre** da meta (`unit`, até 20 caracteres: "copos", "páginas", "vezes") | inteiro com sinal, em unidades | "5 de 8 copos hoje"          |
+| `duration` (tempo)       | minutos ≥ 1 (o formulário mostra horas + minutos)       | inteiro com sinal, em minutos      | "2 h 30 de 5 h na semana"    |
+
+- **Registros com sinal:** o usuário ajusta o total do período com **+** e **−** (ou digitando um valor e escolhendo Adicionar/Remover). Cada ajuste é um registro em `checkins`; o progresso é a soma do período. Assim os relatórios sabem quando cada coisa aconteceu. O total do período **nunca fica negativo**: remover mais do que existe é recusado. Não há edição nem "desfazer" de registros individuais no MVP.
+- **Só inteiros:** sem frações (quem precisa usa uma unidade menor, como ml). Evita arredondamento no SQLite.
+- **Cronômetro (só `duration`):** um por vez em todo o app, gravado em `active_timer` (instante de início em UTC), para sobreviver ao fechamento do app e ao processo morto no Android. Ao parar, o tempo é arredondado para minutos e mostrado para conferência; o usuário registra (pode ajustar) ou descarta. Iniciar outro cronômetro pede para parar o atual.
+- **Trocar a medida** só é permitido enquanto a meta não tem registros (30 "copos" não viram 30 minutos). A recorrência continua podendo ser trocada sempre.
+- Cumprida quando a soma do período ≥ `target` (conclusão: ≥ 1). A soma pode passar do alvo.
 
 Regras comuns:
 
-- `active_days` na meta diária define **quais dias contam** (dias inativos não aparecem em "Hoje", não geram lembretes e não entram no cálculo de sequência). Na semanal, define **em quais dias o app lembra**; check-ins em qualquer dia contam para a semana.
+- `active_days` na meta diária define **quais dias contam** (dias inativos não aparecem em "Hoje", não geram lembretes e não entram no cálculo de sequência). Na semanal, define **em quais dias o app lembra**; registros em qualquer dia contam para a semana.
 - O período de avaliação é sempre recortado por `start_date`/`end_date`. Semanas e dias parciais **não** proporcionalizam o alvo.
 - O período atual (ou o dia de hoje) ainda em andamento não quebra a sequência; ela é avaliada até o último período fechado, somando o atual se já estiver cumprido.
 
@@ -157,16 +173,18 @@ Ponto de partida: `dotnet new install Avalonia.Templates` e `dotnet new avalonia
 
 | Tela              | Conteúdo                                                                                                                                                       |
 |-------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Hoje**          | Resumo da semana (% e check-ins), metas em andamento/concluídas, sequência; lista "Metas de hoje" com progresso no período atual e botão de check-in; próximos lembretes do dia |
+| **Hoje**          | Resumo da semana (%, metas em andamento/concluídas; sequência a partir da Fase 5); lista "Metas de hoje" com progresso no período atual e controles por medida (Feito/Desmarcar; −/+ e painel com valor e nota; cronômetro ▶/⏹ e lançamento manual); próximos lembretes do dia (Fase 4) |
 | **Metas**         | Lista (filtro ativas/arquivadas), criar, editar, arquivar, desarquivar. Meta arquivada é somente leitura (só desarquivar ou excluir)                            |
-| **Editar meta**   | Título, tipo (diária/semanal), alvo, ícone e cor, intervalo, horário ativo, dias da semana, início e fim opcionais. Abre como página no lugar da lista (desktop e celular); excluir com confirmação na própria página |
+| **Editar meta**   | Título, tipo (diária/semanal), medida (conclusão/quantidade/tempo; travada após o primeiro registro), alvo (+ unidade na quantidade; h + min no tempo; oculto na conclusão), ícone e cor, intervalo, horário ativo, dias da semana, início e fim opcionais. Abre como página no lugar da lista (desktop e celular); excluir com confirmação na própria página |
 | **Relatórios**    | Alternar semanal/mensal, navegar entre períodos, barras por dia/semana + tabela por meta                                                                       |
 | **Configurações** | Autostart, duração do "adiar", ao fechar a janela (desktop)                                                                                                     |
 | **Lembrete**      | Notificação nativa do SO com as três ações (janela própria do Avalonia só como fallback)                                                                       |
 
 Navegação: barra lateral à esquerda no desktop (v4) e navegação inferior no Android (v3) com **Hoje, Metas, Relatórios, Configurações** (o protótipo v3 usa "Semana" e "Ajustes"; o MVP padroniza os nomes acima). Os ViewModels são compartilhados; só o shell de navegação muda. O breakpoint de 720 px é o ponto de partida do layout adaptativo.
 
-Na tela Hoje, as metas aparecem assim: diária → "3 de 8 hoje"; semanal → "3 de 5 na semana".
+Na tela Hoje, as metas aparecem assim: diária → "3 de 8 copos hoje"; semanal → "2 h 30 de 5 h na semana"; conclusão → "Feito hoje" / "Pendente". Metas cumpridas no período vão para o fim da lista, marcadas como concluídas.
+
+**% da semana (resumo do Hoje):** média do progresso de cada meta visível na semana, limitado a 100% por meta. Semanal: soma da semana ÷ alvo. Diária: dias ativos cumpridos ÷ dias ativos da semana até hoje (dentro do período da meta). Não se somam valores de unidades diferentes.
 
 ## 8. Modelo de dados (SQLite)
 
@@ -188,17 +206,23 @@ CREATE TABLE goals (
   updated_at TEXT NOT NULL,
   archived_at TEXT,
   deleted_at TEXT,                    -- exclusão lógica
+  measure TEXT NOT NULL DEFAULT 'quantity', -- 'completion' | 'quantity' | 'duration' (v1.4)
+  unit TEXT,                          -- só 'quantity': unidade livre, até 20 caracteres
   CHECK (recurrence IN ('daily','weekly')),
-  CHECK (target >= 1)
+  CHECK (target >= 1),
+  CHECK (measure IN ('completion','quantity','duration')),
+  CHECK (measure <> 'completion' OR target = 1),
+  CHECK ((measure = 'quantity') = (unit IS NOT NULL))
 );
--- Esquema atual (001_init + 002_remove_once). A 002 recriou goals sem 'once' e sem completed_at,
--- excluindo as tarefas únicas existentes com seus check-ins e lembretes.
+-- Esquema alvo após 001_init + 002_remove_once + 003_measures. A 002 recriou goals sem 'once' e sem
+-- completed_at; a 003 adiciona measure/unit (metas existentes viram 'quantity' com unidade 'vezes')
+-- e a tabela active_timer.
 
 CREATE TABLE checkins (
   id TEXT PRIMARY KEY,                -- GUID
   goal_id TEXT NOT NULL REFERENCES goals(id),
   done_at TEXT NOT NULL,              -- ISO 8601 (UTC)
-  amount INTEGER NOT NULL DEFAULT 1,
+  amount INTEGER NOT NULL DEFAULT 1,  -- com sinal, na unidade base da medida (seção 5.2); <> 0
   note TEXT,
   updated_at TEXT NOT NULL,
   deleted_at TEXT
@@ -213,6 +237,12 @@ CREATE TABLE reminder_log (
 );
 
 CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+CREATE TABLE active_timer (            -- no máximo uma linha (v1.4)
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  goal_id TEXT NOT NULL REFERENCES goals(id),
+  started_at TEXT NOT NULL            -- ISO 8601 (UTC)
+);
 CREATE INDEX idx_checkins_goal_date ON checkins(goal_id, done_at);
 CREATE INDEX idx_reminder_log_goal ON reminder_log(goal_id, fired_at);
 ```
@@ -235,6 +265,7 @@ No Linux, o arquivo fica em `$XDG_DATA_HOME` (padrão `~/.local/share/SlimeGoals
 8.  **Linux (GNOME):** o app continua em segundo plano com a janela fechada; fechar oculta por padrão (configurável). O GNOME não exibe ícone de bandeja por padrão, então a bandeja é opcional (extensão AppIndicator). Sem ela, o app é reaberto pelo atalho do aplicativo (instância única) ou pela notificação. No Wayland, clicar na notificação e chamar `Show()` + `Activate()` trouxe a janela à frente (spike); o GNOME também envia `ActivationToken` (xdg-activation), disponível se for preciso.
 9.  **Android:** exige permissão de notificações (Android 13+) e de alarme exato (Android 12+); no Android 16 as duas vêm **negadas** num app recém-instalado e são pedidas num fluxo de primeira execução (`ACTION_REQUEST_SCHEDULE_EXACT_ALARM` abre direto a página do app). `SetExactAndAllowWhileIdle` dispara no horário mesmo com o processo morto e em Doze profundo; o Android cria o processo só para o receiver, e a ação da notificação chega a um `BroadcastReceiver` sem UI (confirmado no spike, `specs/spikes/android-alarme.md`). Desligar a permissão de alarme exato cancela os alarmes: reagendar quando ela voltar e avisar na tela Hoje se faltar alguma permissão.
 10. Tratar suspensão do computador (Linux: recalcular ao retomar, via sinal do systemd-logind).
+11. **Ação principal por medida (v1.4):** `completion` → **Feito** (registra 1); `quantity` → **+1** (soma 1 unidade); `duration` → **Iniciar** (liga o cronômetro sem abrir o app; se outro estiver rodando, abre o app para decidir). **Adiar** e **Ignorar** valem para as três. Meta com cronômetro rodando não gera lembretes; ao parar, a regra do intervalo conta a partir do registro.
 
 ## 10. Relatórios
 
@@ -244,9 +275,9 @@ Calculados por query + Core (`GoalPeriod`), sem tabela própria. Pontos obrigat�
 
 | Tipo     | O que mostra                                                                       |
 |----------|------------------------------------------------------------------------------------|
-| `weekly` | check-ins vs. alvo, % cumprido, melhor dia                                         |
+| `weekly` | soma vs. alvo na unidade da meta, % cumprido, melhor dia                           |
 | `daily`  | dias cumpridos / dias ativos da semana, %                                          |
-| Geral    | check-ins por dia (barras), lembretes disparados vs. respondidos                   |
+| Geral    | registros por dia (barras), lembretes disparados vs. respondidos                   |
 
 **Mensal:** por meta, períodos cumpridos no mês (semanas para `weekly`, dias para `daily`), evolução semana a semana, sequência atual e maior sequência na unidade do tipo. Só contam os períodos em que a meta estava ativa. Semanas que cruzam a virada do mês pertencem ao mês da sua segunda-feira.
 
@@ -314,7 +345,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 | **0**  | Fundação + spikes        | Repositório git, solução em `net10.0`, projetos, DI, `Theme.axaml` com Figtree, navegação lateral. Spikes descartáveis: (a) notificação com ações no GNOME via DBus, com arquivo `.desktop` e dica `desktop-entry`, testada com a janela oculta e com Não Perturbe ativo; (b) *hello world* Avalonia no Android com alarme + notificação com ação | App abre com o tema; notificação com ação responde no Linux; build Android roda e dispara alarme |
 | **1**  | Metas (domínio + dados)  | Entidades, `Recurrence`, `GoalPeriod` (daily/weekly, segunda a domingo, UTC↔local), `001_init.sql`, repositórios, `GoalService`, testes                                                                                                                                                                         | CRUD e `GoalPeriod` passam nos testes; dados persistem após reiniciar                            |
 | **2**  | Telas de metas           | `GoalsView`, `GoalEditView` (tipo, alvo, ícone/cor, período), validação, arquivamento automático ao fim                                                                                                                                                                                                              | Criar, editar e arquivar pela interface                                                          |
-| **3**  | Check-ins e tela Hoje    | `CheckinService` (`amount` soma), `ProgressService`, `TodayView`, desfazer                                                                                                                                                                                                                 | Check-in atualiza o progresso na hora, nos dois tipos                                             |
+| **3**  | Medidas, registros e Hoje | Medida da meta (`003_measures.sql`, formulário), `CheckinService` (ajustes com sinal, total ≥ 0), `TimerService` (`active_timer`), `ProgressService`, `TodayView` com controles por medida e resumo da semana | Registrar, remover e cronometrar atualizam o progresso na hora, nas três medidas e nos dois tipos |
 | **4a** | Planejador               | `ReminderPlanner`: regras da seção 9 escritas antes, testes com `FakeTimeProvider` para os dois tipos                                                                                                                                                                                                                | Testes cobrem virada de dia e de semana, dias inativos, meta cumprida, adiar e ignorar           |
 | **4b** | Agendador + resposta     | Scheduler Linux (timer único), `ReminderResponseHandler`                                                                                                                                                                                                                                                             | Disparo no horário e 3 ações funcionando                                                         |
 | **4c** | Notificação nativa Linux | Adaptador DBus + fallback em janela; expiração = ignorado                                                                                                                                                                                                                                                            | Funciona com a janela principal fechada                                                          |
@@ -361,7 +392,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 - Runtime: .NET 10 LTS.
 - Plataformas iniciais: Linux e Android; Windows e macOS fora do escopo.
 - Ao fechar a janela: ocultar em segundo plano por padrão, com opção de encerrar (desktop).
-- `amount` soma ao progresso (padrão 1).
+- `amount` soma ao progresso (padrão 1); desde a v1.4 tem sinal (ver 5.2).
 - Semanas parciais não proporcionalizam o alvo; meta arquivada automaticamente ao passar o fim.
 
 **Decisões da versão 1.3 (novas):**
@@ -389,6 +420,15 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 - Formulário de meta como página dentro da tela Metas (mesma solução no desktop e no celular).
 - **Tarefa única (`once`) removida** a pedido do autor: simplifica domínio, telas, lembretes e relatórios. A migração `002` recria `goals` sem `'once'` e sem `completed_at` e **exclui** as tarefas únicas existentes (com check-ins e lembretes). As migrações rodam com chaves estrangeiras desligadas e conferidas por `PRAGMA foreign_key_check` antes do `COMMIT`.
 - Linux: o app define `AVALONIA_IM_MODULE=none` (se não definido) para usar XIM; o IME via DBus do Avalonia perdia a composição de teclas mortas (`ç` no layout US internacional).
+
+**Decisões da versão 1.4 (01/11/2026):**
+
+- Medida por meta, independente da recorrência: conclusão (feito/não feito no período), quantidade (inteiro + unidade livre) e tempo (minutos). Ver 5.2.
+- Registro por ajuste com sinal (+/−); o total do período nunca fica negativo. Sem edição nem "desfazer" de registros individuais no MVP (substitui o "desfazer o último" da v1.3).
+- Cronômetro para metas de tempo, gravado no banco, um por vez; lançamento manual também disponível.
+- Ação principal da notificação conforme a medida (Feito, +1, Iniciar); cronômetro rodando pausa os lembretes da meta.
+- Medida travada após o primeiro registro.
+- Sequência no resumo do Hoje fica para a Fase 5, junto com os relatórios.
 
 **Pendências:** versão mínima do Android (Fase 7c; sugestão do spike: Android 8.0, API 26); sincronização entre dispositivos (fora do MVP).
 
