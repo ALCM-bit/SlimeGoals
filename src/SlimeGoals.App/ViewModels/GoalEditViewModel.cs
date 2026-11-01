@@ -18,6 +18,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
     private static readonly int[] StandardIntervals = [15, 30, 60, 90, 120, 180, 240, 360, 720, 1440];
     private const string MissingTime = "Informe o horário.";
     private const string MissingTarget = "Informe o alvo.";
+    private const string MissingDuration = "Informe o tempo.";
 
     private readonly GoalService _service;
     private readonly Goal? _existing;
@@ -26,11 +27,13 @@ public sealed partial class GoalEditViewModel : ObservableObject
     private bool _submitted;
     private bool _targetMissing;
 
-    public GoalEditViewModel(GoalService service, Goal? existing, Action<bool> close)
+    /// <param name="measureLocked">A meta já tem registros: a medida não pode mudar (spec §5.2).</param>
+    public GoalEditViewModel(GoalService service, Goal? existing, bool measureLocked, Action<bool> close)
     {
         _service = service;
         _existing = existing;
         _close = close;
+        IsMeasureLocked = measureLocked;
 
         Icons = GoalIcons.All.Select(IconOption.From).ToList();
         Colors =
@@ -51,7 +54,15 @@ public sealed partial class GoalEditViewModel : ObservableObject
 
         Title = existing?.Title ?? "";
         Recurrence = existing?.Recurrence ?? Recurrence.Daily;
-        Target = existing?.Target ?? 1;
+        Measure = existing?.Measure ?? Measure.Quantity;
+        // Cada medida guarda o próprio alvo: trocar e voltar no formulário não perde o que foi digitado.
+        Target = existing is { Measure: Measure.Quantity } ? existing.Target : 1;
+        Unit = existing?.Unit ?? "vezes";
+        if (existing is { Measure: Measure.Duration })
+        {
+            _durationHours = existing.Target / 60;
+            _durationMinutes = existing.Target % 60;
+        }
         SelectedIcon = IconOption.From(GoalIcons.Get(existing?.Icon ?? GoalIcons.DefaultKey));
         SelectedColor = Colors.Single(c => c.Color == (existing?.Color ?? GoalColor.Purple));
         SelectedInterval = new IntervalOption(interval);
@@ -83,6 +94,44 @@ public sealed partial class GoalEditViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(TargetSuffix), nameof(IsDaily), nameof(IsWeekly))]
     public partial Recurrence Recurrence { get; set; }
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsCompletion), nameof(IsQuantity), nameof(IsDuration))]
+    public partial Measure Measure { get; set; }
+
+    public bool IsMeasureLocked { get; }
+    public string MeasureLockedHint => "A medida não muda depois do primeiro registro.";
+
+    // Atalhos para o segmento da medida; com a medida travada, não mudam nada.
+    public bool IsCompletion { get => Measure == Measure.Completion; set => SetMeasure(value, Measure.Completion); }
+    public bool IsQuantity { get => Measure == Measure.Quantity; set => SetMeasure(value, Measure.Quantity); }
+    public bool IsDuration { get => Measure == Measure.Duration; set => SetMeasure(value, Measure.Duration); }
+
+    private void SetMeasure(bool selected, Measure measure)
+    {
+        if (selected && !IsMeasureLocked)
+            Measure = measure;
+    }
+
+    [ObservableProperty] public partial string Unit { get; set; }
+
+    private decimal? _durationHours;
+    private decimal? _durationMinutes;
+
+    /// <summary>Horas do alvo de tempo (NumericUpDown: null quando apagado).</summary>
+    public decimal? DurationHoursInput
+    {
+        get => _durationHours;
+        set { if (SetProperty(ref _durationHours, value)) RevalidateIfSubmitted(); }
+    }
+
+    /// <summary>Minutos do alvo de tempo (0–59).</summary>
+    public decimal? DurationMinutesInput
+    {
+        get => _durationMinutes;
+        set { if (SetProperty(ref _durationMinutes, value)) RevalidateIfSubmitted(); }
+    }
+
+    /// <summary>Alvo da quantidade (o alvo do tempo vem de horas + minutos; o da conclusão é sempre 1).</summary>
     [ObservableProperty] public partial int Target { get; set; }
 
     /// <summary>
@@ -134,6 +183,8 @@ public sealed partial class GoalEditViewModel : ObservableObject
     public string? ActiveDaysError => ErrorFor(nameof(GoalDraft.ActiveDays));
     public string? EndDateError => ErrorFor(nameof(GoalDraft.EndDate));
     public string? IconError => ErrorFor(nameof(GoalDraft.Icon));
+    public string? UnitError => ErrorFor(nameof(GoalDraft.Unit));
+    public string? MeasureError => ErrorFor(nameof(GoalDraft.Measure));
 
     public string? ErrorFor(string field) => _errors.GetValueOrDefault(field);
 
@@ -205,7 +256,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
 
     private static readonly HashSet<string> Inputs =
     [
-        nameof(Title), nameof(Recurrence), nameof(Target), nameof(SelectedIcon), nameof(SelectedColor),
+        nameof(Title), nameof(Recurrence), nameof(Measure), nameof(Unit), nameof(Target), nameof(SelectedIcon), nameof(SelectedColor),
         nameof(SelectedInterval), nameof(ActiveFrom), nameof(ActiveUntil), nameof(StartDate), nameof(EndDate),
     ];
 
@@ -224,14 +275,23 @@ public sealed partial class GoalEditViewModel : ObservableObject
     /// <summary>Valida como o serviço validaria, mais horários vazios (os seletores aceitam null).</summary>
     private bool Revalidate(out GoalDraft draft)
     {
+        var durationMissing = DurationHoursInput is null && DurationMinutesInput is null;
+        var target = Measure switch
+        {
+            Measure.Completion => 1,
+            Measure.Duration => (int)Math.Round((DurationHoursInput ?? 0) * 60 + (DurationMinutesInput ?? 0), MidpointRounding.AwayFromZero),
+            _ => Target,
+        };
         draft = new GoalDraft(
-            Title, Recurrence, Target, SelectedIcon.Key, SelectedColor.Color,
+            Title, Recurrence, target, SelectedIcon.Key, SelectedColor.Color,
             SelectedInterval.Minutes,
             TimeOnly.FromTimeSpan(ActiveFrom ?? TimeSpan.Zero),
             TimeOnly.FromTimeSpan(ActiveUntil ?? new TimeSpan(23, 59, 0)),
             Days.Where(d => d.IsSelected).Aggregate(WeekDays.None, (all, d) => all | d.Day),
             StartDate is { } s ? DateOnly.FromDateTime(s) : null,
-            EndDate is { } e ? DateOnly.FromDateTime(e) : null);
+            EndDate is { } e ? DateOnly.FromDateTime(e) : null,
+            Measure,
+            Measure == Measure.Quantity ? Unit : null);
 
         var errors = GoalValidator.Validate(draft).Select(x => (x.Field, x.Message)).ToList();
         if (ActiveFrom is null || ActiveUntil is null)
@@ -242,10 +302,16 @@ public sealed partial class GoalEditViewModel : ObservableObject
             if (ActiveUntil is null) errors.Add((nameof(GoalDraft.ActiveUntil), MissingTime));
         }
 
-        if (_targetMissing)
+        var targetMissing = Measure switch
+        {
+            Measure.Quantity => _targetMissing ? MissingTarget : null,
+            Measure.Duration => durationMissing ? MissingDuration : null,
+            _ => null,
+        };
+        if (targetMissing is not null)
         {
             errors.RemoveAll(x => x.Field == nameof(GoalDraft.Target));
-            errors.Add((nameof(GoalDraft.Target), MissingTarget));
+            errors.Add((nameof(GoalDraft.Target), targetMissing));
         }
 
         SetErrors(errors);
@@ -262,6 +328,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
                  {
                      nameof(TitleError), nameof(TargetError), nameof(ReminderError), nameof(ActiveFromError),
                      nameof(ActiveUntilError), nameof(ActiveDaysError), nameof(EndDateError), nameof(IconError),
+                     nameof(UnitError), nameof(MeasureError),
                  })
             OnPropertyChanged(name);
     }
