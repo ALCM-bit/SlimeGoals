@@ -15,6 +15,7 @@ public sealed partial class ShellViewModel : ObservableObject
         if (Pages.Count == 0)
             throw new ArgumentException("O shell precisa de ao menos uma página.", nameof(pages));
         _currentPage = Pages[0];
+        _currentPage.Activate();
     }
 
     public IReadOnlyList<PageViewModel> Pages { get; }
@@ -35,7 +36,8 @@ public sealed partial class ShellViewModel : ObservableObject
                 OnPropertyChanged();
                 return;
             }
-            SetProperty(ref _currentPage, value);
+            if (SetProperty(ref _currentPage, value))
+                value.Activate();
         }
     }
 
