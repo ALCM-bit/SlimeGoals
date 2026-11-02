@@ -190,4 +190,17 @@ public class ReminderServiceTests
 
         _notifications.Shown.Single().Text.Should().Be(new ReminderText("T Água", "B 0/3", "Feito!"));
     }
+
+    [Fact]
+    public async Task Goal_created_now_is_not_fired_immediately()
+    {
+        At(14);
+        var goal = await Add();
+        await _goals.UpdateAsync(goal with { CreatedAt = Today(14) });
+
+        var next = await Service.SyncAsync();
+
+        _notifications.Shown.Should().BeEmpty();
+        next.Should().Be(Today(15));
+    }
 }

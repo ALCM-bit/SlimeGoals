@@ -155,8 +155,9 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
                 .Where(c => c.GoalId == goal.Id && c.DoneAt >= todayStart && c.DoneAt < tomorrowStart)
                 .Select(c => (DateTimeOffset?)c.DoneAt).Max();
             var snoozedAt = last is { Response: ReminderResponse.Snooze } ? last.RespondedAt : null;
+            var createdToday = goal.CreatedAt >= todayStart && goal.CreatedAt < tomorrowStart ? goal.CreatedAt : (DateTimeOffset?)null;
             return new ReminderState(PeriodTotal(goal) >= goal.Target, timerGoalId == goal.Id,
-                last?.FiredAt, lastCheckin, snoozedAt);
+                last?.FiredAt, lastCheckin, snoozedAt, createdToday);
         }
     }
 }

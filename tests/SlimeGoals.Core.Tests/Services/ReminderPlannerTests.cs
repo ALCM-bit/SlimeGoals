@@ -106,4 +106,17 @@ public class ReminderPlannerTests
         ReminderPlanner.Next(goal, Nothing, 10, now, NewYork)
             .Should().Be(new DateTimeOffset(2026, 3, 8, 7, 0, 0, TimeSpan.Zero));
     }
+
+    // Verificação manual da Fase 4: meta salva no meio do horário notificava na hora.
+    [Fact]
+    public void Goal_created_today_waits_one_interval_from_creation() =>
+        Next(Daily(), Nothing with { CreatedTodayAt = Today(14) }, Today(14)).Should().Be(Today(15));
+
+    [Fact]
+    public void Goal_created_before_window_starts_at_window_start() =>
+        Next(Daily(), Nothing with { CreatedTodayAt = Today(7) }, Today(7, 30)).Should().Be(Today(8));
+
+    [Fact]
+    public void Later_fire_wins_over_creation() =>
+        Next(Daily(), Nothing with { CreatedTodayAt = Today(9), LastFiredAt = Today(10) }, Today(10, 1)).Should().Be(Today(11));
 }
