@@ -185,7 +185,7 @@ Navegação: barra lateral à esquerda no desktop (v4) e navegação inferior no
 
 Na tela Hoje, as metas aparecem assim: diária → "3 de 8 copos hoje"; semanal → "2 h 30 de 5 h na semana"; conclusão → "Feito hoje" / "Pendente". Metas cumpridas no período vão para o fim da lista, marcadas como concluídas.
 
-**% da semana (resumo do Hoje):** média do progresso de cada meta visível na semana, limitado a 100% por meta. Semanal: soma da semana ÷ alvo. Diária: média da fração cumprida em cada dia ativo da semana até hoje, inclusive (dentro do período da meta, até 100% por dia); hoje entra com o progresso parcial. Não se somam valores de unidades diferentes.
+**% da semana (resumo do Hoje):** média do progresso de cada meta visível na semana, limitado a 100% por meta. Semanal: soma da semana ÷ alvo. Diária: média da fração cumprida em cada dia ativo da semana até hoje, inclusive (dentro do período da meta e a partir do dia da criação, até 100% por dia); hoje entra com o progresso parcial. Não se somam valores de unidades diferentes.
 
 ## 8. Modelo de dados (SQLite)
 
