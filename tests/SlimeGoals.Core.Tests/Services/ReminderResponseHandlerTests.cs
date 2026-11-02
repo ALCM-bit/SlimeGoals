@@ -189,4 +189,31 @@ public class ReminderResponseHandlerTests
         await Handler.HandleAsync(entry.Id, ReminderAction.Ignore);
         _changeCount.Should().BeGreaterThan(before);
     }
+
+    [Fact]
+    public async Task Concurrent_primary_on_same_log_records_once()
+    {
+        var goal = await Create(Measure.Quantity);
+        var entry = await Fire(goal);
+        var handler = Handler;
+
+        var outcomes = await Task.WhenAll(
+            Task.Run(() => handler.HandleAsync(entry.Id, ReminderAction.Primary)),
+            Task.Run(() => handler.HandleAsync(entry.Id, ReminderAction.Primary)));
+
+        outcomes.Should().BeEquivalentTo([ReminderOutcome.Handled, ReminderOutcome.Stale]);
+        (await Checkins.PeriodTotalAsync(goal.Id)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Primary_on_duration_with_same_goal_timer_running_logs_ignore()
+    {
+        var goal = await Create(Measure.Duration);
+        await Timers.StartAsync(goal.Id);
+        var entry = await Fire(goal);
+
+        (await Handler.HandleAsync(entry.Id, ReminderAction.Primary)).Should().Be(ReminderOutcome.Handled);
+
+        (await _log.GetAsync(entry.Id))!.Response.Should().Be(ReminderResponse.Ignore);
+    }
 }

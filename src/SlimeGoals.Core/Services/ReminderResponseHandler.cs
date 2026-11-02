@@ -15,10 +15,27 @@ public sealed class ReminderResponseHandler(
     TimeProvider time,
     DataChangeNotifier? changes = null)
 {
+    // Serializa as respostas: verificação de "já respondido", ação e gravação ficam atômicas no processo.
+    private readonly SemaphoreSlim _gate = new(1, 1);
+
     public async Task<ReminderOutcome> HandleAsync(Guid logId, ReminderAction action, CancellationToken ct = default)
     {
         if (action == ReminderAction.Open)
             return ReminderOutcome.OpenApp;
+
+        await _gate.WaitAsync(ct);
+        try
+        {
+            return await HandleLockedAsync(logId, action, ct);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task<ReminderOutcome> HandleLockedAsync(Guid logId, ReminderAction action, CancellationToken ct)
+    {
 
         var entry = await log.GetAsync(logId, ct);
         if (entry is null || entry.Response is not null)

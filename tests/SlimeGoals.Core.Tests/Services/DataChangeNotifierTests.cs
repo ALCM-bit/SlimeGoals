@@ -25,4 +25,18 @@ public class DataChangeNotifierTests
 
         act.Should().NotThrow();
     }
+
+    [Fact]
+    public void Throwing_subscriber_does_not_stop_others_or_escape()
+    {
+        var notifier = new DataChangeNotifier();
+        var called = 0;
+        notifier.Changed += (_, _) => throw new InvalidOperationException("boom");
+        notifier.Changed += (_, _) => called++;
+
+        var act = notifier.NotifyChanged;
+
+        act.Should().NotThrow();
+        called.Should().Be(1);
+    }
 }
