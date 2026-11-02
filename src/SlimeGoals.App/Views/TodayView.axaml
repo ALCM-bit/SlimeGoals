@@ -83,27 +83,35 @@
                     <!-- Controles por medida -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                       <!-- Conclusão -->
-                      <Button Classes="primary" Content="Feito"
-                              IsVisible="{Binding IsCompletion}" IsEnabled="{Binding !IsMet}"
-                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).CompleteCommand}"
-                              CommandParameter="{Binding}" />
-                      <Button Classes="danger-solid" Content="Desmarcar"
+                      <Button Classes="ghost icon" AutomationProperties.Name="Desmarcar" ToolTip.Tip="Desmarcar"
                               IsVisible="{Binding IsCompletion}" IsEnabled="{Binding IsMet}"
                               Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).UncompleteCommand}"
-                              CommandParameter="{Binding}" />
+                              CommandParameter="{Binding}">
+                        <Path Classes="btn-icon" Data="{StaticResource IconX}" />
+                      </Button>
+                      <Button Classes="primary icon" AutomationProperties.Name="Feito" ToolTip.Tip="Marcar como feito"
+                              IsVisible="{Binding IsCompletion}" IsEnabled="{Binding !IsMet}"
+                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).CompleteCommand}"
+                              CommandParameter="{Binding}">
+                        <Path Classes="btn-icon" Data="{StaticResource IconCheck}" />
+                      </Button>
                       <!-- Quantidade -->
-                      <Button Classes="ghost icon" Content="−" IsVisible="{Binding IsQuantity}"
-                              AutomationProperties.Name="Remover 1"
+                      <Button Classes="ghost icon" IsVisible="{Binding IsQuantity}"
+                              AutomationProperties.Name="Remover 1" ToolTip.Tip="Remover 1"
                               Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).DecrementCommand}"
-                              CommandParameter="{Binding}" />
-                      <Button Classes="primary icon" Content="+" IsVisible="{Binding IsQuantity}"
-                              AutomationProperties.Name="Adicionar 1"
+                              CommandParameter="{Binding}">
+                        <Path Classes="btn-icon" Data="{StaticResource IconMinus}" />
+                      </Button>
+                      <Button Classes="primary icon" IsVisible="{Binding IsQuantity}"
+                              AutomationProperties.Name="Adicionar 1" ToolTip.Tip="Adicionar 1"
                               Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).IncrementCommand}"
-                              CommandParameter="{Binding}" />
+                              CommandParameter="{Binding}">
+                        <Path Classes="btn-icon" Data="{StaticResource IconPlus}" />
+                      </Button>
                       <!-- Tempo -->
                       <TextBlock Text="{Binding Elapsed}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"
                                  IsVisible="{Binding IsTimerRunning}" />
-                      <Button Classes="primary icon" Content="▶" AutomationProperties.Name="Iniciar cronômetro"
+                      <Button Classes="primary icon" AutomationProperties.Name="Iniciar cronômetro" ToolTip.Tip="Iniciar cronômetro"
                               IsEnabled="{Binding CanStartTimer}"
                               Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).StartTimerCommand}"
                               CommandParameter="{Binding}">
@@ -113,16 +121,21 @@
                             <Binding Path="HasNoTimer" />
                           </MultiBinding>
                         </Button.IsVisible>
+                        <Path Classes="btn-icon" Data="{StaticResource IconPlay}" />
                       </Button>
-                      <Button Classes="danger-solid icon" Content="■" AutomationProperties.Name="Parar cronômetro"
+                      <Button Classes="danger-solid icon" AutomationProperties.Name="Parar cronômetro" ToolTip.Tip="Parar cronômetro"
                               IsVisible="{Binding IsTimerRunning}"
                               Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).StopTimerCommand}"
-                              CommandParameter="{Binding}" />
+                              CommandParameter="{Binding}">
+                        <Path Classes="btn-icon" Data="{StaticResource IconStop}" />
+                      </Button>
                       <!-- Mais opções (só tempo) -->
-                      <Button Classes="ghost icon" Content="⋯" AutomationProperties.Name="Mais opções"
+                      <Button Classes="ghost icon" AutomationProperties.Name="Lançar tempo" ToolTip.Tip="Lançar ou remover tempo"
                               IsVisible="{Binding IsDuration}"
                               Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).OpenPanelCommand}"
-                              CommandParameter="{Binding}" />
+                              CommandParameter="{Binding}">
+                        <Path Classes="btn-icon" Data="{StaticResource IconEllipsis}" />
+                      </Button>
                     </StackPanel>
                   </Grid>
 

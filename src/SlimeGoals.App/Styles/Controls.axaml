@@ -286,9 +286,22 @@
   </Style>
   <Style Selector="Button.icon">
     <Setter Property="MinWidth" Value="44" />
+    <Setter Property="Width" Value="44" />
     <Setter Property="Padding" Value="0" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
     <Setter Property="FontSize" Value="18" />
+  </Style>
+  <!-- Ícone vetorial dentro de Button.icon: grade 24×24 sem esticar (proporções do Lucide), reduzida a ~20 px;
+       traço na cor do texto do botão (acompanha hover e desabilitado) -->
+  <Style Selector="Path.btn-icon">
+    <Setter Property="Width" Value="24" />
+    <Setter Property="Height" Value="24" />
+    <Setter Property="Stretch" Value="None" />
+    <Setter Property="RenderTransform" Value="scale(0.85)" />
+    <Setter Property="StrokeThickness" Value="2.4" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+    <Setter Property="StrokeJoin" Value="Round" />
+    <Setter Property="Stroke" Value="{Binding $parent[ContentPresenter].Foreground}" />
   </Style>
   <Style Selector="Border.inline-panel">
     <Setter Property="Background" Value="{DynamicResource Surface}" />
