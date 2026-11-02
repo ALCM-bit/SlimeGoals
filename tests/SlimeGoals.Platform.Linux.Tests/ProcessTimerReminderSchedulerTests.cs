@@ -89,6 +89,25 @@ public class ProcessTimerReminderSchedulerTests : IDisposable
         _notifications.Shown.Should().HaveCount(1);
     }
 
+    // Revisão da Task 7: a tela Hoje recarrega os "Próximos lembretes" depois de cada disparo.
+    [Fact]
+    public async Task Reminder_tick_notifies_change_without_firing_again()
+    {
+        await AddGoal(target: 5);
+        var scheduler = Create();
+        var notified = 0;
+        _changes.Changed += (_, _) => Interlocked.Increment(ref notified);
+        await scheduler.StartAsync();
+
+        _time.SetUtcNow(At(8));
+
+        await Eventually(() => scheduler.ArmedFor == At(9) && Volatile.Read(ref notified) >= 1);
+        await Task.Delay(200); // o Changed reagenda; reagendar não pode disparar de novo nem avisar em laço
+        _notifications.Shown.Should().HaveCount(1);
+        scheduler.ArmedFor.Should().Be(At(9));
+        Volatile.Read(ref notified).Should().Be(1);
+    }
+
     [Fact]
     public async Task No_goals_arms_for_local_midnight_and_notifies_change_there()
     {

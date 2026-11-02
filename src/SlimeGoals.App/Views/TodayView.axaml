@@ -56,10 +56,11 @@
       <ItemsControl ItemsSource="{Binding Upcoming}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:UpcomingReminderViewModel">
-            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,6">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" Margin="0,0,0,6">
               <TextBlock Text="{Binding Time}" FontWeight="SemiBold" />
-              <TextBlock Text="{Binding Title}" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" />
-            </StackPanel>
+              <TextBlock Grid.Column="1" Text="{Binding Title}" Foreground="{DynamicResource Muted}"
+                         TextTrimming="CharacterEllipsis" />
+            </Grid>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>

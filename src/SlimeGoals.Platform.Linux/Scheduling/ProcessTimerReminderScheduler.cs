@@ -106,9 +106,15 @@ public sealed class ProcessTimerReminderScheduler(ReminderService reminders, Dat
         {
             if (_disposed)
                 return;
-            if (ArmedFor == _midnight)
+            // Virada do dia: avisa antes (telas trocam de dia) e reagenda. Lembrete: reagenda (dispara) e avisa depois,
+            // para a tela Hoje atualizar os "Próximos lembretes". Sem laço: o Changed só reagenda (SyncAsync idempotente)
+            // e esse caminho nunca avisa.
+            var midnight = ArmedFor == _midnight;
+            if (midnight)
                 changes.NotifyChanged();
             await RescheduleAsync().ConfigureAwait(false);
+            if (!midnight)
+                changes.NotifyChanged();
         }
         catch (Exception e)
         {
