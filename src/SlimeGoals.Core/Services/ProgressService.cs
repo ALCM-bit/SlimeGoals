@@ -9,7 +9,11 @@ public sealed record GoalProgress(Goal Goal, int Done, bool IsMet);
 /// <summary>Resumo da semana do Hoje: % médio por meta, metas em andamento e concluídas hoje.</summary>
 public sealed record WeekSummary(int Percent, int InProgress, int Completed);
 
-public sealed record TodaySnapshot(IReadOnlyList<GoalProgress> Goals, WeekSummary Week, ActiveTimer? Timer);
+/// <summary>
+/// Instantâneo do Hoje. <see cref="Timer"/> é o cronômetro ativo mesmo que a meta dele não esteja na lista
+/// (ex.: dia inativo), para a tela poder pará-lo; <see cref="TimerGoal"/> é a dona (null se não existe mais).
+/// </summary>
+public sealed record TodaySnapshot(IReadOnlyList<GoalProgress> Goals, WeekSummary Week, ActiveTimer? Timer, Goal? TimerGoal = null);
 
 /// <summary>
 /// Monta o instantâneo da tela Hoje (spec §7) com uma consulta de registros só: a semana local atual.
@@ -51,10 +55,9 @@ public sealed class ProgressService(IGoalRepository goals, ICheckinRepository ch
         var met = list.Count(p => p.IsMet);
 
         var timer = await timers.GetAsync(ct);
-        if (timer is not null && list.All(p => p.Goal.Id != timer.GoalId))
-            timer = null;
+        var timerGoal = timer is null ? null : await goals.GetAsync(timer.GoalId, ct);
 
-        return new TodaySnapshot(list, new WeekSummary(percent, list.Count - met, met), timer);
+        return new TodaySnapshot(list, new WeekSummary(percent, list.Count - met, met), timer, timerGoal);
     }
 
     /// <summary>

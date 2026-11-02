@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SlimeGoals.App.Goals;
 using SlimeGoals.Core;
+using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Core.Validation;
 
@@ -17,6 +19,8 @@ public sealed partial class TodayPageViewModel(
     private int _loadVersion;
     private ITimer? _ticker;
     private SynchronizationContext? _ui;
+    private ActiveTimer? _offscreenTimer;
+    private string _offscreenTitle = "";
 
     public override string Title => "Hoje";
 
@@ -26,6 +30,11 @@ public sealed partial class TodayPageViewModel(
     [ObservableProperty] public partial int InProgress { get; set; }
     [ObservableProperty] public partial int Completed { get; set; }
     [ObservableProperty] public partial string? ErrorMessage { get; set; }
+
+    /// <summary>Cronômetro de meta que não está na lista de hoje (ex.: dia inativo): faixa com Parar/Descartar.</summary>
+    [ObservableProperty] public partial bool HasOffscreenTimer { get; set; }
+    [ObservableProperty] public partial bool IsOffscreenTimerRunning { get; set; }
+    [ObservableProperty] public partial string? OffscreenTimerText { get; set; }
 
     public bool IsEmpty => Goals.Count == 0;
     public string EmptyMessage => "Nenhuma meta para hoje. Crie uma em Metas.";
@@ -51,6 +60,12 @@ public sealed partial class TodayPageViewModel(
             Goals.Clear();
             foreach (var item in snapshot.Goals)
                 Goals.Add(new TodayGoalViewModel(item, snapshot.Timer, time) { CanStartTimer = snapshot.Timer is null });
+            var shownInCard = Goals.Any(g => g.IsTimerRunning || g.IsTimerStopped);
+            _offscreenTimer = shownInCard ? null : snapshot.Timer;
+            _offscreenTitle = snapshot.TimerGoal?.Title ?? "meta removida";
+            HasOffscreenTimer = _offscreenTimer is not null;
+            IsOffscreenTimerRunning = _offscreenTimer is { StoppedAt: null };
+            UpdateOffscreenText();
             (WeekPercent, InProgress, Completed) = (snapshot.Week.Percent, snapshot.Week.InProgress, snapshot.Week.Completed);
             if (snapshot.Timer is { StoppedAt: null })
                 _ticker = time.CreateTimer(_ => OnUi(Tick), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
@@ -119,23 +134,30 @@ public sealed partial class TodayPageViewModel(
     [RelayCommand]
     private Task DiscardTimerAsync(TodayGoalViewModel? item) => RunAsync(item, _ => timers.DiscardAsync());
 
+    [RelayCommand]
+    private Task StopOffscreenTimerAsync() => RunCoreAsync(() => timers.StopAsync(), panelItem: null);
+
+    [RelayCommand]
+    private Task DiscardOffscreenTimerAsync() => RunCoreAsync(() => timers.DiscardAsync(), panelItem: null);
+
     /// <summary>
     /// Executa a ação e recarrega. Erro de validação numa ação de painel fica no painel, aberto (sem recarregar);
     /// os demais erros vão para a faixa de aviso, depois da recarga (que limpa <see cref="ErrorMessage"/>).
     /// </summary>
-    private async Task RunAsync(TodayGoalViewModel? item, Func<Guid, Task> action, bool panel = false)
+    private Task RunAsync(TodayGoalViewModel? item, Func<Guid, Task> action, bool panel = false) =>
+        item is null ? Task.CompletedTask : RunCoreAsync(() => action(item.Goal.Id), panel ? item : null);
+
+    private async Task RunCoreAsync(Func<Task> action, TodayGoalViewModel? panelItem)
     {
-        if (item is null)
-            return;
         ErrorMessage = null;
         string? error = null;
         try
         {
-            await action(item.Goal.Id);
+            await action();
         }
-        catch (GoalValidationException ex) when (panel)
+        catch (GoalValidationException ex) when (panelItem is not null)
         {
-            item.PanelError = ex.Errors[0].Message;
+            panelItem.PanelError = ex.Errors[0].Message;
             return;
         }
         catch (GoalValidationException ex)
@@ -162,7 +184,15 @@ public sealed partial class TodayPageViewModel(
     {
         foreach (var item in Goals)
             item.UpdateElapsed();
+        UpdateOffscreenText();
     }
+
+    private void UpdateOffscreenText() => OffscreenTimerText = _offscreenTimer switch
+    {
+        null => null,
+        { StoppedAt: null } t => $"Cronômetro rodando em \"{_offscreenTitle}\" · {GoalFormatting.Elapsed(time.GetUtcNow() - t.StartedAt)}",
+        var t => $"Cronômetro parado em \"{_offscreenTitle}\" · {GoalFormatting.Duration(TimerService.Minutes(t, time.GetUtcNow()))}",
+    };
 
     private void OnUi(Action action)
     {

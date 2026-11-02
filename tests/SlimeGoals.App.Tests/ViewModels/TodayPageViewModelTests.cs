@@ -237,4 +237,28 @@ public class TodayPageViewModelTests
 
         page.ErrorMessage.Should().Be("Não foi possível registrar.");
     }
+
+    // Revisão final #1: cronômetro de meta que não aparece hoje (ex.: dia inativo) pode ser parado e descartado.
+    [Fact]
+    public async Task Timer_of_goal_not_shown_today_appears_in_strip_and_can_be_stopped_and_discarded()
+    {
+        var weekend = await GoalService.CreateAsync(new GoalDraft("Fim de semana", Recurrence.Daily, 60, "book", GoalColor.Purple, 60,
+            new TimeOnly(8, 0), new TimeOnly(20, 0), WeekDays.Saturday | WeekDays.Sunday, null, null, Measure.Duration, null));
+        await Create("Violão", Measure.Duration, 30);
+        await _timers.TryStartAsync(new ActiveTimer(weekend.Id, Now.AddMinutes(-12)));
+
+        var page = await Loaded();
+
+        page.Goals.Select(g => g.Title).Should().Equal("Violão");
+        (page.HasOffscreenTimer, page.OffscreenTimerText).Should().Be((true, "Cronômetro rodando em \"Fim de semana\" · 0:12:00"));
+        Card(page, "Violão").CanStartTimer.Should().BeFalse();
+
+        await page.StopOffscreenTimerCommand.ExecuteAsync(null);
+        page.OffscreenTimerText.Should().Be("Cronômetro parado em \"Fim de semana\" · 12 min");
+        await page.DiscardOffscreenTimerCommand.ExecuteAsync(null);
+
+        page.HasOffscreenTimer.Should().BeFalse();
+        Card(page, "Violão").CanStartTimer.Should().BeTrue();
+        page.ErrorMessage.Should().BeNull();
+    }
 }

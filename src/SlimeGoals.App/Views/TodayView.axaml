@@ -36,6 +36,18 @@
       <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
     </Border>
 
+    <!-- Cronômetro de meta fora da lista de hoje (ex.: dia inativo): ainda dá para parar ou descartar -->
+    <Border DockPanel.Dock="Top" Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasOffscreenTimer}">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+        <TextBlock Text="{Binding OffscreenTimerText}" VerticalAlignment="Center" TextWrapping="Wrap" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+          <Button Classes="ghost" Content="Parar" IsVisible="{Binding IsOffscreenTimerRunning}"
+                  Command="{Binding StopOffscreenTimerCommand}" />
+          <Button Classes="ghost" Content="Descartar" Command="{Binding DiscardOffscreenTimerCommand}" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
     <TextBlock DockPanel.Dock="Top" Classes="section-title" Text="Metas de hoje" Margin="0,0,0,10" />
 
     <Panel>

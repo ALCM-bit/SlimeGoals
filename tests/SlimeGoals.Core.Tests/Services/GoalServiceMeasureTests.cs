@@ -63,4 +63,19 @@ public class GoalServiceMeasureTests
         await Service.ArchiveExpiredAsync();
         (await _timers.GetAsync()).Should().BeNull();
     }
+
+    // Revisão final #2: minutos do cronômetro não podem virar unidades de outra medida.
+    [Fact]
+    public async Task Measure_change_is_refused_while_goal_has_a_timer()
+    {
+        var goal = await Service.CreateAsync(GoalValidatorTests.Valid() with { Measure = Measure.Duration, Unit = null, Target = 60 });
+        await _timers.TryStartAsync(new ActiveTimer(goal.Id, _time.GetUtcNow()));
+
+        var act = () => Service.UpdateAsync(goal.Id, GoalValidatorTests.Valid());
+
+        (await act.Should().ThrowAsync<GoalValidationException>()).Which.Errors.Should()
+            .ContainSingle(e => e.Field == "Measure" && e.Message == "Pare o cronômetro antes de mudar a medida.");
+        (await Service.UpdateAsync(goal.Id, GoalValidatorTests.Valid() with { Measure = Measure.Duration, Unit = null, Target = 90 }))
+            .Target.Should().Be(90);
+    }
 }

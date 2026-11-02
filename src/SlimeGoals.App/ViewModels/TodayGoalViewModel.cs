@@ -20,7 +20,8 @@ public sealed partial class TodayGoalViewModel : ObservableObject
         ProgressText = GoalFormatting.Progress(progress);
         Fraction = Math.Clamp((double)progress.Done / Goal.Target, 0, 1);
         IsMet = progress.IsMet;
-        _timer = timer?.GoalId == Goal.Id ? timer : null;
+        // Só meta de tempo mostra cronômetro no cartão; qualquer outro caso vai para a faixa da página.
+        _timer = timer?.GoalId == Goal.Id && Goal.Measure == Measure.Duration ? timer : null;
         _time = time;
         Elapsed = "";
         if (_timer is { StoppedAt: not null })

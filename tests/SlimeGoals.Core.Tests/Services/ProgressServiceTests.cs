@@ -123,14 +123,22 @@ public class ProgressServiceTests
     public async Task No_goals_gives_zero_percent() =>
         (await Service.GetTodayAsync()).Week.Should().Be(new WeekSummary(0, 0, 0));
 
+    // Revisão final #1: cronômetro de meta fora da lista de hoje continua visível (senão bloqueia os outros sem saída).
     [Fact]
-    public async Task Timer_is_returned_only_for_listed_goal()
+    public async Task Timer_is_returned_with_its_goal_even_when_goal_is_not_listed()
     {
         var study = await Create("Estudar", target: 60, measure: Measure.Duration);
         await _timers.TryStartAsync(new ActiveTimer(study.Id, Now));
-        (await Service.GetTodayAsync()).Timer.Should().Be(new ActiveTimer(study.Id, Now));
+        var listed = await Service.GetTodayAsync();
+        (listed.Timer, listed.TimerGoal?.Id).Should().Be((new ActiveTimer(study.Id, Now), study.Id));
+
+        var weekend = await Create("Fim de semana", target: 60, measure: Measure.Duration, days: WeekDays.Saturday | WeekDays.Sunday);
+        await _timers.SaveAsync(new ActiveTimer(weekend.Id, Now));
+        var hidden = await Service.GetTodayAsync();
+        (hidden.Timer, hidden.TimerGoal?.Title).Should().Be((new ActiveTimer(weekend.Id, Now), "Fim de semana"));
 
         await _timers.SaveAsync(new ActiveTimer(Guid.NewGuid(), Now));
-        (await Service.GetTodayAsync()).Timer.Should().BeNull();
+        var orphan = await Service.GetTodayAsync();
+        (orphan.Timer is not null, orphan.TimerGoal).Should().Be((true, (Goal?)null));
     }
 }
