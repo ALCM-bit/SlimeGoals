@@ -32,6 +32,21 @@ public class GoalRepositoryTests : IDisposable
         UpdatedAt = new DateTimeOffset(2026, 11, 2, 9, 15, 30, TimeSpan.Zero),
     };
 
+    [Theory]
+    [InlineData(Measure.Completion, null, 1)]
+    [InlineData(Measure.Quantity, "copos", 8)]
+    [InlineData(Measure.Duration, null, 150)]
+    public async Task Goal_round_trips_measure_and_unit(Measure measure, string? unit, int target)
+    {
+        var goal = NewGoal() with { Measure = measure, Unit = unit, Target = target };
+        await Repo.AddAsync(goal);
+        (await Repo.GetAsync(goal.Id)).Should().Be(goal);
+
+        var changed = goal with { Unit = measure == Measure.Quantity ? "copos de 250 ml" : null };
+        await Repo.UpdateAsync(changed);
+        (await Repo.GetAsync(goal.Id)).Should().Be(changed);
+    }
+
     [Fact]
     public async Task Add_then_Get_round_trips_every_field()
     {
@@ -119,8 +134,8 @@ public class GoalRepositoryTests : IDisposable
             var reopened = new SqliteConnectionFactory($"Data Source={path}");
             using (var c = reopened.Open())
             {
-                MigrationRunner.Migrate(c).Should().Be(2);
-                c.ExecuteScalar<long>("PRAGMA user_version").Should().Be(2);
+                MigrationRunner.Migrate(c).Should().Be(3);
+                c.ExecuteScalar<long>("PRAGMA user_version").Should().Be(3);
             }
             (await new GoalRepository(reopened).GetAsync(goal.Id)).Should().Be(goal);
         }

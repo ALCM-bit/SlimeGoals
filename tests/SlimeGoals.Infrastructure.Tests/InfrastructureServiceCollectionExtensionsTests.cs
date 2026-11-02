@@ -18,6 +18,8 @@ public class InfrastructureServiceCollectionExtensionsTests
 
             Directory.Exists(dir).Should().BeTrue();
             provider.GetRequiredService<IGoalRepository>().Should().BeOfType<GoalRepository>();
+            provider.GetRequiredService<ICheckinRepository>().Should().BeOfType<CheckinRepository>();
+            provider.GetRequiredService<ITimerRepository>().Should().BeOfType<TimerRepository>();
             provider.GetRequiredService<SqliteConnectionFactory>().Should().BeSameAs(provider.GetRequiredService<SqliteConnectionFactory>());
         }
         finally

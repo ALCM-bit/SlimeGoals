@@ -8,8 +8,9 @@ namespace SlimeGoals.Core.Services;
 /// <summary>
 /// Casos de uso de metas: criar, editar, arquivar e excluir (logicamente).
 /// O relógio vem de <see cref="TimeProvider"/> para os testes controlarem o tempo.
+/// Registros entram para travar a medida; o cronômetro, para ser limpo quando a meta sai de cena.
 /// </summary>
-public sealed class GoalService(IGoalRepository goals, TimeProvider time)
+public sealed class GoalService(IGoalRepository goals, ICheckinRepository checkins, ITimerRepository timers, TimeProvider time)
 {
     public async Task<Goal> CreateAsync(GoalDraft draft, CancellationToken ct = default)
     {
@@ -44,6 +45,12 @@ public sealed class GoalService(IGoalRepository goals, TimeProvider time)
         var current = await GetExistingAsync(id, ct);
         if (current.ArchivedAt is not null)
             throw new GoalStateException(id, "Meta arquivada não pode ser editada. Desarquive-a primeiro.");
+        if (draft.Measure != current.Measure && await timers.GetAsync(ct) is { } timer && timer.GoalId == id)
+            throw new GoalValidationException(
+                [new ValidationError(nameof(GoalDraft.Measure), "Pare o cronômetro antes de mudar a medida.")]);
+        if (draft.Measure != current.Measure && await checkins.HasAnyAsync(id, ct))
+            throw new GoalValidationException(
+                [new ValidationError(nameof(GoalDraft.Measure), "A medida não muda depois do primeiro registro.")]);
         var updated = Apply(current, draft) with { UpdatedAt = time.GetUtcNow() };
         await goals.UpdateAsync(updated, ct);
         return updated;
@@ -57,6 +64,7 @@ public sealed class GoalService(IGoalRepository goals, TimeProvider time)
 
         var now = time.GetUtcNow();
         await goals.UpdateAsync(goal with { ArchivedAt = now, UpdatedAt = now }, ct);
+        await ClearTimerOfAsync(id, ct);
     }
 
     /// <summary>
@@ -85,7 +93,10 @@ public sealed class GoalService(IGoalRepository goals, TimeProvider time)
             .ToList();
 
         foreach (var goal in expired)
+        {
             await goals.UpdateAsync(goal with { ArchivedAt = now, UpdatedAt = now }, ct);
+            await ClearTimerOfAsync(goal.Id, ct);
+        }
         return expired.Count;
     }
 
@@ -94,6 +105,16 @@ public sealed class GoalService(IGoalRepository goals, TimeProvider time)
         var goal = await GetExistingAsync(id, ct);
         var now = time.GetUtcNow();
         await goals.UpdateAsync(goal with { DeletedAt = now, UpdatedAt = now }, ct);
+        await ClearTimerOfAsync(id, ct);
+    }
+
+    /// <summary>A meta já tem registros (a medida fica travada).</summary>
+    public Task<bool> HasRecordsAsync(Guid id, CancellationToken ct = default) => checkins.HasAnyAsync(id, ct);
+
+    private async Task ClearTimerOfAsync(Guid goalId, CancellationToken ct)
+    {
+        if (await timers.GetAsync(ct) is { } timer && timer.GoalId == goalId)
+            await timers.ClearAsync(ct);
     }
 
     public Task<Goal?> GetAsync(Guid id, CancellationToken ct = default) => goals.GetAsync(id, ct);
@@ -101,11 +122,16 @@ public sealed class GoalService(IGoalRepository goals, TimeProvider time)
     public Task<IReadOnlyList<Goal>> ListAsync(bool includeArchived = false, CancellationToken ct = default) =>
         goals.ListAsync(includeArchived, ct);
 
-    /// <summary>O banco guarda horários como HH:mm: descarta segundos antes de validar e salvar.</summary>
+    /// <summary>
+    /// O banco guarda horários como HH:mm: descarta segundos. Unidade só existe na quantidade;
+    /// conclusão tem sempre alvo 1 (spec §5.2).
+    /// </summary>
     private static GoalDraft Normalize(GoalDraft draft) => draft with
     {
         ActiveFrom = new TimeOnly(draft.ActiveFrom.Hour, draft.ActiveFrom.Minute),
         ActiveUntil = new TimeOnly(draft.ActiveUntil.Hour, draft.ActiveUntil.Minute),
+        Target = draft.Measure == Measure.Completion ? 1 : draft.Target,
+        Unit = draft.Measure == Measure.Quantity ? draft.Unit?.Trim() : null,
     };
 
     /// <summary>Data de hoje no fuso local do relógio injetado.</summary>
@@ -123,12 +149,14 @@ public sealed class GoalService(IGoalRepository goals, TimeProvider time)
     private async Task<Goal> GetExistingAsync(Guid id, CancellationToken ct) =>
         await goals.GetAsync(id, ct) ?? throw new GoalNotFoundException(id);
 
-    /// <summary>Copia os campos editáveis do rascunho; preserva id, criação, conclusão e arquivamento.</summary>
+    /// <summary>Copia os campos editáveis do rascunho; preserva id, criação e arquivamento.</summary>
     private static Goal Apply(Goal goal, GoalDraft draft) => goal with
     {
         Title = draft.Title.Trim(),
         Recurrence = draft.Recurrence,
         Target = draft.Target,
+        Measure = draft.Measure,
+        Unit = draft.Unit,
         Icon = draft.Icon,
         Color = draft.Color,
         ReminderEveryMinutes = draft.ReminderEveryMinutes,

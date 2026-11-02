@@ -1,6 +1,9 @@
 namespace SlimeGoals.Core.Domain;
 
-/// <summary>Dados editáveis de uma meta, como vêm do formulário (sem id nem carimbos de tempo).</summary>
+/// <summary>
+/// Dados editáveis de uma meta, como vêm do formulário (sem id nem carimbos de tempo).
+/// Medida e unidade vêm por último, com padrão, para as chamadas anteriores à v1.4 continuarem válidas.
+/// </summary>
 public sealed record GoalDraft(
     string Title,
     Recurrence Recurrence,
@@ -12,4 +15,6 @@ public sealed record GoalDraft(
     TimeOnly ActiveUntil,
     WeekDays ActiveDays,
     DateOnly? StartDate,
-    DateOnly? EndDate);
+    DateOnly? EndDate,
+    Measure Measure = Measure.Quantity,
+    string? Unit = "vezes");

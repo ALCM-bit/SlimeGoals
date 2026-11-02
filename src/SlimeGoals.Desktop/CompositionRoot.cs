@@ -15,6 +15,9 @@ internal static class CompositionRoot
         // Core
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<GoalService>();
+        services.AddSingleton<CheckinService>();
+        services.AddSingleton<TimerService>();
+        services.AddSingleton<ProgressService>();
 
         // Adaptadores
         services.AddSlimeGoalsInfrastructure(databasePath);

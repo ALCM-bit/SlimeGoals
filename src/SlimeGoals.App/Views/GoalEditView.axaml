@@ -57,10 +57,44 @@
         </StackPanel>
 
         <StackPanel Classes="field">
+          <TextBlock Classes="field-label" Text="Medida" />
+          <Border Classes="segment" HorizontalAlignment="Left" IsEnabled="{Binding !IsMeasureLocked}">
+            <StackPanel Orientation="Horizontal">
+              <RadioButton Classes="segment" GroupName="goal-measure" Content="Conclusão" IsChecked="{Binding IsCompletion}" />
+              <RadioButton Classes="segment" GroupName="goal-measure" Content="Quantidade" IsChecked="{Binding IsQuantity}" />
+              <RadioButton Classes="segment" GroupName="goal-measure" Content="Tempo" IsChecked="{Binding IsDuration}" />
+            </StackPanel>
+          </Border>
+          <TextBlock Text="{Binding MeasureLockedHint}" Foreground="{DynamicResource Muted}" FontSize="12"
+                     IsVisible="{Binding IsMeasureLocked}" />
+          <TextBlock Classes="field-error" Text="{Binding MeasureError}"
+                     IsVisible="{Binding MeasureError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+
+        <StackPanel Classes="field" IsVisible="{Binding IsQuantity}">
           <TextBlock Classes="field-label" Text="Alvo" />
           <StackPanel Orientation="Horizontal" Spacing="10">
-            <NumericUpDown Value="{Binding TargetInput}" Minimum="1" Maximum="99" Increment="1" FormatString="0"
+            <NumericUpDown Value="{Binding TargetInput}" Minimum="1" Maximum="9999" Increment="1" FormatString="0"
                            Width="130" AutomationProperties.Name="Alvo" />
+            <TextBox Text="{Binding Unit}" MaxLength="20" Width="150" PlaceholderText="Ex.: copos"
+                     AutomationProperties.Name="Unidade" />
+            <TextBlock Text="{Binding TargetSuffix}" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
+          </StackPanel>
+          <TextBlock Classes="field-error" Text="{Binding TargetError}"
+                     IsVisible="{Binding TargetError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <TextBlock Classes="field-error" Text="{Binding UnitError}"
+                     IsVisible="{Binding UnitError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+
+        <StackPanel Classes="field" IsVisible="{Binding IsDuration}">
+          <TextBlock Classes="field-label" Text="Alvo" />
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <NumericUpDown Value="{Binding DurationHoursInput}" Minimum="0" Maximum="168" Increment="1" FormatString="0"
+                           Width="110" AutomationProperties.Name="Horas" />
+            <TextBlock Text="h" VerticalAlignment="Center" />
+            <NumericUpDown Value="{Binding DurationMinutesInput}" Minimum="0" Maximum="59" Increment="1" FormatString="0"
+                           Width="110" AutomationProperties.Name="Minutos" />
+            <TextBlock Text="min" VerticalAlignment="Center" />
             <TextBlock Text="{Binding TargetSuffix}" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
           </StackPanel>
           <TextBlock Classes="field-error" Text="{Binding TargetError}"

@@ -12,12 +12,13 @@ public class GoalsPageViewModelTests
     private static readonly DateOnly Today = new(2026, 11, 2);
     private readonly FakeTimeProvider _time = new(T0);
     private readonly InMemoryGoalRepository _repo = new();
+    private readonly InMemoryCheckinRepository _checkins = new();
     private readonly GoalService _service;
     private readonly GoalsPageViewModel _vm;
 
     public GoalsPageViewModelTests()
     {
-        _service = new GoalService(_repo, _time);
+        _service = new GoalService(_repo, _checkins, new InMemoryTimerRepository(), _time);
         _vm = new GoalsPageViewModel(_service, _time);
     }
 
@@ -76,10 +77,23 @@ public class GoalsPageViewModelTests
         await Create("Ativa");
         await Load();
 
-        _vm.EditCommand.Execute(_vm.Goals.Single());
+        await _vm.EditCommand.ExecuteAsync(_vm.Goals.Single());
 
         _vm.Editor.Should().NotBeNull();
         _vm.Editor!.Title.Should().Be("Ativa");
+        _vm.Editor.IsMeasureLocked.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Edit_locks_measure_when_goal_has_records()
+    {
+        var goal = await Create("Com registro");
+        await new CheckinService(_repo, _checkins, _time).AdjustAsync(goal.Id, 1);
+        await Load();
+
+        await _vm.EditCommand.ExecuteAsync(_vm.Goals.Single());
+
+        _vm.Editor!.IsMeasureLocked.Should().BeTrue();
     }
 
     [Fact]
@@ -179,7 +193,7 @@ public class GoalsPageViewModelTests
         // 03/11 01:00 UTC = 02/11 22:00 em São Paulo: a data mostrada é a local.
         var at = new DateTimeOffset(2026, 11, 3, 1, 0, 0, TimeSpan.Zero);
 
-        new GoalItemViewModel(goal, zone).Summary.Should().Be("3× por semana · a cada 2 h · 09:00–18:00 · Seg a sex");
+        new GoalItemViewModel(goal, zone).Summary.Should().Be("3 vezes por semana · a cada 2 h · 09:00–18:00 · Seg a sex");
         new GoalItemViewModel(goal, zone).Status.Should().BeNull();
         new GoalItemViewModel(goal with { ArchivedAt = at }, zone).Status.Should().Be("Arquivada em 02/11");
     }

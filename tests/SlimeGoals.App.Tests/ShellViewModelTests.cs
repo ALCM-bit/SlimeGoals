@@ -10,11 +10,20 @@ public class ShellViewModelTests
     private static GoalsPageViewModel Goals()
     {
         var time = new FakeTimeProvider();
-        return new GoalsPageViewModel(new GoalService(new InMemoryGoalRepository(), time), time);
+        return new GoalsPageViewModel(new GoalService(new InMemoryGoalRepository(), new InMemoryCheckinRepository(), new InMemoryTimerRepository(), time), time);
+    }
+
+    internal static TodayPageViewModel Today()
+    {
+        var time = new FakeTimeProvider();
+        var (goals, checkins, timers) = (new InMemoryGoalRepository(), new InMemoryCheckinRepository(), new InMemoryTimerRepository());
+        var checkinService = new CheckinService(goals, checkins, time);
+        return new TodayPageViewModel(new ProgressService(goals, checkins, timers, time), checkinService,
+            new TimerService(goals, timers, checkinService, time), new GoalService(goals, checkins, timers, time), time);
     }
 
     private static ShellViewModel Create() => new(new PageViewModel[]
-        { new TodayPageViewModel(), Goals(), new ReportsPageViewModel(), new SettingsPageViewModel() });
+        { Today(), Goals(), new ReportsPageViewModel(), new SettingsPageViewModel() });
 
     [Fact]
     public void Pages_follow_spec_order_and_start_on_today()
@@ -41,7 +50,7 @@ public class ShellViewModelNullSelectionTests
     [Fact]
     public void Setting_current_page_to_null_keeps_previous_page()
     {
-        var shell = new ShellViewModel([new TodayPageViewModel(), new SettingsPageViewModel()]);
+        var shell = new ShellViewModel([ShellViewModelTests.Today(), new SettingsPageViewModel()]);
         shell.CurrentPage = shell.Pages[1];
 
         shell.CurrentPage = null!;

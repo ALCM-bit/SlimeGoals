@@ -65,13 +65,24 @@ public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider
     }
 
     [RelayCommand]
-    private void New() => Editor = new GoalEditViewModel(service, null, CloseEditor);
+    private void New() => Editor = new GoalEditViewModel(service, null, measureLocked: false, CloseEditor);
 
+    /// <summary>Abre o editor; meta com registros abre com a medida travada (spec §5.2).</summary>
     [RelayCommand(CanExecute = nameof(CanEdit))]
-    private void Edit(GoalItemViewModel? item)
+    private async Task EditAsync(GoalItemViewModel? item)
     {
-        if (item is not null)
-            Editor = new GoalEditViewModel(service, item.Goal, CloseEditor);
+        if (item is null)
+            return;
+        ErrorMessage = null;
+        try
+        {
+            var locked = await service.HasRecordsAsync(item.Goal.Id);
+            Editor = new GoalEditViewModel(service, item.Goal, locked, CloseEditor);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            ErrorMessage = "Não foi possível abrir a meta.";
+        }
     }
 
     private static bool CanEdit(GoalItemViewModel? item) => item is { IsArchived: false };

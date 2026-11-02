@@ -6,7 +6,7 @@ namespace SlimeGoals.Infrastructure.Tests.Data;
 
 public class MigrationRunnerTests
 {
-    private const int Latest = 2;
+    private const int Latest = 3;
 
     private const string GoalColumns =
         "id, title, recurrence, target, icon, color, reminder_every_min, active_from, active_until, active_days, created_at, updated_at";
@@ -107,7 +107,7 @@ public class Migration002Tests
     {
         using var db = V1WithData();
 
-        MigrationRunner.Migrate(db.Anchor).Should().Be(2);
+        MigrationRunner.Migrate(db.Anchor, upTo: 2).Should().Be(2);
 
         db.Anchor.Query<string>("SELECT id FROM goals ORDER BY id").Should().Equal("d", "w");
         db.Anchor.Query<string>("SELECT id FROM checkins").Should().Equal("cd");
@@ -140,6 +140,66 @@ public class Migration002Tests
     }
 }
 
+public class Migration003Tests
+{
+    private const string Columns =
+        "id, title, recurrence, target, icon, color, reminder_every_min, active_from, active_until, active_days, start_date, end_date, created_at, updated_at, archived_at, deleted_at";
+
+    private static string Insert(string id, string extraColumns = "", string extraValues = "", int target = 3) =>
+        $"INSERT INTO goals ({Columns}{extraColumns}) VALUES ('{id}', 't', 'daily', {target}, 'book', 'pink', 45, '09:00', '18:00', '1,2,3', NULL, '2026-12-20', '2026-11-02T12:00:00Z', '2026-11-02T13:00:00Z', NULL, NULL{extraValues})";
+
+    [Fact]
+    public void Existing_goals_become_quantity_in_vezes()
+    {
+        using var db = new TestDatabase(migrate: false);
+        MigrationRunner.Migrate(db.Anchor, upTo: 2);
+        db.Anchor.Execute(Insert("g"));
+        var before = db.Anchor.QuerySingle($"SELECT {Columns} FROM goals");
+
+        MigrationRunner.Migrate(db.Anchor).Should().Be(3);
+
+        db.Anchor.QuerySingle<(string, string)>("SELECT measure, unit FROM goals").Should().Be(("quantity", "vezes"));
+        ((IDictionary<string, object>)db.Anchor.QuerySingle($"SELECT {Columns} FROM goals"))
+            .Should().BeEquivalentTo((IDictionary<string, object>)before);
+    }
+
+    [Theory]
+    [InlineData("completion", "NULL", 2)]
+    [InlineData("quantity", "NULL", 3)]
+    [InlineData("duration", "'min'", 30)]
+    [InlineData("monthly", "NULL", 1)]
+    public void Measure_checks_are_enforced(string measure, string unit, int target)
+    {
+        using var db = new TestDatabase();
+        var act = () => db.Anchor.Execute(Insert("g", ", measure, unit", $", '{measure}', {unit}", target));
+        act.Should().Throw<SqliteException>().Where(e => e.Message.Contains("CHECK"));
+    }
+
+    [Fact]
+    public void Valid_measures_are_accepted()
+    {
+        using var db = new TestDatabase();
+        db.Anchor.Execute(Insert("a", ", measure, unit", ", 'completion', NULL", 1));
+        db.Anchor.Execute(Insert("b", ", measure, unit", ", 'quantity', 'copos'"));
+        db.Anchor.Execute(Insert("c", ", measure, unit", ", 'duration', NULL", 90));
+        db.Anchor.ExecuteScalar<long>("SELECT COUNT(*) FROM goals").Should().Be(3);
+    }
+
+    [Fact]
+    public void Only_one_timer_row()
+    {
+        using var db = new TestDatabase();
+        db.Anchor.Execute(Insert("g", ", measure, unit", ", 'duration', NULL", 60));
+        db.Anchor.Execute("INSERT INTO active_timer (id, goal_id, started_at) VALUES (1, 'g', '2026-11-02T12:00:00Z')");
+
+        var second = () => db.Anchor.Execute("INSERT INTO active_timer (id, goal_id, started_at) VALUES (2, 'g', '2026-11-02T12:00:00Z')");
+        var orphan = () => db.Anchor.Execute("UPDATE active_timer SET goal_id = 'nope'");
+
+        second.Should().Throw<SqliteException>().Where(e => e.Message.Contains("CHECK"));
+        orphan.Should().Throw<SqliteException>().Where(e => e.Message.Contains("FOREIGN KEY"));
+    }
+}
+
 public class MigrationRunnerConcurrencyTests
 {
     // Revisão final #5a: dois processos abrindo um banco novo ao mesmo tempo.
@@ -160,7 +220,7 @@ public class MigrationRunnerConcurrencyTests
                     return MigrationRunner.Migrate(c);
                 }));
 
-                (await Task.WhenAll(runs)).Should().AllBeEquivalentTo(2);
+                (await Task.WhenAll(runs)).Should().AllBeEquivalentTo(3);
             }
             finally
             {

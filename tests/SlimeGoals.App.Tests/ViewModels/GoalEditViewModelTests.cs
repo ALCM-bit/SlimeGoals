@@ -11,11 +11,13 @@ public class GoalEditViewModelTests
     // 02/11/2026, fuso UTC (padrão do FakeTimeProvider).
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 11, 2, 12, 0, 0, TimeSpan.Zero));
     private readonly InMemoryGoalRepository _repo = new();
+    private readonly InMemoryCheckinRepository _checkins = new();
+    private readonly InMemoryTimerRepository _timers = new();
     private readonly List<bool> _closed = [];
-    private GoalService Service => new(_repo, _time);
+    private GoalService Service => new(_repo, _checkins, _timers, _time);
 
-    private GoalEditViewModel New() => new(Service, null, _closed.Add);
-    private GoalEditViewModel Edit(Goal goal) => new(Service, goal, _closed.Add);
+    private GoalEditViewModel New() => new(Service, null, false, _closed.Add);
+    private GoalEditViewModel Edit(Goal goal, bool locked = false) => new(Service, goal, locked, _closed.Add);
 
     private Task<Goal> Existing(Func<GoalDraft, GoalDraft>? change = null) => Service.CreateAsync((change ?? (d => d))(
         new GoalDraft("Estudar inglês", Recurrence.Weekly, 5, "book", GoalColor.Pink, 45,
@@ -279,5 +281,114 @@ public class GoalEditViewModelTests
 
         vm.GeneralError.Should().Be("Não foi possível excluir a meta.");
         _closed.Should().BeEmpty();
+    }
+
+    // ---- Fase 3: medida ----
+
+    [Fact]
+    public void New_goal_defaults_to_quantity_in_vezes()
+    {
+        var vm = New();
+        (vm.Measure, vm.IsQuantity, vm.Unit, vm.IsMeasureLocked).Should().Be((Measure.Quantity, true, "vezes", false));
+    }
+
+    [Fact]
+    public async Task Duration_hours_and_minutes_build_target_in_minutes()
+    {
+        var vm = New();
+        vm.Title = "Estudar";
+        vm.IsDuration = true;
+        vm.DurationHoursInput = 2;
+        vm.DurationMinutesInput = 30;
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        var saved = (await _repo.ListAsync(includeArchived: false)).Single();
+        (saved.Measure, saved.Target, saved.Unit).Should().Be((Measure.Duration, 150, (string?)null));
+    }
+
+    [Fact]
+    public async Task Editing_duration_goal_splits_target()
+    {
+        var goal = await Existing(d => d with { Measure = Measure.Duration, Target = 150, Unit = null });
+        var vm = Edit(goal);
+        (vm.IsDuration, vm.DurationHoursInput, vm.DurationMinutesInput).Should().Be((true, 2m, 30m));
+    }
+
+    [Fact]
+    public async Task Empty_duration_reports_informe_o_tempo()
+    {
+        var vm = New();
+        vm.Title = "Estudar";
+        vm.IsDuration = true;
+        vm.DurationHoursInput = null;
+        vm.DurationMinutesInput = null;
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        vm.TargetError.Should().Be("Informe o tempo.");
+        _closed.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Completion_saves_target_1_without_unit()
+    {
+        var vm = New();
+        vm.Title = "Arrumar a mesa";
+        vm.Target = 7;
+        vm.IsCompletion = true;
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        var saved = (await _repo.ListAsync(includeArchived: false)).Single();
+        (saved.Measure, saved.Target, saved.Unit).Should().Be((Measure.Completion, 1, (string?)null));
+    }
+
+    [Fact]
+    public async Task Missing_unit_shows_unit_error()
+    {
+        var vm = New();
+        vm.Title = "Água";
+        vm.Unit = "  ";
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        vm.UnitError.Should().Be("Informe a unidade.");
+        _closed.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Switching_measure_keeps_each_measure_inputs()
+    {
+        var vm = New();
+        vm.Target = 8;
+        vm.Unit = "copos";
+        vm.IsDuration = true;
+        vm.DurationHoursInput = 1;
+        vm.IsCompletion = true;
+        vm.IsQuantity = true;
+
+        (vm.Target, vm.Unit).Should().Be((8, "copos"));
+        vm.IsDuration = true;
+        vm.DurationHoursInput.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Locked_measure_is_reported_and_service_error_shows_on_measure_field()
+    {
+        var goal = await Existing(); // começa em 05/11: o registro entra direto no repositório
+        await _checkins.AddAsync(new Checkin
+            { Id = Guid.NewGuid(), GoalId = goal.Id, DoneAt = _time.GetUtcNow(), Amount = 1, UpdatedAt = _time.GetUtcNow() });
+
+        var locked = Edit(goal, locked: true);
+        locked.IsMeasureLocked.Should().BeTrue();
+        locked.MeasureLockedHint.Should().Be("A medida não muda depois do primeiro registro.");
+        locked.IsCompletion = true;
+        locked.Measure.Should().Be(Measure.Quantity); // travada: o atalho não muda a medida
+
+        var stale = Edit(goal); // aberto antes do primeiro registro
+        stale.IsCompletion = true;
+        await stale.SaveCommand.ExecuteAsync(null);
+        stale.MeasureError.Should().Be("A medida não muda depois do primeiro registro.");
     }
 }

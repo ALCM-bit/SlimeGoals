@@ -1,5 +1,6 @@
 using System.Globalization;
 using SlimeGoals.Core.Domain;
+using SlimeGoals.Core.Services;
 
 namespace SlimeGoals.App.Goals;
 
@@ -15,12 +16,58 @@ public static class GoalFormatting
         (WeekDays.Friday, "Sex"), (WeekDays.Saturday, "Sáb"), (WeekDays.Sunday, "Dom"),
     ];
 
-    public static string Target(Recurrence recurrence, int target) => recurrence switch
+    /// <summary>Alvo do período conforme a medida: "8 copos por dia", "5 h por semana", "Concluir na semana".</summary>
+    public static string Target(Goal goal) => goal.Measure switch
     {
-        Recurrence.Daily => $"{target}× por dia",
-        Recurrence.Weekly => $"{target}× por semana",
-        _ => throw new ArgumentOutOfRangeException(nameof(recurrence), recurrence, null),
+        Measure.Completion => goal.Recurrence == Recurrence.Weekly ? "Concluir na semana" : "Concluir no dia",
+        Measure.Quantity => $"{goal.Target} {UnitFor(goal.Target, goal.Unit)} {PerPeriod(goal.Recurrence)}",
+        Measure.Duration => $"{Duration(goal.Target)} {PerPeriod(goal.Recurrence)}",
+        _ => throw new ArgumentOutOfRangeException(nameof(goal), goal.Measure, null),
     };
+
+    /// <summary>Progresso do período atual: "5 de 8 copos hoje", "2 h 30 de 5 h na semana", "Feito hoje", "Pendente".</summary>
+    public static string Progress(GoalProgress progress)
+    {
+        var goal = progress.Goal;
+        var when = goal.Recurrence == Recurrence.Weekly ? "na semana" : "hoje";
+        return goal.Measure switch
+        {
+            Measure.Completion => progress.IsMet ? $"Feito {when}" : "Pendente",
+            Measure.Quantity => $"{progress.Done} de {goal.Target} {UnitFor(goal.Target, goal.Unit)} {when}",
+            Measure.Duration => $"{Duration(progress.Done)} de {Duration(goal.Target)} {when}",
+            _ => throw new ArgumentOutOfRangeException(nameof(progress), goal.Measure, null),
+        };
+    }
+
+    /// <summary>Tempo de meta: 45 → "45 min"; 120 → "2 h"; 150 → "2 h 30".</summary>
+    public static string Duration(int minutes)
+    {
+        var (hours, rest) = (Math.Abs(minutes) / 60, Math.Abs(minutes) % 60);
+        var sign = minutes < 0 ? "-" : "";
+        return (hours, rest) switch
+        {
+            (0, _) => $"{sign}{rest} min",
+            (_, 0) => $"{sign}{hours} h",
+            _ => $"{sign}{hours} h {rest:00}",
+        };
+    }
+
+    /// <summary>Cronômetro: "0:05:09", "1:02:03" (horas sem zero à esquerda).</summary>
+    public static string Elapsed(TimeSpan elapsed) =>
+        $"{(int)elapsed.TotalHours}:{elapsed.Minutes:00}:{elapsed.Seconds:00}";
+
+    /// <summary>
+    /// Singular só para a unidade padrão: 1 → "vez". A unidade é texto livre ("copos", "páginas"),
+    /// e flexionar texto livre em pt-BR exigiria regras que erram mais do que acertam.
+    /// </summary>
+    private static string? UnitFor(int amount, string? unit) => (amount, unit) switch
+    {
+        (1, "vezes") => "vez",
+        (1, "Vezes") => "Vez",
+        _ => unit,
+    };
+
+    private static string PerPeriod(Recurrence recurrence) => recurrence == Recurrence.Weekly ? "por semana" : "por dia";
 
     public static string Interval(int minutes)
     {
@@ -56,7 +103,7 @@ public static class GoalFormatting
     {
         var parts = new List<string>
         {
-            Target(goal.Recurrence, goal.Target),
+            Target(goal),
             $"a cada {Interval(goal.ReminderEveryMinutes)}",
             Window(goal.ActiveFrom, goal.ActiveUntil),
             Days(goal.ActiveDays),

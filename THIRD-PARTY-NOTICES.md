@@ -9,6 +9,7 @@ Os componentes abaixo mantêm suas próprias licenças.
 |---|---|---|
 | Fonte [Figtree](https://github.com/erikdkennedy/figtree) | `src/SlimeGoals.App/Assets/Fonts/` | SIL Open Font License 1.1 ([OFL.txt](src/SlimeGoals.App/Assets/Fonts/OFL.txt)) |
 | 16 ícones do [Lucide](https://lucide.dev) (lucide-static 1.66.0), convertidos para path data | `src/SlimeGoals.App/Goals/GoalIcons.cs` | ISC (texto abaixo) |
+| 7 ícones do Lucide para botões de ação (check, x, minus, plus, play, square, ellipsis), convertidos para path data | `src/SlimeGoals.App/Styles/Theme.axaml` | ISC (texto abaixo) |
 
 ## Dependências NuGet (baixadas na compilação)
 
