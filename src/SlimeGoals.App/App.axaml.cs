@@ -32,7 +32,11 @@ public partial class App(IServiceProvider services) : Application
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             var window = new MainWindow { DataContext = shell };
             desktop.MainWindow = window;
-            desktop.ShutdownRequested += (_, _) => window.AllowClose = true;
+            desktop.ShutdownRequested += (_, e) =>
+            {
+                if (!e.Cancel)
+                    window.AllowClose = true;
+            };
             if (services.GetService<MainWindowActivator>() is { } activator)
                 activator.Window = window;
             if (services.GetService<DesktopAppLifetime>() is { } lifetime)

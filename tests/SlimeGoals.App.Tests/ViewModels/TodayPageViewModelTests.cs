@@ -359,4 +359,19 @@ public class TodayPageViewModelTests
 
         (page.IsPaused, page.TogglePauseCommand.CanExecute(null)).Should().Be((false, false));
     }
+
+    [Fact]
+    public async Task Pause_is_available_without_upcoming_reminders()
+    {
+        await Create("Água");
+        _time.Advance(TimeSpan.FromHours(9)); // quarta, 21:00: janela (08–20h) já acabou
+        var page = await Loaded();
+        (page.HasUpcoming, page.CanPause, page.TogglePauseCommand.CanExecute(null)).Should().Be((false, true, true));
+
+        await page.TogglePauseCommand.ExecuteAsync(null);
+        await page.LoadCommand.ExecutionTask!;
+
+        (page.IsPaused, page.CanPause).Should().Be((true, false));
+        (await Pause.GetAsync()).IsPaused.Should().BeTrue();
+    }
 }

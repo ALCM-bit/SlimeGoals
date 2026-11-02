@@ -56,15 +56,16 @@
       </Grid>
     </Border>
 
-    <TextBlock DockPanel.Dock="Top" Classes="section-title" Text="Metas de hoje" Margin="0,0,0,10" />
+    <!-- Cabeçalho da lista; "Pausar lembretes" fica aqui para valer mesmo sem próximos lembretes -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+      <TextBlock Classes="section-title" Text="Metas de hoje" VerticalAlignment="Center" />
+      <Button Grid.Column="1" Classes="ghost" Content="Pausar lembretes"
+              IsVisible="{Binding CanPause}" Command="{Binding TogglePauseCommand}" />
+    </Grid>
 
     <!-- Próximos lembretes do dia, abaixo da lista (só com itens) -->
     <StackPanel DockPanel.Dock="Bottom" Margin="0,4,0,14" IsVisible="{Binding HasUpcoming}">
-      <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-        <TextBlock Classes="section-title" Text="Próximos lembretes" VerticalAlignment="Center" />
-        <Button Grid.Column="1" Classes="ghost" Content="{Binding PauseButtonText}"
-                IsVisible="{Binding CanPause}" Command="{Binding TogglePauseCommand}" />
-      </Grid>
+      <TextBlock Classes="section-title" Text="Próximos lembretes" Margin="0,0,0,10" />
       <ItemsControl ItemsSource="{Binding Upcoming}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:UpcomingReminderViewModel">
