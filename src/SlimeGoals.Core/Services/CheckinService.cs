@@ -8,7 +8,8 @@ namespace SlimeGoals.Core.Services;
 /// Registra ajustes de progresso (spec §5.2): valores com sinal; o total do período nunca fica negativo
 /// e, na conclusão, nunca passa de 1.
 /// </summary>
-public sealed class CheckinService(IGoalRepository goals, ICheckinRepository checkins, TimeProvider time)
+public sealed class CheckinService(IGoalRepository goals, ICheckinRepository checkins, TimeProvider time,
+    DataChangeNotifier? changes = null)
 {
     public const int MaxNoteLength = 200;
     public const int MaxQuantityAmount = 9999;
@@ -51,6 +52,7 @@ public sealed class CheckinService(IGoalRepository goals, ICheckinRepository che
             Note = note,
             UpdatedAt = now,
         }, ct);
+        changes?.NotifyChanged();
         return total;
     }
 
