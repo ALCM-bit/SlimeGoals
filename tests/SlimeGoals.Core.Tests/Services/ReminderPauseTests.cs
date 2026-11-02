@@ -63,4 +63,25 @@ public class ReminderPauseTests
 
         (await Pause.GetAsync()).ResumedAt.Should().BeNull();
     }
+
+    [Fact]
+    public async Task Failed_resume_leaves_pause_and_anchor_written()
+    {
+        await Pause.PauseAsync();
+        var failing = new ReminderPause(new ThrowingOnRemove(_settings), _time);
+
+        var act = () => failing.ResumeAsync();
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        var state = await Pause.GetAsync();
+        state.IsPaused.Should().BeTrue();
+        state.ResumedAt.Should().Be(_time.GetUtcNow());
+    }
+
+    private sealed class ThrowingOnRemove(ISettingsRepository inner) : ISettingsRepository
+    {
+        public Task<string?> GetAsync(string key, CancellationToken ct = default) => inner.GetAsync(key, ct);
+        public Task SetAsync(string key, string value, CancellationToken ct = default) => inner.SetAsync(key, value, ct);
+        public Task RemoveAsync(string key, CancellationToken ct = default) => throw new InvalidOperationException();
+    }
 }

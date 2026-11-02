@@ -47,8 +47,8 @@ public sealed class ReminderPause(ISettingsRepository settings, TimeProvider tim
     {
         if (!(await GetAsync(ct)).IsPaused)
             return;
-        await settings.RemoveAsync(PausedKey, ct);
         await settings.SetAsync(ResumedAtKey, time.GetUtcNow().UtcDateTime.ToString("O", CultureInfo.InvariantCulture), ct);
+        await settings.RemoveAsync(PausedKey, ct);
         changes?.NotifyChanged();
     }
 }

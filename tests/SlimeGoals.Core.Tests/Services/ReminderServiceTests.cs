@@ -212,7 +212,7 @@ public class ReminderServiceTests
     [Fact]
     public async Task Paused_sync_fires_nothing_withdraws_pending_and_returns_null()
     {
-        var goal = await Add();
+        await Add();
         At(9);
         await PausableService.SyncAsync();
         var pendingId = _notifications.Shown.Should().ContainSingle().Subject.LogId;
@@ -227,7 +227,6 @@ public class ReminderServiceTests
         At(11);
         await PausableService.SyncAsync();
         _notifications.Shown.Should().HaveCount(1);
-        goal.Should().NotBeNull();
     }
 
     [Fact]
