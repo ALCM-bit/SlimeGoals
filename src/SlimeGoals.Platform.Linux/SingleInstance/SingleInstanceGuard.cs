@@ -54,8 +54,10 @@ public sealed class SingleInstanceGuard : IDisposable
         {
             lockStream = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         }
-        catch (IOException)
+        catch (IOException ex)
         {
+            // Normalmente é outra instância segurando a trava; o texto ajuda a ver disco cheio ou somente leitura.
+            Trace.TraceInformation($"SingleInstanceGuard: trava {lockPath} indisponível: {ex.Message}");
             return null;
         }
 
@@ -166,6 +168,15 @@ public sealed class SingleInstanceGuard : IDisposable
             catch (Exception ex)
             {
                 Trace.TraceError($"SingleInstanceGuard: falha ao aceitar conexão: {ex}");
+                // Pausa curta: um erro persistente (ex.: EMFILE) não pode girar o laço sem parar.
+                try
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(100), ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
                 continue;
             }
 
@@ -186,7 +197,8 @@ public sealed class SingleInstanceGuard : IDisposable
                     return;
 
                 await client.SendAsync(Encoding.UTF8.GetBytes(OkReply), SocketFlags.None, cts.Token).ConfigureAwait(false);
-                ThreadPool.QueueUserWorkItem(_ => RaiseShowRequested());
+                if (Volatile.Read(ref _disposed) == 0)
+                    ThreadPool.QueueUserWorkItem(_ => RaiseShowRequested());
             }
         }
         catch (Exception ex) when (ct.IsCancellationRequested)
@@ -201,6 +213,9 @@ public sealed class SingleInstanceGuard : IDisposable
 
     private void RaiseShowRequested()
     {
+        // O guarda pode ter sido descartado entre a fila e a execução: depois do Dispose, nenhum aviso.
+        if (Volatile.Read(ref _disposed) != 0)
+            return;
         try
         {
             ShowRequested?.Invoke(this, EventArgs.Empty);

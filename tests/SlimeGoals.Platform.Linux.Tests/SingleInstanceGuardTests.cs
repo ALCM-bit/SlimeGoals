@@ -89,6 +89,21 @@ public sealed class SingleInstanceGuardTests : IDisposable
     }
 
     [Fact]
+    public async Task After_dispose_signal_returns_false_and_handler_is_not_raised_again()
+    {
+        var guard = SingleInstanceGuard.TryAcquire(Dir, Key)!;
+        var count = 0;
+        var shown = ShowSignal(guard, () => Interlocked.Increment(ref count));
+        SingleInstanceGuard.SignalExisting(Dir, Key).Should().BeTrue();
+        await shown.Task.WaitAsync(Wait);
+
+        guard.Dispose();
+
+        SingleInstanceGuard.SignalExisting(Dir, Key).Should().BeFalse();
+        Volatile.Read(ref count).Should().Be(1);
+    }
+
+    [Fact]
     public async Task Orphan_socket_file_is_replaced()
     {
         Directory.CreateDirectory(Dir);
