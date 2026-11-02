@@ -20,6 +20,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<IGoalRepository, GoalRepository>();
         services.AddSingleton<ICheckinRepository, CheckinRepository>();
         services.AddSingleton<ITimerRepository, TimerRepository>();
+        services.AddSingleton<IReminderLogRepository, ReminderLogRepository>();
         return services;
     }
 }

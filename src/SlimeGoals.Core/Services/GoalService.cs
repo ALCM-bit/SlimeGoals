@@ -10,7 +10,8 @@ namespace SlimeGoals.Core.Services;
 /// O relógio vem de <see cref="TimeProvider"/> para os testes controlarem o tempo.
 /// Registros entram para travar a medida; o cronômetro, para ser limpo quando a meta sai de cena.
 /// </summary>
-public sealed class GoalService(IGoalRepository goals, ICheckinRepository checkins, ITimerRepository timers, TimeProvider time)
+public sealed class GoalService(IGoalRepository goals, ICheckinRepository checkins, ITimerRepository timers, TimeProvider time,
+    DataChangeNotifier? changes = null)
 {
     public async Task<Goal> CreateAsync(GoalDraft draft, CancellationToken ct = default)
     {
@@ -35,6 +36,7 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
         }, draft);
 
         await goals.AddAsync(goal, ct);
+        changes?.NotifyChanged();
         return goal;
     }
 
@@ -53,6 +55,7 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
                 [new ValidationError(nameof(GoalDraft.Measure), "A medida não muda depois do primeiro registro.")]);
         var updated = Apply(current, draft) with { UpdatedAt = time.GetUtcNow() };
         await goals.UpdateAsync(updated, ct);
+        changes?.NotifyChanged();
         return updated;
     }
 
@@ -65,6 +68,7 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
         var now = time.GetUtcNow();
         await goals.UpdateAsync(goal with { ArchivedAt = now, UpdatedAt = now }, ct);
         await ClearTimerOfAsync(id, ct);
+        changes?.NotifyChanged();
     }
 
     /// <summary>
@@ -81,6 +85,7 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
                 $"O período desta meta terminou em {end.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)}. Crie uma nova meta para continuar.");
 
         await goals.UpdateAsync(goal with { ArchivedAt = null, UpdatedAt = time.GetUtcNow() }, ct);
+        changes?.NotifyChanged();
     }
 
     /// <summary>Arquiva as metas ativas cujo fim já passou (spec RF10). Devolve quantas arquivou.</summary>
@@ -97,6 +102,8 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
             await goals.UpdateAsync(goal with { ArchivedAt = now, UpdatedAt = now }, ct);
             await ClearTimerOfAsync(goal.Id, ct);
         }
+        if (expired.Count > 0)
+            changes?.NotifyChanged();
         return expired.Count;
     }
 
@@ -106,6 +113,7 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
         var now = time.GetUtcNow();
         await goals.UpdateAsync(goal with { DeletedAt = now, UpdatedAt = now }, ct);
         await ClearTimerOfAsync(id, ct);
+        changes?.NotifyChanged();
     }
 
     /// <summary>A meta já tem registros (a medida fica travada).</summary>

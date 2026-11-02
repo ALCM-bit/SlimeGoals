@@ -22,9 +22,3 @@ public sealed record IconOption(string Key, string Name)
 }
 
 public sealed record ColorOption(GoalColor Color, string Name);
-
-public sealed record IntervalOption(int Minutes)
-{
-    public string Label => GoalFormatting.Interval(Minutes);
-    public override string ToString() => Label;
-}

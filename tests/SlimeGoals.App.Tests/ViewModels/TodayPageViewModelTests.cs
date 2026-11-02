@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Time.Testing;
+using SlimeGoals.App.Goals;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
@@ -14,6 +15,9 @@ public class TodayPageViewModelTests
     private readonly InMemoryGoalRepository _goals = new();
     private readonly InMemoryCheckinRepository _checkins = new();
     private readonly InMemoryTimerRepository _timers = new();
+    private readonly InMemoryReminderLogRepository _log = new();
+    private readonly FakeNotificationService _notifications = new();
+    private readonly DataChangeNotifier _changes = new();
 
     public TodayPageViewModelTests() => _time.SetLocalTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
 
@@ -22,7 +26,8 @@ public class TodayPageViewModelTests
 
     private TodayPageViewModel NewPage() => new(
         new ProgressService(_goals, _checkins, _timers, _time), CheckinService,
-        new TimerService(_goals, _timers, CheckinService, _time), GoalService, _time);
+        new TimerService(_goals, _timers, CheckinService, _time), GoalService, _time,
+        new ReminderService(_goals, _checkins, _timers, _log, _notifications, new ReminderFormatter(), _time), _changes);
 
     private async Task<TodayPageViewModel> Loaded()
     {
@@ -272,5 +277,38 @@ public class TodayPageViewModelTests
         page.HasOffscreenTimer.Should().BeFalse();
         Card(page, "Violão").CanStartTimer.Should().BeTrue();
         page.ErrorMessage.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Today_reloads_when_data_changes()
+    {
+        var water = await Create("Água");
+        var page = await Loaded();
+
+        await CheckinService.AdjustAsync(water.Id, 2); // escrita de fora da tela (ex.: notificação)
+        _changes.NotifyChanged();
+        await page.LoadCommand.ExecutionTask!;
+
+        Card(page, "Água").ProgressText.Should().Be("2 de 8 copos hoje");
+    }
+
+    [Fact]
+    public async Task Today_lists_upcoming_reminders_of_today()
+    {
+        await Create("Água");
+        _time.Advance(TimeSpan.FromHours(19)); // quinta, 07:00 em São Paulo: primeiro lembrete às 08:00
+
+        var page = await Loaded();
+
+        page.HasUpcoming.Should().BeTrue();
+        page.Upcoming.Should().Equal(new UpcomingReminderViewModel("08:00", "Água"));
+    }
+
+    [Fact]
+    public async Task Today_without_upcoming_hides_section()
+    {
+        var page = await Loaded();
+
+        (page.HasUpcoming, page.Upcoming.Count).Should().Be((false, 0));
     }
 }

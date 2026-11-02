@@ -20,6 +20,7 @@ Os componentes abaixo mantêm suas próprias licenças.
 | Microsoft.Extensions.DependencyInjection(.Abstractions) | MIT |
 | Microsoft.Data.Sqlite | MIT |
 | Dapper | Apache-2.0 |
+| Tmds.DBus.Protocol | MIT |
 | xunit.v3.mtp-v2 | Apache-2.0 |
 | AwesomeAssertions | Apache-2.0 |
 | Microsoft.Extensions.TimeProvider.Testing | MIT |

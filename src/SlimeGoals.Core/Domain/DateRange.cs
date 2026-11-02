@@ -20,24 +20,6 @@ public readonly record struct DateRange(DateOnly Start, DateOnly EndExclusive)
     /// Primeiro instante do dia local, em UTC. Trata o horário de verão:
     /// meia-noite inexistente → primeiro instante válido; meia-noite repetida → primeira ocorrência.
     /// </summary>
-    /// <remarks>
-    /// A busca é feita pelo lado UTC (UTC → local é sempre bem definido), porque
-    /// IsInvalidTime/GetUtcOffset no lado local erram em alguns fusos reais (ex.: America/Asuncion, 2023).
-    /// </remarks>
-    public static DateTimeOffset LocalMidnightToUtc(DateOnly date, TimeZoneInfo zone)
-    {
-        var midnight = date.ToDateTime(TimeOnly.MinValue);
-        bool ReachedDay(DateTimeOffset utc) => TimeZoneInfo.ConvertTime(utc, zone).DateTime >= midnight;
-
-        // Nenhum fuso passa de UTC+14: 15 h antes da meia-noite "em UTC" ainda é o dia anterior.
-        var utc = new DateTimeOffset(midnight, TimeSpan.Zero).AddHours(-15);
-        while (!ReachedDay(utc))
-            utc = utc.AddMinutes(15);
-
-        // Refina minuto a minuto dentro do último passo (transições ocorrem em minutos inteiros).
-        var candidate = utc.AddMinutes(-15);
-        while (!ReachedDay(candidate))
-            candidate = candidate.AddMinutes(1);
-        return candidate;
-    }
+    public static DateTimeOffset LocalMidnightToUtc(DateOnly date, TimeZoneInfo zone) =>
+        LocalTime.ToUtc(date, TimeOnly.MinValue, zone);
 }

@@ -7,7 +7,8 @@ namespace SlimeGoals.Core.Services;
 /// Cronômetro das metas de tempo (spec §5.2): um por vez, gravado no banco para sobreviver ao fechamento
 /// do app. Parar congela os minutos; o registro só acontece quando o usuário confirma.
 /// </summary>
-public sealed class TimerService(IGoalRepository goals, ITimerRepository timers, CheckinService checkins, TimeProvider time)
+public sealed class TimerService(IGoalRepository goals, ITimerRepository timers, CheckinService checkins, TimeProvider time,
+    DataChangeNotifier? changes = null)
 {
     public Task<ActiveTimer?> GetAsync(CancellationToken ct = default) => timers.GetAsync(ct);
 
@@ -32,6 +33,7 @@ public sealed class TimerService(IGoalRepository goals, ITimerRepository timers,
 
         if (!await timers.TryStartAsync(new ActiveTimer(goalId, time.GetUtcNow()), ct))
             throw Conflict(goalId, "outra meta");
+        changes?.NotifyChanged();
     }
 
     /// <summary>Congela o cronômetro (idempotente) e devolve os minutos.</summary>
@@ -42,6 +44,7 @@ public sealed class TimerService(IGoalRepository goals, ITimerRepository timers,
         {
             timer = timer with { StoppedAt = time.GetUtcNow() };
             await timers.SaveAsync(timer, ct);
+            changes?.NotifyChanged();
         }
         return Minutes(timer, time.GetUtcNow());
     }
@@ -53,10 +56,15 @@ public sealed class TimerService(IGoalRepository goals, ITimerRepository timers,
             throw new GoalStateException(Guid.Empty, "Pare o cronômetro antes de registrar.");
         var total = await checkins.AdjustAsync(timer.GoalId, minutes, note, ct);
         await timers.ClearAsync(ct);
+        changes?.NotifyChanged();
         return total;
     }
 
-    public Task DiscardAsync(CancellationToken ct = default) => timers.ClearAsync(ct);
+    public async Task DiscardAsync(CancellationToken ct = default)
+    {
+        await timers.ClearAsync(ct);
+        changes?.NotifyChanged();
+    }
 
     /// <summary>Minutos inteiros entre o início e a parada (ou agora), arredondando ao mais próximo.</summary>
     public static int Minutes(ActiveTimer timer, DateTimeOffset now) =>

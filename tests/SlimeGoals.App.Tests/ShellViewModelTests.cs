@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Time.Testing;
+using SlimeGoals.App.Goals;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Testing;
@@ -19,7 +20,9 @@ public class ShellViewModelTests
         var (goals, checkins, timers) = (new InMemoryGoalRepository(), new InMemoryCheckinRepository(), new InMemoryTimerRepository());
         var checkinService = new CheckinService(goals, checkins, time);
         return new TodayPageViewModel(new ProgressService(goals, checkins, timers, time), checkinService,
-            new TimerService(goals, timers, checkinService, time), new GoalService(goals, checkins, timers, time), time);
+            new TimerService(goals, timers, checkinService, time), new GoalService(goals, checkins, timers, time), time,
+            new ReminderService(goals, checkins, timers, new InMemoryReminderLogRepository(), new FakeNotificationService(),
+                new ReminderFormatter(), time), new DataChangeNotifier());
     }
 
     private static ShellViewModel Create() => new(new PageViewModel[]
