@@ -48,7 +48,7 @@ public sealed class ProgressService(IGoalRepository goals, ICheckinRepository ch
             .ToList();
 
         var fractions = active
-            .Select(g => WeekFraction(g, today, monday, SumOn))
+            .Select(g => WeekFraction(g, today, monday, zone, SumOn))
             .OfType<double>()
             .ToList();
         var percent = fractions.Count == 0 ? 0 : (int)Math.Round(fractions.Average() * 100, MidpointRounding.AwayFromZero);
@@ -64,9 +64,12 @@ public sealed class ProgressService(IGoalRepository goals, ICheckinRepository ch
     /// Fração da semana cumprida pela meta (spec §7), ou null se ela não entra na média.
     /// Semanal: soma da semana ÷ alvo. Diária: média, nos dias ativos de segunda a hoje, da fração cumprida
     /// em cada dia (até 1). Hoje entra com o progresso parcial, para o % subir à medida que se registra.
+    /// Dias antes da criação da meta (data local) não contam: ela nem existia neles.
     /// </summary>
-    private static double? WeekFraction(Goal goal, DateOnly today, DateOnly monday, Func<Goal, DateOnly, int> sumOn)
+    private static double? WeekFraction(Goal goal, DateOnly today, DateOnly monday, TimeZoneInfo zone,
+        Func<Goal, DateOnly, int> sumOn)
     {
+        var createdOn = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(goal.CreatedAt, zone).DateTime);
         var days = Enumerable.Range(0, today.DayNumber - monday.DayNumber + 1).Select(monday.AddDays).ToList();
         if (goal.Recurrence == Recurrence.Weekly)
         {
@@ -76,7 +79,7 @@ public sealed class ProgressService(IGoalRepository goals, ICheckinRepository ch
             return Math.Clamp((double)sum / goal.Target, 0, 1);
         }
 
-        var counted = days.Where(d => GoalPeriod.IsShownOn(goal, d)).ToList();
+        var counted = days.Where(d => d >= createdOn && GoalPeriod.IsShownOn(goal, d)).ToList();
         return counted.Count == 0 ? null : counted.Average(d => Math.Clamp((double)sumOn(goal, d) / goal.Target, 0, 1));
     }
 }

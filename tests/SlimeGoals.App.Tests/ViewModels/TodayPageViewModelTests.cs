@@ -55,7 +55,7 @@ public class TodayPageViewModelTests
         var card = Card(page, "Água");
         (card.ProgressText, card.Fraction, card.IsMet, card.IsQuantity).Should().Be(("3 de 8 copos hoje", 0.375, false, true));
         Card(page, "Mesa").ProgressText.Should().Be("Pendente");
-        (page.InProgress, page.Completed, page.WeekPercent).Should().Be((2, 0, 6)); // quarta: Água (0 + 0 + 3/8) / 3, Mesa 0 → 6,25%
+        (page.InProgress, page.Completed, page.WeekPercent).Should().Be((2, 0, 19)); // criadas hoje (quarta): só hoje conta → (3/8 + 0) / 2
     }
 
     [Fact]

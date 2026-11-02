@@ -21,14 +21,21 @@ public class ProgressServiceTests
     private GoalService Goals => new(_goals, _checkins, _timers, _time);
     private ProgressService Service => new(_goals, _checkins, _timers, _time);
 
+    /// <summary>
+    /// Cria a meta como se existisse desde <paramref name="createdOn"/> (padrão: semana anterior, para os dias
+    /// desta semana contarem todos). O relógio não volta, então a data de criação é ajustada no repositório.
+    /// </summary>
     private async Task<Goal> Create(string title, Recurrence recurrence = Recurrence.Daily, int target = 1,
-        WeekDays days = WeekDays.All, DateOnly? start = null, Measure measure = Measure.Quantity)
+        WeekDays days = WeekDays.All, DateOnly? start = null, Measure measure = Measure.Quantity, DateOnly? createdOn = null)
     {
         var goal = await Goals.CreateAsync(GoalValidatorTests.Valid() with
         {
             Title = title, Recurrence = recurrence, Target = target, ActiveDays = days, StartDate = start,
             Measure = measure, Unit = measure == Measure.Quantity ? "vezes" : null,
         });
+        var day = createdOn ?? Today.AddDays(-7);
+        goal = goal with { CreatedAt = new DateTimeOffset(day.ToDateTime(new TimeOnly(13, 0)), TimeSpan.Zero) + (goal.CreatedAt - Now) };
+        await _goals.UpdateAsync(goal);
         _time.Advance(TimeSpan.FromSeconds(1)); // CreatedAt distintos, mesma data
         return goal;
     }
@@ -122,6 +129,27 @@ public class ProgressServiceTests
         await Record(weekly, Today, 1);
 
         (await Service.GetTodayAsync()).Week.Percent.Should().Be(38); // (0,5 + 0,25) / 2 = 37,5
+    }
+
+    // Uma meta criada na quarta não conta segunda e terça como 0: ela nem existia nesses dias.
+    [Fact]
+    public async Task Daily_goal_created_mid_week_counts_from_creation_day()
+    {
+        var fresh = await Create("Água", target: 8, createdOn: Today);
+        await Record(fresh, Today, 8);
+
+        (await Service.GetTodayAsync()).Week.Percent.Should().Be(100);
+    }
+
+    [Fact]
+    public async Task Creation_day_uses_local_date()
+    {
+        // 23:30 de terça em São Paulo é 02:30 UTC de quarta: a meta conta desde terça.
+        var goal = await Create("Água", createdOn: Today);
+        await _goals.UpdateAsync(goal with { CreatedAt = new DateTimeOffset(2026, 11, 4, 2, 30, 0, TimeSpan.Zero) });
+        await Record(goal, Today, 1);
+
+        (await Service.GetTodayAsync()).Week.Percent.Should().Be(50); // ter 0, qua 1
     }
 
     [Fact]
