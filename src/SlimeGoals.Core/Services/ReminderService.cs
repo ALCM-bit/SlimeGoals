@@ -12,7 +12,8 @@ public sealed record UpcomingReminder(Goal Goal, DateTimeOffset At);
 /// grava os disparos no log e os mostra pelo <see cref="INotificationService"/>.
 /// </summary>
 public sealed class ReminderService(IGoalRepository goals, ICheckinRepository checkins, ITimerRepository timers,
-    IReminderLogRepository log, INotificationService notifications, IReminderFormatter formatter, TimeProvider time)
+    IReminderLogRepository log, INotificationService notifications, IReminderFormatter formatter, TimeProvider time,
+    ReminderPause? pause = null)
 {
     /// <summary>Adiar fixo em 10 min; a configuração vem na Fase 6.</summary>
     public const int SnoozeMinutes = 10;
@@ -22,6 +23,14 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
     {
         var now = time.GetUtcNow();
         var snapshot = await LoadAsync(now, ct);
+
+        // Pausado: nada vale, nada dispara.
+        if (snapshot.Paused)
+        {
+            foreach (var entry in await log.ListPendingAsync(ct))
+                await IgnoreAsync(entry, now, ct);
+            return null;
+        }
 
         // 1. Pendentes que não valem mais.
         var pending = await log.ListPendingAsync(ct);
@@ -77,6 +86,8 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
     {
         var now = time.GetUtcNow();
         var snapshot = await LoadAsync(now, ct);
+        if (snapshot.Paused)
+            return [];
         return snapshot.Goals
             .Select(g => (Goal: g, At: NextFor(g, snapshot, now)))
             .Where(x => x.At is { } at && at < snapshot.TomorrowStart)
@@ -121,20 +132,23 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
         var weekCheckins = await checkins.ListAsync(from, to, ct);
         var fires = (await log.ListAsync(from, to, ct)).ToList();
         var timer = await timers.GetAsync(ct);
+        var pauseState = pause is null ? new PauseState(false, null) : await pause.GetAsync(ct);
 
         var byGoalAndDay = weekCheckins
             .GroupBy(c => (c.GoalId, Day: DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(c.DoneAt, zone).DateTime)))
             .ToDictionary(g => g.Key, g => g.Sum(c => c.Amount));
 
-        return new Snapshot(active, zone, today, todayStart, tomorrowStart, byGoalAndDay, weekCheckins, fires, timer?.GoalId);
+        return new Snapshot(active, zone, today, todayStart, tomorrowStart, byGoalAndDay, weekCheckins, fires, timer?.GoalId,
+            pauseState);
     }
 
     /// <summary>Fatos da semana local levantados de uma vez; <see cref="Fires"/> cresce conforme se dispara.</summary>
     private sealed class Snapshot(IReadOnlyList<Goal> goals, TimeZoneInfo zone, DateOnly today,
         DateTimeOffset todayStart, DateTimeOffset tomorrowStart,
         Dictionary<(Guid GoalId, DateOnly Day), int> sums, IReadOnlyList<Checkin> weekCheckins,
-        List<ReminderLogEntry> fires, Guid? timerGoalId)
+        List<ReminderLogEntry> fires, Guid? timerGoalId, PauseState pauseState)
     {
+        public bool Paused => pauseState.IsPaused;
         public IReadOnlyList<Goal> Goals { get; } = goals;
         public TimeZoneInfo Zone { get; } = zone;
         public DateTimeOffset TodayStart => todayStart;
@@ -155,9 +169,11 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
                 .Where(c => c.GoalId == goal.Id && c.DoneAt >= todayStart && c.DoneAt < tomorrowStart)
                 .Select(c => (DateTimeOffset?)c.DoneAt).Max();
             var snoozedAt = last is { Response: ReminderResponse.Snooze } ? last.RespondedAt : null;
-            var createdToday = goal.CreatedAt >= todayStart && goal.CreatedAt < tomorrowStart ? goal.CreatedAt : (DateTimeOffset?)null;
+            var intervalStart = new[] { goal.CreatedAt, pauseState.ResumedAt }
+                .Where(t => t is { } v && v >= todayStart && v < tomorrowStart)
+                .Max();
             return new ReminderState(PeriodTotal(goal) >= goal.Target, timerGoalId == goal.Id,
-                last?.FiredAt, lastCheckin, snoozedAt, createdToday);
+                last?.FiredAt, lastCheckin, snoozedAt, intervalStart);
         }
     }
 }

@@ -27,7 +27,12 @@ public class ReminderServiceTests
         public ReminderText Format(Goal goal, int periodTotal) => new($"T {goal.Title}", $"B {periodTotal}/{goal.Target}", "Feito!");
     }
 
+    private readonly InMemorySettingsRepository _settings = new();
+    private ReminderPause Pause => new(_settings, _time);
+
     private ReminderService Service => new(_goals, _checkins, _timers, _log, _notifications, new FakeFormatter(), _time);
+
+    private ReminderService PausableService => new(_goals, _checkins, _timers, _log, _notifications, new FakeFormatter(), _time, Pause);
 
     private async Task<Goal> Add(string title = "Meta", int target = 1)
     {
@@ -202,5 +207,50 @@ public class ReminderServiceTests
 
         _notifications.Shown.Should().BeEmpty();
         next.Should().Be(Today(15));
+    }
+
+    [Fact]
+    public async Task Paused_sync_fires_nothing_withdraws_pending_and_returns_null()
+    {
+        var goal = await Add();
+        At(9);
+        await PausableService.SyncAsync();
+        var pendingId = _notifications.Shown.Should().ContainSingle().Subject.LogId;
+        At(9, 30);
+        await Pause.PauseAsync();
+
+        var next = await PausableService.SyncAsync();
+
+        next.Should().BeNull();
+        _notifications.Withdrawn.Should().Contain(pendingId);
+        _log.All.Should().ContainSingle().Which.Response.Should().Be(ReminderResponse.Ignore);
+        At(11);
+        await PausableService.SyncAsync();
+        _notifications.Shown.Should().HaveCount(1);
+        goal.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Paused_upcoming_is_empty()
+    {
+        await Add();
+        await Pause.PauseAsync();
+
+        (await PausableService.UpcomingTodayAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Resume_restarts_interval_from_resume_time()
+    {
+        await Add();
+        At(9);
+        await Pause.PauseAsync();
+        At(15);
+        await Pause.ResumeAsync();
+
+        var next = await PausableService.SyncAsync();
+
+        _notifications.Shown.Should().BeEmpty();
+        next.Should().Be(Today(16));
     }
 }
