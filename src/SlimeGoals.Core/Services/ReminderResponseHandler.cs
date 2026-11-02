@@ -26,7 +26,10 @@ public sealed class ReminderResponseHandler(
         await _gate.WaitAsync(ct);
         try
         {
-            return await HandleLockedAsync(logId, action, ct);
+            // Retém os avisos até a resposta ser gravada: senão o agendador, avisado pela ação (registro ou
+            // cronômetro), veria o lembrete ainda pendente com a meta já atendida e o marcaria como ignorado.
+            using (changes?.Defer())
+                return await HandleLockedAsync(logId, action, ct);
         }
         finally
         {
@@ -36,7 +39,6 @@ public sealed class ReminderResponseHandler(
 
     private async Task<ReminderOutcome> HandleLockedAsync(Guid logId, ReminderAction action, CancellationToken ct)
     {
-
         var entry = await log.GetAsync(logId, ct);
         if (entry is null || entry.Response is not null)
             return ReminderOutcome.Stale;
