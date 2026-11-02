@@ -2,7 +2,6 @@ using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Data;
 using Avalonia.Platform;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
@@ -44,8 +43,7 @@ public partial class App(IServiceProvider services) : Application
             if (services.GetService<DesktopAppLifetime>() is { } lifetime)
                 lifetime.Desktop = desktop;
             desktop.Exit += (_, _) => StopAll(hosted);
-            if (services.GetService<TrayMenuViewModel>() is { } tray)
-                CreateTrayIcon(tray);
+            CreateTrayIcon();
         }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime single)
             single.MainView = new ShellView { DataContext = shell };
@@ -60,12 +58,22 @@ public partial class App(IServiceProvider services) : Application
     /// Ícone na bandeja com "Abrir", pausa e "Sair". Opcional: sem suporte (ex.: GNOME sem AppIndicator)
     /// ou com erro, o app segue sem ele.
     /// </summary>
-    private void CreateTrayIcon(TrayMenuViewModel tray)
+    private void CreateTrayIcon()
     {
+        TrayMenuViewModel? tray;
         try
         {
-            var pauseItem = new NativeMenuItem { Command = tray.TogglePauseCommand };
-            pauseItem.Bind(NativeMenuItem.HeaderProperty, new Binding(nameof(TrayMenuViewModel.PauseText)) { Source = tray });
+            tray = services.GetService<TrayMenuViewModel>();
+            if (tray is null)
+                return;
+
+            // PauseText já muda na thread da interface (o VM marshala): basta copiar para o item.
+            var pauseItem = new NativeMenuItem { Header = tray.PauseText, Command = tray.TogglePauseCommand };
+            tray.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(TrayMenuViewModel.PauseText))
+                    pauseItem.Header = tray.PauseText;
+            };
 
             var icon = new TrayIcon
             {
