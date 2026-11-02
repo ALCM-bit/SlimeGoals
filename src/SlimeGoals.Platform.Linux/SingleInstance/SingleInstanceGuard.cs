@@ -26,6 +26,7 @@ public sealed class SingleInstanceGuard : IDisposable
     private readonly Socket _listener;
     private readonly string _socketPath;
     private readonly CancellationTokenSource _cts = new();
+    private int _stopped;
     private int _disposed;
 
     private SingleInstanceGuard(FileStream lockStream, Socket listener, string socketPath)
@@ -82,6 +83,25 @@ public sealed class SingleInstanceGuard : IDisposable
     }
 
     /// <summary>
+    /// Tenta <see cref="TryAcquire"/> a cada <paramref name="interval"/> até <paramref name="timeout"/>.
+    /// Serve para quando a outra instância segura a trava mas não responde (está encerrando ou travou):
+    /// se ela liberar a tempo, esta vira a primeira; senão, <c>null</c>.
+    /// </summary>
+    public static SingleInstanceGuard? WaitToAcquire(string runtimeDirectory, string key, TimeSpan timeout, TimeSpan interval)
+    {
+        var deadline = Stopwatch.StartNew();
+        while (true)
+        {
+            if (TryAcquire(runtimeDirectory, key) is { } guard)
+                return guard;
+            var remaining = timeout - deadline.Elapsed;
+            if (remaining <= TimeSpan.Zero)
+                return null;
+            Thread.Sleep(remaining < interval ? remaining : interval);
+        }
+    }
+
+    /// <summary>
     /// Pede à instância existente para mostrar a janela; <c>true</c> se ela respondeu <c>ok</c> em até 2 s.
     /// Qualquer falha (ninguém ouvindo, socket ausente, tempo esgotado) devolve <c>false</c>.
     /// </summary>
@@ -99,10 +119,14 @@ public sealed class SingleInstanceGuard : IDisposable
         }
     }
 
-    /// <summary>Para de ouvir, apaga o socket e libera a trava.</summary>
-    public void Dispose()
+    /// <summary>
+    /// Para de ouvir e apaga o socket, mas segue com a trava: para o app que está saindo e ainda encerra serviços.
+    /// Quem abrir nesse meio-tempo não recebe <c>ok</c> e espera a trava (<see cref="WaitToAcquire"/>).
+    /// Idempotente.
+    /// </summary>
+    public void StopListening()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        if (Interlocked.Exchange(ref _stopped, 1) != 0)
             return;
 
         _cts.Cancel();
@@ -115,6 +139,15 @@ public sealed class SingleInstanceGuard : IDisposable
         {
             Trace.TraceError($"SingleInstanceGuard: não consegui apagar {_socketPath}: {ex}");
         }
+    }
+
+    /// <summary>Para de ouvir, apaga o socket e libera a trava. Idempotente.</summary>
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
+        StopListening();
         // Libera a trava só depois de apagar o socket: quem travar em seguida cria o seu sem disputa.
         _lock.Dispose();
         _cts.Dispose();
@@ -197,7 +230,7 @@ public sealed class SingleInstanceGuard : IDisposable
                     return;
 
                 await client.SendAsync(Encoding.UTF8.GetBytes(OkReply), SocketFlags.None, cts.Token).ConfigureAwait(false);
-                if (Volatile.Read(ref _disposed) == 0)
+                if (Volatile.Read(ref _stopped) == 0)
                     ThreadPool.QueueUserWorkItem(_ => RaiseShowRequested());
             }
         }
@@ -213,8 +246,8 @@ public sealed class SingleInstanceGuard : IDisposable
 
     private void RaiseShowRequested()
     {
-        // O guarda pode ter sido descartado entre a fila e a execução: depois do Dispose, nenhum aviso.
-        if (Volatile.Read(ref _disposed) != 0)
+        // O guarda pode ter parado de ouvir entre a fila e a execução: depois disso, nenhum aviso.
+        if (Volatile.Read(ref _stopped) != 0)
             return;
         try
         {

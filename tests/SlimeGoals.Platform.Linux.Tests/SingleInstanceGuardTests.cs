@@ -151,4 +151,59 @@ public sealed class SingleInstanceGuardTests : IDisposable
         read.Should().Be(0, "o servidor fecha a conexão sem responder");
         raised.Should().BeFalse();
     }
+
+    // Revisão final da Fase 4d: a primeira instância encerrando não pode engolir a nova abertura.
+    [Fact]
+    public async Task Wait_to_acquire_takes_over_when_first_instance_releases()
+    {
+        var first = SingleInstanceGuard.TryAcquire(Dir, Key)!;
+        first.StopListening();
+        SingleInstanceGuard.SignalExisting(Dir, Key).Should().BeFalse("quem está saindo já não responde");
+        var waiting = Task.Run(() => SingleInstanceGuard.WaitToAcquire(
+            Dir, Key, TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(50)));
+        await Task.Delay(200);
+        waiting.IsCompleted.Should().BeFalse("a trava segue com quem está saindo");
+
+        first.Dispose();
+
+        using var next = await waiting.WaitAsync(Wait);
+        next.Should().NotBeNull();
+        var shown = ShowSignal(next!);
+        SingleInstanceGuard.SignalExisting(Dir, Key).Should().BeTrue();
+        await shown.Task.WaitAsync(Wait);
+    }
+
+    [Fact]
+    public void Wait_to_acquire_gives_up_while_first_instance_holds_the_lock()
+    {
+        using var first = SingleInstanceGuard.TryAcquire(Dir, Key);
+        var watch = Stopwatch.StartNew();
+
+        using var next = SingleInstanceGuard.WaitToAcquire(Dir, Key, TimeSpan.FromMilliseconds(300), TimeSpan.FromMilliseconds(50));
+
+        next.Should().BeNull();
+        watch.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(250));
+        watch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task Stop_listening_keeps_lock_silences_handler_and_dispose_after_is_harmless()
+    {
+        var guard = SingleInstanceGuard.TryAcquire(Dir, Key)!;
+        var raised = false;
+        guard.ShowRequested += (_, _) => raised = true;
+
+        guard.StopListening();
+        guard.StopListening();
+
+        File.Exists(SocketPath(Dir, Key)).Should().BeFalse();
+        SingleInstanceGuard.SignalExisting(Dir, Key).Should().BeFalse();
+        SingleInstanceGuard.TryAcquire(Dir, Key).Should().BeNull();
+        guard.Dispose();
+        guard.Dispose();
+        using var next = SingleInstanceGuard.TryAcquire(Dir, Key);
+        next.Should().NotBeNull();
+        await Task.Delay(50);
+        raised.Should().BeFalse();
+    }
 }

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 using Microsoft.Extensions.DependencyInjection;
 using SlimeGoals.App.Hosting;
 using SlimeGoals.Infrastructure.Data;
@@ -10,6 +11,9 @@ namespace SlimeGoals.Desktop;
 
 internal static class Program
 {
+    private static readonly TimeSpan AcquireRetryTimeout = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan AcquireRetryInterval = TimeSpan.FromMilliseconds(200);
+
     // Nada de Avalonia ou SynchronizationContext antes de AppMain: a plataforma ainda não foi inicializada.
     [STAThread]
     public static void Main(string[] args)
@@ -28,8 +32,15 @@ internal static class Program
             guard = SingleInstanceGuard.TryAcquire(runtime, key);
             if (guard is null)
             {
-                SingleInstanceGuard.SignalExisting(runtime, key);
-                return;
+                if (SingleInstanceGuard.SignalExisting(runtime, key))
+                    return;
+                // Trava presa sem resposta: a outra está encerrando (ou travou). Espera um pouco para assumir.
+                guard = SingleInstanceGuard.WaitToAcquire(runtime, key, AcquireRetryTimeout, AcquireRetryInterval);
+                if (guard is null)
+                {
+                    Trace.TraceWarning("Outra instância segura a trava e não responde; saindo.");
+                    return;
+                }
             }
         }
         catch (Exception e)
@@ -61,12 +72,28 @@ internal static class Program
                 };
             }
 
-            BuildAvaloniaApp(services).StartWithClassicDesktopLifetime(args);
+            BuildAvaloniaApp(services, guard).StartWithClassicDesktopLifetime(args);
         }
     }
 
-    private static AppBuilder BuildAvaloniaApp(IServiceProvider services)
+    private static AppBuilder BuildAvaloniaApp(IServiceProvider services, SingleInstanceGuard? guard)
         => AppBuilder.Configure(() => new SlimeGoals.App.App(services))
             .UsePlatformDetect()
-            .LogToTrace();
+            .LogToTrace()
+            .AfterSetup(builder => StopListeningOnExit(builder, guard));
+
+    /// <summary>
+    /// Ao sair, para de ouvir já no <c>Exit</c>, antes de encerrar os serviços: uma nova abertura nesse meio-tempo
+    /// não recebe <c>ok</c> de quem está indo embora e espera a trava, que só sai no <c>using</c> do Main
+    /// (depois de fechar o banco).
+    /// </summary>
+    private static void StopListeningOnExit(AppBuilder builder, SingleInstanceGuard? guard)
+    {
+        if (guard is null)
+            return;
+        if (builder.Instance?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            desktop.Exit += (_, _) => guard.StopListening();
+        else
+            Trace.TraceWarning("Sem ciclo de vida de desktop no AfterSetup; a instância única só é liberada no fim do Main.");
+    }
 }
