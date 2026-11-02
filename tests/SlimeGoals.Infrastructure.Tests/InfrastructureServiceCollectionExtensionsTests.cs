@@ -20,6 +20,7 @@ public class InfrastructureServiceCollectionExtensionsTests
             provider.GetRequiredService<IGoalRepository>().Should().BeOfType<GoalRepository>();
             provider.GetRequiredService<ICheckinRepository>().Should().BeOfType<CheckinRepository>();
             provider.GetRequiredService<ITimerRepository>().Should().BeOfType<TimerRepository>();
+            provider.GetRequiredService<IReminderLogRepository>().Should().BeOfType<ReminderLogRepository>();
             provider.GetRequiredService<SqliteConnectionFactory>().Should().BeSameAs(provider.GetRequiredService<SqliteConnectionFactory>());
         }
         finally
