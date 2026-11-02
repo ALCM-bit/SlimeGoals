@@ -15,10 +15,10 @@ namespace SlimeGoals.App.ViewModels;
 /// </summary>
 public sealed partial class GoalEditViewModel : ObservableObject
 {
-    private static readonly int[] StandardIntervals = [15, 30, 60, 90, 120, 180, 240, 360, 720, 1440];
     private const string MissingTime = "Informe o horário.";
     private const string MissingTarget = "Informe o alvo.";
     private const string MissingDuration = "Informe o tempo.";
+    private const string MissingInterval = "Informe o intervalo.";
 
     private readonly GoalService _service;
     private readonly Goal? _existing;
@@ -50,7 +50,8 @@ public sealed partial class GoalEditViewModel : ObservableObject
         ];
 
         var interval = existing?.ReminderEveryMinutes ?? 60;
-        Intervals = StandardIntervals.Append(interval).Distinct().Order().Select(m => new IntervalOption(m)).ToList();
+        _reminderHours = interval / 60;
+        _reminderMinutes = interval % 60;
 
         Title = existing?.Title ?? "";
         Recurrence = existing?.Recurrence ?? Recurrence.Daily;
@@ -65,7 +66,6 @@ public sealed partial class GoalEditViewModel : ObservableObject
         }
         SelectedIcon = IconOption.From(GoalIcons.Get(existing?.Icon ?? GoalIcons.DefaultKey));
         SelectedColor = Colors.Single(c => c.Color == (existing?.Color ?? GoalColor.Purple));
-        SelectedInterval = new IntervalOption(interval);
         ActiveFrom = (existing?.ActiveFrom ?? new TimeOnly(8, 0)).ToTimeSpan();
         ActiveUntil = (existing?.ActiveUntil ?? new TimeOnly(20, 0)).ToTimeSpan();
         StartDate = existing?.StartDate?.ToDateTime(TimeOnly.MinValue);
@@ -85,7 +85,6 @@ public sealed partial class GoalEditViewModel : ObservableObject
 
     public IReadOnlyList<IconOption> Icons { get; }
     public IReadOnlyList<ColorOption> Colors { get; }
-    public IReadOnlyList<IntervalOption> Intervals { get; }
     public IReadOnlyList<DayOption> Days { get; }
 
     [ObservableProperty] public partial string Title { get; set; }
@@ -158,7 +157,22 @@ public sealed partial class GoalEditViewModel : ObservableObject
     }
     [ObservableProperty] public partial IconOption SelectedIcon { get; set; }
     [ObservableProperty] public partial ColorOption SelectedColor { get; set; }
-    [ObservableProperty] public partial IntervalOption SelectedInterval { get; set; }
+    private decimal? _reminderHours;
+    private decimal? _reminderMinutes;
+
+    /// <summary>Horas do intervalo de lembrete (NumericUpDown: null quando apagado).</summary>
+    public decimal? ReminderHoursInput
+    {
+        get => _reminderHours;
+        set { if (SetProperty(ref _reminderHours, value)) RevalidateIfSubmitted(); }
+    }
+
+    /// <summary>Minutos do intervalo de lembrete (0–59).</summary>
+    public decimal? ReminderMinutesInput
+    {
+        get => _reminderMinutes;
+        set { if (SetProperty(ref _reminderMinutes, value)) RevalidateIfSubmitted(); }
+    }
     [ObservableProperty] public partial TimeSpan? ActiveFrom { get; set; }
     [ObservableProperty] public partial TimeSpan? ActiveUntil { get; set; }
     [ObservableProperty] public partial DateTime? StartDate { get; set; }
@@ -257,7 +271,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
     private static readonly HashSet<string> Inputs =
     [
         nameof(Title), nameof(Recurrence), nameof(Measure), nameof(Unit), nameof(Target), nameof(SelectedIcon), nameof(SelectedColor),
-        nameof(SelectedInterval), nameof(ActiveFrom), nameof(ActiveUntil), nameof(StartDate), nameof(EndDate),
+        nameof(ActiveFrom), nameof(ActiveUntil), nameof(StartDate), nameof(EndDate),
     ];
 
     private void OnInputChanged(object? sender, PropertyChangedEventArgs e)
@@ -276,6 +290,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
     private bool Revalidate(out GoalDraft draft)
     {
         var durationMissing = DurationHoursInput is null && DurationMinutesInput is null;
+        var intervalMissing = ReminderHoursInput is null && ReminderMinutesInput is null;
         var target = Measure switch
         {
             Measure.Completion => 1,
@@ -284,7 +299,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
         };
         draft = new GoalDraft(
             Title, Recurrence, target, SelectedIcon.Key, SelectedColor.Color,
-            SelectedInterval.Minutes,
+            (int)Math.Round((ReminderHoursInput ?? 0) * 60 + (ReminderMinutesInput ?? 0), MidpointRounding.AwayFromZero),
             TimeOnly.FromTimeSpan(ActiveFrom ?? TimeSpan.Zero),
             TimeOnly.FromTimeSpan(ActiveUntil ?? new TimeSpan(23, 59, 0)),
             Days.Where(d => d.IsSelected).Aggregate(WeekDays.None, (all, d) => all | d.Day),
@@ -308,6 +323,11 @@ public sealed partial class GoalEditViewModel : ObservableObject
             Measure.Duration => durationMissing ? MissingDuration : null,
             _ => null,
         };
+        if (intervalMissing)
+        {
+            errors.RemoveAll(x => x.Field == nameof(GoalDraft.ReminderEveryMinutes));
+            errors.Add((nameof(GoalDraft.ReminderEveryMinutes), MissingInterval));
+        }
         if (targetMissing is not null)
         {
             errors.RemoveAll(x => x.Field == nameof(GoalDraft.Target));

@@ -35,7 +35,7 @@ public class GoalEditViewModelTests
         vm.Target.Should().Be(1);
         vm.SelectedIcon.Key.Should().Be("target");
         vm.SelectedColor.Color.Should().Be(GoalColor.Purple);
-        vm.SelectedInterval.Minutes.Should().Be(60);
+        (vm.ReminderHoursInput, vm.ReminderMinutesInput).Should().Be((1m, 0m));
         vm.ActiveFrom.Should().Be(new TimeSpan(8, 0, 0));
         vm.ActiveUntil.Should().Be(new TimeSpan(20, 0, 0));
         vm.Days.Should().OnlyContain(d => d.IsSelected);
@@ -63,9 +63,7 @@ public class GoalEditViewModelTests
             WeekDays.Monday, WeekDays.Tuesday, WeekDays.Wednesday, WeekDays.Thursday, WeekDays.Friday);
         vm.StartDate.Should().Be(new DateTime(2026, 11, 5));
         vm.EndDate.Should().Be(new DateTime(2026, 12, 20));
-        // 45 min não está na lista padrão: entra na ordem, entre 30 e 60, e fica selecionado.
-        vm.Intervals.Select(i => i.Minutes).Should().ContainInOrder(30, 45, 60);
-        vm.SelectedInterval.Minutes.Should().Be(45);
+        (vm.ReminderHoursInput, vm.ReminderMinutesInput).Should().Be((0m, 45m));
     }
 
     [Fact]
@@ -125,6 +123,38 @@ public class GoalEditViewModelTests
         vm.ActiveFromError.Should().Be("Informe o horário.");
         vm.ActiveUntilError.Should().BeNull();
         _repo.Count.Should().Be(0);
+    }
+
+    // Verificação manual da Fase 4: o intervalo era uma lista fixa; agora é digitado em horas + minutos.
+    [Fact]
+    public async Task Typed_reminder_interval_is_saved_in_minutes()
+    {
+        var vm = New();
+        vm.Title = "Água";
+        vm.ReminderHoursInput = 1;
+        vm.ReminderMinutesInput = 20;
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        (await _repo.ListAsync(includeArchived: false)).Single().ReminderEveryMinutes.Should().Be(80);
+    }
+
+    [Fact]
+    public async Task Empty_or_out_of_range_interval_shows_error()
+    {
+        var vm = New();
+        vm.Title = "Água";
+        vm.ReminderHoursInput = null;
+        vm.ReminderMinutesInput = null;
+        await vm.SaveCommand.ExecuteAsync(null);
+        vm.ReminderError.Should().Be("Informe o intervalo.");
+
+        vm.ReminderMinutesInput = 3;
+        vm.ReminderError.Should().Be("O intervalo deve ser entre 5 minutos e 24 horas.");
+
+        vm.ReminderMinutesInput = 5;
+        vm.ReminderError.Should().BeNull();
+        _closed.Should().BeEmpty();
     }
 
     [Fact]

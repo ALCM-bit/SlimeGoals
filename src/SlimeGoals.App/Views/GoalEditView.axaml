@@ -139,14 +139,14 @@
 
         <StackPanel Classes="field">
           <TextBlock Classes="field-label" Text="Lembrar a cada" />
-          <ComboBox ItemsSource="{Binding Intervals}" SelectedItem="{Binding SelectedInterval}" MinWidth="160"
-                    AutomationProperties.Name="Lembrar a cada">
-            <ComboBox.ItemTemplate>
-              <DataTemplate x:DataType="vm:IntervalOption">
-                <TextBlock Text="{Binding Label}" />
-              </DataTemplate>
-            </ComboBox.ItemTemplate>
-          </ComboBox>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <NumericUpDown Value="{Binding ReminderHoursInput}" Minimum="0" Maximum="24" Increment="1" FormatString="0"
+                           Width="110" AutomationProperties.Name="Lembrar a cada, horas" />
+            <TextBlock Text="h" VerticalAlignment="Center" />
+            <NumericUpDown Value="{Binding ReminderMinutesInput}" Minimum="0" Maximum="59" Increment="1" FormatString="0"
+                           Width="110" AutomationProperties.Name="Lembrar a cada, minutos" />
+            <TextBlock Text="min" VerticalAlignment="Center" />
+          </StackPanel>
           <TextBlock Classes="field-error" Text="{Binding ReminderError}"
                      IsVisible="{Binding ReminderError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         </StackPanel>
