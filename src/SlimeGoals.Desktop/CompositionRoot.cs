@@ -24,6 +24,7 @@ internal static class CompositionRoot
         services.AddSingleton<CheckinService>();
         services.AddSingleton<TimerService>();
         services.AddSingleton<ProgressService>();
+        services.AddSingleton<ReminderPause>();
         services.AddSingleton<ReminderService>();
         services.AddSingleton<ReminderResponseHandler>();
 
@@ -37,6 +38,8 @@ internal static class CompositionRoot
         // Ciclo de vida do app — a mesma instância do ativador é a que a App preenche com a janela
         services.AddSingleton<MainWindowActivator>();
         services.AddSingleton<IWindowActivator>(sp => sp.GetRequiredService<MainWindowActivator>());
+        services.AddSingleton<DesktopAppLifetime>();
+        services.AddSingleton<IAppLifetime>(sp => sp.GetRequiredService<DesktopAppLifetime>());
         services.AddSingleton<IAppHostedService, ReminderHost>();
 
         // UI — ordem de registro = ordem na navegação (spec §7)
@@ -45,6 +48,7 @@ internal static class CompositionRoot
         services.AddSingleton<PageViewModel, ReportsPageViewModel>();
         services.AddSingleton<PageViewModel, SettingsPageViewModel>();
         services.AddSingleton<ShellViewModel>();
+        services.AddSingleton<TrayMenuViewModel>();
 
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true });
     }

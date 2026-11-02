@@ -8,15 +8,15 @@ namespace SlimeGoals.Core.Services;
 /// <param name="LastFiredAt">Último disparo de hoje.</param>
 /// <param name="LastCheckinAt">Último registro de hoje.</param>
 /// <param name="SnoozedAt">RespondedAt do último disparo de hoje, se a resposta foi Adiar.</param>
-/// <param name="CreatedTodayAt">Instante de criação, se a meta foi criada hoje: o intervalo conta a partir dele,
-/// para a meta recém-salva não notificar na hora.</param>
+/// <param name="IntervalStartAt">Instante de hoje a partir do qual o intervalo conta: criação da meta ou retomada
+/// dos lembretes (evita notificar na hora e rajada de atrasados).</param>
 public sealed record ReminderState(
     bool PeriodMet,
     bool HasTimer,
     DateTimeOffset? LastFiredAt,
     DateTimeOffset? LastCheckinAt,
     DateTimeOffset? SnoozedAt,
-    DateTimeOffset? CreatedTodayAt = null);
+    DateTimeOffset? IntervalStartAt = null);
 
 /// <summary>Função pura que decide quando uma meta deve lembrar o usuário (spec §9.1–9.2).</summary>
 public static class ReminderPlanner
@@ -60,10 +60,13 @@ public static class ReminderPlanner
     private static DateTimeOffset TodayCandidate(Goal goal, ReminderState state, int snoozeMinutes,
         DateTimeOffset windowStart)
     {
-        if (state.SnoozedAt is { } snoozedAt && (state.LastCheckinAt is not { } checkin || snoozedAt > checkin))
+        // Adiar vale até um registro ou o início de intervalo (criação/retomada) posterior a ele.
+        if (state.SnoozedAt is { } snoozedAt
+            && (state.LastCheckinAt is not { } checkin || snoozedAt > checkin)
+            && (state.IntervalStartAt is not { } intervalStart || snoozedAt > intervalStart))
             return snoozedAt.AddMinutes(snoozeMinutes);
 
-        var anchor = new[] { state.LastFiredAt, state.LastCheckinAt, state.CreatedTodayAt }
+        var anchor = new[] { state.LastFiredAt, state.LastCheckinAt, state.IntervalStartAt }
             .Where(t => t is { } v && v >= windowStart)
             .Max();
         return anchor is { } baseTime ? baseTime.AddMinutes(goal.ReminderEveryMinutes) : windowStart;

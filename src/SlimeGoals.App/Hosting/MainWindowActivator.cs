@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Threading;
 
@@ -9,15 +10,29 @@ namespace SlimeGoals.App.Hosting;
 /// </summary>
 public sealed class MainWindowActivator : IWindowActivator
 {
-    public Window? Window { get; set; }
+    private volatile Window? _window;
 
-    public void Activate() => Dispatcher.UIThread.Post(() =>
+    public Window? Window
     {
-        if (Window is not { } window)
+        get => _window;
+        set => _window = value;
+    }
+
+    public void Activate()
+    {
+        // Sem janela, o Avalonia pode nem ter iniciado (ex.: segunda instância durante a migração):
+        // não toca no Dispatcher antes de saber que a janela existe.
+        if (_window is not { } window)
+        {
+            Trace.TraceInformation("Pedido para mostrar a janela antes de ela existir; ignorado.");
             return;
-        if (window.WindowState == WindowState.Minimized)
-            window.WindowState = WindowState.Normal;
-        window.Show();
-        window.Activate();
-    });
+        }
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (window.WindowState == WindowState.Minimized)
+                window.WindowState = WindowState.Normal;
+            window.Show();
+            window.Activate();
+        });
+    }
 }

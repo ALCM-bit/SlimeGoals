@@ -16,4 +16,16 @@ public static class XdgPaths
             dataHome = Path.Combine(home, ".local", "share");
         return Path.Combine(dataHome, AppFolder, DatabaseFile);
     }
+
+    /// <summary>
+    /// Pasta de arquivos de execução (trava e socket da instância única):
+    /// <c>$XDG_RUNTIME_DIR</c>, ou <c>{tempPath}/slimegoals-{userName}</c> se ele faltar ou estiver vazio.
+    /// </summary>
+    public static string RuntimeDirectory(Func<string, string?> getEnv, string userName, string tempPath)
+    {
+        var runtimeDir = getEnv("XDG_RUNTIME_DIR");
+        return string.IsNullOrWhiteSpace(runtimeDir)
+            ? Path.Combine(tempPath, $"slimegoals-{userName}")
+            : runtimeDir;
+    }
 }

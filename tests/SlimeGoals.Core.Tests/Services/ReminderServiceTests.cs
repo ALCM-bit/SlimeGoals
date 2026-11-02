@@ -27,7 +27,12 @@ public class ReminderServiceTests
         public ReminderText Format(Goal goal, int periodTotal) => new($"T {goal.Title}", $"B {periodTotal}/{goal.Target}", "Feito!");
     }
 
+    private readonly InMemorySettingsRepository _settings = new();
+    private ReminderPause Pause => new(_settings, _time);
+
     private ReminderService Service => new(_goals, _checkins, _timers, _log, _notifications, new FakeFormatter(), _time);
+
+    private ReminderService PausableService => new(_goals, _checkins, _timers, _log, _notifications, new FakeFormatter(), _time, Pause);
 
     private async Task<Goal> Add(string title = "Meta", int target = 1)
     {
@@ -202,5 +207,102 @@ public class ReminderServiceTests
 
         _notifications.Shown.Should().BeEmpty();
         next.Should().Be(Today(15));
+    }
+
+    [Fact]
+    public async Task Paused_sync_fires_nothing_withdraws_pending_and_returns_null()
+    {
+        await Add();
+        At(9);
+        await PausableService.SyncAsync();
+        var pendingId = _notifications.Shown.Should().ContainSingle().Subject.LogId;
+        At(9, 30);
+        await Pause.PauseAsync();
+
+        var next = await PausableService.SyncAsync();
+
+        next.Should().BeNull();
+        _notifications.Withdrawn.Should().Contain(pendingId);
+        _log.All.Should().ContainSingle().Which.Response.Should().Be(ReminderResponse.Ignore);
+        At(11);
+        await PausableService.SyncAsync();
+        _notifications.Shown.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task Paused_upcoming_is_empty()
+    {
+        await Add();
+        await Pause.PauseAsync();
+
+        (await PausableService.UpcomingTodayAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Resume_restarts_interval_from_resume_time()
+    {
+        await Add();
+        At(9);
+        await Pause.PauseAsync();
+        At(15);
+        await Pause.ResumeAsync();
+
+        var next = await PausableService.SyncAsync();
+
+        _notifications.Shown.Should().BeEmpty();
+        next.Should().Be(Today(16));
+    }
+
+    // Revisão final da Fase 4d: adiar respondido antes da pausa não pode disparar na retomada.
+    [Fact]
+    public async Task Resume_supersedes_snooze_answered_before_pause()
+    {
+        await Add();
+        await PausableService.SyncAsync();
+        var fired = _notifications.Shown.Should().ContainSingle().Subject.LogId;
+        At(8, 55);
+        await _log.RespondAsync(fired, ReminderResponse.Snooze, _time.GetUtcNow());
+        At(9);
+        await Pause.PauseAsync();
+        await PausableService.SyncAsync();
+        At(15);
+        await Pause.ResumeAsync();
+
+        var next = await PausableService.SyncAsync();
+
+        _notifications.Shown.Should().ContainSingle();
+        next.Should().Be(Today(16));
+    }
+
+    [Fact]
+    public async Task Resume_from_yesterday_is_not_an_anchor()
+    {
+        await Add();
+        var yesterday = Today(15).AddDays(-1).UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+        await _settings.SetAsync(ReminderPause.ResumedAtKey, yesterday);
+        At(14);
+
+        var next = await PausableService.SyncAsync();
+
+        _notifications.Shown.Should().ContainSingle();
+        next.Should().Be(Today(15));
+    }
+
+    [Theory]
+    [InlineData(10, 12)]
+    [InlineData(12, 10)]
+    public async Task Later_of_creation_and_resume_is_the_anchor(int createdHour, int resumedHour)
+    {
+        var goal = await Add();
+        await _goals.UpdateAsync(goal with { CreatedAt = Today(createdHour) });
+        At(resumedHour);
+        await Pause.PauseAsync();
+        await Pause.ResumeAsync();
+        At(12, 30);
+
+        var next = await PausableService.SyncAsync();
+
+        _notifications.Shown.Should().BeEmpty();
+        next.Should().Be(Today(13));
     }
 }

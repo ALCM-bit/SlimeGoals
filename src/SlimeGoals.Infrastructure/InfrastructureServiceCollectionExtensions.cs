@@ -21,6 +21,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<ICheckinRepository, CheckinRepository>();
         services.AddSingleton<ITimerRepository, TimerRepository>();
         services.AddSingleton<IReminderLogRepository, ReminderLogRepository>();
+        services.AddSingleton<ISettingsRepository, SettingsRepository>();
         return services;
     }
 }

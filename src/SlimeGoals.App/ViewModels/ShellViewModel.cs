@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SlimeGoals.App.Hosting;
 
 namespace SlimeGoals.App.ViewModels;
 
@@ -9,8 +10,11 @@ namespace SlimeGoals.App.ViewModels;
 /// </summary>
 public sealed partial class ShellViewModel : ObservableObject
 {
-    public ShellViewModel(IEnumerable<PageViewModel> pages)
+    private readonly IAppLifetime? _lifetime;
+
+    public ShellViewModel(IEnumerable<PageViewModel> pages, IAppLifetime? lifetime = null)
     {
+        _lifetime = lifetime;
         Pages = pages.ToList();
         if (Pages.Count == 0)
             throw new ArgumentException("O shell precisa de ao menos uma página.", nameof(pages));
@@ -43,4 +47,10 @@ public sealed partial class ShellViewModel : ObservableObject
 
     [RelayCommand]
     private void Navigate(PageViewModel page) => CurrentPage = page;
+
+    /// <summary>"Sair": encerra o processo (fechar a janela só a oculta). Sem lifetime, fica desabilitado.</summary>
+    [RelayCommand(CanExecute = nameof(CanQuit))]
+    private void Quit() => _lifetime?.Quit();
+
+    private bool CanQuit() => _lifetime is not null;
 }

@@ -18,16 +18,20 @@ public class TodayPageViewModelTests
     private readonly InMemoryReminderLogRepository _log = new();
     private readonly FakeNotificationService _notifications = new();
     private readonly DataChangeNotifier _changes = new();
+    private readonly InMemorySettingsRepository _settings = new();
 
     public TodayPageViewModelTests() => _time.SetLocalTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
 
     private GoalService GoalService => new(_goals, _checkins, _timers, _time);
     private CheckinService CheckinService => new(_goals, _checkins, _time);
 
+    private ReminderPause Pause => new(_settings, _time, _changes);
+
     private TodayPageViewModel NewPage() => new(
         new ProgressService(_goals, _checkins, _timers, _time), CheckinService,
         new TimerService(_goals, _timers, CheckinService, _time), GoalService, _time,
-        new ReminderService(_goals, _checkins, _timers, _log, _notifications, new ReminderFormatter(), _time), _changes);
+        new ReminderService(_goals, _checkins, _timers, _log, _notifications, new ReminderFormatter(), _time, Pause),
+        _changes, Pause);
 
     private async Task<TodayPageViewModel> Loaded()
     {
@@ -310,5 +314,64 @@ public class TodayPageViewModelTests
         var page = await Loaded();
 
         (page.HasUpcoming, page.Upcoming.Count).Should().Be((false, 0));
+    }
+
+    [Fact]
+    public async Task Today_shows_paused_state_and_hides_upcoming()
+    {
+        await Create("Água");
+        _time.Advance(TimeSpan.FromHours(19)); // quinta, 07:00: haveria lembrete às 08:00
+        await new ReminderPause(_settings, _time).PauseAsync();
+
+        var page = await Loaded();
+
+        (page.IsPaused, page.HasUpcoming, page.Upcoming.Count).Should().Be((true, false, 0));
+        page.PauseButtonText.Should().Be("Retomar lembretes");
+        page.Goals.Should().ContainSingle(); // o resto da tela continua
+    }
+
+    [Fact]
+    public async Task Toggle_pause_pauses_then_resumes()
+    {
+        await Create("Água");
+        _time.Advance(TimeSpan.FromHours(19));
+        var page = await Loaded();
+        (page.IsPaused, page.PauseButtonText, page.HasUpcoming).Should().Be((false, "Pausar lembretes", true));
+
+        await page.TogglePauseCommand.ExecuteAsync(null);
+        await page.LoadCommand.ExecutionTask!;
+        (page.IsPaused, page.PauseButtonText, page.HasUpcoming).Should().Be((true, "Retomar lembretes", false));
+        (await Pause.GetAsync()).IsPaused.Should().BeTrue();
+
+        await page.TogglePauseCommand.ExecuteAsync(null);
+        await page.LoadCommand.ExecutionTask!;
+        (page.IsPaused, page.PauseButtonText, page.HasUpcoming).Should().Be((false, "Pausar lembretes", true));
+    }
+
+    [Fact]
+    public async Task Without_pause_toggle_cannot_execute()
+    {
+        var page = new TodayPageViewModel(
+            new ProgressService(_goals, _checkins, _timers, _time), CheckinService,
+            new TimerService(_goals, _timers, CheckinService, _time), GoalService, _time,
+            new ReminderService(_goals, _checkins, _timers, _log, _notifications, new ReminderFormatter(), _time), _changes);
+        await page.LoadCommand.ExecuteAsync(null);
+
+        (page.IsPaused, page.TogglePauseCommand.CanExecute(null)).Should().Be((false, false));
+    }
+
+    [Fact]
+    public async Task Pause_is_available_without_upcoming_reminders()
+    {
+        await Create("Água");
+        _time.Advance(TimeSpan.FromHours(9)); // quarta, 21:00: janela (08–20h) já acabou
+        var page = await Loaded();
+        (page.HasUpcoming, page.CanPause, page.TogglePauseCommand.CanExecute(null)).Should().Be((false, true, true));
+
+        await page.TogglePauseCommand.ExecuteAsync(null);
+        await page.LoadCommand.ExecutionTask!;
+
+        (page.IsPaused, page.CanPause).Should().Be((true, false));
+        (await Pause.GetAsync()).IsPaused.Should().BeTrue();
     }
 }

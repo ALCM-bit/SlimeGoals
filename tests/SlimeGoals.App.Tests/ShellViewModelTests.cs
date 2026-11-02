@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Time.Testing;
 using SlimeGoals.App.Goals;
+using SlimeGoals.App.Hosting;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Testing;
@@ -101,5 +102,34 @@ public class ShellViewModelActivationTests
         shell.CurrentPage = null!;
 
         _a.Activations.Should().Be(1);
+    }
+}
+
+public class ShellViewModelQuitTests
+{
+    private sealed class FakeLifetime : IAppLifetime
+    {
+        public int Quits { get; private set; }
+        public void Quit() => Quits++;
+    }
+
+    [Fact]
+    public void Quit_command_calls_lifetime()
+    {
+        var lifetime = new FakeLifetime();
+        var shell = new ShellViewModel([new SettingsPageViewModel()], lifetime);
+
+        shell.QuitCommand.CanExecute(null).Should().BeTrue();
+        shell.QuitCommand.Execute(null);
+
+        lifetime.Quits.Should().Be(1);
+    }
+
+    [Fact]
+    public void Quit_without_lifetime_cannot_execute()
+    {
+        var shell = new ShellViewModel([new SettingsPageViewModel()]);
+
+        shell.QuitCommand.CanExecute(null).Should().BeFalse();
     }
 }

@@ -92,7 +92,7 @@ Aplicação multiplataforma para cadastrar metas (hábitos diários e metas sema
 ```csharp
 public interface IGoalRepository { /* CRUD de metas */ }
 public interface ICheckinRepository { /* add, undo, soma por período, query por período */ }
-public interface IReminderScheduler { void Reschedule(); void Pause(); void Resume(); }  // Fase 4: assíncrono (Task); Pause/Resume só na 4d
+public interface IReminderScheduler { void Reschedule(); }  // Fase 4: assíncrono (Task); Pause/Resume ficaram no Core (`ReminderPause`), não no agendador (Fase 4d)
 public interface INotificationService
 {
     void Show(Reminder reminder);                                  // não bloqueia (Fase 4: Task)
@@ -151,6 +151,7 @@ Regras comuns:
     │   ├── SlimeGoals.Platform.Linux/       # net10.0
     │   │   ├── Scheduling/        # timer único
     │   │   ├── Notifications/     # DBus (freedesktop) + fallback em janela
+    │   │   ├── SingleInstance/    # guarda de instância única (trava + socket Unix)
     │   │   └── Autostart/         # XDG autostart
     │   ├── SlimeGoals.Platform.Android/     # net10.0-android
     │   │   ├── Scheduling/        # AlarmManager + receiver de boot
@@ -160,8 +161,8 @@ Regras comuns:
     │   │   ├── ViewModels/
     │   │   ├── Assets/Fonts/      # Figtree
     │   │   ├── Styles/            # Theme.axaml (tokens), Controls.axaml
-    │   │   └── App.axaml
-    │   ├── SlimeGoals.Desktop/              # head Linux: Program.cs, DI, bandeja, instância única
+    │   │   └── App.axaml          # inclui o ícone da bandeja
+    │   ├── SlimeGoals.Desktop/              # head Linux: Program.cs, DI, liga a instância única ao app
     │   └── SlimeGoals.Android/              # head Android: MainActivity, DI, receivers
     ├── tests/
     │   ├── SlimeGoals.Core.Tests/
@@ -264,7 +265,7 @@ No Linux, o arquivo fica em `$XDG_DATA_HOME` (padrão `~/.local/share/SlimeGoals
 5.  Ao disparar: grava em `reminder_log` e chama `INotificationService.Show`. A resposta chega depois e é tratada pelo `ReminderResponseHandler`. Notificações não bloqueiam o código, por isso o modelo é baseado em evento (Linux) ou receiver (Android).
 6.  Notificação sem resposta conta como ignorada ao expirar e é retirada da central quando: dispara o próximo lembrete da mesma meta; a meta deixa de precisar de lembrete (cumprida, arquivada, excluída, cronômetro iniciado, fora da janela); o app encerra; ou o app abre e encontra registros pendentes de uma execução anterior. O prazo é controlado pelo app: o GNOME ignora `expire_timeout` e mantém a notificação na central (confirmado no spike, `specs/spikes/gnome-notificacoes.md`). Fechar a notificação no X (`NotificationClosed`, motivo 2, sem `ActionInvoked` antes) também conta como ignorada. Notificações deixadas por uma execução que caiu ficam na central do GNOME com ações que não funcionam (o mapa de ids do D-Bus estava na memória); a próxima abertura as marca como ignoradas.
 7.  **Entrega das ações no Linux:** o GNOME envia `ActionInvoked` apenas para a conexão D-Bus que criou a notificação; com o processo encerrado, o clique é perdido sem aviso. Por isso o adaptador mantém uma única conexão de vida longa e, ao encerrar o app, retira as notificações pendentes (`CloseNotification`). A ativação via D-Bus (`org.gtk.Notifications` ou portal) é avaliada na Fase 4c.
-8.  **Linux (GNOME):** o app continua em segundo plano com a janela fechada; fechar oculta por padrão (configurável). O GNOME não exibe ícone de bandeja por padrão, então a bandeja é opcional (extensão AppIndicator). Sem ela, o app é reaberto pelo atalho do aplicativo (instância única) ou pela notificação. No Wayland, clicar na notificação e chamar `Show()` + `Activate()` trouxe a janela à frente (spike); o GNOME também envia `ActivationToken` (xdg-activation), disponível se for preciso.
+8.  **Linux (GNOME):** o app continua em segundo plano com a janela fechada; fechar oculta sempre nesta fase (a opção de encerrar ao fechar vem na Fase 6); sair por "Sair" na barra lateral, `Ctrl+Q` ou bandeja. Instância única por banco de dados (trava + socket Unix em `XDG_RUNTIME_DIR`): a segunda execução mostra a janela existente (no Wayland, o GNOME pode exibir "está pronto" em vez de trazê-la). Lembretes podem ser pausados e retomados (pausa persistida; ao retomar o intervalo recomeça, sem rajada). O GNOME não exibe ícone de bandeja por padrão, então a bandeja é opcional (extensão AppIndicator). Sem ela, o app é reaberto pelo atalho do aplicativo (instância única) ou pela notificação. No Wayland, clicar na notificação e chamar `Show()` + `Activate()` trouxe a janela à frente (spike); o GNOME também envia `ActivationToken` (xdg-activation), disponível se for preciso.
 9.  **Android:** exige permissão de notificações (Android 13+) e de alarme exato (Android 12+); no Android 16 as duas vêm **negadas** num app recém-instalado e são pedidas num fluxo de primeira execução (`ACTION_REQUEST_SCHEDULE_EXACT_ALARM` abre direto a página do app). `SetExactAndAllowWhileIdle` dispara no horário mesmo com o processo morto e em Doze profundo; o Android cria o processo só para o receiver, e a ação da notificação chega a um `BroadcastReceiver` sem UI (confirmado no spike, `specs/spikes/android-alarme.md`). Desligar a permissão de alarme exato cancela os alarmes: reagendar quando ela voltar e avisar na tela Hoje se faltar alguma permissão.
 10. Tratar suspensão do computador (Linux: recalcular ao retomar, via sinal do systemd-logind).
 11. **Ação principal por medida (v1.4):** `completion` → **Feito** (registra 1); `quantity` → **+1** (soma 1 unidade); `duration` → **Iniciar** (liga o cronômetro sem abrir o app; se outro estiver rodando, abre o app para decidir). **Adiar** e **Ignorar** valem para as três. Meta com cronômetro rodando, ou parado aguardando registro, não gera lembretes; ao registrar, a regra do intervalo conta a partir do registro. Se o cronômetro rodando for de outra meta, **Iniciar** apenas abre o app (cronômetro de meta arquivada ou inexistente é órfão e não conta como conflito).
@@ -351,7 +352,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 | **4a** | Planejador               | `ReminderPlanner`: regras da seção 9 escritas antes, testes com `FakeTimeProvider` para os dois tipos                                                                                                                                                                                                                | Testes cobrem virada de dia e de semana, dias inativos, meta cumprida, adiar e ignorar           |
 | **4b** | Agendador + resposta     | Scheduler Linux (timer único), `ReminderResponseHandler`                                                                                                                                                                                                                                                             | Disparo no horário e 3 ações funcionando                                                         |
 | **4c** | Notificação nativa Linux | Adaptador DBus; expiração = ignorado. A janela principal fica aberta ou minimizada até a 4d (fechar ainda encerra o app); sem fallback em janela (fica para a Fase 6, se preciso)                                                                                                                                                                                                                                                            | Notificação com ações funciona no GNOME (janela aberta ou minimizada)                            |
-| **4d** | Segundo plano            | Fechar = ocultar, instância única, bandeja opcional (extensão AppIndicator no GNOME)                                                                                                                                                                                                                                 | Reabrir o app não duplica o processo; notificações funcionam com a janela principal fechada      |
+| **4d** | Segundo plano            | Fechar = ocultar, instância única, bandeja opcional (extensão AppIndicator no GNOME). Implementado (verificação manual no GNOME pendente): bandeja com Abrir/Pausar/Sair; pausa também na tela Hoje                                                                                                                                                                                                                                 | Reabrir o app não duplica o processo; notificações funcionam com a janela principal fechada      |
 | **5**  | Relatórios               | `ReportService` por tipo, `ReportsView`, barras em XAML, sequências em dias e semanas                                                                                                                                                                                                                                | Números conferem com os check-ins (testes), inclusive meta arquivada                             |
 | **6**  | Linux: acabamento        | Configurações, autostart XDG, suspensão, ícones, arquivo `slimegoals.desktop` (`StartupWMClass=slimegoals`, para nome/ícone nas notificações), AppImage ou *self-contained* com os textos de licença das dependências                                                                                                                                                                                                                    | Instalável e estável no GNOME (CachyOS)                                                          |
 | **7a** | Android: UI              | Head Android, shell com navegação inferior (v3), layouts adaptados                                                                                                                                                                                                                                                   | Todas as telas usáveis no celular                                                                |
@@ -441,11 +442,26 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 - Sem fallback em janela: se o D-Bus falhar, o app segue sem notificações, registra em `Trace` e tenta conectar de novo só no próximo lembrete (uma vez por disparo), sem laço (fallback na Fase 6, se preciso).
 - Fechar a janela continua encerrando o app até a 4d; o critério "janela fechada" da 4c passou para a 4d.
 - Virada do dia: o agendador acorda à meia-noite local e avisa o `DataChangeNotifier`; a tela Hoje recarrega (resolve a pendência da Fase 3).
-- `IReminderScheduler`/`INotificationService` ficaram assíncronos (`Task`); `Pause`/`Resume` entram na 4d, com a bandeja.
+- `IReminderScheduler`/`INotificationService` ficaram assíncronos (`Task`); `Pause`/`Resume`: ver Decisões da Fase 4d (ficaram no Core, em `ReminderPause`).
 - Pendente de meta excluída ou inexistente é tratado como ignorado e retirado da central.
 - **Iniciar** numa meta de tempo com cronômetro de outra meta rodando abre o app e não altera o cronômetro; cronômetro órfão (meta arquivada/inexistente) não conta como conflito.
 - O tratador de respostas é serializado, para que ações simultâneas no mesmo lembrete não registrem duas vezes.
 - O agendador avisa `Changed` depois de todo disparo, para "Próximos lembretes" não ficar desatualizado.
+
+**Decisões da Fase 4d (02/11/2026):**
+
+- Fechar a janela sempre oculta nesta fase; para encerrar: "Sair" no rodapé da barra lateral, `Ctrl+Q` ou bandeja. "Encerrar ao fechar" vem com as Configurações (Fase 6).
+- Instância única por banco: `slimegoals-<hash>.lock` e `.sock` (8 primeiros hex do SHA-256 do caminho do banco) em `$XDG_RUNTIME_DIR` (ou `Path.GetTempPath()/slimegoals-<usuário>/`); a segunda execução envia `show`, recebe `ok` e sai com código 0; socket órfão é apagado e recriado.
+- Pausa dos lembretes gravada em `settings` (`reminders.paused`); pausado, nada dispara e as pendentes saem da central como ignoradas; a tela Hoje mostra "Lembretes pausados" com **Retomar** e oculta "Próximos lembretes".
+- Ao retomar, `reminders.resumed_at` (UTC) reinicia o intervalo de cada meta naquele dia, sem rajada de atrasados.
+- Bandeja opcional (Abrir, Pausar/Retomar lembretes, Sair; clique no ícone abre); no GNOME exige a extensão AppIndicator e, sem ela, nada quebra; ícone provisório (Lucide "target", `#9B7BEA`) até a Fase 6.
+- A segunda instância traz a janela pelo mesmo `MainWindowActivator` da notificação; no Wayland sem token de ativação o GNOME pode mostrar "SlimeGoals está pronto" (aceito, conferido à mão).
+- Desvio da §5: `IReminderScheduler` não ganhou `Pause`/`Resume`; a pausa fica no Core (`ReminderPause`) e chega ao agendador pelo `DataChangeNotifier` (mesma regra no Android, Fase 7b).
+- `ResumeAsync` grava `resumed_at` antes de remover `paused`, para um travamento entre as duas gravações não causar rajada.
+- O botão Pausar fica no cabeçalho "Metas de hoje", sempre acessível (inclusive sem próximos lembretes e sem bandeja).
+- Se a aquisição da instância única lançar exceção, o app abre sem ela (registro em `Trace`).
+- Pedido de mostrar a janela antes de ela existir é ignorado (vale também para o "Abrir" da notificação).
+- O `.lock` permanece no disco ao encerrar (apagar disputaria com outro processo); só o `.sock` é apagado.
 
 **Pendências:** versão mínima do Android (Fase 7c; sugestão do spike: Android 8.0, API 26); sincronização entre dispositivos (fora do MVP).
 

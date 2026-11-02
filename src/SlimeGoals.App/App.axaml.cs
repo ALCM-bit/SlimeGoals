@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Platform;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using SlimeGoals.App.Hosting;
@@ -27,11 +29,21 @@ public partial class App(IServiceProvider services) : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // Fechar a janela só a oculta: o processo segue para os lembretes até o "Sair" (Shutdown).
+            desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             var window = new MainWindow { DataContext = shell };
             desktop.MainWindow = window;
+            desktop.ShutdownRequested += (_, e) =>
+            {
+                if (!e.Cancel)
+                    window.AllowClose = true;
+            };
             if (services.GetService<MainWindowActivator>() is { } activator)
                 activator.Window = window;
+            if (services.GetService<DesktopAppLifetime>() is { } lifetime)
+                lifetime.Desktop = desktop;
             desktop.Exit += (_, _) => StopAll(hosted);
+            CreateTrayIcon();
         }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime single)
             single.MainView = new ShellView { DataContext = shell };
@@ -40,6 +52,61 @@ public partial class App(IServiceProvider services) : Application
 
         foreach (var service in hosted)
             _ = StartSafelyAsync(service);
+    }
+
+    /// <summary>
+    /// Ícone na bandeja com "Abrir", pausa e "Sair". Opcional: sem suporte (ex.: GNOME sem AppIndicator)
+    /// ou com erro, o app segue sem ele.
+    /// </summary>
+    private void CreateTrayIcon()
+    {
+        TrayMenuViewModel? tray;
+        try
+        {
+            tray = services.GetService<TrayMenuViewModel>();
+            if (tray is null)
+                return;
+
+            // PauseText já muda na thread da interface (o VM marshala): basta copiar para o item.
+            var pauseItem = new NativeMenuItem { Header = tray.PauseText, Command = tray.TogglePauseCommand };
+            tray.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(TrayMenuViewModel.PauseText))
+                    pauseItem.Header = tray.PauseText;
+            };
+
+            var icon = new TrayIcon
+            {
+                Icon = new WindowIcon(AssetLoader.Open(new Uri("avares://SlimeGoals.App/Assets/tray.png"))),
+                ToolTipText = "SlimeGoals",
+                Menu = new NativeMenu
+                {
+                    new NativeMenuItem { Header = "Abrir", Command = tray.OpenCommand },
+                    pauseItem,
+                    new NativeMenuItem { Header = "Sair", Command = tray.QuitCommand },
+                },
+            };
+            icon.Clicked += (_, _) => tray.OpenCommand.Execute(null);
+            TrayIcon.SetIcons(this, [icon]);
+        }
+        catch (Exception e)
+        {
+            Trace.TraceError($"Falha ao criar o ícone da bandeja: {e}");
+            return;
+        }
+        _ = RefreshTraySafelyAsync(tray);
+    }
+
+    private static async Task RefreshTraySafelyAsync(TrayMenuViewModel tray)
+    {
+        try
+        {
+            await tray.RefreshAsync();
+        }
+        catch (Exception e)
+        {
+            Trace.TraceError($"Falha ao atualizar a bandeja: {e}");
+        }
     }
 
     /// <summary>Fora da thread da interface: o início (D-Bus, banco) não pode travar nem derrubar a janela.</summary>

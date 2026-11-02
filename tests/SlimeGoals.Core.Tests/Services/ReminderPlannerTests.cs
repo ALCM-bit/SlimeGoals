@@ -110,13 +110,24 @@ public class ReminderPlannerTests
     // Verificação manual da Fase 4: meta salva no meio do horário notificava na hora.
     [Fact]
     public void Goal_created_today_waits_one_interval_from_creation() =>
-        Next(Daily(), Nothing with { CreatedTodayAt = Today(14) }, Today(14)).Should().Be(Today(15));
+        Next(Daily(), Nothing with { IntervalStartAt = Today(14) }, Today(14)).Should().Be(Today(15));
 
     [Fact]
     public void Goal_created_before_window_starts_at_window_start() =>
-        Next(Daily(), Nothing with { CreatedTodayAt = Today(7) }, Today(7, 30)).Should().Be(Today(8));
+        Next(Daily(), Nothing with { IntervalStartAt = Today(7) }, Today(7, 30)).Should().Be(Today(8));
 
     [Fact]
     public void Later_fire_wins_over_creation() =>
-        Next(Daily(), Nothing with { CreatedTodayAt = Today(9), LastFiredAt = Today(10) }, Today(10, 1)).Should().Be(Today(11));
+        Next(Daily(), Nothing with { IntervalStartAt = Today(9), LastFiredAt = Today(10) }, Today(10, 1)).Should().Be(Today(11));
+
+    // Revisão final da Fase 4d: adiar respondido antes da pausa disparava na hora da retomada.
+    [Fact]
+    public void Resume_after_snooze_supersedes_snooze() =>
+        Next(Daily(), Nothing with { LastFiredAt = Today(8), SnoozedAt = Today(8, 55), IntervalStartAt = Today(15) },
+            Today(15)).Should().Be(Today(16));
+
+    [Fact]
+    public void Snooze_after_interval_start_still_wins() =>
+        Next(Daily(), Nothing with { IntervalStartAt = Today(9), LastFiredAt = Today(10), SnoozedAt = Today(10, 5) },
+            Today(10, 6)).Should().Be(Today(10, 15));
 }

@@ -20,7 +20,8 @@ public sealed record UpcomingReminderViewModel(string Time, string Title);
 /// escritas de fora da tela (notificação, virada do dia) chegam pelo <see cref="DataChangeNotifier"/>.
 /// </summary>
 public sealed partial class TodayPageViewModel(ProgressService progress, CheckinService checkins, TimerService timers,
-    GoalService goals, TimeProvider time, ReminderService reminders, DataChangeNotifier changes) : PageViewModel
+    GoalService goals, TimeProvider time, ReminderService reminders, DataChangeNotifier changes,
+    ReminderPause? pause = null) : PageViewModel
 {
     private bool _subscribed;
     private int _loadVersion;
@@ -36,6 +37,16 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     public ObservableCollection<UpcomingReminderViewModel> Upcoming { get; } = [];
 
     public bool HasUpcoming => Upcoming.Count > 0;
+
+    /// <summary>Lembretes pausados: a tela mostra a faixa "Lembretes pausados" e esconde os próximos.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PauseButtonText), nameof(CanPause))]
+    public partial bool IsPaused { get; set; }
+
+    public string PauseButtonText => IsPaused ? "Retomar lembretes" : "Pausar lembretes";
+
+    /// <summary>Botão "Pausar lembretes" do cabeçalho: só sem pausa e com a pausa disponível.</summary>
+    public bool CanPause => pause is not null && !IsPaused;
 
     [ObservableProperty] public partial int WeekPercent { get; set; }
     [ObservableProperty] public partial int InProgress { get; set; }
@@ -102,9 +113,11 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     private async Task LoadUpcomingAsync(int version)
     {
         IReadOnlyList<UpcomingReminder> upcoming;
+        var paused = false;
         try
         {
-            upcoming = await reminders.UpcomingTodayAsync();
+            paused = pause is not null && (await pause.GetAsync()).IsPaused;
+            upcoming = paused ? [] : await reminders.UpcomingTodayAsync();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -114,6 +127,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         if (version != _loadVersion)
             return;
 
+        IsPaused = paused;
         Upcoming.Clear();
         foreach (var item in upcoming)
             Upcoming.Add(new UpcomingReminderViewModel(
@@ -121,6 +135,29 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
                 item.Goal.Title));
         OnPropertyChanged(nameof(HasUpcoming));
     }
+
+    /// <summary>Pausa ou retoma; a recarga chega pelo <see cref="DataChangeNotifier"/>.</summary>
+    [RelayCommand(CanExecute = nameof(HasPause))]
+    private async Task TogglePauseAsync()
+    {
+        if (pause is null)
+            return;
+        ErrorMessage = null;
+        try
+        {
+            if (IsPaused)
+                await pause.ResumeAsync();
+            else
+                await pause.PauseAsync();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Trace.TraceError($"Falha ao pausar/retomar os lembretes: {ex}");
+            ErrorMessage = "Não foi possível alterar a pausa dos lembretes.";
+        }
+    }
+
+    private bool HasPause() => pause is not null;
 
     [RelayCommand]
     private Task CompleteAsync(TodayGoalViewModel? item) => RunAsync(item, id => checkins.AdjustAsync(id, 1));
