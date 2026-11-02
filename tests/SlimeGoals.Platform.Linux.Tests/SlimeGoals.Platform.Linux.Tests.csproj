@@ -19,10 +19,12 @@
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\SlimeGoals.Core\SlimeGoals.Core.csproj" />
+    <ProjectReference Include="..\SlimeGoals.Testing\SlimeGoals.Testing.csproj" />
   </ItemGroup>
 
 
