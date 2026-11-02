@@ -2,6 +2,8 @@ using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Data;
+using Avalonia.Platform;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using SlimeGoals.App.Hosting;
@@ -42,6 +44,8 @@ public partial class App(IServiceProvider services) : Application
             if (services.GetService<DesktopAppLifetime>() is { } lifetime)
                 lifetime.Desktop = desktop;
             desktop.Exit += (_, _) => StopAll(hosted);
+            if (services.GetService<TrayMenuViewModel>() is { } tray)
+                CreateTrayIcon(tray);
         }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime single)
             single.MainView = new ShellView { DataContext = shell };
@@ -50,6 +54,51 @@ public partial class App(IServiceProvider services) : Application
 
         foreach (var service in hosted)
             _ = StartSafelyAsync(service);
+    }
+
+    /// <summary>
+    /// Ícone na bandeja com "Abrir", pausa e "Sair". Opcional: sem suporte (ex.: GNOME sem AppIndicator)
+    /// ou com erro, o app segue sem ele.
+    /// </summary>
+    private void CreateTrayIcon(TrayMenuViewModel tray)
+    {
+        try
+        {
+            var pauseItem = new NativeMenuItem { Command = tray.TogglePauseCommand };
+            pauseItem.Bind(NativeMenuItem.HeaderProperty, new Binding(nameof(TrayMenuViewModel.PauseText)) { Source = tray });
+
+            var icon = new TrayIcon
+            {
+                Icon = new WindowIcon(AssetLoader.Open(new Uri("avares://SlimeGoals.App/Assets/tray.png"))),
+                ToolTipText = "SlimeGoals",
+                Menu = new NativeMenu
+                {
+                    new NativeMenuItem { Header = "Abrir", Command = tray.OpenCommand },
+                    pauseItem,
+                    new NativeMenuItem { Header = "Sair", Command = tray.QuitCommand },
+                },
+            };
+            icon.Clicked += (_, _) => tray.OpenCommand.Execute(null);
+            TrayIcon.SetIcons(this, [icon]);
+        }
+        catch (Exception e)
+        {
+            Trace.TraceError($"Falha ao criar o ícone da bandeja: {e}");
+            return;
+        }
+        _ = RefreshTraySafelyAsync(tray);
+    }
+
+    private static async Task RefreshTraySafelyAsync(TrayMenuViewModel tray)
+    {
+        try
+        {
+            await tray.RefreshAsync();
+        }
+        catch (Exception e)
+        {
+            Trace.TraceError($"Falha ao atualizar a bandeja: {e}");
+        }
     }
 
     /// <summary>Fora da thread da interface: o início (D-Bus, banco) não pode travar nem derrubar a janela.</summary>
