@@ -11,6 +11,9 @@ public class GoalFormattingTests
     [InlineData(Measure.Completion, Recurrence.Weekly, 1, null, "Concluir na semana")]
     [InlineData(Measure.Quantity, Recurrence.Daily, 8, "copos", "8 copos por dia")]
     [InlineData(Measure.Quantity, Recurrence.Weekly, 3, "vezes", "3 vezes por semana")]
+    [InlineData(Measure.Quantity, Recurrence.Daily, 1, "vezes", "1 vez por dia")]
+    [InlineData(Measure.Quantity, Recurrence.Daily, 1, "Vezes", "1 Vez por dia")]
+    [InlineData(Measure.Quantity, Recurrence.Daily, 1, "copos", "1 copos por dia")]
     [InlineData(Measure.Duration, Recurrence.Daily, 45, null, "45 min por dia")]
     [InlineData(Measure.Duration, Recurrence.Weekly, 300, null, "5 h por semana")]
     public void Target(Measure m, Recurrence r, int target, string? unit, string expected) =>
@@ -37,6 +40,8 @@ public class GoalFormattingTests
     [InlineData(Measure.Completion, Recurrence.Daily, 1, null, 0, "Pendente")]
     [InlineData(Measure.Quantity, Recurrence.Daily, 8, "copos", 5, "5 de 8 copos hoje")]
     [InlineData(Measure.Quantity, Recurrence.Weekly, 3, "vezes", 2, "2 de 3 vezes na semana")]
+    [InlineData(Measure.Quantity, Recurrence.Daily, 1, "vezes", 1, "1 de 1 vez hoje")]
+    [InlineData(Measure.Quantity, Recurrence.Daily, 1, "vezes", 0, "0 de 1 vez hoje")]
     [InlineData(Measure.Duration, Recurrence.Weekly, 300, null, 150, "2 h 30 de 5 h na semana")]
     [InlineData(Measure.Duration, Recurrence.Daily, 45, null, 0, "0 min de 45 min hoje")]
     public void Progress(Measure m, Recurrence r, int target, string? unit, int done, string expected)

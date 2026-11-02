@@ -92,7 +92,7 @@
             <NumericUpDown Value="{Binding DurationHoursInput}" Minimum="0" Maximum="168" Increment="1" FormatString="0"
                            Width="110" AutomationProperties.Name="Horas" />
             <TextBlock Text="h" VerticalAlignment="Center" />
-            <NumericUpDown Value="{Binding DurationMinutesInput}" Minimum="0" Maximum="59" Increment="5" FormatString="0"
+            <NumericUpDown Value="{Binding DurationMinutesInput}" Minimum="0" Maximum="59" Increment="1" FormatString="0"
                            Width="110" AutomationProperties.Name="Minutos" />
             <TextBlock Text="min" VerticalAlignment="Center" />
             <TextBlock Text="{Binding TargetSuffix}" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />

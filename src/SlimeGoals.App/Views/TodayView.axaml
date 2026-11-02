@@ -87,7 +87,7 @@
                               IsVisible="{Binding IsCompletion}" IsEnabled="{Binding !IsMet}"
                               Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).CompleteCommand}"
                               CommandParameter="{Binding}" />
-                      <Button Classes="ghost" Content="Desmarcar"
+                      <Button Classes="danger-solid" Content="Desmarcar"
                               IsVisible="{Binding IsCompletion}" IsEnabled="{Binding IsMet}"
                               Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).UncompleteCommand}"
                               CommandParameter="{Binding}" />
@@ -118,9 +118,9 @@
                               IsVisible="{Binding IsTimerRunning}"
                               Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).StopTimerCommand}"
                               CommandParameter="{Binding}" />
-                      <!-- Mais opções (quantidade e tempo) -->
+                      <!-- Mais opções (só tempo) -->
                       <Button Classes="ghost icon" Content="⋯" AutomationProperties.Name="Mais opções"
-                              IsVisible="{Binding !IsCompletion}"
+                              IsVisible="{Binding IsDuration}"
                               Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).OpenPanelCommand}"
                               CommandParameter="{Binding}" />
                     </StackPanel>
@@ -135,16 +135,11 @@
                           <RadioButton Classes="segment" Content="Remover" IsChecked="{Binding PanelRemoves}" />
                         </StackPanel>
                       </Border>
-                      <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsQuantity}">
-                        <NumericUpDown Value="{Binding PanelAmountInput}" Minimum="1" Maximum="9999" Increment="1"
-                                       FormatString="0" Width="130" AutomationProperties.Name="Quantidade" />
-                        <TextBlock Text="{Binding Goal.Unit}" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
-                      </StackPanel>
-                      <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsDuration}">
+                      <StackPanel Orientation="Horizontal" Spacing="10">
                         <NumericUpDown Value="{Binding PanelHoursInput}" Minimum="0" Maximum="24" Increment="1"
                                        FormatString="0" Width="110" AutomationProperties.Name="Horas" />
                         <TextBlock Text="h" VerticalAlignment="Center" />
-                        <NumericUpDown Value="{Binding PanelMinutesInput}" Minimum="0" Maximum="59" Increment="5"
+                        <NumericUpDown Value="{Binding PanelMinutesInput}" Minimum="0" Maximum="59" Increment="1"
                                        FormatString="0" Width="110" AutomationProperties.Name="Minutos" />
                         <TextBlock Text="min" VerticalAlignment="Center" />
                       </StackPanel>

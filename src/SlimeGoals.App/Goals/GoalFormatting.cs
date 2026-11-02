@@ -20,7 +20,7 @@ public static class GoalFormatting
     public static string Target(Goal goal) => goal.Measure switch
     {
         Measure.Completion => goal.Recurrence == Recurrence.Weekly ? "Concluir na semana" : "Concluir no dia",
-        Measure.Quantity => $"{goal.Target} {goal.Unit} {PerPeriod(goal.Recurrence)}",
+        Measure.Quantity => $"{goal.Target} {UnitFor(goal.Target, goal.Unit)} {PerPeriod(goal.Recurrence)}",
         Measure.Duration => $"{Duration(goal.Target)} {PerPeriod(goal.Recurrence)}",
         _ => throw new ArgumentOutOfRangeException(nameof(goal), goal.Measure, null),
     };
@@ -33,7 +33,7 @@ public static class GoalFormatting
         return goal.Measure switch
         {
             Measure.Completion => progress.IsMet ? $"Feito {when}" : "Pendente",
-            Measure.Quantity => $"{progress.Done} de {goal.Target} {goal.Unit} {when}",
+            Measure.Quantity => $"{progress.Done} de {goal.Target} {UnitFor(goal.Target, goal.Unit)} {when}",
             Measure.Duration => $"{Duration(progress.Done)} de {Duration(goal.Target)} {when}",
             _ => throw new ArgumentOutOfRangeException(nameof(progress), goal.Measure, null),
         };
@@ -55,6 +55,17 @@ public static class GoalFormatting
     /// <summary>Cronômetro: "0:05:09", "1:02:03" (horas sem zero à esquerda).</summary>
     public static string Elapsed(TimeSpan elapsed) =>
         $"{(int)elapsed.TotalHours}:{elapsed.Minutes:00}:{elapsed.Seconds:00}";
+
+    /// <summary>
+    /// Singular só para a unidade padrão: 1 → "vez". A unidade é texto livre ("copos", "páginas"),
+    /// e flexionar texto livre em pt-BR exigiria regras que erram mais do que acertam.
+    /// </summary>
+    private static string? UnitFor(int amount, string? unit) => (amount, unit) switch
+    {
+        (1, "vezes") => "vez",
+        (1, "Vezes") => "Vez",
+        _ => unit,
+    };
 
     private static string PerPeriod(Recurrence recurrence) => recurrence == Recurrence.Weekly ? "por semana" : "por dia";
 

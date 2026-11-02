@@ -40,11 +40,10 @@ public sealed partial class TodayGoalViewModel : ObservableObject
     public double Fraction { get; }
     public bool IsMet { get; }
 
-    // ---- Painel de valor (quantidade e tempo) ----
+    // ---- Painel de valor (só tempo; a quantidade usa só −/+) ----
     [ObservableProperty] public partial bool IsPanelOpen { get; set; }
     /// <summary>false = Adicionar; true = Remover.</summary>
     [ObservableProperty] public partial bool PanelRemoves { get; set; }
-    [ObservableProperty] public partial decimal? PanelAmountInput { get; set; }
     [ObservableProperty] public partial decimal? PanelHoursInput { get; set; }
     [ObservableProperty] public partial decimal? PanelMinutesInput { get; set; }
     [ObservableProperty] public partial string? PanelNote { get; set; }
@@ -53,23 +52,22 @@ public sealed partial class TodayGoalViewModel : ObservableObject
     public bool PanelAdds { get => !PanelRemoves; set => PanelRemoves = !value; }
     partial void OnPanelRemovesChanged(bool value) => OnPropertyChanged(nameof(PanelAdds));
 
-    /// <summary>Abre o painel limpo.</summary>
+    /// <summary>Abre (só em meta de tempo) ou fecha o painel, limpo.</summary>
     public void ResetPanel(bool open)
     {
+        open &= IsDuration;
         PanelRemoves = false;
-        PanelAmountInput = PanelHoursInput = PanelMinutesInput = null;
+        PanelHoursInput = PanelMinutesInput = null;
         PanelNote = PanelError = null;
         IsPanelOpen = open;
     }
 
-    /// <summary>Valor do painel na unidade base (com sinal), ou null se nada foi digitado.</summary>
+    /// <summary>Minutos do painel (com sinal), ou null se nada foi digitado.</summary>
     public int? PanelAmount()
     {
-        decimal? value = IsDuration
-            ? (PanelHoursInput is null && PanelMinutesInput is null ? null : (PanelHoursInput ?? 0) * 60 + (PanelMinutesInput ?? 0))
-            : PanelAmountInput;
-        if (value is not { } v)
+        if (PanelHoursInput is null && PanelMinutesInput is null)
             return null;
+        var v = (PanelHoursInput ?? 0) * 60 + (PanelMinutesInput ?? 0);
         var amount = (int)Math.Round(v, MidpointRounding.AwayFromZero);
         return PanelRemoves ? -amount : amount;
     }

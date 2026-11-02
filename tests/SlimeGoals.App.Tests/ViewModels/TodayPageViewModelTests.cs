@@ -55,7 +55,7 @@ public class TodayPageViewModelTests
         var card = Card(page, "Água");
         (card.ProgressText, card.Fraction, card.IsMet, card.IsQuantity).Should().Be(("3 de 8 copos hoje", 0.375, false, true));
         Card(page, "Mesa").ProgressText.Should().Be("Pendente");
-        (page.InProgress, page.Completed, page.WeekPercent).Should().Be((2, 0, 0));
+        (page.InProgress, page.Completed, page.WeekPercent).Should().Be((2, 0, 6)); // quarta: Água (0 + 0 + 3/8) / 3, Mesa 0 → 6,25%
     }
 
     [Fact]
@@ -117,11 +117,23 @@ public class TodayPageViewModelTests
     }
 
     [Fact]
-    public async Task Panel_with_empty_value_shows_informe_um_valor()
+    public async Task Panel_does_not_open_for_quantity_goal()
     {
         await Create("Água");
         var page = await Loaded();
         var card = Card(page, "Água");
+
+        page.OpenPanelCommand.Execute(card);
+
+        card.IsPanelOpen.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Panel_with_empty_value_shows_informe_um_valor()
+    {
+        await Create("Estudar", Measure.Duration, 60);
+        var page = await Loaded();
+        var card = Card(page, "Estudar");
 
         page.OpenPanelCommand.Execute(card);
         await page.ConfirmPanelCommand.ExecuteAsync(card);
@@ -134,12 +146,12 @@ public class TodayPageViewModelTests
     [Fact]
     public async Task Panel_note_too_long_keeps_panel_open_with_error()
     {
-        await Create("Água");
+        await Create("Estudar", Measure.Duration, 60);
         var page = await Loaded();
-        var card = Card(page, "Água");
+        var card = Card(page, "Estudar");
 
         page.OpenPanelCommand.Execute(card);
-        card.PanelAmountInput = 2;
+        card.PanelMinutesInput = 20;
         card.PanelNote = new string('a', 201);
         await page.ConfirmPanelCommand.ExecuteAsync(card);
 
