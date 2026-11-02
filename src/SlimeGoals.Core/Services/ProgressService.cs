@@ -62,8 +62,8 @@ public sealed class ProgressService(IGoalRepository goals, ICheckinRepository ch
 
     /// <summary>
     /// Fração da semana cumprida pela meta (spec §7), ou null se ela não entra na média.
-    /// Semanal: soma da semana ÷ alvo. Diária: dias ativos cumpridos ÷ dias ativos de segunda a ontem,
-    /// mais hoje só se já cumprido (o dia em andamento não puxa a média para baixo).
+    /// Semanal: soma da semana ÷ alvo. Diária: média, nos dias ativos de segunda a hoje, da fração cumprida
+    /// em cada dia (até 1). Hoje entra com o progresso parcial, para o % subir à medida que se registra.
     /// </summary>
     private static double? WeekFraction(Goal goal, DateOnly today, DateOnly monday, Func<Goal, DateOnly, int> sumOn)
     {
@@ -76,8 +76,7 @@ public sealed class ProgressService(IGoalRepository goals, ICheckinRepository ch
             return Math.Clamp((double)sum / goal.Target, 0, 1);
         }
 
-        bool Met(DateOnly d) => sumOn(goal, d) >= goal.Target;
-        var counted = days.Where(d => GoalPeriod.IsShownOn(goal, d) && (d < today || Met(d))).ToList();
-        return counted.Count == 0 ? null : (double)counted.Count(Met) / counted.Count;
+        var counted = days.Where(d => GoalPeriod.IsShownOn(goal, d)).ToList();
+        return counted.Count == 0 ? null : counted.Average(d => Math.Clamp((double)sumOn(goal, d) / goal.Target, 0, 1));
     }
 }

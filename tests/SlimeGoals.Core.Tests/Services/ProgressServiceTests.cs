@@ -95,28 +95,33 @@ public class ProgressServiceTests
         await Record(daily, Today.AddDays(-2), 1);
         await Record(daily, Today.AddDays(-1), 1);
 
-        (await Service.GetTodayAsync()).Week.Percent.Should().Be(75);
+        // semanal 3/6 = 0,5; diária seg 1, ter 1, hoje 0 = 2/3 → média 58%
+        (await Service.GetTodayAsync()).Week.Percent.Should().Be(58);
+    }
+
+    // Verificação manual da Fase 3: meta diária pendente hoje ficava fora da média e o painel mostrava 100%.
+    [Fact]
+    public async Task Daily_fraction_counts_each_day_with_partial_progress_capped_at_one()
+    {
+        var daily = await Create("Diária", target: 4);
+        await Record(daily, Today.AddDays(-2), 8); // seg: passou do alvo, conta 1
+        await Record(daily, Today.AddDays(-1), 2); // ter: metade
+        await Record(daily, Today, 2);             // hoje: metade
+        (await Service.GetTodayAsync()).Week.Percent.Should().Be(67); // (1 + 0,5 + 0,5) / 3
+
+        await Record(daily, Today, 2);
+        (await Service.GetTodayAsync()).Week.Percent.Should().Be(83); // (1 + 0,5 + 1) / 3
     }
 
     [Fact]
-    public async Task Today_counts_in_daily_fraction_only_when_met()
+    public async Task Daily_goal_starting_today_counts_only_today()
     {
-        var daily = await Create("Diária");
-        await Record(daily, Today.AddDays(-2), 1);
-        (await Service.GetTodayAsync()).Week.Percent.Should().Be(50); // seg ok, ter não; hoje pendente fica fora
-
-        await Record(daily, Today, 1);
-        (await Service.GetTodayAsync()).Week.Percent.Should().Be(67); // 2 de 3
-    }
-
-    [Fact]
-    public async Task Daily_goal_starting_today_unmet_is_left_out_of_average()
-    {
-        await Create("Nova", start: Today);
+        var fresh = await Create("Nova", target: 2, start: Today);
         var weekly = await Create("Semanal", Recurrence.Weekly, target: 4);
-        await Record(weekly, Today, 2);
+        await Record(fresh, Today, 1);
+        await Record(weekly, Today, 1);
 
-        (await Service.GetTodayAsync()).Week.Percent.Should().Be(50);
+        (await Service.GetTodayAsync()).Week.Percent.Should().Be(38); // (0,5 + 0,25) / 2 = 37,5
     }
 
     [Fact]
