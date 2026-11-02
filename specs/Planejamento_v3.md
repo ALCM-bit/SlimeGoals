@@ -151,6 +151,7 @@ Regras comuns:
     │   ├── SlimeGoals.Platform.Linux/       # net10.0
     │   │   ├── Scheduling/        # timer único
     │   │   ├── Notifications/     # DBus (freedesktop) + fallback em janela
+    │   │   ├── SingleInstance/    # guarda de instância única (trava + socket Unix)
     │   │   └── Autostart/         # XDG autostart
     │   ├── SlimeGoals.Platform.Android/     # net10.0-android
     │   │   ├── Scheduling/        # AlarmManager + receiver de boot
@@ -160,8 +161,8 @@ Regras comuns:
     │   │   ├── ViewModels/
     │   │   ├── Assets/Fonts/      # Figtree
     │   │   ├── Styles/            # Theme.axaml (tokens), Controls.axaml
-    │   │   └── App.axaml
-    │   ├── SlimeGoals.Desktop/              # head Linux: Program.cs, DI, bandeja, instância única
+    │   │   └── App.axaml          # inclui o ícone da bandeja
+    │   ├── SlimeGoals.Desktop/              # head Linux: Program.cs, DI, liga a instância única ao app
     │   └── SlimeGoals.Android/              # head Android: MainActivity, DI, receivers
     ├── tests/
     │   ├── SlimeGoals.Core.Tests/
@@ -441,7 +442,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 - Sem fallback em janela: se o D-Bus falhar, o app segue sem notificações, registra em `Trace` e tenta conectar de novo só no próximo lembrete (uma vez por disparo), sem laço (fallback na Fase 6, se preciso).
 - Fechar a janela continua encerrando o app até a 4d; o critério "janela fechada" da 4c passou para a 4d.
 - Virada do dia: o agendador acorda à meia-noite local e avisa o `DataChangeNotifier`; a tela Hoje recarrega (resolve a pendência da Fase 3).
-- `IReminderScheduler`/`INotificationService` ficaram assíncronos (`Task`); `Pause`/`Resume` entram na 4d, com a bandeja (na 4d ficaram no Core, em `ReminderPause`; ver Decisões da Fase 4d).
+- `IReminderScheduler`/`INotificationService` ficaram assíncronos (`Task`); `Pause`/`Resume`: ver Decisões da Fase 4d (ficaram no Core, em `ReminderPause`).
 - Pendente de meta excluída ou inexistente é tratado como ignorado e retirado da central.
 - **Iniciar** numa meta de tempo com cronômetro de outra meta rodando abre o app e não altera o cronômetro; cronômetro órfão (meta arquivada/inexistente) não conta como conflito.
 - O tratador de respostas é serializado, para que ações simultâneas no mesmo lembrete não registrem duas vezes.
