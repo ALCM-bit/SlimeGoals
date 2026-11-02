@@ -50,6 +50,21 @@
 
     <TextBlock DockPanel.Dock="Top" Classes="section-title" Text="Metas de hoje" Margin="0,0,0,10" />
 
+    <!-- Próximos lembretes do dia, abaixo da lista (só com itens) -->
+    <StackPanel DockPanel.Dock="Bottom" Margin="0,4,0,14" IsVisible="{Binding HasUpcoming}">
+      <TextBlock Classes="section-title" Text="Próximos lembretes" Margin="0,0,0,10" />
+      <ItemsControl ItemsSource="{Binding Upcoming}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:UpcomingReminderViewModel">
+            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,6">
+              <TextBlock Text="{Binding Time}" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Title}" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
     <Panel>
       <TextBlock Text="{Binding EmptyMessage}" IsVisible="{Binding IsEmpty}" Foreground="{DynamicResource Muted}"
                  HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="15" />

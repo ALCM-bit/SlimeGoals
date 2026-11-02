@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SlimeGoals.App.Goals;
@@ -9,13 +11,18 @@ using SlimeGoals.Core.Validation;
 
 namespace SlimeGoals.App.ViewModels;
 
+/// <summary>Linha de "Próximos lembretes": hora local ("14:30") e título da meta.</summary>
+public sealed record UpcomingReminderViewModel(string Time, string Title);
+
 /// <summary>
-/// Tela Hoje (spec §7): resumo da semana e cartões das metas de hoje com controles por medida.
-/// Cada ação chama um serviço do Core e recarrega o instantâneo.
+/// Tela Hoje (spec §7): resumo da semana, cartões das metas de hoje com controles por medida
+/// e os próximos lembretes do dia. Cada ação chama um serviço do Core e recarrega o instantâneo;
+/// escritas de fora da tela (notificação, virada do dia) chegam pelo <see cref="DataChangeNotifier"/>.
 /// </summary>
-public sealed partial class TodayPageViewModel(
-    ProgressService progress, CheckinService checkins, TimerService timers, GoalService goals, TimeProvider time) : PageViewModel
+public sealed partial class TodayPageViewModel(ProgressService progress, CheckinService checkins, TimerService timers,
+    GoalService goals, TimeProvider time, ReminderService reminders, DataChangeNotifier changes) : PageViewModel
 {
+    private bool _subscribed;
     private int _loadVersion;
     private ITimer? _ticker;
     private SynchronizationContext? _ui;
@@ -25,6 +32,10 @@ public sealed partial class TodayPageViewModel(
     public override string Title => "Hoje";
 
     public ObservableCollection<TodayGoalViewModel> Goals { get; } = [];
+
+    public ObservableCollection<UpcomingReminderViewModel> Upcoming { get; } = [];
+
+    public bool HasUpcoming => Upcoming.Count > 0;
 
     [ObservableProperty] public partial int WeekPercent { get; set; }
     [ObservableProperty] public partial int InProgress { get; set; }
@@ -47,6 +58,12 @@ public sealed partial class TodayPageViewModel(
     {
         // O tique do cronômetro precisa voltar à thread da interface (bindings do Avalonia).
         _ui ??= SynchronizationContext.Current;
+        if (!_subscribed)
+        {
+            // Assina uma vez (a página vive com o app); pode chegar de qualquer thread, recarrega na da interface.
+            _subscribed = true;
+            changes.Changed += (_, _) => OnUi(() => LoadCommand.Execute(null));
+        }
         var version = ++_loadVersion;
         ErrorMessage = null;
         try
@@ -69,6 +86,7 @@ public sealed partial class TodayPageViewModel(
             (WeekPercent, InProgress, Completed) = (snapshot.Week.Percent, snapshot.Week.InProgress, snapshot.Week.Completed);
             if (snapshot.Timer is { StoppedAt: null })
                 _ticker = time.CreateTimer(_ => OnUi(Tick), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+            await LoadUpcomingAsync(version);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -78,6 +96,30 @@ public sealed partial class TodayPageViewModel(
         {
             OnPropertyChanged(nameof(IsEmpty));
         }
+    }
+
+    /// <summary>Falha aqui só esconde a seção: o resto da tela Hoje continua valendo.</summary>
+    private async Task LoadUpcomingAsync(int version)
+    {
+        IReadOnlyList<UpcomingReminder> upcoming;
+        try
+        {
+            upcoming = await reminders.UpcomingTodayAsync();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Trace.TraceError($"Falha ao carregar os próximos lembretes: {ex}");
+            upcoming = [];
+        }
+        if (version != _loadVersion)
+            return;
+
+        Upcoming.Clear();
+        foreach (var item in upcoming)
+            Upcoming.Add(new UpcomingReminderViewModel(
+                TimeZoneInfo.ConvertTime(item.At, time.LocalTimeZone).ToString("HH:mm", CultureInfo.InvariantCulture),
+                item.Goal.Title));
+        OnPropertyChanged(nameof(HasUpcoming));
     }
 
     [RelayCommand]
