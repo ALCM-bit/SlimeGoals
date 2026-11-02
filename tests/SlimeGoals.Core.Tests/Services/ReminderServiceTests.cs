@@ -125,6 +125,22 @@ public class ReminderServiceTests
         _log.All.Single().Response.Should().Be(ReminderResponse.Ignore);
     }
 
+    // Revisão final da Fase 4: pendente de ontem não pode valer para o novo dia.
+    [Fact]
+    public async Task Pending_from_yesterday_is_withdrawn_as_ignore_after_midnight()
+    {
+        await Add(target: 5);
+        At(19, 30);
+        await Service.SyncAsync();
+        var fired = _notifications.Shown.Single().LogId;
+
+        _time.SetUtcNow(Today(0).AddDays(1));
+        await Service.SyncAsync();
+
+        _log.All.Single(e => e.Id == fired).Response.Should().Be(ReminderResponse.Ignore);
+        _notifications.Withdrawn.Should().Contain(fired);
+    }
+
     [Fact]
     public async Task Failing_notification_still_logs_and_advances()
     {

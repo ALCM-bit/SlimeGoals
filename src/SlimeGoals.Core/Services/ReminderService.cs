@@ -32,7 +32,9 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
         {
             var goal = snapshot.Goals.FirstOrDefault(g => g.Id == entry.GoalId)
                        ?? await goals.GetAsync(entry.GoalId, ct);
+            // Disparado antes de hoje (dia local): não vale mais depois da meia-noite.
             var stale = goal is null || goal.ArchivedAt is not null
+                        || entry.FiredAt < snapshot.TodayStart
                         || newestFire[entry.GoalId] > entry.FiredAt
                         || NextFor(goal, snapshot, now) is not { } next || next >= snapshot.TomorrowStart;
             if (stale)
@@ -135,6 +137,7 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
     {
         public IReadOnlyList<Goal> Goals { get; } = goals;
         public TimeZoneInfo Zone { get; } = zone;
+        public DateTimeOffset TodayStart => todayStart;
         public DateTimeOffset TomorrowStart => tomorrowStart;
         public List<ReminderLogEntry> Fires { get; } = fires;
 
