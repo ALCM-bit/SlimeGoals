@@ -48,11 +48,23 @@
       </Grid>
     </Border>
 
+    <!-- Lembretes pausados (mesmo estilo da faixa do cronômetro) -->
+    <Border DockPanel.Dock="Top" Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding IsPaused}">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+        <TextBlock Text="Lembretes pausados" VerticalAlignment="Center" TextWrapping="Wrap" />
+        <Button Grid.Column="1" Classes="ghost" Content="Retomar" Command="{Binding TogglePauseCommand}" />
+      </Grid>
+    </Border>
+
     <TextBlock DockPanel.Dock="Top" Classes="section-title" Text="Metas de hoje" Margin="0,0,0,10" />
 
     <!-- Próximos lembretes do dia, abaixo da lista (só com itens) -->
     <StackPanel DockPanel.Dock="Bottom" Margin="0,4,0,14" IsVisible="{Binding HasUpcoming}">
-      <TextBlock Classes="section-title" Text="Próximos lembretes" Margin="0,0,0,10" />
+      <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+        <TextBlock Classes="section-title" Text="Próximos lembretes" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Classes="ghost" Content="{Binding PauseButtonText}"
+                IsVisible="{Binding CanPause}" Command="{Binding TogglePauseCommand}" />
+      </Grid>
       <ItemsControl ItemsSource="{Binding Upcoming}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:UpcomingReminderViewModel">

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,10 +28,15 @@ public partial class App(IServiceProvider services) : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // Fechar a janela só a oculta: o processo segue para os lembretes até o "Sair" (Shutdown).
+            desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             var window = new MainWindow { DataContext = shell };
             desktop.MainWindow = window;
+            desktop.ShutdownRequested += (_, _) => window.AllowClose = true;
             if (services.GetService<MainWindowActivator>() is { } activator)
                 activator.Window = window;
+            if (services.GetService<DesktopAppLifetime>() is { } lifetime)
+                lifetime.Desktop = desktop;
             desktop.Exit += (_, _) => StopAll(hosted);
         }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime single)
