@@ -119,4 +119,15 @@ public class ReminderPlannerTests
     [Fact]
     public void Later_fire_wins_over_creation() =>
         Next(Daily(), Nothing with { IntervalStartAt = Today(9), LastFiredAt = Today(10) }, Today(10, 1)).Should().Be(Today(11));
+
+    // Revisão final da Fase 4d: adiar respondido antes da pausa disparava na hora da retomada.
+    [Fact]
+    public void Resume_after_snooze_supersedes_snooze() =>
+        Next(Daily(), Nothing with { LastFiredAt = Today(8), SnoozedAt = Today(8, 55), IntervalStartAt = Today(15) },
+            Today(15)).Should().Be(Today(16));
+
+    [Fact]
+    public void Snooze_after_interval_start_still_wins() =>
+        Next(Daily(), Nothing with { IntervalStartAt = Today(9), LastFiredAt = Today(10), SnoozedAt = Today(10, 5) },
+            Today(10, 6)).Should().Be(Today(10, 15));
 }

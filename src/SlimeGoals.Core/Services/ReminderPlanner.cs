@@ -60,7 +60,10 @@ public static class ReminderPlanner
     private static DateTimeOffset TodayCandidate(Goal goal, ReminderState state, int snoozeMinutes,
         DateTimeOffset windowStart)
     {
-        if (state.SnoozedAt is { } snoozedAt && (state.LastCheckinAt is not { } checkin || snoozedAt > checkin))
+        // Adiar vale até um registro ou o início de intervalo (criação/retomada) posterior a ele.
+        if (state.SnoozedAt is { } snoozedAt
+            && (state.LastCheckinAt is not { } checkin || snoozedAt > checkin)
+            && (state.IntervalStartAt is not { } intervalStart || snoozedAt > intervalStart))
             return snoozedAt.AddMinutes(snoozeMinutes);
 
         var anchor = new[] { state.LastFiredAt, state.LastCheckinAt, state.IntervalStartAt }
