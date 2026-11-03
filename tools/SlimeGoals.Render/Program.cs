@@ -1,9 +1,11 @@
 using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.App.Views;
 using SlimeGoals.Render;
+using ScrollViewer = Avalonia.Controls.ScrollViewer;
 using Window = Avalonia.Controls.Window;
 
 if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all")))
@@ -47,6 +49,11 @@ void Render(bool phone, string suffix, int width, int height)
     goals.NewCommand.Execute(null);
     Pump();
     Capture("goal-edit");
+    // O fim do formulário (horários, período e, no layout estreito, as ações) fica abaixo da dobra
+    window.GetVisualDescendants().OfType<GoalEditView>().Single()
+        .GetVisualDescendants().OfType<ScrollViewer>().First().ScrollToEnd();
+    Pump();
+    Capture("goal-edit-end");
     goals.Editor = null;
 
     reports.Mode = ReportMode.Week;

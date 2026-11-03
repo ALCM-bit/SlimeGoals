@@ -10,7 +10,7 @@ dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|al
 
 Sem o segundo argumento, vale `all`. Grava um PNG por tela e tamanho, sempre o `ShellView` inteiro:
 
-- `today-<tamanho>.png`, `goals-<tamanho>.png`, `goal-edit-<tamanho>.png`,
+- `today-<tamanho>.png`, `goals-<tamanho>.png`, `goal-edit-<tamanho>.png`, `goal-edit-end-<tamanho>.png` (o formulário rolado até o fim),
   `reports-week-<tamanho>.png`, `reports-month-<tamanho>.png`, `settings-<tamanho>.png`;
 - `<tamanho>` é `phone` (412×915) ou `desktop` (1100×720).
 
@@ -21,5 +21,5 @@ Quatro metas de exemplo (Beber água, Leitura, Treino, Aula de inglês) e regist
 
 ## Observações
 
-- A variação `phone` ainda usa os ViewModels com o padrão do desktop; `Sample.CreateShell(bool phone)` é o ponto onde passar as capacidades do Android.
+- A variação `phone` monta o shell com as capacidades do Android (`PlatformCapabilities(false, false, false, false)`): sem lembretes em Hoje, sem as seções Geral e Janela nas Configurações e sem "Sair"; a `desktop`, com `PlatformCapabilities.Desktop`.
 - A `RenderApp` espelha os `DataTemplates` do `App.axaml`: ao criar uma página nova, registre-a nos dois lugares.

@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using SlimeGoals.App.Goals;
+using SlimeGoals.App.Hosting;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Domain;
@@ -40,26 +41,25 @@ public sealed class Sample : IDisposable
     }
 
     /// <summary>
-    /// Monta um shell novo (páginas novas, com os dados do banco de exemplo).
-    /// TODO(Task 3): na variação <paramref name="phone"/>, passar as capacidades do Android
-    /// (new PlatformCapabilities(false, false, false, false)) aos ViewModels; hoje ambas usam o padrão do desktop.
+    /// Monta um shell novo (páginas novas, com os dados do banco de exemplo). Na variação
+    /// <paramref name="phone"/>, com as capacidades do Android (nada de lembretes, autostart, janela nem Sair).
     /// </summary>
     public ShellViewModel CreateShell(bool phone)
     {
-        _ = phone;
+        var capabilities = phone ? new PlatformCapabilities(false, false, false, false) : PlatformCapabilities.Desktop;
         var s = _services;
         PageViewModel[] pages =
         [
             new TodayPageViewModel(s.GetRequiredService<ProgressService>(), s.GetRequiredService<CheckinService>(),
                 s.GetRequiredService<TimerService>(), s.GetRequiredService<GoalService>(), TimeProvider.System,
                 s.GetRequiredService<ReminderService>(), s.GetRequiredService<DataChangeNotifier>(),
-                s.GetRequiredService<ReminderPause>(), s.GetRequiredService<ReportService>()),
+                s.GetRequiredService<ReminderPause>(), s.GetRequiredService<ReportService>(), capabilities),
             new GoalsPageViewModel(s.GetRequiredService<GoalService>(), TimeProvider.System),
             new ReportsPageViewModel(s.GetRequiredService<ReportService>(), TimeProvider.System,
                 s.GetRequiredService<DataChangeNotifier>()),
-            new SettingsPageViewModel(s.GetRequiredService<AppSettings>()),
+            new SettingsPageViewModel(s.GetRequiredService<AppSettings>(), capabilities: capabilities),
         ];
-        return new ShellViewModel(pages);
+        return new ShellViewModel(pages, capabilities: capabilities);
     }
 
     private async Task SeedAsync()
