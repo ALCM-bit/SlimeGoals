@@ -43,6 +43,14 @@ public sealed class ReminderResponseHandler(
         if (entry is null || entry.Response is not null)
             return ReminderOutcome.Stale;
 
+        // Notificação de um dia anterior (no Android nada a expira à meia-noite): não registra nada em "hoje".
+        var zone = time.LocalTimeZone;
+        if (TimeZoneInfo.ConvertTime(entry.FiredAt, zone).Date < time.GetLocalNow().Date)
+        {
+            await RespondAsync(logId, ReminderResponse.Ignore, ct);
+            return ReminderOutcome.Stale;
+        }
+
         switch (action)
         {
             case ReminderAction.Snooze:
