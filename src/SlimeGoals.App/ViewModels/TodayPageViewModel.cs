@@ -35,6 +35,8 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
 
     public override string Title => "Hoje";
 
+    public override string IconKey => "NavToday";
+
     public ObservableCollection<TodayGoalViewModel> Goals { get; } = [];
 
     public ObservableCollection<UpcomingReminderViewModel> Upcoming { get; } = [];

@@ -3,10 +3,11 @@
              xmlns:vm="using:SlimeGoals.App.ViewModels"
              x:Class="SlimeGoals.App.Views.ReportsView"
              x:DataType="vm:ReportsPageViewModel">
-  <DockPanel Margin="8,4,8,0">
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+  <DockPanel Classes="page">
+    <!-- No layout estreito o segmento desce para a linha de baixo (estilo report-mode) -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,16">
       <TextBlock Classes="page-title" Text="{Binding Title}" VerticalAlignment="Center" />
-      <Border Grid.Column="1" Classes="segment">
+      <Border Classes="segment report-mode">
         <StackPanel Orientation="Horizontal">
           <RadioButton Classes="segment" GroupName="reports-mode" Content="Semana" IsChecked="{Binding IsWeek}" />
           <RadioButton Classes="segment" GroupName="reports-mode" Content="Mês" IsChecked="{Binding IsMonth}" />
@@ -38,21 +39,21 @@
 
     <ScrollViewer>
       <StackPanel Margin="0,0,0,14">
-        <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,0,0,16">
+        <UniformGrid Classes="report-tiles" Margin="0,0,0,16">
           <Border Classes="stat">
             <StackPanel>
               <TextBlock Classes="stat-label" Text="Cumprido" />
               <TextBlock Classes="stat-value" Text="{Binding PercentText}" />
             </StackPanel>
           </Border>
-          <Border Grid.Column="1" Classes="stat"
+          <Border Classes="stat"
                   IsVisible="{Binding RemindersText, Converter={x:Static ObjectConverters.IsNotNull}}">
             <StackPanel>
               <TextBlock Classes="stat-label" Text="Lembretes" />
               <TextBlock Classes="stat-value" Text="{Binding RemindersText}" />
             </StackPanel>
           </Border>
-        </Grid>
+        </UniformGrid>
 
         <Border Classes="card" Margin="0,0,0,16">
           <StackPanel Spacing="12">

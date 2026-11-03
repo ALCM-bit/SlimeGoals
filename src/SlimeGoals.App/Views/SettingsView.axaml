@@ -3,7 +3,7 @@
              xmlns:vm="using:SlimeGoals.App.ViewModels"
              x:Class="SlimeGoals.App.Views.SettingsView"
              x:DataType="vm:SettingsPageViewModel">
-  <DockPanel Margin="8,4,8,0">
+  <DockPanel Classes="page">
     <TextBlock DockPanel.Dock="Top" Classes="page-title" Text="{Binding Title}" Margin="0,0,0,16" />
 
     <Border DockPanel.Dock="Top" Classes="warning-band" Margin="0,0,0,12"
@@ -12,7 +12,7 @@
     </Border>
 
     <ScrollViewer>
-      <StackPanel Spacing="16" MaxWidth="640" HorizontalAlignment="Left" Margin="0,0,0,14">
+      <StackPanel Classes="settings-list" Spacing="16" Margin="0,0,0,14">
         <Border Classes="card" IsVisible="{Binding ShowGeneral}">
           <StackPanel Spacing="12">
             <TextBlock Classes="section-title" Text="Geral" />

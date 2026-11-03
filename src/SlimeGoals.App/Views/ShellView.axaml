@@ -1,27 +1,55 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:SlimeGoals.App.ViewModels"
+             xmlns:conv="using:SlimeGoals.App.Converters"
              x:Class="SlimeGoals.App.Views.ShellView"
              x:DataType="vm:ShellViewModel">
-  <!-- Layout bento v4: barra lateral de 220px + conteúdo, espaçamento de 14px -->
-  <Grid ColumnDefinitions="220,*" Margin="14" ColumnSpacing="14">
-    <Border Classes="panel" Padding="14,20">
-      <DockPanel>
-        <TextBlock DockPanel.Dock="Top" Text="SlimeGoals" FontSize="17" FontWeight="ExtraBold"
-                   Margin="12,0,0,18" />
-        <Button DockPanel.Dock="Bottom" Classes="ghost" Content="Sair" HorizontalAlignment="Stretch"
-                IsVisible="{Binding ShowQuit}" Command="{Binding QuitCommand}" ToolTip.Tip="Sair (Ctrl+Q)" />
-        <ListBox Classes="nav" ItemsSource="{Binding Pages}" SelectionMode="Single,AlwaysSelected"
-                 SelectedItem="{Binding CurrentPage, Mode=TwoWay}"
-                 AutomationProperties.Name="Navegação principal">
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="vm:PageViewModel">
-              <TextBlock Text="{Binding Title}" />
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
-      </DockPanel>
+  <!-- Largo (desktop): bento v4, barra lateral de 220px + conteúdo, espaçamento de 14px.
+       Estreito (classe compact, abaixo de 720px; ver code-behind): navegação inferior, sem barra lateral. -->
+  <DockPanel>
+    <Border DockPanel.Dock="Bottom" Classes="bottom-nav">
+      <ListBox Classes="bottom-nav" ItemsSource="{Binding Pages}" SelectionMode="Single,AlwaysSelected"
+               SelectedItem="{Binding CurrentPage, Mode=TwoWay}"
+               AutomationProperties.Name="Navegação principal">
+        <ListBox.ItemsPanel>
+          <ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate>
+        </ListBox.ItemsPanel>
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:PageViewModel">
+            <StackPanel Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
+              <Border Classes="nav-pill">
+                <Viewbox Width="22" Height="22">
+                  <Canvas Width="24" Height="24">
+                    <Path Classes="nav-icon" Data="{Binding IconKey, Converter={x:Static conv:NavIconConverter.Instance}}" />
+                  </Canvas>
+                </Viewbox>
+              </Border>
+              <TextBlock Classes="nav-label" Text="{Binding Title}" />
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
     </Border>
-    <ContentControl Grid.Column="1" Content="{Binding CurrentPage}" />
-  </Grid>
+
+    <DockPanel Classes="shell-body">
+      <Border DockPanel.Dock="Left" Classes="panel sidebar" Padding="14,20">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" Text="SlimeGoals" FontSize="17" FontWeight="ExtraBold"
+                     Margin="12,0,0,18" />
+          <Button DockPanel.Dock="Bottom" Classes="ghost" Content="Sair" HorizontalAlignment="Stretch"
+                  IsVisible="{Binding ShowQuit}" Command="{Binding QuitCommand}" ToolTip.Tip="Sair (Ctrl+Q)" />
+          <ListBox Classes="nav" ItemsSource="{Binding Pages}" SelectionMode="Single,AlwaysSelected"
+                   SelectedItem="{Binding CurrentPage, Mode=TwoWay}"
+                   AutomationProperties.Name="Navegação principal">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:PageViewModel">
+                <TextBlock Text="{Binding Title}" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </Border>
+      <ContentControl Content="{Binding CurrentPage}" />
+    </DockPanel>
+  </DockPanel>
 </UserControl>

@@ -16,6 +16,8 @@ public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider
 
     public override string Title => "Metas";
 
+    public override string IconKey => "NavGoals";
+
     public ObservableCollection<GoalItemViewModel> Goals { get; } = [];
 
     [ObservableProperty] public partial bool ShowArchived { get; set; }

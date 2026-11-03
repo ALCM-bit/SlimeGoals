@@ -26,6 +26,8 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
 
     public override string Title => "Configurações";
 
+    public override string IconKey => "NavSettings";
+
     /// <summary>Seção "Geral" (início com o sistema).</summary>
     public bool ShowGeneral => _capabilities.Autostart;
 

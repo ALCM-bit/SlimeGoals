@@ -3,11 +3,11 @@
              xmlns:vm="using:SlimeGoals.App.ViewModels"
              x:Class="SlimeGoals.App.Views.TodayView"
              x:DataType="vm:TodayPageViewModel">
-  <DockPanel Margin="8,4,8,0">
+  <DockPanel Classes="page">
     <TextBlock DockPanel.Dock="Top" Classes="page-title" Text="{Binding Title}" Margin="0,0,0,16" />
 
     <!-- Resumo da semana (spec §7) -->
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,*,*" ColumnSpacing="12" Margin="0,0,0,16">
+    <UniformGrid DockPanel.Dock="Top" Classes="tiles" Margin="0,0,0,16">
       <Border Classes="stat">
         <StackPanel>
           <TextBlock Classes="stat-label" Text="Progresso da semana" />
@@ -17,19 +17,19 @@
           </StackPanel>
         </StackPanel>
       </Border>
-      <Border Grid.Column="1" Classes="stat">
+      <Border Classes="stat">
         <StackPanel>
           <TextBlock Classes="stat-label" Text="Em andamento" />
           <TextBlock Classes="stat-value" Text="{Binding InProgress}" />
         </StackPanel>
       </Border>
-      <Border Grid.Column="2" Classes="stat">
+      <Border Classes="stat">
         <StackPanel>
           <TextBlock Classes="stat-label" Text="Concluídas hoje" />
           <TextBlock Classes="stat-value" Text="{Binding Completed}" />
         </StackPanel>
       </Border>
-      <Border Grid.Column="3" Classes="stat">
+      <Border Classes="stat">
         <StackPanel>
           <TextBlock Classes="stat-label" Text="Sequência" />
           <StackPanel Orientation="Horizontal" Spacing="4">
@@ -41,7 +41,7 @@
                      IsVisible="{Binding StreakGoal, Converter={x:Static ObjectConverters.IsNotNull}}" />
         </StackPanel>
       </Border>
-    </Grid>
+    </UniformGrid>
 
     <Border DockPanel.Dock="Top" Classes="warning-band" Margin="0,0,0,12"
             IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}">

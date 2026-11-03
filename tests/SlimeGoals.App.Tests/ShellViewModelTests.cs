@@ -47,6 +47,12 @@ public class ShellViewModelTests
     }
 
     [Fact]
+    public void Pages_have_bottom_nav_icon_keys()
+    {
+        Create().Pages.Select(p => p.IconKey).Should().Equal("NavToday", "NavGoals", "NavReports", "NavSettings");
+    }
+
+    [Fact]
     public void Navigate_changes_current_page_and_notifies()
     {
         var shell = Create();
