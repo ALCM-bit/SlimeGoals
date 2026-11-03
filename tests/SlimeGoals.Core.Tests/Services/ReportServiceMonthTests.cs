@@ -162,4 +162,35 @@ public class ReportServiceMonthTests
         top!.Goal.Id.Should().Be(weekly.Id);
         top.Length.Should().Be(2);
     }
+
+    [Fact]
+    public async Task Top_streak_ignores_goals_whose_end_date_has_passed()
+    {
+        var ended = await Create("Encerrada", createdOn: D(10, 1));
+        await RecordRange(ended, D(10, 1), D(11, 3)); // 34 dias até ontem
+        await _goals.UpdateAsync(ended with { EndDate = Tue });
+
+        (await Service.GetTopStreakAsync()).Should().BeNull();
+
+        var other = await Create("Outra", createdOn: D(10, 1));
+        await RecordRange(other, D(10, 30), D(11, 3)); // 5 dias
+
+        var top = await Service.GetTopStreakAsync();
+
+        top.Should().NotBeNull();
+        top!.Goal.Id.Should().Be(other.Id);
+    }
+
+    [Fact]
+    public async Task Top_streak_tie_goes_to_the_older_goal()
+    {
+        var newer = await Create("Diária", createdOn: D(10, 5));
+        await RecordRange(newer, D(10, 28), D(11, 3)); // 7 dias
+        var older = await Create("Semanal", Recurrence.Weekly, createdOn: D(10, 3));
+        await Record(older, D(10, 28), 1); // 1 semana (26/10) = 7 dias
+
+        var top = await Service.GetTopStreakAsync();
+
+        top!.Goal.Id.Should().Be(older.Id);
+    }
 }

@@ -108,12 +108,14 @@ public sealed class ReportService(IGoalRepository goals, ICheckinRepository chec
         return new MonthReport(year, month, range, weeks, rows, overall);
     }
 
-    /// <summary>Meta ativa com a maior sequência atual (semana vale 7 dias); null se nenhuma tem sequência.</summary>
+    /// <summary>Meta ativa (não arquivada e ainda no período) com a maior sequência atual (semana vale 7 dias); null se nenhuma tem sequência.</summary>
     public async Task<StreakHighlight?> GetTopStreakAsync(CancellationToken ct = default)
     {
         var zone = time.LocalTimeZone;
         var today = DateOnly.FromDateTime(time.GetLocalNow().DateTime);
-        var active = (await goals.ListAsync(includeArchived: false, ct)).OrderBy(g => g.CreatedAt).ToList();
+        var active = (await goals.ListAsync(includeArchived: false, ct))
+            .Where(g => g.EndDate is not { } end || end >= today)
+            .OrderBy(g => g.CreatedAt).ToList();
         if (active.Count == 0)
             return null;
 
