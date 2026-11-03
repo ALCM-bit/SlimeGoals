@@ -5,7 +5,7 @@ Ferramenta de desenvolvimento que renderiza as telas do app sem janela (Avalonia
 ## Uso
 
 ```
-dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all]
+dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot]
 ```
 
 Sem o segundo argumento, vale `all`. Grava um PNG por tela e tamanho, sempre o `ShellView` inteiro:
@@ -13,6 +13,8 @@ Sem o segundo argumento, vale `all`. Grava um PNG por tela e tamanho, sempre o `
 - `today-<tamanho>.png`, `goals-<tamanho>.png`, `goal-edit-<tamanho>.png`, `goal-edit-end-<tamanho>.png` (o formulário rolado até o fim),
   `reports-week-<tamanho>.png`, `reports-month-<tamanho>.png`, `settings-<tamanho>.png`;
 - `<tamanho>` é `phone` (412×915) ou `desktop` (1100×720).
+
+O modo `mascot` grava só `mascot.png`: as quatro poses do slime (dormindo, parado, feliz, comemorando), lado a lado em 160×160 sobre o `HeroBrush`, com o nome acessível embaixo. O quadro mostra o instante zero das animações.
 
 ## Dados
 
