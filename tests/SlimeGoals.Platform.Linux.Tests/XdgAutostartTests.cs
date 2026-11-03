@@ -28,7 +28,7 @@ public sealed class XdgAutostartTests : IDisposable
 
     [Fact]
     public void QuoteExec_escapes_special_characters() =>
-        XdgAutostart.QuoteExec("a\"b$c`d\\e").Should().Be("\"a\\\"b\\$c\\`d\\\\e\"");
+        XdgAutostart.QuoteExec("a\"b$c`d\\e%f").Should().Be("\"a\\\\\"b\\\\$c\\\\`d\\\\\\\\e%%f\"");
 
     [Fact]
     public void Disable_removes_entry_and_is_idempotent()
@@ -56,5 +56,18 @@ public sealed class XdgAutostartTests : IDisposable
         sut.Enable();
         sut.IsEnabled().Should().BeTrue();
         File.ReadAllText(EntryPath).Should().NotContain(line);
+    }
+
+    [Fact]
+    public void Entry_pointing_to_another_executable_counts_as_disabled_and_enable_rewrites_it()
+    {
+        new XdgAutostart(Dir, "/velho/slimegoals").Enable();
+        var sut = new XdgAutostart(Dir, "/novo/slimegoals");
+
+        sut.IsEnabled().Should().BeFalse();
+        sut.Enable();
+        sut.IsEnabled().Should().BeTrue();
+        File.ReadAllText(EntryPath).Should().Contain("Exec=\"/novo/slimegoals\" --background\n")
+            .And.NotContain("/velho/");
     }
 }

@@ -33,12 +33,10 @@ internal static class Program
             guard = SingleInstanceGuard.TryAcquire(runtime, key);
             if (guard is null)
             {
-                // Autostart duplicado: sai sem pedir a janela.
-                if (options.Background)
+                // Autostart não pede a janela; nos demais casos, se a outra respondeu, ela mostra a janela e saímos.
+                if (!options.Background && SingleInstanceGuard.SignalExisting(runtime, key))
                     return;
-                if (SingleInstanceGuard.SignalExisting(runtime, key))
-                    return;
-                // Trava presa sem resposta: a outra está encerrando (ou travou). Espera um pouco para assumir.
+                // Trava presa (ou autostart logo após um logout) sem resposta: a outra está encerrando (ou travou). Espera um pouco para assumir.
                 guard = SingleInstanceGuard.WaitToAcquire(runtime, key, AcquireRetryTimeout, AcquireRetryInterval);
                 if (guard is null)
                 {
