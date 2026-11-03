@@ -112,11 +112,11 @@
                     </Border>
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
-                      <StackPanel Orientation="Horizontal" Spacing="8">
+                      <DockPanel LastChildFill="True">
+                        <TextBlock DockPanel.Dock="Right" Text="concluída" Foreground="{DynamicResource Success}" FontSize="12"
+                                   Margin="8,0,0,0" VerticalAlignment="Center" IsVisible="{Binding IsMet}" />
                         <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Text="concluída" Foreground="{DynamicResource Success}" FontSize="12"
-                                   VerticalAlignment="Center" IsVisible="{Binding IsMet}" />
-                      </StackPanel>
+                      </DockPanel>
                       <TextBlock Text="{Binding ProgressText}" Foreground="{DynamicResource Muted}" FontSize="13" />
                       <ProgressBar Classes="goal" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
                     </StackPanel>

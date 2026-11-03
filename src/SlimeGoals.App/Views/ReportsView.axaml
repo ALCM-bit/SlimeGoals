@@ -134,12 +134,12 @@
                     </Viewbox>
                   </Border>
                   <StackPanel Grid.Column="1" Spacing="6">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                      <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                      <Border Classes="tag" IsVisible="{Binding IsArchived}">
+                    <DockPanel LastChildFill="True">
+                      <Border DockPanel.Dock="Right" Classes="tag" Margin="8,0,0,0" IsVisible="{Binding IsArchived}">
                         <TextBlock Text="Arquivada" />
                       </Border>
-                    </StackPanel>
+                      <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    </DockPanel>
                     <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource Muted}" FontSize="13" TextWrapping="Wrap" />
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                       <ProgressBar Classes="goal" Minimum="0" Maximum="1" Value="{Binding PercentFraction}"

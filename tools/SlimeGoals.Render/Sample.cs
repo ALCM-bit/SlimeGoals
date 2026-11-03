@@ -75,7 +75,7 @@ public sealed class Sample : IDisposable
             180, from, until, WeekDays.All, null, null, Measure.Duration));
         var workout = await goals.CreateAsync(new GoalDraft("Treino", Recurrence.Weekly, 300, "workout", GoalColor.Green,
             180, from, until, WeekDays.All, null, null, Measure.Duration));
-        var english = await goals.CreateAsync(new GoalDraft("Aula de inglês", Recurrence.Weekly, 1, "language", GoalColor.Amber,
+        var english = await goals.CreateAsync(new GoalDraft("Aula de inglês com a professora particular às terças", Recurrence.Weekly, 1, "language", GoalColor.Amber,
             180, from, until, WeekDays.All, null, null, Measure.Completion));
 
         var now = DateTimeOffset.Now;
