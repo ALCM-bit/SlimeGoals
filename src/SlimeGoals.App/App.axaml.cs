@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SlimeGoals.App.Hosting;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.App.Views;
+using SlimeGoals.Core.Services;
 
 namespace SlimeGoals.App;
 
@@ -31,8 +32,18 @@ public partial class App(IServiceProvider services) : Application
         {
             // Fechar a janela só a oculta: o processo segue para os lembretes até o "Sair" (Shutdown).
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            var window = new MainWindow { DataContext = shell };
-            desktop.MainWindow = window;
+            var lifetime = services.GetService<DesktopAppLifetime>();
+            var closeBehavior = services.GetService<WindowCloseBehavior>();
+            var window = new MainWindow
+            {
+                DataContext = shell,
+                QuitOnClose = () => closeBehavior?.Current == CloseAction.Quit,
+                Quit = () => lifetime?.Quit(),
+            };
+            // Em segundo plano a janela não vai para desktop.MainWindow (que a abriria sozinha):
+            // o MainWindowActivator a mostra no primeiro pedido.
+            if (services.GetService<AppStartOptions>() is not { Background: true })
+                desktop.MainWindow = window;
             desktop.ShutdownRequested += (_, e) =>
             {
                 if (!e.Cancel)
@@ -40,7 +51,7 @@ public partial class App(IServiceProvider services) : Application
             };
             if (services.GetService<MainWindowActivator>() is { } activator)
                 activator.Window = window;
-            if (services.GetService<DesktopAppLifetime>() is { } lifetime)
+            if (lifetime is not null)
                 lifetime.Desktop = desktop;
             desktop.Exit += (_, _) => StopAll(hosted);
             CreateTrayIcon();

@@ -14,7 +14,7 @@ namespace SlimeGoals.Desktop;
 /// <summary>Raiz de composição do head Linux: único lugar que conhece todas as camadas (spec §5).</summary>
 internal static class CompositionRoot
 {
-    public static ServiceProvider Build(string databasePath)
+    public static ServiceProvider Build(string databasePath, AppStartOptions options)
     {
         var services = new ServiceCollection();
 
@@ -24,6 +24,7 @@ internal static class CompositionRoot
         services.AddSingleton<GoalService>();
         services.AddSingleton<CheckinService>();
         services.AddSingleton<TimerService>();
+        services.AddSingleton<AppSettings>();
         services.AddSingleton<ProgressService>();
         services.AddSingleton<ReportService>();
         services.AddSingleton<ReminderPause>();
@@ -42,6 +43,9 @@ internal static class CompositionRoot
         services.AddSingleton<IWindowActivator>(sp => sp.GetRequiredService<MainWindowActivator>());
         services.AddSingleton<DesktopAppLifetime>();
         services.AddSingleton<IAppLifetime>(sp => sp.GetRequiredService<DesktopAppLifetime>());
+        services.AddSingleton(options);
+        services.AddSingleton<WindowCloseBehavior>();
+        services.AddSingleton<IAppHostedService>(sp => sp.GetRequiredService<WindowCloseBehavior>());
         services.AddSingleton<IAppHostedService, ReminderHost>();
         services.AddSingleton<ISleepSignalSource, LogindSleepSignalSource>();
         services.AddSingleton<SleepResumeWatcher>();

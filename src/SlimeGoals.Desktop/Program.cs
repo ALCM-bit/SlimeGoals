@@ -18,6 +18,7 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        var options = AppStartOptions.Parse(args);
         InputMethodEnvironment.Apply(Environment.GetEnvironmentVariable, Environment.SetEnvironmentVariable);
 
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -32,6 +33,9 @@ internal static class Program
             guard = SingleInstanceGuard.TryAcquire(runtime, key);
             if (guard is null)
             {
+                // Autostart duplicado: sai sem pedir a janela.
+                if (options.Background)
+                    return;
                 if (SingleInstanceGuard.SignalExisting(runtime, key))
                     return;
                 // Trava presa sem resposta: a outra está encerrando (ou travou). Espera um pouco para assumir.
@@ -52,7 +56,7 @@ internal static class Program
 
         using (guard)
         {
-            using var services = CompositionRoot.Build(databasePath);
+            using var services = CompositionRoot.Build(databasePath, options);
             using (var connection = services.GetRequiredService<SqliteConnectionFactory>().Open())
                 MigrationRunner.Migrate(connection);
 
