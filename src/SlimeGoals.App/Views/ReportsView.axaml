@@ -57,7 +57,7 @@
         <Border Classes="card" Margin="0,0,0,16">
           <StackPanel Spacing="12">
             <TextBlock Classes="section-title" Text="{Binding BarsTitle}" />
-            <ItemsControl ItemsSource="{Binding Bars}" Height="150">
+            <ItemsControl ItemsSource="{Binding Bars}" Height="170">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                   <UniformGrid Rows="1" />
