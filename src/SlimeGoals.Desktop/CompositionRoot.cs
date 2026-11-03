@@ -6,6 +6,7 @@ using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Infrastructure;
 using SlimeGoals.Platform.Linux.Notifications;
+using SlimeGoals.Platform.Linux.Power;
 using SlimeGoals.Platform.Linux.Scheduling;
 
 namespace SlimeGoals.Desktop;
@@ -42,6 +43,9 @@ internal static class CompositionRoot
         services.AddSingleton<DesktopAppLifetime>();
         services.AddSingleton<IAppLifetime>(sp => sp.GetRequiredService<DesktopAppLifetime>());
         services.AddSingleton<IAppHostedService, ReminderHost>();
+        services.AddSingleton<ISleepSignalSource, LogindSleepSignalSource>();
+        services.AddSingleton<SleepResumeWatcher>();
+        services.AddSingleton<IAppHostedService, SleepResumeHost>();
 
         // UI — ordem de registro = ordem na navegação (spec §7)
         services.AddSingleton<PageViewModel, TodayPageViewModel>();
