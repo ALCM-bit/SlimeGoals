@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using Avalonia;
 using SlimeGoals.App.ViewModels;
@@ -17,19 +18,25 @@ public partial class ShellView : UserControl
     }
 
     private TopLevel? _topLevel;
+    private bool _backSubscribed;
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
         _topLevel = TopLevel.GetTopLevel(this);
-        if (_topLevel is not null)
+        // Só no Android: no desktop Alt+Left / botão Voltar do mouse descartariam o formulário em edição.
+        if (_topLevel is not null && Application.Current?.ApplicationLifetime is IActivityApplicationLifetime)
+        {
             _topLevel.BackRequested += OnBackRequested;
+            _backSubscribed = true;
+        }
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        if (_topLevel is not null)
+        if (_topLevel is not null && _backSubscribed)
             _topLevel.BackRequested -= OnBackRequested;
+        _backSubscribed = false;
         _topLevel = null;
         base.OnDetachedFromVisualTree(e);
     }
