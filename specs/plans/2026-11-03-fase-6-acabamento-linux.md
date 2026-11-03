@@ -45,7 +45,7 @@
    - `reminders.snooze_minutes`: opções 5, 10, 15, 30 e 60 min; padrão 10. Valor ausente ou inválido vale 10.
    - `window.close_action`: `"hide"` (padrão) ou `"quit"`.
    - Mudar qualquer configuração vale na hora, sem reiniciar.
-   - O adiar novo vale para as próximas respostas "Adiar". Um adiar já respondido continua contando a duração que estava valendo quando foi respondido.
+   - O adiar novo vale na hora, inclusive para um adiar já respondido e ainda não disparado: mudar de 10 para 30 min às 10:05 leva o disparo de 10:10 para 10:30. Guardar a duração de cada adiar exigiria migrar o `reminder_log` só para esse caso raro (decisão revista na execução).
 2. **Iniciar com o sistema:**
    - a fonte da verdade é o arquivo `~/.config/autostart/slimegoals.desktop` (ou `$XDG_CONFIG_HOME/autostart`), não a tabela `settings`;
    - ligar grava o arquivo com o caminho do executável atual (`Environment.ProcessPath`) e `--background`; desligar apaga o arquivo;
