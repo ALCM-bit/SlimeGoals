@@ -13,11 +13,8 @@ public sealed record UpcomingReminder(Goal Goal, DateTimeOffset At);
 /// </summary>
 public sealed class ReminderService(IGoalRepository goals, ICheckinRepository checkins, ITimerRepository timers,
     IReminderLogRepository log, INotificationService notifications, IReminderFormatter formatter, TimeProvider time,
-    ReminderPause? pause = null)
+    ReminderPause? pause = null, AppSettings? settings = null)
 {
-    /// <summary>Adiar fixo em 10 min; a configuração vem na Fase 6.</summary>
-    public const int SnoozeMinutes = 10;
-
     /// <summary>Retira pendentes que não valem mais, dispara os devidos (Next ≤ agora) e devolve o próximo disparo.</summary>
     public async Task<DateTimeOffset?> SyncAsync(CancellationToken ct = default)
     {
@@ -118,7 +115,7 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
     }
 
     private DateTimeOffset? NextFor(Goal goal, Snapshot s, DateTimeOffset now) =>
-        ReminderPlanner.Next(goal, s.StateOf(goal), SnoozeMinutes, now, s.Zone);
+        ReminderPlanner.Next(goal, s.StateOf(goal), s.SnoozeMinutes, now, s.Zone);
 
     private async Task<Snapshot> LoadAsync(DateTimeOffset now, CancellationToken ct)
     {
@@ -133,22 +130,24 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
         var fires = (await log.ListAsync(from, to, ct)).ToList();
         var timer = await timers.GetAsync(ct);
         var pauseState = pause is null ? new PauseState(false, null) : await pause.GetAsync(ct);
+        var snooze = settings is null ? AppSettings.DefaultSnoozeMinutes : await settings.GetSnoozeMinutesAsync(ct);
 
         var byGoalAndDay = weekCheckins
             .GroupBy(c => (c.GoalId, Day: DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(c.DoneAt, zone).DateTime)))
             .ToDictionary(g => g.Key, g => g.Sum(c => c.Amount));
 
         return new Snapshot(active, zone, today, todayStart, tomorrowStart, byGoalAndDay, weekCheckins, fires, timer?.GoalId,
-            pauseState);
+            pauseState, snooze);
     }
 
     /// <summary>Fatos da semana local levantados de uma vez; <see cref="Fires"/> cresce conforme se dispara.</summary>
     private sealed class Snapshot(IReadOnlyList<Goal> goals, TimeZoneInfo zone, DateOnly today,
         DateTimeOffset todayStart, DateTimeOffset tomorrowStart,
         Dictionary<(Guid GoalId, DateOnly Day), int> sums, IReadOnlyList<Checkin> weekCheckins,
-        List<ReminderLogEntry> fires, Guid? timerGoalId, PauseState pauseState)
+        List<ReminderLogEntry> fires, Guid? timerGoalId, PauseState pauseState, int snoozeMinutes)
     {
         public bool Paused => pauseState.IsPaused;
+        public int SnoozeMinutes => snoozeMinutes;
         public IReadOnlyList<Goal> Goals { get; } = goals;
         public TimeZoneInfo Zone { get; } = zone;
         public DateTimeOffset TodayStart => todayStart;

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=SlimeGoals
+GenericName=Metas e lembretes
+Comment=Hábitos e metas com lembretes
+Exec=@EXEC@
+Icon=slimegoals
+Terminal=false
+Categories=Utility;
+Keywords=metas;hábitos;lembretes;
+StartupWMClass=slimegoals
+StartupNotify=true

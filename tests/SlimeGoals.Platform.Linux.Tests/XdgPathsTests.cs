@@ -18,6 +18,15 @@ public class XdgPathsTests
             .Should().Be("/home/u/.local/share/SlimeGoals/slimegoals.db");
 
     [Fact]
+    public void AutostartDirectory_uses_xdg_config_home_or_default()
+    {
+        XdgPaths.AutostartDirectory(v => v == "XDG_CONFIG_HOME" ? "/x/cfg" : null, "/home/u")
+            .Should().Be("/x/cfg/autostart");
+        XdgPaths.AutostartDirectory(_ => null, "/home/u").Should().Be("/home/u/.config/autostart");
+        XdgPaths.AutostartDirectory(_ => "", "/home/u").Should().Be("/home/u/.config/autostart");
+    }
+
+    [Fact]
     public void Runtime_directory_uses_xdg_runtime_dir_when_set() =>
         XdgPaths.RuntimeDirectory(v => v == "XDG_RUNTIME_DIR" ? "/run/user/1000" : null, "ana", "/tmp")
             .Should().Be("/run/user/1000");

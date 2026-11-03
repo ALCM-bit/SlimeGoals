@@ -78,6 +78,22 @@ Para testar sem tocar nos seus dados, aponte para outra pasta:
 XDG_DATA_HOME=/tmp/slimegoals-dev dotnet run --project src/SlimeGoals.Desktop
 ```
 
+## Instalar no Linux
+
+O pacote é um `.tar.gz` *self-contained* (não precisa do .NET instalado) para linux-x64. A instalação é só no seu usuário, sem root.
+
+```bash
+# gerar o pacote (ou baixar o .tar.gz pronto)
+bash packaging/linux/build.sh
+tar -xzf artifacts/slimegoals-0.6.0-linux-x64.tar.gz
+cd slimegoals-0.6.0
+./install.sh
+```
+
+Isso instala o app em `~/.local/opt/slimegoals/`, o link em `~/.local/bin/slimegoals`, o atalho em `~/.local/share/applications/slimegoals.desktop` e os ícones em `~/.local/share/icons/hicolor/`. Rodar `./install.sh` de novo substitui a versão instalada.
+
+Para desinstalar, rode `./uninstall.sh` de dentro da pasta extraída. Ele não apaga seus dados: o banco de dados fica em `~/.local/share/SlimeGoals`. A entrada de "iniciar com o sistema" (`~/.config/autostart/slimegoals.desktop`) também fica; apague-a à mão se quiser.
+
 ## Documentação
 
 - [Especificação (v1.3)](specs/Planejamento_v3.md): requisitos, modelo de dados, regras de lembrete e design system

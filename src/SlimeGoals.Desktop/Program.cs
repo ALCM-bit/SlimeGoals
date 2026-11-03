@@ -18,6 +18,7 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        var options = AppStartOptions.Parse(args);
         InputMethodEnvironment.Apply(Environment.GetEnvironmentVariable, Environment.SetEnvironmentVariable);
 
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -32,9 +33,10 @@ internal static class Program
             guard = SingleInstanceGuard.TryAcquire(runtime, key);
             if (guard is null)
             {
-                if (SingleInstanceGuard.SignalExisting(runtime, key))
+                // Autostart não pede a janela; nos demais casos, se a outra respondeu, ela mostra a janela e saímos.
+                if (!options.Background && SingleInstanceGuard.SignalExisting(runtime, key))
                     return;
-                // Trava presa sem resposta: a outra está encerrando (ou travou). Espera um pouco para assumir.
+                // Trava presa (ou autostart logo após um logout) sem resposta: a outra está encerrando (ou travou). Espera um pouco para assumir.
                 guard = SingleInstanceGuard.WaitToAcquire(runtime, key, AcquireRetryTimeout, AcquireRetryInterval);
                 if (guard is null)
                 {
@@ -52,7 +54,7 @@ internal static class Program
 
         using (guard)
         {
-            using var services = CompositionRoot.Build(databasePath);
+            using var services = CompositionRoot.Build(databasePath, home, options);
             using (var connection = services.GetRequiredService<SqliteConnectionFactory>().Open())
                 MigrationRunner.Migrate(connection);
 
@@ -79,6 +81,7 @@ internal static class Program
     private static AppBuilder BuildAvaloniaApp(IServiceProvider services, SingleInstanceGuard? guard)
         => AppBuilder.Configure(() => new SlimeGoals.App.App(services))
             .UsePlatformDetect()
+            .With(new X11PlatformOptions { WmClass = "slimegoals" })
             .LogToTrace()
             .AfterSetup(builder => StopListeningOnExit(builder, guard));
 

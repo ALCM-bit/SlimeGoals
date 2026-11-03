@@ -9,6 +9,8 @@ namespace SlimeGoals.App.Tests;
 
 public class ShellViewModelTests
 {
+    internal static SettingsPageViewModel Settings() => new(new AppSettings(new InMemorySettingsRepository()));
+
     private static GoalsPageViewModel Goals()
     {
         var time = new FakeTimeProvider();
@@ -34,7 +36,7 @@ public class ShellViewModelTests
     }
 
     private static ShellViewModel Create() => new(new PageViewModel[]
-        { Today(), Goals(), Reports(), new SettingsPageViewModel() });
+        { Today(), Goals(), Reports(), ShellViewModelTests.Settings() });
 
     [Fact]
     public void Pages_follow_spec_order_and_start_on_today()
@@ -61,7 +63,7 @@ public class ShellViewModelNullSelectionTests
     [Fact]
     public void Setting_current_page_to_null_keeps_previous_page()
     {
-        var shell = new ShellViewModel([ShellViewModelTests.Today(), new SettingsPageViewModel()]);
+        var shell = new ShellViewModel([ShellViewModelTests.Today(), ShellViewModelTests.Settings()]);
         shell.CurrentPage = shell.Pages[1];
 
         shell.CurrentPage = null!;
@@ -124,7 +126,7 @@ public class ShellViewModelQuitTests
     public void Quit_command_calls_lifetime()
     {
         var lifetime = new FakeLifetime();
-        var shell = new ShellViewModel([new SettingsPageViewModel()], lifetime);
+        var shell = new ShellViewModel([ShellViewModelTests.Settings()], lifetime);
 
         shell.QuitCommand.CanExecute(null).Should().BeTrue();
         shell.QuitCommand.Execute(null);
@@ -135,7 +137,7 @@ public class ShellViewModelQuitTests
     [Fact]
     public void Quit_without_lifetime_cannot_execute()
     {
-        var shell = new ShellViewModel([new SettingsPageViewModel()]);
+        var shell = new ShellViewModel([ShellViewModelTests.Settings()]);
 
         shell.QuitCommand.CanExecute(null).Should().BeFalse();
     }

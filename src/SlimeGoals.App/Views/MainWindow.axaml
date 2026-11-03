@@ -4,7 +4,7 @@
         xmlns:vm="using:SlimeGoals.App.ViewModels"
         x:Class="SlimeGoals.App.Views.MainWindow"
         x:DataType="vm:ShellViewModel"
-        Title="SlimeGoals" Width="1100" Height="720" MinWidth="900" MinHeight="600">
+        Title="SlimeGoals" Icon="avares://SlimeGoals.App/Assets/icon-256.png" Width="1100" Height="720" MinWidth="900" MinHeight="600">
   <Window.KeyBindings>
     <KeyBinding Gesture="Ctrl+Q" Command="{Binding QuitCommand}" />
   </Window.KeyBindings>
