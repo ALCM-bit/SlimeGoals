@@ -32,6 +32,30 @@ public class ReportFormattingTests
     }
 
     [Fact]
+    public void Day_entry_shows_day_value_against_target_for_daily_and_contribution_for_weekly()
+    {
+        ReportFormatting.DayEntry(new DayGoalEntry(NewGoal(), 8, true)).Should().Be("8 de 8 copos");
+        ReportFormatting.DayEntry(new DayGoalEntry(NewGoal(measure: Measure.Duration, target: 30, unit: null), 40, true))
+            .Should().Be("40 min de 30 min");
+        ReportFormatting.DayEntry(new DayGoalEntry(NewGoal(measure: Measure.Completion, target: 1, unit: null), 1, true))
+            .Should().Be("Feito");
+        ReportFormatting.DayEntry(new DayGoalEntry(NewGoal(Recurrence.Weekly, Measure.Duration, 300, null), 45, null))
+            .Should().Be("45 min");
+        ReportFormatting.DayEntry(new DayGoalEntry(NewGoal(Recurrence.Weekly, target: 20), 1, null))
+            .Should().Be("1 copos");
+        ReportFormatting.DayEntry(new DayGoalEntry(NewGoal(Recurrence.Weekly, target: 20, unit: "vezes"), 1, null))
+            .Should().Be("1 vez");
+    }
+
+    [Fact]
+    public void Detail_titles()
+    {
+        ReportFormatting.DayTitle(new DateOnly(2026, 11, 2)).Should().Be("Segunda, 2 nov");
+        ReportFormatting.DayTitle(new DateOnly(2026, 11, 8)).Should().Be("Domingo, 8 nov");
+        ReportFormatting.WeekOf(new DateOnly(2026, 10, 26)).Should().Be("Semana de 26 out");
+    }
+
+    [Fact]
     public void Month_texts()
     {
         ReportFormatting.MonthTitle(2026, 11).Should().Be("Novembro de 2026");

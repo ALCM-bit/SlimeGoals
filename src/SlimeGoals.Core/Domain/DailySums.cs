@@ -29,5 +29,8 @@ public sealed class DailySums
 
     /// <summary>Registros com Amount &gt; 0 no dia, somando as metas dadas.</summary>
     public int PositiveCountOn(DateOnly day, IReadOnlySet<Guid> goalIds) =>
-        goalIds.Sum(id => _positives.GetValueOrDefault((id, day)));
+        goalIds.Sum(id => PositiveCountOn(id, day));
+
+    /// <summary>Registros com Amount &gt; 0 da meta no dia.</summary>
+    public int PositiveCountOn(Guid goalId, DateOnly day) => _positives.GetValueOrDefault((goalId, day));
 }

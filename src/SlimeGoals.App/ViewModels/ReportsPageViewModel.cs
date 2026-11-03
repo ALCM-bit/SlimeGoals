@@ -61,6 +61,11 @@ public sealed partial class ReportsPageViewModel(ReportService reports, TimeProv
 
     public ObservableCollection<BarViewModel> Bars { get; } = [];
 
+    /// <summary>Barra cujo detalhe aparece embaixo do gráfico. Ao abrir um período, a de hoje (ou da semana atual).</summary>
+    [ObservableProperty] public partial BarViewModel? SelectedBar { get; set; }
+
+    private int? _selectedIndex;
+
     public ObservableCollection<ReportRowViewModel> Rows { get; } = [];
 
     public bool IsEmpty => Rows.Count == 0;
@@ -89,6 +94,7 @@ public sealed partial class ReportsPageViewModel(ReportService reports, TimeProv
     {
         _weekStart = null;
         _month = null;
+        _selectedIndex = null;
         NextCommand.NotifyCanExecuteChanged();
     }
 
@@ -114,8 +120,29 @@ public sealed partial class ReportsPageViewModel(ReportService reports, TimeProv
             var moved = new DateOnly(year, month, 1).AddMonths(step);
             _month = (moved.Year, moved.Month);
         }
+        _selectedIndex = null;
         NextCommand.NotifyCanExecuteChanged();
         return LoadCommand.ExecuteAsync(null);
+    }
+
+    [RelayCommand]
+    private void SelectBar(BarViewModel? bar)
+    {
+        if (bar is null || !Bars.Contains(bar))
+            return;
+        _selectedIndex = Bars.IndexOf(bar);
+        ApplySelection();
+    }
+
+    /// <summary>
+    /// Mantém a barra escolhida na recarga do mesmo período; num período novo (ou sem escolha), seleciona a atual.
+    /// </summary>
+    private void ApplySelection()
+    {
+        var index = _selectedIndex is { } i && i < Bars.Count ? i : Bars.ToList().FindIndex(b => b.IsCurrent);
+        for (var k = 0; k < Bars.Count; k++)
+            Bars[k].IsSelected = k == index;
+        SelectedBar = index >= 0 ? Bars[index] : null;
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
@@ -170,7 +197,11 @@ public sealed partial class ReportsPageViewModel(ReportService reports, TimeProv
         Bars.Clear();
         foreach (var day in report.Days)
             Bars.Add(new BarViewModel(WeekLabels[((int)day.Day.DayOfWeek + 6) % 7],
-                day.Records.ToString(CultureInfo.InvariantCulture), (double)day.Records / max, day.Day == today));
+                day.Records.ToString(CultureInfo.InvariantCulture), (double)day.Records / max, day.Day == today,
+                ReportFormatting.DayTitle(day.Day),
+                day.Goals.Select(e => Detail(e.Goal, ReportFormatting.DayEntry(e), e.Met == true)).ToList(),
+                "Nenhum registro neste dia."));
+        ApplySelection();
 
         Rows.Clear();
         foreach (var row in report.Goals)
@@ -188,15 +219,28 @@ public sealed partial class ReportsPageViewModel(ReportService reports, TimeProv
         BarsTitle = "Evolução por semana";
 
         Bars.Clear();
-        foreach (var week in report.Weeks)
+        for (var i = 0; i < report.Weeks.Count; i++)
+        {
+            var week = report.Weeks[i];
+            var index = i;
+            var details = report.Goals
+                .Where(r => r.WeekPercents[index] is not null)
+                .Select(r => Detail(r.Goal, ReportFormatting.Percent(r.WeekPercents[index]), r.WeekPercents[index] >= 100))
+                .ToList();
             Bars.Add(new BarViewModel(ReportFormatting.DayMonth(week.Monday), ReportFormatting.Percent(week.Percent),
-                (week.Percent ?? 0) / 100.0, week.Monday == currentWeek));
+                (week.Percent ?? 0) / 100.0, week.Monday == currentWeek, ReportFormatting.WeekOf(week.Monday), details,
+                "Nenhuma meta nesta semana."));
+        }
+        ApplySelection();
 
         Rows.Clear();
         foreach (var row in report.Goals)
             Rows.Add(NewRow(row.Goal, ReportFormatting.MonthDetail(row), row.Percent, ReportFormatting.Streak(row)));
         NextCommand.NotifyCanExecuteChanged();
     }
+
+    private static BarDetailViewModel Detail(Goal goal, string value, bool met) =>
+        new(goal.Title, goal.Icon, goal.Color, value, met);
 
     private static ReportRowViewModel NewRow(Goal goal, string detail, int? percent, string? extra) =>
         new(goal.Title, goal.Icon, goal.Color, detail, ReportFormatting.Percent(percent), (percent ?? 0) / 100.0,

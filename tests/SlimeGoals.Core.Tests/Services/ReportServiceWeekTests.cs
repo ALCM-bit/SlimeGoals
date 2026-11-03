@@ -138,6 +138,27 @@ public class ReportServiceWeekTests
     }
 
     [Fact]
+    public async Task Day_bars_list_the_goals_that_compose_them()
+    {
+        var water = await Create("Água", target: 2);
+        var gym = await Create("Treino", Recurrence.Weekly, target: 300, measure: Measure.Duration);
+        var fixedOnly = await Create("Corrigida");
+        await Record(water, Mon, 1);
+        await Record(water, Mon, 1);
+        await Record(gym, Mon, 60);
+        await Record(gym, Mon, -15);
+        await Record(fixedOnly, Mon, -1); // só correção: não compõe a barra
+        await Record(water, Tue, 1);
+
+        var report = await Service.GetWeekAsync(Today);
+
+        var monday = report.Days[0].Goals;
+        monday.Select(e => (e.Goal.Title, e.Done, e.Met)).Should().Equal(("Água", 2, (bool?)true), ("Treino", 45, (bool?)null));
+        report.Days[1].Goals.Select(e => (e.Goal.Title, e.Done, e.Met)).Should().Equal(("Água", 1, (bool?)false));
+        report.Days[2].Goals.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Counts_reminders_fired_and_answered_in_week()
     {
         var goal = await Create("A");

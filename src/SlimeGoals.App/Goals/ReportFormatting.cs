@@ -71,6 +71,33 @@ public static class ReportFormatting
     public static string? BestDay(WeekGoalRow row) =>
         row.BestDay is { } day ? $"Melhor dia: {ShortDays[(int)day.DayOfWeek]}" : null;
 
+    private static readonly string[] FullDays = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
+    /// <summary>Título do detalhe de uma barra da semana: "Segunda, 2 nov".</summary>
+    public static string DayTitle(DateOnly day) => $"{FullDays[(int)day.DayOfWeek]}, {DayMonth(day)}";
+
+    /// <summary>Título do detalhe de uma barra do mês: "Semana de 26 out".</summary>
+    public static string WeekOf(DateOnly monday) => $"Semana de {DayMonth(monday)}";
+
+    /// <summary>
+    /// Valor de uma meta no dia: diária contra o alvo do dia ("8 de 8 copos", "40 min de 30 min", "Feito");
+    /// semanal só com o que entrou no dia ("45 min", "3 copos"), porque o alvo é da semana.
+    /// </summary>
+    public static string DayEntry(DayGoalEntry entry)
+    {
+        var goal = entry.Goal;
+        var daily = goal.Recurrence == Recurrence.Daily;
+        return goal.Measure switch
+        {
+            Measure.Completion => entry.Done >= goal.Target ? "Feito" : "Pendente",
+            Measure.Quantity when daily => $"{entry.Done} de {goal.Target} {GoalFormatting.UnitFor(goal.Target, goal.Unit)}",
+            Measure.Quantity => $"{entry.Done} {GoalFormatting.UnitFor(entry.Done, goal.Unit)}",
+            Measure.Duration when daily => $"{GoalFormatting.Duration(entry.Done)} de {GoalFormatting.Duration(goal.Target)}",
+            Measure.Duration => GoalFormatting.Duration(entry.Done),
+            _ => throw new ArgumentOutOfRangeException(nameof(entry), goal.Measure, null),
+        };
+    }
+
     public static string Reminders(int fired, int answered) =>
         $"{Count(fired, "disparado", "disparados")} · {Count(answered, "respondido", "respondidos")}";
 }

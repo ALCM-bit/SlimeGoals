@@ -63,6 +63,73 @@ public class ReportsPageViewModelTests
     }
 
     [Fact]
+    public async Task Current_day_bar_starts_selected_and_lists_its_goals()
+    {
+        var goal = await CreateDaily("Mesa");
+        await _goals.UpdateAsync(goal with { CreatedAt = new DateTimeOffset(2026, 11, 2, 13, 0, 0, TimeSpan.Zero) });
+        await _checkins.AddAsync(new Checkin
+        {
+            Id = Guid.NewGuid(), GoalId = goal.Id, Amount = 1, UpdatedAt = Now,
+            DoneAt = new DateTimeOffset(2026, 11, 2, 13, 0, 0, TimeSpan.Zero),
+        });
+
+        var page = await Loaded();
+
+        page.SelectedBar.Should().BeSameAs(page.Bars[2]);
+        page.Bars[2].IsSelected.Should().BeTrue();
+        page.SelectedBar!.DetailTitle.Should().Be("Quarta, 4 nov");
+        page.SelectedBar.Details.Should().BeEmpty();
+        page.SelectedBar.EmptyDetail.Should().Be("Nenhum registro neste dia.");
+
+        page.SelectBarCommand.Execute(page.Bars[0]);
+
+        page.Bars[2].IsSelected.Should().BeFalse();
+        page.Bars[0].IsSelected.Should().BeTrue();
+        page.SelectedBar!.DetailTitle.Should().Be("Segunda, 2 nov");
+        page.SelectedBar.Details.Select(d => (d.Title, d.Value, d.IsMet)).Should().Equal(("Mesa", "Feito", true));
+    }
+
+    [Fact]
+    public async Task Selection_survives_reload_and_resets_on_navigation()
+    {
+        var goal = await CreateDaily();
+        var page = await Loaded();
+        page.SelectBarCommand.Execute(page.Bars[0]);
+
+        await CheckinService.AdjustAsync(goal.Id, 1); // recarga pelo aviso de mudança
+
+        page.SelectedBar.Should().BeSameAs(page.Bars[0]);
+        page.Bars[0].IsSelected.Should().BeTrue();
+
+        await page.PreviousCommand.ExecuteAsync(null);
+
+        page.SelectedBar.Should().BeNull(); // semana passada: nenhuma barra é a de hoje
+        page.Bars.Should().OnlyContain(b => !b.IsSelected);
+    }
+
+    [Fact]
+    public async Task Month_bar_lists_goal_percents_of_that_week()
+    {
+        var goal = await CreateDaily("Mesa");
+        await _checkins.AddAsync(new Checkin
+        {
+            Id = Guid.NewGuid(), GoalId = goal.Id, Amount = 1, UpdatedAt = Now,
+            DoneAt = new DateTimeOffset(2026, 11, 3, 13, 0, 0, TimeSpan.Zero),
+        });
+        await _goals.UpdateAsync(goal with { CreatedAt = new DateTimeOffset(2026, 11, 2, 13, 0, 0, TimeSpan.Zero) });
+        var page = await Loaded();
+
+        page.IsMonth = true;
+        await page.LoadCommand.ExecuteAsync(null);
+
+        page.SelectedBar.Should().BeSameAs(page.Bars[0]);
+        page.SelectedBar!.DetailTitle.Should().Be("Semana de 2 nov");
+        page.SelectedBar.Details.Select(d => (d.Title, d.Value, d.IsMet)).Should().Equal(("Mesa", "50%", false));
+        page.Bars[1].Details.Should().BeEmpty();
+        page.Bars[1].EmptyDetail.Should().Be("Nenhuma meta nesta semana.");
+    }
+
+    [Fact]
     public async Task Previous_then_next_navigates_weeks()
     {
         await CreateDaily();
