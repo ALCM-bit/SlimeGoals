@@ -102,6 +102,9 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     [ObservableProperty] public partial bool IsOffscreenTimerRunning { get; set; }
     [ObservableProperty] public partial string? OffscreenTimerText { get; set; }
 
+    /// <summary>Pose e frase do slime, conforme o progresso de hoje e a pausa dos lembretes.</summary>
+    [ObservableProperty] public partial MascotState Mascot { get; set; } = MascotState.For(0, 0, false);
+
     public bool IsEmpty => Goals.Count == 0;
     public string EmptyMessage => "Nenhuma meta para hoje. Crie uma em Metas.";
 
@@ -144,6 +147,8 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
                 _ticker = time.CreateTimer(_ => OnUi(Tick), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
             await LoadStreakAsync(version);
             await LoadUpcomingAsync(version);
+            if (version == _loadVersion)
+                Mascot = MascotState.For(Goals.Count, Goals.Count(g => g.IsMet), IsPaused);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

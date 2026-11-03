@@ -14,6 +14,9 @@ public sealed class InMemoryGoalRepository : IGoalRepository
     /// <summary>Quando definido, toda escrita lança esta exceção (simula banco travado, disco cheio...).</summary>
     public Exception? FailWritesWith { get; set; }
 
+    /// <summary>Quando definido, toda leitura lança esta exceção.</summary>
+    public Exception? FailReadsWith { get; set; }
+
     public Task AddAsync(Goal goal, CancellationToken ct = default)
     {
         if (FailWritesWith is not null) throw FailWritesWith;
@@ -30,10 +33,10 @@ public sealed class InMemoryGoalRepository : IGoalRepository
     }
 
     public Task<Goal?> GetAsync(Guid id, CancellationToken ct = default) =>
-        Task.FromResult(_goals.TryGetValue(id, out var g) && g.DeletedAt is null ? g : null);
+        FailReadsWith is not null ? throw FailReadsWith : Task.FromResult(_goals.TryGetValue(id, out var g) && g.DeletedAt is null ? g : null);
 
     public Task<IReadOnlyList<Goal>> ListAsync(bool includeArchived, CancellationToken ct = default) =>
-        Task.FromResult<IReadOnlyList<Goal>>(_goals.Values
+        FailReadsWith is not null ? throw FailReadsWith : Task.FromResult<IReadOnlyList<Goal>>(_goals.Values
             .Where(g => g.DeletedAt is null && (includeArchived || g.ArchivedAt is null))
             .OrderBy(g => g.CreatedAt).ToList());
 }
