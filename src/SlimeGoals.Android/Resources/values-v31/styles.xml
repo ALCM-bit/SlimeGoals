@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <style name="SlimeGoals.Theme" parent="@style/Theme.AppCompat.NoActionBar">
+    <item name="android:windowActionBar">false</item>
+    <item name="android:windowNoTitle">true</item>
+    <item name="android:windowBackground">@null</item>
+    <item name="android:statusBarColor">@color/slime_bg</item>
+    <item name="android:navigationBarColor">@color/slime_bg</item>
+    <item name="android:windowLightStatusBar">false</item>
+    <item name="android:windowLightNavigationBar">false</item>
+    <item name="android:windowSplashScreenBackground">@color/slime_bg</item>
+    <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+    <item name="postSplashScreenTheme">@style/SlimeGoals.Theme.Main</item>
+  </style>
+  <style name="SlimeGoals.Theme.Main" parent="SlimeGoals.Theme">
+    <item name="android:windowIsTranslucent">true</item>
+  </style>
+</resources>
