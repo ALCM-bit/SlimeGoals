@@ -27,7 +27,7 @@ public class GoalHistoryTests
     };
 
     [Fact]
-    public void Daily_periods_skip_inactive_days_before_creation_and_after_today()
+    public void Daily_periods_skip_inactive_days_before_creation_and_after_today_and_mark_today_open()
     {
         var g = DailyGoal();
         var range = new DateRange(D("2026-10-26"), D("2026-11-09"));
@@ -35,13 +35,15 @@ public class GoalHistoryTests
 
         var periods = GoalHistory.Periods(g, range, D("2026-11-04"), Zone, sums);
 
-        periods.Select(p => p.Range.Start).Should().Equal(D("2026-10-28"), D("2026-10-30"), D("2026-11-02"));
-        periods.Should().OnlyContain(p => p.Met);
+        // Hoje (qua, 04/11) entra como pendente; 26/10 fica antes da criação.
+        periods.Select(p => p.Range.Start).Should().Equal(D("2026-10-28"), D("2026-10-30"), D("2026-11-02"), D("2026-11-04"));
+        periods.Select(p => (p.Met, p.InProgress)).Should().Equal((true, false), (true, false), (true, false), (false, true));
 
         var withToday = GoalHistory.Periods(g, range, D("2026-11-04"), Zone,
             Sums(C(g, "2026-10-28"), C(g, "2026-10-30"), C(g, "2026-11-02"), C(g, "2026-11-04")));
         withToday[^1].Range.Start.Should().Be(D("2026-11-04"));
         withToday[^1].Met.Should().BeTrue();
+        withToday[^1].InProgress.Should().BeTrue();
     }
 
     [Fact]
@@ -70,7 +72,7 @@ public class GoalHistoryTests
     }
 
     [Fact]
-    public void Weekly_periods_use_clipped_evaluation_and_skip_unmet_current_week()
+    public void Weekly_periods_use_clipped_evaluation_and_mark_current_week_open()
     {
         var g = G(Recurrence.Weekly, start: "2026-10-21");
         var sums = Sums(C(g, "2026-10-20", 2), C(g, "2026-10-22"), C(g, "2026-10-27", 3), C(g, "2026-11-03"));
@@ -79,7 +81,8 @@ public class GoalHistoryTests
 
         periods.Should().Equal(
             new PeriodResult(new DateRange(D("2026-10-19"), D("2026-10-26")), 1, false),
-            new PeriodResult(new DateRange(D("2026-10-26"), D("2026-11-02")), 3, true));
+            new PeriodResult(new DateRange(D("2026-10-26"), D("2026-11-02")), 3, true),
+            new PeriodResult(new DateRange(D("2026-11-02"), D("2026-11-09")), 1, false, InProgress: true));
     }
 
     [Fact]
@@ -95,6 +98,6 @@ public class GoalHistoryTests
             Sums(C(g, "2026-11-05")));
 
         periods.Should().ContainSingle().Which.Should().Be(
-            new PeriodResult(new DateRange(D("2026-11-02"), D("2026-11-09")), 1, true));
+            new PeriodResult(new DateRange(D("2026-11-02"), D("2026-11-09")), 1, true, InProgress: true));
     }
 }

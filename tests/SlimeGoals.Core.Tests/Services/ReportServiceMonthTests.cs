@@ -68,7 +68,7 @@ public class ReportServiceMonthTests
     }
 
     [Fact]
-    public async Task Daily_month_counts_days_until_today()
+    public async Task Daily_month_counts_days_until_today_with_today_pending()
     {
         var goal = await Create("Água");
         await Record(goal, Mon, 1);
@@ -77,12 +77,12 @@ public class ReportServiceMonthTests
         var report = await Service.GetMonthAsync(2026, 11);
 
         var row = report.Goals.Single();
-        (row.MetPeriods, row.CountedPeriods, row.Percent).Should().Be((2, 2, 100));
-        row.WeekPercents.Should().Equal(100, null, null, null, null);
+        (row.MetPeriods, row.CountedPeriods, row.Percent).Should().Be((2, 3, 67));
+        row.WeekPercents.Should().Equal(67, null, null, null, null);
         report.Weeks.Should().HaveCount(5);
-        report.Weeks[0].Percent.Should().Be(100);
+        report.Weeks[0].Percent.Should().Be(67);
         report.Weeks[1].Percent.Should().BeNull();
-        report.Percent.Should().Be(100);
+        report.Percent.Should().Be(67);
     }
 
     [Fact]

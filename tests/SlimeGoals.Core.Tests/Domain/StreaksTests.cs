@@ -18,4 +18,15 @@ public class StreaksTests
     [Fact]
     public void Trailing_miss_resets_current() =>
         Streaks.From(P(true, true, false)).Should().Be(new Streak(0, 2));
+
+    [Fact]
+    public void Open_period_not_yet_met_does_not_break_the_streak()
+    {
+        var periods = P(true, true, false);
+        periods[^1] = periods[^1] with { InProgress = true };
+        Streaks.From(periods).Should().Be(new Streak(2, 2));
+
+        periods[^1] = periods[^1] with { Done = 1, Met = true };
+        Streaks.From(periods).Should().Be(new Streak(3, 3));
+    }
 }

@@ -41,7 +41,7 @@ public class ReportsPageViewModelTests
     [Fact]
     public async Task Opens_on_current_week_with_bars_and_rows()
     {
-        // Meta de 02/11, cumprida em 02/11 e 03/11; hoje (04/11) ainda em aberto não baixa o %.
+        // Meta de 02/11, cumprida em 02/11 e 03/11; hoje (04/11) conta como pendente até ser cumprido.
         var goal = await CreateDaily();
         await _goals.UpdateAsync(goal with { CreatedAt = new DateTimeOffset(2026, 11, 2, 13, 0, 0, TimeSpan.Zero) });
         foreach (var day in new[] { 2, 3 })
@@ -56,8 +56,8 @@ public class ReportsPageViewModelTests
         page.PeriodTitle.Should().Be("2 a 8 nov 2026");
         page.Bars.Count.Should().Be(7);
         page.Bars[2].IsCurrent.Should().BeTrue();
-        page.Rows.Single().Detail.Should().Be("2 de 2 dias");
-        page.Rows.Single().PercentText.Should().Be("100%");
+        page.Rows.Single().Detail.Should().Be("2 de 3 dias");
+        page.Rows.Single().PercentText.Should().Be("67%");
         page.RemindersText.Should().Be("0 disparados · 0 respondidos");
         page.NextCommand.CanExecute(null).Should().BeFalse();
     }
@@ -124,7 +124,7 @@ public class ReportsPageViewModelTests
 
         page.SelectedBar.Should().BeSameAs(page.Bars[0]);
         page.SelectedBar!.DetailTitle.Should().Be("Semana de 2 nov");
-        page.SelectedBar.Details.Select(d => (d.Title, d.Value, d.IsMet)).Should().Equal(("Mesa", "50%", false));
+        page.SelectedBar.Details.Select(d => (d.Title, d.Value, d.IsMet)).Should().Equal(("Mesa", "33%", false)); // seg não, ter sim, qua (hoje) pendente
         page.Bars[1].Details.Should().BeEmpty();
         page.Bars[1].EmptyDetail.Should().Be("Nenhuma meta nesta semana.");
     }
@@ -201,7 +201,7 @@ public class ReportsPageViewModelTests
     {
         var goal = await CreateDaily();
         var page = await Loaded();
-        page.Rows[0].Detail.Should().Be("0 de 0 dias");
+        page.Rows[0].Detail.Should().Be("0 de 1 dia"); // criada hoje: hoje pendente
 
         await CheckinService.AdjustAsync(goal.Id, 1);
 

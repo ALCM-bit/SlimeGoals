@@ -59,10 +59,10 @@ public class ReportServiceSqliteTests : IDisposable
 
         var week = await Service.GetWeekAsync(new DateOnly(2026, 11, 4));
         week.Goals.Select(r => (r.Goal.Id, r.MetPeriods, r.CountedPeriods, r.Percent)).Should().Equal(
-            (first.Id, 2, 2, 100), (archived.Id, 1, 2, 50));
+            (first.Id, 2, 3, 67), (archived.Id, 1, 2, 50)); // hoje (04/11) pendente; a arquivada para em 03/11
 
         var month = await Service.GetMonthAsync(2026, 11);
         month.Goals.Select(r => (r.Goal.Id, r.MetPeriods, r.CountedPeriods)).Should().Equal(
-            (first.Id, 2, 2), (archived.Id, 1, 2));
+            (first.Id, 2, 3), (archived.Id, 1, 2));
     }
 }

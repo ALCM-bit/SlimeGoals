@@ -1,7 +1,10 @@
 namespace SlimeGoals.Core.Domain;
 
-/// <summary>Um período contado (dia da diária, semana da semanal; semana = segunda a segunda).</summary>
-public sealed record PeriodResult(DateRange Range, int Done, bool Met);
+/// <summary>
+/// Um período contado (dia da diária, semana da semanal; semana = segunda a segunda).
+/// InProgress = é o período de hoje, ainda em andamento.
+/// </summary>
+public sealed record PeriodResult(DateRange Range, int Done, bool Met, bool InProgress = false);
 
 /// <summary>
 /// Histórico de uma meta para os relatórios: quando ela existiu e quais períodos contam.
@@ -22,7 +25,8 @@ public static class GoalHistory
 
     /// <summary>
     /// Períodos contados que intersectam o intervalo, em ordem e sem dias depois de hoje.
-    /// O período que contém hoje ainda está em andamento: só entra se já foi cumprido.
+    /// O período que contém hoje entra como pendente até ser cumprido (InProgress); a sequência o ignora
+    /// enquanto não for cumprido (<see cref="Streaks.From"/>).
     /// </summary>
     public static IReadOnlyList<PeriodResult> Periods(Goal goal, DateRange range, DateOnly today,
         TimeZoneInfo zone, DailySums sums)
@@ -36,7 +40,7 @@ public static class GoalHistory
                 if (!ExistedOn(goal, d, zone) || !goal.ActiveDays.Includes(d.DayOfWeek))
                     continue;
                 var done = sums.On(goal.Id, d);
-                Add(result, new PeriodResult(new DateRange(d, d.AddDays(1)), done, done >= goal.Target), d == today);
+                result.Add(new PeriodResult(new DateRange(d, d.AddDays(1)), done, done >= goal.Target, d == today));
             }
             return result;
         }
@@ -57,15 +61,9 @@ public static class GoalHistory
                 continue;
 
             var done = sums.In(goal.Id, GoalPeriod.EvaluationPeriod(goal, day)!.Value);
-            Add(result, new PeriodResult(week, done, done >= goal.Target), week.Contains(today));
+            result.Add(new PeriodResult(week, done, done >= goal.Target, week.Contains(today)));
         }
         return result;
-    }
-
-    private static void Add(List<PeriodResult> list, PeriodResult period, bool containsToday)
-    {
-        if (!containsToday || period.Met)
-            list.Add(period);
     }
 
     private static DateOnly LocalDay(DateTimeOffset instant, TimeZoneInfo zone) =>

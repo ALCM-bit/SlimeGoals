@@ -286,7 +286,7 @@ Sem tabela própria e sem query nova nos repositórios. Cada relatório faz uma 
 
 **Regras da Fase 5:**
 
-- **Período contado.** Uma meta conta num dia quando ele está entre a data local de criação e a de arquivamento (inclusive), dentro do início e fim da meta e não é futuro. Diária: só dias ativos. Semanal: a semana conta se ao menos um dia dela conta; a soma usa o período de avaliação recortado. O período em andamento (hoje, semana atual) só entra quando já cumprido; em aberto, não reduz o % nem quebra a sequência.
+- **Período contado.** Uma meta conta num dia quando ele está entre a data local de criação e a de arquivamento (inclusive), dentro do início e fim da meta e não é futuro. Diária: só dias ativos. Semanal: a semana conta se ao menos um dia dela conta; a soma usa o período de avaliação recortado. O período em andamento (hoje, semana atual) conta como pendente até ser cumprido: entra no % ("1 de 2 dias") mas não quebra a sequência.
 - **% cumprido.** Diária: dias cumpridos ÷ dias contados. Semanal na semana: soma ÷ alvo, até 100% (a semana em andamento mostra o parcial). Semanal no mês: semanas cumpridas ÷ semanas contadas. Sem período contado, "—". O % geral é a média dos % que têm valor, com `MidpointRounding.AwayFromZero`. Difere do % do Hoje, em que a diária conta a fração parcial de cada dia.
 - **Barras.** Semana: metas com progresso no dia local (soma líquida positiva; oito +1 de água contam como uma meta, e +1 seguido de −1 não conta). Mês: média dos % das metas em cada semana. Clicar numa barra mostra as metas que a compõem: na semana, o valor de cada meta no dia (✓ na diária cumprida); no mês, o % de cada meta na semana.
 - **Lembretes.** Disparados = entradas do log no intervalo; respondidos = Feito ou Adiar. Ignorar e expiração ficam gravados do mesmo jeito (§9) e não contam como resposta.
@@ -461,7 +461,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 **Decisões da Fase 5 (03/11/2026):**
 
 - Período contado: entre criação e arquivamento (datas locais), dentro do início/fim da meta, nunca futuro; diária só em dias ativos, semanal se ao menos um dia conta.
-- Período em andamento só entra na contagem quando já cumprido; em aberto, não reduz o % nem quebra a sequência.
+- Período em andamento conta como pendente até ser cumprido: entra no %, mas não quebra a sequência (revisto em 03/11/2026: só contá-lo depois de cumprido deixava a semana em 100% com o dia de hoje zerado).
 - % cumprido: diária = dias cumpridos ÷ contados; semanal na semana = soma ÷ alvo (até 100%); no mês = semanas cumpridas ÷ contadas; sem período, "—"; geral = média dos que têm valor, com a semanal da semana em andamento entrando pelo parcial (confirmado pelo autor em 03/11/2026).
 - O % dos relatórios (dia cumprido ou não) difere do % do Hoje (fração parcial por dia).
 - Mês = semanas cuja segunda-feira cai nele, inteiras, também para diárias; domingo 01/11/2026 pertence a outubro.

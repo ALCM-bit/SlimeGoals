@@ -51,14 +51,14 @@ public class ReportServiceWeekTests
         _log.AddAsync(new ReminderLogEntry(Guid.NewGuid(), goal.Id, firedAt, response, response is null ? null : firedAt));
 
     [Fact]
-    public async Task Daily_row_counts_met_days_and_skips_unmet_today()
+    public async Task Daily_row_counts_met_days_and_today_as_pending()
     {
         var goal = await Create("Água", target: 2);
         await Record(goal, Mon, 2);
         await Record(goal, Tue, 1);
 
         var row = (await Service.GetWeekAsync(Today)).Goals.Single();
-        (row.MetPeriods, row.CountedPeriods, row.Percent).Should().Be((1, 2, 50));
+        (row.MetPeriods, row.CountedPeriods, row.Percent).Should().Be((1, 3, 33)); // hoje (qua) pendente
         row.BestDay.Should().BeNull();
 
         await Record(goal, Today, 2);
@@ -77,9 +77,9 @@ public class ReportServiceWeekTests
         var rows = (await Service.GetWeekAsync(Today)).Goals;
 
         var a = rows.Single(r => r.Goal.Id == some.Id);
-        (a.MetPeriods, a.CountedPeriods, a.Percent).Should().Be((1, 1, 100));
+        (a.MetPeriods, a.CountedPeriods, a.Percent).Should().Be((1, 2, 50)); // seg cumprida, qua (hoje) pendente
         var b = rows.Single(r => r.Goal.Id == fresh.Id);
-        (b.MetPeriods, b.CountedPeriods, b.Percent).Should().Be((0, 1, 0));
+        (b.MetPeriods, b.CountedPeriods, b.Percent).Should().Be((0, 2, 0)); // ter e qua
     }
 
     [Fact]
@@ -195,8 +195,8 @@ public class ReportServiceWeekTests
 
         var report = await Service.GetWeekAsync(Today);
 
-        report.Goals.Select(r => r.Percent).Should().Equal(50, 80, null);
-        report.Percent.Should().Be(65);
+        report.Goals.Select(r => r.Percent).Should().Equal(33, 80, 0);
+        report.Percent.Should().Be(38);
     }
 
     [Fact]
