@@ -24,6 +24,7 @@ internal static class CompositionRoot
         services.AddSingleton<CheckinService>();
         services.AddSingleton<TimerService>();
         services.AddSingleton<ProgressService>();
+        services.AddSingleton<ReportService>();
         services.AddSingleton<ReminderPause>();
         services.AddSingleton<ReminderService>();
         services.AddSingleton<ReminderResponseHandler>();

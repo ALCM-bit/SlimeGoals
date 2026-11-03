@@ -31,7 +31,7 @@ public class TodayPageViewModelTests
         new ProgressService(_goals, _checkins, _timers, _time), CheckinService,
         new TimerService(_goals, _timers, CheckinService, _time), GoalService, _time,
         new ReminderService(_goals, _checkins, _timers, _log, _notifications, new ReminderFormatter(), _time, Pause),
-        _changes, Pause);
+        _changes, Pause, new ReportService(_goals, _checkins, _log, _time));
 
     private async Task<TodayPageViewModel> Loaded()
     {
@@ -46,6 +46,33 @@ public class TodayPageViewModelTests
             measure == Measure.Quantity ? unit : null));
 
     private static TodayGoalViewModel Card(TodayPageViewModel page, string title) => page.Goals.Single(g => g.Title == title);
+
+    [Fact]
+    public async Task Streak_tile_shows_top_current_streak_and_updates_when_today_is_met()
+    {
+        var goal = await Create("Água", Measure.Completion, 1);
+        await _goals.UpdateAsync(goal with { CreatedAt = new DateTimeOffset(2026, 10, 31, 12, 0, 0, TimeSpan.Zero) });
+        foreach (var day in new[] { 1, 2, 3 })
+            await _checkins.AddAsync(new Checkin
+            {
+                Id = Guid.NewGuid(), GoalId = goal.Id, DoneAt = new DateTimeOffset(2026, 11, day, 13, 0, 0, TimeSpan.Zero),
+                Amount = 1, UpdatedAt = Now,
+            });
+
+        var page = await Loaded();
+
+        Assert.Equal((3, "dias", "Água"), (page.StreakValue, page.StreakUnit, page.StreakGoal));
+        await page.CompleteCommand.ExecuteAsync(Card(page, "Água"));
+        Assert.Equal(4, page.StreakValue);
+    }
+
+    [Fact]
+    public async Task Streak_tile_without_streak_shows_zero_days()
+    {
+        var page = await Loaded();
+
+        Assert.Equal((0, "dias", (string?)null), (page.StreakValue, page.StreakUnit, page.StreakGoal));
+    }
 
     [Fact]
     public async Task Load_shows_goals_texts_and_week_summary()

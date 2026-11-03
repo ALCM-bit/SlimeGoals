@@ -60,7 +60,7 @@ public static class GoalFormatting
     /// Singular só para a unidade padrão: 1 → "vez". A unidade é texto livre ("copos", "páginas"),
     /// e flexionar texto livre em pt-BR exigiria regras que erram mais do que acertam.
     /// </summary>
-    private static string? UnitFor(int amount, string? unit) => (amount, unit) switch
+    public static string? UnitFor(int amount, string? unit) => (amount, unit) switch
     {
         (1, "vezes") => "vez",
         (1, "Vezes") => "Vez",

@@ -21,7 +21,7 @@ public sealed record UpcomingReminderViewModel(string Time, string Title);
 /// </summary>
 public sealed partial class TodayPageViewModel(ProgressService progress, CheckinService checkins, TimerService timers,
     GoalService goals, TimeProvider time, ReminderService reminders, DataChangeNotifier changes,
-    ReminderPause? pause = null) : PageViewModel
+    ReminderPause? pause = null, ReportService? reports = null) : PageViewModel
 {
     private bool _subscribed;
     private int _loadVersion;
@@ -51,6 +51,10 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     [ObservableProperty] public partial int WeekPercent { get; set; }
     [ObservableProperty] public partial int InProgress { get; set; }
     [ObservableProperty] public partial int Completed { get; set; }
+    /// <summary>Tile "Sequência": maior sequência atual entre as metas ativas, com o título da meta.</summary>
+    [ObservableProperty] public partial int StreakValue { get; set; }
+    [ObservableProperty] public partial string StreakUnit { get; set; } = "dias";
+    [ObservableProperty] public partial string? StreakGoal { get; set; }
     [ObservableProperty] public partial string? ErrorMessage { get; set; }
 
     /// <summary>Cronômetro de meta que não está na lista de hoje (ex.: dia inativo): faixa com Parar/Descartar.</summary>
@@ -97,6 +101,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             (WeekPercent, InProgress, Completed) = (snapshot.Week.Percent, snapshot.Week.InProgress, snapshot.Week.Completed);
             if (snapshot.Timer is { StoppedAt: null })
                 _ticker = time.CreateTimer(_ => OnUi(Tick), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+            await LoadStreakAsync(version);
             await LoadUpcomingAsync(version);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -107,6 +112,28 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         {
             OnPropertyChanged(nameof(IsEmpty));
         }
+    }
+
+    /// <summary>Falha aqui só zera o tile: o resto da tela Hoje continua valendo.</summary>
+    private async Task LoadStreakAsync(int version)
+    {
+        StreakHighlight? highlight = null;
+        try
+        {
+            if (reports is not null)
+                highlight = await reports.GetTopStreakAsync();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Trace.TraceError($"Falha ao carregar a sequência: {ex}");
+        }
+        if (version != _loadVersion)
+            return;
+
+        StreakValue = highlight?.Length ?? 0;
+        StreakGoal = highlight?.Goal.Title;
+        var one = StreakValue == 1;
+        StreakUnit = highlight?.Goal.Recurrence == Recurrence.Weekly ? (one ? "semana" : "semanas") : (one ? "dia" : "dias");
     }
 
     /// <summary>Falha aqui só esconde a seção: o resto da tela Hoje continua valendo.</summary>

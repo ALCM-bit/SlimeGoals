@@ -71,6 +71,8 @@
   <!-- Ícones dos botões de ação (Lucide, ISC; grade 24×24, só traço). Use com Path.btn-icon. -->
   <StreamGeometry x:Key="IconCheck">M 20 6 L 9 17 L 4 12</StreamGeometry>
   <StreamGeometry x:Key="IconX">M 18 6 L 6 18 M 6 6 L 18 18</StreamGeometry>
+  <StreamGeometry x:Key="IconChevronLeft">M 15 18 L 9 12 L 15 6</StreamGeometry>
+  <StreamGeometry x:Key="IconChevronRight">M 9 18 L 15 12 L 9 6</StreamGeometry>
   <StreamGeometry x:Key="IconMinus">M 5 12 L 19 12</StreamGeometry>
   <StreamGeometry x:Key="IconPlus">M 5 12 L 19 12 M 12 5 L 12 19</StreamGeometry>
   <StreamGeometry x:Key="IconPlay">M 6 3 L 20 12 L 6 21 Z</StreamGeometry>
