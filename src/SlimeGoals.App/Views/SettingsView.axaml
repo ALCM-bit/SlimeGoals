@@ -16,7 +16,7 @@
         <Border Classes="card">
           <StackPanel Spacing="12">
             <TextBlock Classes="section-title" Text="Geral" />
-            <ToggleSwitch MinHeight="44" Content="Iniciar com o sistema" IsChecked="{Binding StartWithSystem}"
+            <ToggleSwitch MinHeight="44" Content="Iniciar com o sistema" OnContent="" OffContent="" IsChecked="{Binding StartWithSystem}"
                           IsEnabled="{Binding CanAutostart}" />
             <TextBlock Text="Abre em segundo plano ao entrar na sessão." Foreground="{DynamicResource Muted}"
                        TextWrapping="Wrap" IsVisible="{Binding CanAutostart}" />

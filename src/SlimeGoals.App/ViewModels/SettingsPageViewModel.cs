@@ -99,7 +99,7 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
             else
                 autostart.Disable();
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Trace.TraceError($"Falha ao alterar o início com o sistema: {ex}");
             Revert(() => StartWithSystem = oldValue);

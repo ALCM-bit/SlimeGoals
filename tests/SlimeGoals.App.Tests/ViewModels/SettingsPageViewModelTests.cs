@@ -84,6 +84,18 @@ public class SettingsPageViewModelTests
     }
 
     [Fact]
+    public async Task Autostart_unexpected_failure_reverts_toggle_and_shows_error()
+    {
+        var autostart = new FakeAutostart { Failure = new InvalidOperationException("x") };
+        var vm = await LoadedAsync(new RecordingSettings(), autostart);
+
+        vm.StartWithSystem = true;
+
+        vm.StartWithSystem.Should().BeFalse();
+        vm.ErrorMessage.Should().Be("Não foi possível alterar o início com o sistema.");
+    }
+
+    [Fact]
     public async Task Save_failure_reverts_value_and_shows_error()
     {
         var repo = new RecordingSettings { Fail = true };
