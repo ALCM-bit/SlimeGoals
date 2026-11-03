@@ -189,8 +189,27 @@ public class ReportServiceWeekTests
 
         var report = await Service.GetWeekAsync(Today);
 
+        // A semanal ainda aberta mostra o parcial na linha, mas não entra no geral (decisão 2, revista em 03/11).
         report.Goals.Select(r => r.Percent).Should().Equal(50, 80, null);
-        report.Percent.Should().Be(65);
+        report.Percent.Should().Be(50);
+
+        await Record(weekly, Today, 60); // cumpriu a semana: passa a contar com 100%
+
+        report = await Service.GetWeekAsync(Today);
+        report.Goals.Select(r => r.Percent).Should().Equal(50, 100, null);
+        report.Percent.Should().Be(75);
+    }
+
+    [Fact]
+    public async Task Overall_percent_counts_unmet_weekly_goal_once_the_week_is_over()
+    {
+        var weekly = await Create("Semanal", Recurrence.Weekly, target: 300, measure: Measure.Duration);
+        await Record(weekly, new DateOnly(2026, 10, 27), 120);
+
+        var report = await Service.GetWeekAsync(new DateOnly(2026, 10, 26));
+
+        report.Goals.Single().Percent.Should().Be(40);
+        report.Percent.Should().Be(40);
     }
 
     [Fact]
