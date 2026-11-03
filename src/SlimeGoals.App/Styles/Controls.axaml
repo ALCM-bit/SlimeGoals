@@ -1,8 +1,9 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:SlimeGoals.App.Views">
 
-  <!-- Fonte e cores padrão da janela -->
-  <Style Selector="Window">
+  <!-- Fonte e cores padrão da janela; no Android não há Window, e a ShellView é a raiz -->
+  <Style Selector="Window, views|ShellView">
     <Setter Property="FontFamily" Value="{DynamicResource FigtreeFont}" />
     <Setter Property="Background" Value="{DynamicResource BgDeep}" />
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
@@ -39,7 +40,7 @@
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
   </Style>
   <Style Selector="ListBox.nav ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="#1D1928" />
+    <Setter Property="Background" Value="{DynamicResource NavHover}" />
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
   </Style>
   <Style Selector="ListBox.nav ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
@@ -52,6 +53,77 @@
   <Style Selector="ListBox.nav ListBoxItem:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="BorderBrush" Value="{DynamicResource PrimarySoft}" />
     <Setter Property="BorderThickness" Value="2" />
+  </Style>
+
+  <!-- ===== Fase 7a: shell adaptativo. Largo = barra lateral; classe compact (ShellView < 720px) =
+       navegação inferior, margens menores e os ajustes de cada tela (fim deste arquivo). ===== -->
+  <Style Selector="DockPanel.shell-body">
+    <Setter Property="Margin" Value="14" />
+  </Style>
+  <Style Selector="Border.sidebar">
+    <Setter Property="Width" Value="220" />
+    <Setter Property="Margin" Value="0,0,14,0" />
+  </Style>
+  <Style Selector="Border.bottom-nav">
+    <Setter Property="IsVisible" Value="False" />
+    <Setter Property="Background" Value="{DynamicResource Panel}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="Padding" Value="4,6" />
+  </Style>
+  <Style Selector="ListBox.bottom-nav">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="ListBox.bottom-nav ListBoxItem">
+    <Setter Property="MinHeight" Value="56" />
+    <Setter Property="Padding" Value="0,4" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+  </Style>
+  <!-- Sem o fundo de item do Fluent: o destaque é só a pílula atrás do ícone -->
+  <Style Selector="ListBox.bottom-nav ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+  </Style>
+  <Style Selector="ListBox.bottom-nav ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.bottom-nav ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter, ListBox.bottom-nav ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter, ListBox.bottom-nav ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="ListBox.bottom-nav ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter, ListBox.bottom-nav ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Foreground" Value="{DynamicResource PrimarySoft}" />
+  </Style>
+  <Style Selector="ListBox.bottom-nav ListBoxItem:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimarySoft}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <Style Selector="Border.nav-pill">
+    <Setter Property="Width" Value="56" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="ListBox.bottom-nav ListBoxItem:pointerover Border.nav-pill">
+    <Setter Property="Background" Value="{DynamicResource NavHover}" />
+  </Style>
+  <Style Selector="ListBox.bottom-nav ListBoxItem:selected Border.nav-pill">
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+  </Style>
+  <Style Selector="Path.nav-icon">
+    <Setter Property="StrokeThickness" Value="2" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+    <Setter Property="StrokeJoin" Value="Round" />
+    <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource FindAncestor, AncestorType=ContentPresenter, Tree=Visual}}" />
+  </Style>
+  <Style Selector="TextBlock.nav-label">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="ListBox.bottom-nav ListBoxItem:selected TextBlock.nav-label">
+    <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
 
   <!-- ===== Fase 2: componentes das telas de metas (tokens da spec §11) ===== -->
@@ -372,5 +444,131 @@
   <Style Selector="Border.tag TextBlock">
     <Setter Property="FontSize" Value="11" />
     <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+
+  <!-- Classes das telas que o layout estreito ajusta; aqui, os valores do layout largo -->
+  <Style Selector="DockPanel.page">
+    <Setter Property="Margin" Value="8,4,8,0" />
+  </Style>
+  <Style Selector="UniformGrid.tiles">
+    <Setter Property="Columns" Value="4" />
+    <Setter Property="ColumnSpacing" Value="12" />
+    <Setter Property="RowSpacing" Value="12" />
+  </Style>
+  <Style Selector="UniformGrid.report-tiles">
+    <Setter Property="Columns" Value="2" />
+    <Setter Property="ColumnSpacing" Value="12" />
+    <Setter Property="RowSpacing" Value="12" />
+  </Style>
+  <!-- Coluna e linha por estilo (valor local venceria o do layout estreito) -->
+  <Style Selector="StackPanel.card-actions">
+    <Setter Property="Grid.Column" Value="2" />
+  </Style>
+  <Style Selector="Border.report-mode">
+    <Setter Property="Grid.Column" Value="1" />
+  </Style>
+  <!-- Campos lado a lado do formulário (Orientation só por estilo: valor local venceria o do layout estreito) -->
+  <Style Selector="StackPanel.field-row">
+    <Setter Property="Orientation" Value="Horizontal" />
+    <Setter Property="Spacing" Value="10" />
+  </Style>
+  <Style Selector="StackPanel.goal-form">
+    <Setter Property="Width" Value="640" />
+    <Setter Property="MaxWidth" Value="640" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="Margin" Value="0,0,0,8" />
+  </Style>
+  <Style Selector="ContentControl.goal-actions.docked">
+    <Setter Property="Width" Value="640" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="Margin" Value="0,12,0,14" />
+  </Style>
+  <Style Selector="ContentControl.goal-actions.inline">
+    <Setter Property="IsVisible" Value="False" />
+    <Setter Property="Margin" Value="0,24,0,6" />
+  </Style>
+  <!-- Enter salva pela barra visível (a fixa, no layout largo) -->
+  <Style Selector="ContentControl.goal-actions.docked Button.save">
+    <Setter Property="IsDefault" Value="True" />
+  </Style>
+  <Style Selector="StackPanel.settings-list">
+    <Setter Property="MaxWidth" Value="640" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+
+  <!-- ===== Layout estreito (Fase 7a): tudo abaixo vale só sob a classe compact (ShellView < 720px) ===== -->
+  <Style Selector=".compact Border.bottom-nav">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
+  <Style Selector=".compact Border.sidebar">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector=".compact DockPanel.shell-body">
+    <Setter Property="Margin" Value="12" />
+  </Style>
+  <Style Selector=".compact DockPanel.page">
+    <Setter Property="Margin" Value="0,4,0,0" />
+  </Style>
+  <Style Selector=".compact TextBlock.page-title">
+    <Setter Property="FontSize" Value="22" />
+  </Style>
+  <!-- Hoje: resumo em 2×2 -->
+  <Style Selector=".compact UniformGrid.tiles">
+    <Setter Property="Columns" Value="2" />
+  </Style>
+  <!-- Metas: ações do cartão na linha de baixo, sob o texto -->
+  <Style Selector=".compact StackPanel.card-actions">
+    <Setter Property="Grid.Row" Value="1" />
+    <Setter Property="Grid.Column" Value="1" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="Margin" Value="0,12,0,0" />
+  </Style>
+  <!-- Formulário de meta: largura fluida, campos lado a lado empilhados, ações no fim da rolagem -->
+  <Style Selector=".compact StackPanel.goal-form">
+    <Setter Property="Width" Value="NaN" />
+    <Setter Property="MaxWidth" Value="Infinity" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <!-- folga à direita para a barra de rolagem sobreposta não cobrir campos e o Salvar -->
+    <Setter Property="Margin" Value="0,0,8,8" />
+  </Style>
+  <Style Selector=".compact StackPanel.field-row">
+    <Setter Property="Orientation" Value="Vertical" />
+  </Style>
+  <Style Selector=".compact TextBlock.row-label">
+    <Setter Property="MinWidth" Value="40" />
+  </Style>
+  <Style Selector=".compact StackPanel.delete-actions">
+    <Setter Property="Grid.Row" Value="1" />
+    <Setter Property="Grid.ColumnSpan" Value="2" />
+    <Setter Property="Margin" Value="0,10,0,0" />
+  </Style>
+  <Style Selector=".compact ContentControl.goal-actions.docked">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector=".compact ContentControl.goal-actions.inline">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
+  <!-- Relatórios: tiles em coluna única, segmento abaixo do título, barras mais finas -->
+  <Style Selector=".compact UniformGrid.report-tiles">
+    <Setter Property="Columns" Value="1" />
+  </Style>
+  <Style Selector=".compact Border.report-mode">
+    <Setter Property="Grid.Row" Value="1" />
+    <Setter Property="Grid.Column" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="Margin" Value="0,12,0,0" />
+  </Style>
+  <!-- "N disparados · N respondidos" cabe numa linha em 22px; quebra só se os números crescerem -->
+  <Style Selector=".compact UniformGrid.report-tiles TextBlock.stat-value">
+    <Setter Property="FontSize" Value="22" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector=".compact Border.bar">
+    <Setter Property="Width" Value="22" />
+  </Style>
+  <!-- Configurações: cartões na largura toda -->
+  <Style Selector=".compact StackPanel.settings-list">
+    <Setter Property="MaxWidth" Value="Infinity" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
   </Style>
 </Styles>

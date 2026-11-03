@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Ferramenta de desenvolvimento: fora da solução, não entra em dotnet test nem no pacote. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>SlimeGoals.Render</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" />
+    <PackageReference Include="Avalonia.Skia" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SlimeGoals.App\SlimeGoals.App.csproj" />
+    <ProjectReference Include="..\..\src\SlimeGoals.Core\SlimeGoals.Core.csproj" />
+    <ProjectReference Include="..\..\src\SlimeGoals.Infrastructure\SlimeGoals.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

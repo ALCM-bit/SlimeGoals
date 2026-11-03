@@ -47,6 +47,12 @@ public class ShellViewModelTests
     }
 
     [Fact]
+    public void Pages_have_bottom_nav_icon_keys()
+    {
+        Create().Pages.Select(p => p.IconKey).Should().Equal("NavToday", "NavGoals", "NavReports", "NavSettings");
+    }
+
+    [Fact]
     public void Navigate_changes_current_page_and_notifies()
     {
         var shell = Create();
@@ -54,6 +60,53 @@ public class ShellViewModelTests
         shell.NavigateCommand.Execute(shell.Pages[2]);
         shell.CurrentPage.Should().BeOfType<ReportsPageViewModel>();
         monitor.Should().RaisePropertyChangeFor(s => s.CurrentPage);
+    }
+}
+
+public class ShellViewModelBackTests
+{
+    private static ShellViewModel Create(PlatformCapabilities? capabilities = null)
+    {
+        var time = new FakeTimeProvider();
+        var goals = new GoalsPageViewModel(new GoalService(new InMemoryGoalRepository(), new InMemoryCheckinRepository(),
+            new InMemoryTimerRepository(), time), time);
+        var reports = new ReportsPageViewModel(new ReportService(new InMemoryGoalRepository(), new InMemoryCheckinRepository(),
+            new InMemoryReminderLogRepository(), time), time, new DataChangeNotifier());
+        return new ShellViewModel([ShellViewModelTests.Today(), goals, reports, ShellViewModelTests.Settings()],
+            capabilities: capabilities);
+    }
+
+    [Fact]
+    public void GoBack_closes_goal_editor_first()
+    {
+        var shell = Create();
+        var goals = (GoalsPageViewModel)shell.Pages[1];
+        shell.CurrentPage = goals;
+        goals.NewCommand.Execute(null);
+        goals.Editor.Should().NotBeNull();
+
+        shell.GoBack().Should().BeTrue();
+
+        goals.Editor.Should().BeNull();
+        shell.CurrentPage.Should().BeSameAs(goals);
+    }
+
+    [Fact]
+    public void GoBack_returns_to_today_then_lets_system_handle()
+    {
+        var shell = Create();
+        shell.CurrentPage = shell.Pages[2];
+
+        shell.GoBack().Should().BeTrue();
+        shell.CurrentPage.Should().BeOfType<TodayPageViewModel>();
+        shell.GoBack().Should().BeFalse();
+    }
+
+    [Fact]
+    public void ShowQuit_follows_capabilities()
+    {
+        Create().ShowQuit.Should().BeTrue();
+        Create(new PlatformCapabilities(false, false, false, false)).ShowQuit.Should().BeFalse();
     }
 }
 

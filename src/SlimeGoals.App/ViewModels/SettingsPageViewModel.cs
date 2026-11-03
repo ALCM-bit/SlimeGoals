@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SlimeGoals.App.Hosting;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Services;
 
@@ -13,14 +14,31 @@ public sealed record SnoozeOptionViewModel(int Minutes, string Label);
 /// Tela Configurações (spec RF08): cada mudança grava na hora; se a gravação falhar, o valor volta ao anterior
 /// e a tela mostra o erro. Carregar não grava nada.
 /// </summary>
-public sealed partial class SettingsPageViewModel(AppSettings settings, IAutostart? autostart = null) : PageViewModel
+public sealed partial class SettingsPageViewModel(AppSettings settings, IAutostart? autostart = null,
+    PlatformCapabilities? capabilities = null) : PageViewModel
 {
+    private readonly PlatformCapabilities _capabilities = capabilities ?? PlatformCapabilities.Desktop;
+
     private const string SaveError = "Não foi possível salvar a configuração.";
     private const string AutostartError = "Não foi possível alterar o início com o sistema.";
 
     private bool _loading;
 
     public override string Title => "Configurações";
+
+    public override string IconKey => "NavSettings";
+
+    /// <summary>Seção "Geral" (início com o sistema).</summary>
+    public bool ShowGeneral => _capabilities.Autostart;
+
+    /// <summary>Seção "Lembretes" (tempo de adiar).</summary>
+    public bool ShowReminders => _capabilities.Reminders;
+
+    /// <summary>Seção "Janela" (ao fechar).</summary>
+    public bool ShowWindow => _capabilities.WindowClose;
+
+    /// <summary>Nenhuma seção se aplica à plataforma: a tela mostra um aviso no lugar.</summary>
+    public bool IsEmpty => !ShowGeneral && !ShowReminders && !ShowWindow;
 
     public bool CanAutostart => autostart is not null;
 

@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using SlimeGoals.App.Hosting;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Services;
@@ -13,6 +14,17 @@ public class SettingsPageViewModelTests
         var vm = new SettingsPageViewModel(new AppSettings(repo), autostart);
         await vm.LoadCommand.ExecuteAsync(null);
         return vm;
+    }
+
+    [Fact]
+    public void Sections_follow_capabilities()
+    {
+        var settings = new AppSettings(new RecordingSettings());
+        var all = new SettingsPageViewModel(settings);
+        var none = new SettingsPageViewModel(settings, null, new PlatformCapabilities(false, false, false, false));
+
+        (all.ShowGeneral, all.ShowReminders, all.ShowWindow, all.IsEmpty).Should().Be((true, true, true, false));
+        (none.ShowGeneral, none.ShowReminders, none.ShowWindow, none.IsEmpty).Should().Be((false, false, false, true));
     }
 
     [Fact]

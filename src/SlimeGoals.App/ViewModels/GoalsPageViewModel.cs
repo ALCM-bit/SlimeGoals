@@ -16,6 +16,8 @@ public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider
 
     public override string Title => "Metas";
 
+    public override string IconKey => "NavGoals";
+
     public ObservableCollection<GoalItemViewModel> Goals { get; } = [];
 
     [ObservableProperty] public partial bool ShowArchived { get; set; }
@@ -143,6 +145,15 @@ public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider
         }
         await LoadCommand.ExecuteAsync(null);
         ErrorMessage ??= error;
+    }
+
+    /// <summary>Voltar do sistema: fecha o editor aberto sem salvar. Devolve falso se não havia editor.</summary>
+    public bool CloseEditorIfOpen()
+    {
+        if (Editor is null)
+            return false;
+        CloseEditor(saved: false);
+        return true;
     }
 
     private void CloseEditor(bool saved)

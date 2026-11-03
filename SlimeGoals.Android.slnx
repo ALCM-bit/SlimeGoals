@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SlimeGoals.Android/SlimeGoals.Android.csproj" />
+    <Project Path="src/SlimeGoals.App/SlimeGoals.App.csproj" />
+    <Project Path="src/SlimeGoals.Core/SlimeGoals.Core.csproj" />
+    <Project Path="src/SlimeGoals.Infrastructure/SlimeGoals.Infrastructure.csproj" />
+  </Folder>
+</Solution>

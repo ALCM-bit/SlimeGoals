@@ -164,12 +164,14 @@ Regras comuns:
     │   │   ├── Styles/            # Theme.axaml (tokens), Controls.axaml
     │   │   └── App.axaml          # inclui o ícone da bandeja
     │   ├── SlimeGoals.Desktop/              # head Linux: Program.cs, DI, liga a instância única e a suspensão ao app (SleepResumeHost)
-    │   └── SlimeGoals.Android/              # head Android: MainActivity, DI, receivers
+    │   └── SlimeGoals.Android/              # head Android: AndroidApplication, MainActivity, AndroidCompositionRoot (7a; receivers na 7b)
+    ├── tools/SlimeGoals.Render/         # renderização headless de cada página (412×915 e 1100×720), fora das soluções
     ├── packaging/linux/                 # build.sh, install.sh, uninstall.sh, slimegoals.desktop.in, make-icons.sh, icons/, licenses/
     ├── tests/
     │   ├── SlimeGoals.Core.Tests/
     │   └── SlimeGoals.Infrastructure.Tests/
-    └── SlimeGoals.sln
+    ├── SlimeGoals.slnx                  # sem o head Android (o `dotnet test` não exige o workload `android`)
+    └── SlimeGoals.Android.slnx          # Core, Infrastructure, App e Android
 
 Ponto de partida: `dotnet new install Avalonia.Templates` e `dotnet new avalonia.xplat -n SlimeGoals` (gera Core de UI + heads desktop/mobile). Depois reorganize para a estrutura acima e aponte todos os projetos para `net10.0` (ou `net10.0-android`).
 
@@ -185,6 +187,8 @@ Ponto de partida: `dotnet new install Avalonia.Templates` e `dotnet new avalonia
 | **Lembrete**      | Notificação nativa do SO com as três ações (janela própria do Avalonia só como fallback)                                                                       |
 
 Navegação: barra lateral à esquerda no desktop (v4) e navegação inferior no Android (v3) com **Hoje, Metas, Relatórios, Configurações** (o protótipo v3 usa "Semana" e "Ajustes"; o MVP padroniza os nomes acima). Os ViewModels são compartilhados; só o shell de navegação muda. O breakpoint de 720 px é o ponto de partida do layout adaptativo.
+
+**Interface no Android (Fase 7a):** o `ShellView` usa a classe `compact` quando sua largura é menor que 720 px (também numa janela estreita no desktop). Nela, a barra lateral dá lugar à navegação inferior (ListBox ligada a `CurrentPage`, com ícones do Lucide: sun, list-checks, chart-column, sliders-horizontal), os tiles do Hoje ficam 2×2, o formulário de meta ocupa a largura com as ações dentro da rolagem, os tiles de Relatórios empilham (barras de 22 px) e Configurações ocupa a largura toda. O botão Voltar do sistema chama `ShellViewModel.GoBack()`: fecha o editor sem salvar; em outra página volta para Hoje; em Hoje devolve falso e o sistema manda o app para segundo plano. O que aparece depende de `PlatformCapabilities(Reminders, Autostart, WindowClose, Quit)`: no desktop tudo verdadeiro; no Android da 7a tudo falso, o que esconde "Próximos lembretes" e "Pausar lembretes" no Hoje, as seções "Geral" e "Janela" em Configurações e o "Sair". O tile "Lembretes" de Relatórios continua visível no Android (a 7b liga os lembretes).
 
 Na tela Hoje, as metas aparecem assim: diária → "3 de 8 copos hoje"; semanal → "2 h 30 de 5 h na semana"; conclusão → "Feito hoje" / "Pendente". Metas cumpridas no período vão para o fim da lista, marcadas como concluídas.
 
@@ -352,7 +356,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 | **4d** | Segundo plano            | Fechar = ocultar, instância única, bandeja opcional (extensão AppIndicator no GNOME). Implementado (verificação manual no GNOME pendente): bandeja com Abrir/Pausar/Sair; pausa também na tela Hoje                                                                                                                                                                                                                                 | Reabrir o app não duplica o processo; notificações funcionam com a janela principal fechada      |
 | **5**  | Relatórios               | `ReportService` por tipo, `ReportsView`, barras em XAML, sequências em dias e semanas. Implementado (verificação manual pelo autor pendente): `DailySums`, `GoalHistory`, `Streaks` e `ReportService` no Core; `ReportsPageViewModel`, `ReportFormatting` e `ReportsView` no App; tile "Sequência" no Hoje; sem tabela nem query nova | Números conferem com os check-ins (testes), inclusive meta arquivada                             |
 | **6**  | Linux: acabamento        | Configurações, autostart XDG, suspensão, ícones, arquivo `slimegoals.desktop` (`StartupWMClass=slimegoals`, para nome/ícone nas notificações), *self-contained* (AppImage ficou fora; `.tar.gz` self-contained) com os textos de licença das dependências. Implementado (verificação manual pelo autor pendente): `AppSettings` e `IAutostart` no Core; `XdgAutostart` e `SleepResumeWatcher` (logind) no Platform.Linux; `AppStartOptions` (`--background`) e `WindowCloseBehavior` no App; `SleepResumeHost` e `WM_CLASS` `slimegoals` no Desktop; tela de Configurações; ícone do slime no app e na bandeja; pacote `slimegoals-<versão>-linux-x64.tar.gz` (~46 MB, sem *trimming*) com `install.sh`/`uninstall.sh` em `~/.local`, textos de licença e versão 0.6.0 | Instalável e estável no GNOME (CachyOS)                                                          |
-| **7a** | Android: UI              | Head Android, shell com navegação inferior (v3), layouts adaptados                                                                                                                                                                                                                                                   | Todas as telas usáveis no celular                                                                |
+| **7a** | Android: UI              | Head Android, shell com navegação inferior (v3), layouts adaptados. Implementado (verificação manual pelo autor pendente): `PlatformCapabilities` e `ShellViewModel.GoBack()` no App; classe `compact` abaixo de 720 px, navegação inferior com ícones, ciclo de vida `IActivityApplicationLifetime` e fundo/fonte do tema sem janela; head `SlimeGoals.Android` (`dev.alcm.slimegoals`, API mínima 26, APK Debug, ícone do slime, banco em `FilesDir`, sem permissões, `NoopNotificationService`, sem `ReminderHost`); `SlimeGoals.Android.slnx`; `tools/SlimeGoals.Render` | Todas as telas usáveis no celular                                                                |
 | **7b** | Android: lembretes       | `AlarmManager`, notificação com ações, permissões, receiver de boot, handler sem UI                                                                                                                                                                                                                                  | Lembrete dispara e as 3 ações funcionam com o app fechado, inclusive após reiniciar o aparelho   |
 | **7c** | Android: distribuição    | APK/AAB assinado, versão mínima do Android definida, textos de licença das dependências incluídos                                                                                                                                                                                                                                                                  | Instalável em um aparelho real                                                                   |
 | **8**  | Mascote (opcional)       | 3–4 poses estáticas na tela Hoje (slime já aprovado)                                                                                                                                                                                                                                                                 | Imagem muda conforme o progresso                                                                 |
@@ -377,7 +381,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 | Ação de notificação perdida quando o processo do app não está rodando                                    | Retirar notificações pendentes ao sair; avaliar ativação D-Bus (`org.gtk.Notifications`/portal) na Fase 4c |
 | Modo Não Perturbe do GNOME silencia os banners                                                           | Documentar; lembretes continuam na central de notificações; avaliar aviso na tela Hoje                    |
 | Android: o sistema encerra o processo e restringe alarmes (Doze, alarme exato, permissão de notificação) | **Validado no emulador (Android 16):** alarme exato e ação funcionam com o processo morto e em Doze. Falta validar restrições de fabricantes num aparelho real e o receiver de boot (Fase 7b) |
-| Suporte mobile do Avalonia menos maduro                                                                  | **Validado no spike:** abertura a frio de 1,0–1,2 s (Debug, emulador); no Android o ciclo de vida é `IActivityApplicationLifetime` |
+| Suporte mobile do Avalonia menos maduro                                                                  | **Validado no spike:** abertura a frio de 1,0–1,2 s (Debug, emulador); no Android o ciclo de vida é `IActivityApplicationLifetime`. **Fase 7a:** app completo com `TotalTime` de 1591 ms na primeira abertura e 1327 ms nas seguintes (Debug, emulador) |
 | Fuso horário e horário de verão                                                                          | Instantes em UTC, datas de calendário locais, conversão na borda via `GoalPeriod`                         |
 | Três tipos de recorrência multiplicam casos de borda                                                     | Regra centralizada em `GoalPeriod`; testes por tipo antes de qualquer tela                                |
 | Semanas e dias parciais                                                                                  | Alvo não proporcionalizado; arquivamento automático ao fim                                                |
@@ -493,3 +497,15 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 1.  Revisar e aprovar esta v1.3.
 2.  Escrever o plano de implementação detalhado das Fases 0 e 1.
 3.  Executar a Fase 0: solução, tema, navegação e os dois spikes.
+
+**Decisões da Fase 7a (03/11/2026):**
+
+1. `PlatformCapabilities(Reminders, Autostart, WindowClose, Quit)`, um registro por head: desktop tudo verdadeiro; Android da 7a tudo falso (a 7b liga `Reminders`); esconde "Próximos lembretes"/"Pausar lembretes", "Geral", "Janela" e "Sair" conforme o caso; a seção "Lembretes" (adiar) continua.
+2. Layout adaptativo por largura, não por plataforma: abaixo de 720 px o `ShellView` usa `compact`; o mínimo de 900 px da janela do desktop continua.
+3. Navegação inferior com os quatro itens e ícones do Lucide (sun, list-checks, chart-column, sliders-horizontal); o item ativo usa `Selected` e `PrimarySoft`.
+4. Voltar: `ShellViewModel.GoBack()` fecha o editor, senão volta para Hoje, senão devolve falso (o sistema decide); no desktop ninguém o chama.
+5. Dados no Android em `<FilesDir>/slimegoals.db` (armazenamento privado), com migrações ao abrir; desinstalar apaga os dados.
+6. Lembretes na 7a: `NoopNotificationService` só para satisfazer o `ReminderService`; sem `ReminderHost` nem agendador; a 7b usa o `AlarmManager`.
+7. Identidade: `dev.alcm.slimegoals`, rótulo "SlimeGoals", API mínima 26, APK Debug, ícone do slime em `mipmap-*`, tema escuro com barras em `#0F0D15`, orientação livre sem recriar a Activity, `AdjustResize` para o teclado.
+8. O head Android fica fora de `SlimeGoals.slnx` e entra em `SlimeGoals.Android.slnx` (Core, Infrastructure, App e Android).
+9. `tools/SlimeGoals.Render`, fora das duas soluções: semeia banco temporário e grava PNGs de cada página em 412×915 (celular, com as capacidades do Android) e 1100×720 (desktop) para revisão dos layouts.

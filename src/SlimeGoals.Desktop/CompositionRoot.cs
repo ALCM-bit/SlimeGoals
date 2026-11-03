@@ -21,6 +21,7 @@ internal static class CompositionRoot
         var services = new ServiceCollection();
 
         // Core — os serviços que escrevem recebem o DataChangeNotifier único (parâmetro opcional preenchido pelo container)
+        services.AddSingleton(PlatformCapabilities.Desktop);
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<DataChangeNotifier>();
         services.AddSingleton<GoalService>();

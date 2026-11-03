@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Head Android: fica fora de SlimeGoals.slnx (exige o workload android); compile com SlimeGoals.Android.slnx. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
+    <RootNamespace>SlimeGoals.Android</RootNamespace>
+    <ApplicationId>dev.alcm.slimegoals</ApplicationId>
+    <ApplicationTitle>SlimeGoals</ApplicationTitle>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>$(Version)</ApplicationDisplayVersion>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Android" />
+    <PackageReference Include="Xamarin.AndroidX.Core.SplashScreen" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SlimeGoals.App\SlimeGoals.App.csproj" />
+    <ProjectReference Include="..\SlimeGoals.Core\SlimeGoals.Core.csproj" />
+    <ProjectReference Include="..\SlimeGoals.Infrastructure\SlimeGoals.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

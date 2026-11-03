@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Time.Testing;
 using SlimeGoals.App.Goals;
+using SlimeGoals.App.Hosting;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
@@ -27,11 +28,21 @@ public class TodayPageViewModelTests
 
     private ReminderPause Pause => new(_settings, _time, _changes);
 
-    private TodayPageViewModel NewPage() => new(
+    private TodayPageViewModel NewPage(PlatformCapabilities? capabilities = null) => new(
         new ProgressService(_goals, _checkins, _timers, _time), CheckinService,
         new TimerService(_goals, _timers, CheckinService, _time), GoalService, _time,
         new ReminderService(_goals, _checkins, _timers, _log, _notifications, new ReminderFormatter(), _time, Pause),
-        _changes, Pause, new ReportService(_goals, _checkins, _log, _time));
+        _changes, Pause, new ReportService(_goals, _checkins, _log, _time), capabilities);
+
+    [Fact]
+    public async Task Without_reminders_hides_upcoming_and_pause()
+    {
+        await Create("Água");
+        var page = NewPage(new PlatformCapabilities(false, true, true, true));
+        await page.LoadCommand.ExecuteAsync(null);
+
+        (page.Upcoming.Count, page.HasUpcoming, page.CanPause, page.ShowReminders).Should().Be((0, false, false, false));
+    }
 
     private async Task<TodayPageViewModel> Loaded()
     {

@@ -3,7 +3,7 @@
              xmlns:vm="using:SlimeGoals.App.ViewModels"
              x:Class="SlimeGoals.App.Views.SettingsView"
              x:DataType="vm:SettingsPageViewModel">
-  <DockPanel Margin="8,4,8,0">
+  <DockPanel Classes="page">
     <TextBlock DockPanel.Dock="Top" Classes="page-title" Text="{Binding Title}" Margin="0,0,0,16" />
 
     <Border DockPanel.Dock="Top" Classes="warning-band" Margin="0,0,0,12"
@@ -12,8 +12,8 @@
     </Border>
 
     <ScrollViewer>
-      <StackPanel Spacing="16" MaxWidth="640" HorizontalAlignment="Left" Margin="0,0,0,14">
-        <Border Classes="card">
+      <StackPanel Classes="settings-list" Spacing="16" Margin="0,0,0,14">
+        <Border Classes="card" IsVisible="{Binding ShowGeneral}">
           <StackPanel Spacing="12">
             <TextBlock Classes="section-title" Text="Geral" />
             <ToggleSwitch MinHeight="44" Content="Iniciar com o sistema" OnContent="" OffContent="" IsChecked="{Binding StartWithSystem}"
@@ -25,7 +25,12 @@
           </StackPanel>
         </Border>
 
-        <Border Classes="card">
+        <Border Classes="card" IsVisible="{Binding IsEmpty}">
+          <TextBlock Text="Nada para configurar por enquanto. Os lembretes chegam ao Android na próxima versão."
+                     Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+        </Border>
+
+        <Border Classes="card" IsVisible="{Binding ShowReminders}">
           <StackPanel Spacing="12">
             <TextBlock Classes="section-title" Text="Lembretes" />
             <TextBlock Text="Adiar lembretes por" />
@@ -40,7 +45,7 @@
           </StackPanel>
         </Border>
 
-        <Border Classes="card">
+        <Border Classes="card" IsVisible="{Binding ShowWindow}">
           <StackPanel Spacing="12">
             <TextBlock Classes="section-title" Text="Janela" />
             <TextBlock Text="Ao fechar a janela" />

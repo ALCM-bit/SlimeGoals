@@ -7,6 +7,9 @@ public abstract class PageViewModel : ObservableObject
 {
     public abstract string Title { get; }
 
+    /// <summary>Chave do ícone da navegação inferior (recurso <c>Icon{IconKey}</c> do tema); vazio = sem ícone.</summary>
+    public virtual string IconKey => "";
+
     /// <summary>Chamado pelo shell quando a página passa a ser exibida (ex.: recarregar dados).</summary>
     public virtual void Activate() { }
 }

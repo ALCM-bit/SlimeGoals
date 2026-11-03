@@ -4,6 +4,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SlimeGoals.App.Goals;
+using SlimeGoals.App.Hosting;
 using SlimeGoals.Core;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
@@ -21,8 +22,10 @@ public sealed record UpcomingReminderViewModel(string Time, string Title);
 /// </summary>
 public sealed partial class TodayPageViewModel(ProgressService progress, CheckinService checkins, TimerService timers,
     GoalService goals, TimeProvider time, ReminderService reminders, DataChangeNotifier changes,
-    ReminderPause? pause = null, ReportService? reports = null) : PageViewModel
+    ReminderPause? pause = null, ReportService? reports = null, PlatformCapabilities? capabilities = null) : PageViewModel
 {
+    private readonly bool _reminders = (capabilities ?? PlatformCapabilities.Desktop).Reminders;
+
     private bool _subscribed;
     private int _loadVersion;
     private ITimer? _ticker;
@@ -31,6 +34,8 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     private string _offscreenTitle = "";
 
     public override string Title => "Hoje";
+
+    public override string IconKey => "NavToday";
 
     public ObservableCollection<TodayGoalViewModel> Goals { get; } = [];
 
@@ -46,7 +51,10 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     public string PauseButtonText => IsPaused ? "Retomar lembretes" : "Pausar lembretes";
 
     /// <summary>Botão "Pausar lembretes" do cabeçalho: só sem pausa e com a pausa disponível.</summary>
-    public bool CanPause => pause is not null && !IsPaused;
+    public bool CanPause => _reminders && pause is not null && !IsPaused;
+
+    /// <summary>Próximos lembretes e pausa só existem onde a plataforma tem lembretes.</summary>
+    public bool ShowReminders => _reminders;
 
     [ObservableProperty] public partial int WeekPercent { get; set; }
     [ObservableProperty] public partial int InProgress { get; set; }
@@ -139,6 +147,8 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     /// <summary>Falha aqui só esconde a seção: o resto da tela Hoje continua valendo.</summary>
     private async Task LoadUpcomingAsync(int version)
     {
+        if (!_reminders)
+            return;
         IReadOnlyList<UpcomingReminder> upcoming;
         var paused = false;
         try

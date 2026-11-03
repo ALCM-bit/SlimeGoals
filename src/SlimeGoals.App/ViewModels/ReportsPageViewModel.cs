@@ -27,6 +27,8 @@ public sealed partial class ReportsPageViewModel(ReportService reports, TimeProv
 
     public override string Title => "Relatórios";
 
+    public override string IconKey => "NavReports";
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsWeek), nameof(IsMonth))]
     public partial ReportMode Mode { get; set; }
