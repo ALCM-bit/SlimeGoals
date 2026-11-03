@@ -513,7 +513,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 1. Agendador do Android no Core (`SystemAlarmReminderScheduler`, porta `ISystemAlarm`), testável sem o workload `android`; `AndroidSystemAlarm` só arma e cancela.
 2. Um alarme só, no próximo lembrete; sem lembrete futuro (sem metas, todas cumpridas, pausado) o alarme é cancelado; sem alarme à meia-noite.
 3. Falha ao sincronizar arma nova tentativa em 15 min e registra em `Trace`.
-4. Pendentes não expiram ao abrir o app no Android; valem as outras regras da §9.6.
+4. Pendentes não expiram ao abrir o app no Android; valem as outras regras da §9.6. Notificação deixada na gaveta depois da janela ou do dia segue lá até a próxima sincronização; uma ação sobre lembrete disparado antes de hoje é tratada como obsoleta (registrada como ignorada, nada é gravado).
 5. Sem permissão de alarme exato, lembretes inexatos (`SetAndAllowWhileIdle`) e aviso no Hoje; reagenda exato quando a permissão volta; `USE_EXACT_ALARM` descartada.
 6. Notificação: canal `lembretes` (importância alta), uma por disparo (tag = id do registro), ação principal, "Adiar" e "Ignorar"; corpo abre o app; arrastar conta como ignorar; ícone do slime em silhueta, destaque `#9B7BEA`.
 7. "Iniciar" com outro cronômetro rodando: a notificação vira "Outro cronômetro está rodando. Toque para abrir o app." sem botões (restrição de *trampoline* do Android 12+); o registro segue pendente.
