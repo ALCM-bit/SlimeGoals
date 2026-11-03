@@ -1,6 +1,153 @@
+using System.Diagnostics;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using SlimeGoals.Core.Abstractions;
+using SlimeGoals.Core.Services;
+
 namespace SlimeGoals.App.ViewModels;
 
-public sealed class SettingsPageViewModel : PageViewModel
+/// <summary>Uma opção do adiar na lista de Configurações.</summary>
+public sealed record SnoozeOptionViewModel(int Minutes, string Label);
+
+/// <summary>
+/// Tela Configurações (spec RF08): cada mudança grava na hora; se a gravação falhar, o valor volta ao anterior
+/// e a tela mostra o erro. Carregar não grava nada.
+/// </summary>
+public sealed partial class SettingsPageViewModel(AppSettings settings, IAutostart? autostart = null) : PageViewModel
 {
+    private const string SaveError = "Não foi possível salvar a configuração.";
+    private const string AutostartError = "Não foi possível alterar o início com o sistema.";
+
+    private bool _loading;
+
     public override string Title => "Configurações";
+
+    public bool CanAutostart => autostart is not null;
+
+    public string? AutostartUnavailableText => autostart is null ? "Indisponível neste sistema." : null;
+
+    public IReadOnlyList<SnoozeOptionViewModel> SnoozeOptions { get; } =
+        [.. AppSettings.SnoozeOptions.Select(m => new SnoozeOptionViewModel(m, m == 60 ? "1 h" : $"{m} min"))];
+
+    [ObservableProperty] public partial bool StartWithSystem { get; set; }
+
+    [ObservableProperty] public partial SnoozeOptionViewModel? SelectedSnooze { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CloseQuits), nameof(CloseHint))]
+    public partial bool CloseHides { get; set; } = true;
+
+    /// <summary>Segmento "Encerrar o app" (RadioButton, dois sentidos); par de <see cref="CloseHides"/>.</summary>
+    public bool CloseQuits
+    {
+        get => !CloseHides;
+        set
+        {
+            if (value)
+                CloseHides = false;
+        }
+    }
+
+    public string CloseHint => CloseHides
+        ? "Os lembretes continuam com a janela fechada."
+        : "Com o app fechado, os lembretes param.";
+
+    [ObservableProperty] public partial string? ErrorMessage { get; set; }
+
+    /// <summary>Última gravação disparada por uma mudança na tela (para quem precisa esperar o fim dela).</summary>
+    public Task LastSave { get; private set; } = Task.CompletedTask;
+
+    public override void Activate() => LoadCommand.Execute(null);
+
+    [RelayCommand]
+    private async Task LoadAsync()
+    {
+        ErrorMessage = null;
+        try
+        {
+            var snooze = await settings.GetSnoozeMinutesAsync();
+            var close = await settings.GetCloseActionAsync();
+            var enabled = autostart?.IsEnabled() ?? false;
+            _loading = true;
+            try
+            {
+                StartWithSystem = enabled;
+                SelectedSnooze = SnoozeOptions.FirstOrDefault(o => o.Minutes == snooze);
+                CloseHides = close == CloseAction.Hide;
+            }
+            finally
+            {
+                _loading = false;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Trace.TraceError($"Falha ao carregar as configurações: {ex}");
+            ErrorMessage = "Não foi possível carregar a configuração.";
+        }
+    }
+
+    partial void OnStartWithSystemChanged(bool oldValue, bool newValue)
+    {
+        if (_loading || autostart is null)
+            return;
+        ErrorMessage = null;
+        try
+        {
+            if (newValue)
+                autostart.Enable();
+            else
+                autostart.Disable();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Trace.TraceError($"Falha ao alterar o início com o sistema: {ex}");
+            Revert(() => StartWithSystem = oldValue);
+            ErrorMessage = AutostartError;
+        }
+    }
+
+    partial void OnSelectedSnoozeChanged(SnoozeOptionViewModel? oldValue, SnoozeOptionViewModel? newValue)
+    {
+        if (_loading || newValue is null)
+            return;
+        LastSave = SaveAsync(() => settings.SetSnoozeMinutesAsync(newValue.Minutes), () => SelectedSnooze = oldValue);
+    }
+
+    partial void OnCloseHidesChanged(bool oldValue, bool newValue)
+    {
+        if (_loading)
+            return;
+        LastSave = SaveAsync(
+            () => settings.SetCloseActionAsync(newValue ? CloseAction.Hide : CloseAction.Quit),
+            () => CloseHides = oldValue);
+    }
+
+    private async Task SaveAsync(Func<Task> save, Action revert)
+    {
+        ErrorMessage = null;
+        try
+        {
+            await save();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Trace.TraceError($"Falha ao salvar a configuração: {ex}");
+            Revert(revert);
+            ErrorMessage = SaveError;
+        }
+    }
+
+    private void Revert(Action revert)
+    {
+        _loading = true;
+        try
+        {
+            revert();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
 }

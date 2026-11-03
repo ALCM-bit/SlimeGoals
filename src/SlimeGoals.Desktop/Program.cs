@@ -56,7 +56,7 @@ internal static class Program
 
         using (guard)
         {
-            using var services = CompositionRoot.Build(databasePath, options);
+            using var services = CompositionRoot.Build(databasePath, home, options);
             using (var connection = services.GetRequiredService<SqliteConnectionFactory>().Open())
                 MigrationRunner.Migrate(connection);
 

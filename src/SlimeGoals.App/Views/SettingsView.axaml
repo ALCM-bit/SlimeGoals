@@ -3,6 +3,59 @@
              xmlns:vm="using:SlimeGoals.App.ViewModels"
              x:Class="SlimeGoals.App.Views.SettingsView"
              x:DataType="vm:SettingsPageViewModel">
-  <!-- Placeholder da Fase 0: conteúdo real nas próximas fases -->
-  <TextBlock Classes="page-title" Text="{Binding Title}" Margin="8,4" />
+  <DockPanel Margin="8,4,8,0">
+    <TextBlock DockPanel.Dock="Top" Classes="page-title" Text="{Binding Title}" Margin="0,0,0,16" />
+
+    <Border DockPanel.Dock="Top" Classes="warning-band" Margin="0,0,0,12"
+            IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
+    </Border>
+
+    <ScrollViewer>
+      <StackPanel Spacing="16" MaxWidth="640" HorizontalAlignment="Left" Margin="0,0,0,14">
+        <Border Classes="card">
+          <StackPanel Spacing="12">
+            <TextBlock Classes="section-title" Text="Geral" />
+            <ToggleSwitch MinHeight="44" Content="Iniciar com o sistema" IsChecked="{Binding StartWithSystem}"
+                          IsEnabled="{Binding CanAutostart}" />
+            <TextBlock Text="Abre em segundo plano ao entrar na sessão." Foreground="{DynamicResource Muted}"
+                       TextWrapping="Wrap" IsVisible="{Binding CanAutostart}" />
+            <TextBlock Text="{Binding AutostartUnavailableText}" Foreground="{DynamicResource Muted}"
+                       TextWrapping="Wrap" IsVisible="{Binding !CanAutostart}" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel Spacing="12">
+            <TextBlock Classes="section-title" Text="Lembretes" />
+            <TextBlock Text="Adiar lembretes por" />
+            <ComboBox MinHeight="44" MinWidth="160" HorizontalAlignment="Left" ItemsSource="{Binding SnoozeOptions}"
+                      SelectedItem="{Binding SelectedSnooze}" AutomationProperties.Name="Adiar lembretes por">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:SnoozeOptionViewModel">
+                  <TextBlock Text="{Binding Label}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel Spacing="12">
+            <TextBlock Classes="section-title" Text="Janela" />
+            <TextBlock Text="Ao fechar a janela" />
+            <Border Classes="segment" HorizontalAlignment="Left">
+              <StackPanel Orientation="Horizontal">
+                <RadioButton Classes="segment" GroupName="close-action" Content="Manter em segundo plano"
+                             IsChecked="{Binding CloseHides}" />
+                <RadioButton Classes="segment" GroupName="close-action" Content="Encerrar o app"
+                             IsChecked="{Binding CloseQuits}" />
+              </StackPanel>
+            </Border>
+            <TextBlock Text="{Binding CloseHint}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
 </UserControl>

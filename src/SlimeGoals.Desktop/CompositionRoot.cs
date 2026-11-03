@@ -5,6 +5,8 @@ using SlimeGoals.App.ViewModels;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Infrastructure;
+using SlimeGoals.Platform.Linux;
+using SlimeGoals.Platform.Linux.Autostart;
 using SlimeGoals.Platform.Linux.Notifications;
 using SlimeGoals.Platform.Linux.Power;
 using SlimeGoals.Platform.Linux.Scheduling;
@@ -14,7 +16,7 @@ namespace SlimeGoals.Desktop;
 /// <summary>Raiz de composição do head Linux: único lugar que conhece todas as camadas (spec §5).</summary>
 internal static class CompositionRoot
 {
-    public static ServiceProvider Build(string databasePath, AppStartOptions options)
+    public static ServiceProvider Build(string databasePath, string home, AppStartOptions options)
     {
         var services = new ServiceCollection();
 
@@ -47,6 +49,8 @@ internal static class CompositionRoot
         services.AddSingleton<WindowCloseBehavior>();
         services.AddSingleton<IAppHostedService>(sp => sp.GetRequiredService<WindowCloseBehavior>());
         services.AddSingleton<IAppHostedService, ReminderHost>();
+        services.AddSingleton<IAutostart>(_ => new XdgAutostart(
+            XdgPaths.AutostartDirectory(Environment.GetEnvironmentVariable, home), Environment.ProcessPath!));
         services.AddSingleton<ISleepSignalSource, LogindSleepSignalSource>();
         services.AddSingleton<SleepResumeWatcher>();
         services.AddSingleton<IAppHostedService, SleepResumeHost>();
