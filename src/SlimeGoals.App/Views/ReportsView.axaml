@@ -3,6 +3,119 @@
              xmlns:vm="using:SlimeGoals.App.ViewModels"
              x:Class="SlimeGoals.App.Views.ReportsView"
              x:DataType="vm:ReportsPageViewModel">
-  <!-- Placeholder da Fase 0: conteúdo real nas próximas fases -->
-  <TextBlock Classes="page-title" Text="{Binding Title}" Margin="8,4" />
+  <DockPanel Margin="8,4,8,0">
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+      <TextBlock Classes="page-title" Text="{Binding Title}" VerticalAlignment="Center" />
+      <Border Grid.Column="1" Classes="segment">
+        <StackPanel Orientation="Horizontal">
+          <RadioButton Classes="segment" GroupName="reports-mode" Content="Semana" IsChecked="{Binding IsWeek}" />
+          <RadioButton Classes="segment" GroupName="reports-mode" Content="Mês" IsChecked="{Binding IsMonth}" />
+        </StackPanel>
+      </Border>
+    </Grid>
+
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,16">
+      <Button Classes="ghost icon" AutomationProperties.Name="Período anterior" ToolTip.Tip="Período anterior"
+              Command="{Binding PreviousCommand}">
+        <Path Classes="btn-icon" Data="{StaticResource IconChevronLeft}" />
+      </Button>
+      <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Center">
+        <TextBlock Text="{Binding PeriodTitle}" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" />
+        <TextBlock Text="{Binding PeriodSubtitle}" Foreground="{DynamicResource Muted}" FontSize="12"
+                   HorizontalAlignment="Center"
+                   IsVisible="{Binding PeriodSubtitle, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
+      <Button Grid.Column="2" Classes="ghost icon" AutomationProperties.Name="Próximo período" ToolTip.Tip="Próximo período"
+              Command="{Binding NextCommand}">
+        <Path Classes="btn-icon" Data="{StaticResource IconChevronRight}" />
+      </Button>
+    </Grid>
+
+    <Border DockPanel.Dock="Top" Classes="warning-band" Margin="0,0,0,12"
+            IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
+    </Border>
+
+    <ScrollViewer>
+      <StackPanel Margin="0,0,0,14">
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,0,0,16">
+          <Border Classes="stat">
+            <StackPanel>
+              <TextBlock Classes="stat-label" Text="Cumprido" />
+              <TextBlock Classes="stat-value" Text="{Binding PercentText}" />
+            </StackPanel>
+          </Border>
+          <Border Grid.Column="1" Classes="stat"
+                  IsVisible="{Binding RemindersText, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <StackPanel>
+              <TextBlock Classes="stat-label" Text="Lembretes" />
+              <TextBlock Classes="stat-value" Text="{Binding RemindersText}" />
+            </StackPanel>
+          </Border>
+        </Grid>
+
+        <Border Classes="card" Margin="0,0,0,16">
+          <StackPanel Spacing="12">
+            <TextBlock Classes="section-title" Text="{Binding BarsTitle}" />
+            <ItemsControl ItemsSource="{Binding Bars}" Height="150">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <UniformGrid Rows="1" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:BarViewModel">
+                  <Grid RowDefinitions="Auto,*,Auto" RowSpacing="4">
+                    <TextBlock Classes="bar-label" Classes.current="{Binding IsCurrent}" Text="{Binding Value}" />
+                    <Border Grid.Row="1" Classes="bar" Classes.current="{Binding IsCurrent}"
+                            Height="{Binding BarHeight}" />
+                    <TextBlock Grid.Row="2" Classes="bar-label" Classes.current="{Binding IsCurrent}" Text="{Binding Label}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <TextBlock Classes="section-title" Text="Metas" Margin="0,0,0,10" />
+        <TextBlock Text="{Binding EmptyMessage}" IsVisible="{Binding IsEmpty}" Foreground="{DynamicResource Muted}"
+                   HorizontalAlignment="Center" FontSize="15" Margin="0,16" />
+        <ItemsControl ItemsSource="{Binding Rows}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ReportRowViewModel">
+              <Border Classes="card" Margin="0,0,0,10">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                  <Border Classes="icon-tile" VerticalAlignment="Top"
+                          Background="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Bg}">
+                    <Viewbox Width="22" Height="22">
+                      <Canvas Width="24" Height="24">
+                        <Path Classes="goal-icon" Data="{Binding IconKey, Converter={StaticResource IconGeometry}}"
+                              Stroke="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
+                      </Canvas>
+                    </Viewbox>
+                  </Border>
+                  <StackPanel Grid.Column="1" Spacing="6">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      <Border Classes="tag" IsVisible="{Binding IsArchived}">
+                        <TextBlock Text="Arquivada" />
+                      </Border>
+                    </StackPanel>
+                    <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource Muted}" FontSize="13" TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                      <ProgressBar Classes="goal" Minimum="0" Maximum="1" Value="{Binding PercentFraction}"
+                                   VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Text="{Binding PercentText}" FontWeight="SemiBold" />
+                    </Grid>
+                    <TextBlock Text="{Binding Extra}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap"
+                               IsVisible="{Binding Extra, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
 </UserControl>

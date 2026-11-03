@@ -310,4 +310,31 @@
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
     <Setter Property="Padding" Value="14,12" />
   </Style>
+  <Style Selector="Border.bar">
+    <Setter Property="Width" Value="30" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="VerticalAlignment" Value="Bottom" />
+    <Setter Property="Background" Value="{DynamicResource BarIdle}" />
+  </Style>
+  <Style Selector="Border.bar.current">
+    <Setter Property="Background" Value="{DynamicResource Primary}" />
+  </Style>
+  <Style Selector="TextBlock.bar-label">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="TextBlock.bar-label.current">
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+  </Style>
+  <Style Selector="Border.tag">
+    <Setter Property="Background" Value="{DynamicResource BarIdle}" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="8,2" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.tag TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
 </Styles>
