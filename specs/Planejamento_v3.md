@@ -143,7 +143,7 @@ Regras comuns:
     ├── specs/                           # especificações e protótipos (versionados)
     ├── src/
     │   ├── SlimeGoals.Core/                 # net10.0
-    │   │   ├── Domain/            # Goal, Recurrence, GoalPeriod, Checkin, ReminderLog, Report
+    │   │   ├── Domain/            # Goal, Recurrence, GoalPeriod, Checkin, ReminderLog, Report, DailySums, GoalHistory, Streaks
     │   │   ├── Services/          # GoalService, CheckinService, ProgressService, ReportService, ReminderPlanner, ReminderResponseHandler
     │   │   └── Abstractions/      # interfaces acima
     │   ├── SlimeGoals.Infrastructure/       # net10.0 (portátil)
@@ -175,10 +175,10 @@ Ponto de partida: `dotnet new install Avalonia.Templates` e `dotnet new avalonia
 
 | Tela              | Conteúdo                                                                                                                                                       |
 |-------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Hoje**          | Resumo da semana (%, metas em andamento/concluídas; sequência a partir da Fase 5); lista "Metas de hoje" com progresso no período atual e controles por medida (Feito/Desmarcar; −/+ e painel com valor e nota; cronômetro ▶/⏹ e lançamento manual); próximos lembretes do dia (Fase 4) |
+| **Hoje**          | Resumo da semana (%, metas em andamento/concluídas; tile "Sequência": maior sequência atual entre as metas ativas, com o título da meta); lista "Metas de hoje" com progresso no período atual e controles por medida (Feito/Desmarcar; −/+ e painel com valor e nota; cronômetro ▶/⏹ e lançamento manual); próximos lembretes do dia (Fase 4) |
 | **Metas**         | Lista (filtro ativas/arquivadas), criar, editar, arquivar, desarquivar. Meta arquivada é somente leitura (só desarquivar ou excluir)                            |
 | **Editar meta**   | Título, tipo (diária/semanal), medida (conclusão/quantidade/tempo; travada após o primeiro registro), alvo (+ unidade na quantidade; h + min no tempo; oculto na conclusão), ícone e cor, intervalo, horário ativo, dias da semana, início e fim opcionais. Abre como página no lugar da lista (desktop e celular); excluir com confirmação na própria página |
-| **Relatórios**    | Alternar semanal/mensal, navegar entre períodos, barras por dia/semana + tabela por meta                                                                       |
+| **Relatórios**    | Segmentos Semana/Mês e botões Anterior/Próximo (abre no período atual; Próximo desabilitado nele; Anterior sem limite). Resumo (% cumprido, lembretes disparados vs. respondidos na semana), barras ("Registros por dia" na semana, "Evolução por semana" no mês) e tabela "Metas" com sequências; meta arquivada leva a tag "Arquivada". Período sem metas: "Nenhuma meta neste período." |
 | **Configurações** | Autostart, duração do "adiar", ao fechar a janela (desktop)                                                                                                     |
 | **Lembrete**      | Notificação nativa do SO com as três ações (janela própria do Avalonia só como fallback)                                                                       |
 
@@ -272,31 +272,26 @@ No Linux, o arquivo fica em `$XDG_DATA_HOME` (padrão `~/.local/share/SlimeGoals
 
 ## 10. Relatórios
 
-Calculados por query + Core (`GoalPeriod`), sem tabela própria. Pontos obrigatórios: ignorar registros com `deleted_at`; incluir metas arquivadas quando estavam ativas no período (RF09); converter os limites locais para UTC; semana sempre de segunda a domingo.
+Sem tabela própria e sem query nova nos repositórios. Cada relatório faz uma leitura de registros do período (`deleted_at` ignorado pelos repositórios), agrupa por dia local no Core (`DailySums`) e calcula o resto em `GoalHistory`, `Streaks` e `ReportService` (`GetWeekAsync`, `GetMonthAsync`, `MonthRange`, `GetTopStreakAsync`). Limites locais convertidos para UTC com `DateRange.ToUtc`; semana sempre de segunda a domingo; metas arquivadas entram quando estavam ativas no período (RF09).
 
 **Semanal:**
 
 | Tipo     | O que mostra                                                                       |
 |----------|------------------------------------------------------------------------------------|
 | `weekly` | soma vs. alvo na unidade da meta, % cumprido, melhor dia                           |
-| `daily`  | dias cumpridos / dias ativos da semana, %                                          |
+| `daily`  | dias cumpridos / dias contados da semana, %                                        |
 | Geral    | registros por dia (barras), lembretes disparados vs. respondidos                   |
 
-**Mensal:** por meta, períodos cumpridos no mês (semanas para `weekly`, dias para `daily`), evolução semana a semana, sequência atual e maior sequência na unidade do tipo. Só contam os períodos em que a meta estava ativa. Semanas que cruzam a virada do mês pertencem ao mês da sua segunda-feira.
+**Mensal:** por meta, períodos cumpridos no mês (semanas para `weekly`, dias para `daily`), evolução semana a semana, sequência atual e maior sequência na unidade do tipo. O mês são as semanas cuja segunda-feira cai nele, inteiras; o cabeçalho mostra o intervalo real.
 
-A query abaixo é **ilustrativa** (base para metas semanais) e será refinada na Fase 5:
+**Regras da Fase 5:**
 
-```sql
-SELECT g.id, g.title, g.recurrence, g.target, COALESCE(SUM(c.amount), 0) AS done
-FROM goals g
-LEFT JOIN checkins c
-       ON c.goal_id = g.id AND c.deleted_at IS NULL
-      AND c.done_at >= @start AND c.done_at < @end
-WHERE g.deleted_at IS NULL
-  AND (g.archived_at IS NULL OR g.archived_at >= @start)
-  AND (g.start_date IS NULL OR g.start_date <= @endLocalDate)
-GROUP BY g.id;
-```
+- **Período contado.** Uma meta conta num dia quando ele está entre a data local de criação e a de arquivamento (inclusive), dentro do início e fim da meta e não é futuro. Diária: só dias ativos. Semanal: a semana conta se ao menos um dia dela conta; a soma usa o período de avaliação recortado. O período em andamento (hoje, semana atual) só entra quando já cumprido; em aberto, não reduz o % nem quebra a sequência.
+- **% cumprido.** Diária: dias cumpridos ÷ dias contados. Semanal na semana: soma ÷ alvo, até 100% (a semana em andamento mostra o parcial). Semanal no mês: semanas cumpridas ÷ semanas contadas. Sem período contado, "—". O % geral é a média dos % que têm valor, com `MidpointRounding.AwayFromZero`. Difere do % do Hoje, em que a diária conta a fração parcial de cada dia.
+- **Barras.** Semana: registros por dia local, só com valor positivo (ajustes negativos são correções). Mês: média dos % das metas em cada semana.
+- **Lembretes.** Disparados = entradas do log no intervalo; respondidos = Feito ou Adiar. Ignorar e expiração ficam gravados do mesmo jeito (§9) e não contam como resposta.
+- **Sequências.** Calculadas sobre todo o histórico da meta até o fim do período mostrado ou até hoje. Num mês passado aparecem como estavam no fim dele. Dias inativos da diária não quebram a sequência; meta arquivada para no dia do arquivamento.
+- **Melhor dia** (só semanal): dia de maior soma positiva; no empate, o mais cedo.
 
 ## 11. Design system (tokens)
 
@@ -353,7 +348,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 | **4b** | Agendador + resposta     | Scheduler Linux (timer único), `ReminderResponseHandler`                                                                                                                                                                                                                                                             | Disparo no horário e 3 ações funcionando                                                         |
 | **4c** | Notificação nativa Linux | Adaptador DBus; expiração = ignorado. A janela principal fica aberta ou minimizada até a 4d (fechar ainda encerra o app); sem fallback em janela (fica para a Fase 6, se preciso)                                                                                                                                                                                                                                                            | Notificação com ações funciona no GNOME (janela aberta ou minimizada)                            |
 | **4d** | Segundo plano            | Fechar = ocultar, instância única, bandeja opcional (extensão AppIndicator no GNOME). Implementado (verificação manual no GNOME pendente): bandeja com Abrir/Pausar/Sair; pausa também na tela Hoje                                                                                                                                                                                                                                 | Reabrir o app não duplica o processo; notificações funcionam com a janela principal fechada      |
-| **5**  | Relatórios               | `ReportService` por tipo, `ReportsView`, barras em XAML, sequências em dias e semanas                                                                                                                                                                                                                                | Números conferem com os check-ins (testes), inclusive meta arquivada                             |
+| **5**  | Relatórios               | `ReportService` por tipo, `ReportsView`, barras em XAML, sequências em dias e semanas. Implementado (verificação manual pelo autor pendente): `DailySums`, `GoalHistory`, `Streaks` e `ReportService` no Core; `ReportsPageViewModel`, `ReportFormatting` e `ReportsView` no App; tile "Sequência" no Hoje; sem tabela nem query nova | Números conferem com os check-ins (testes), inclusive meta arquivada                             |
 | **6**  | Linux: acabamento        | Configurações, autostart XDG, suspensão, ícones, arquivo `slimegoals.desktop` (`StartupWMClass=slimegoals`, para nome/ícone nas notificações), AppImage ou *self-contained* com os textos de licença das dependências                                                                                                                                                                                                                    | Instalável e estável no GNOME (CachyOS)                                                          |
 | **7a** | Android: UI              | Head Android, shell com navegação inferior (v3), layouts adaptados                                                                                                                                                                                                                                                   | Todas as telas usáveis no celular                                                                |
 | **7b** | Android: lembretes       | `AlarmManager`, notificação com ações, permissões, receiver de boot, handler sem UI                                                                                                                                                                                                                                  | Lembrete dispara e as 3 ações funcionam com o app fechado, inclusive após reiniciar o aparelho   |
@@ -366,9 +361,9 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 
 ## 13. Estratégia de testes
 
-- **Core (unitários):** `GoalPeriod` (dois tipos, recorte por início/fim, virada de semana, horário de verão), `ReminderPlanner`, progresso, sequências, `ReportService`. Use `FakeTimeProvider` e fuso explícito nos testes.
-- **Infrastructure (integração):** SQLite em memória (`Data Source=:memory:`) para repositórios e migrações, incluindo as restrições `CHECK`.
-- **UI:** testes de ViewModel (sem renderizar); validação visual manual contra os protótipos.
+- **Core (unitários):** `GoalPeriod` (dois tipos, recorte por início/fim, virada de semana, horário de verão), `ReminderPlanner`, progresso, `GoalHistory` (períodos contados), `Streaks`, `ReportService`. Use `FakeTimeProvider` e fuso explícito nos testes.
+- **Infrastructure (integração):** SQLite em memória (`Data Source=:memory:`) para repositórios e migrações, incluindo as restrições `CHECK`, e um teste dos relatórios com meta arquivada e registro excluído.
+- **UI:** testes de ViewModel (sem renderizar; inclui `ReportsPageViewModel`); validação visual manual contra os protótipos.
 
 ## 14. Riscos e decisões em aberto
 
@@ -462,6 +457,20 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 - Se a aquisição da instância única lançar exceção, o app abre sem ela (registro em `Trace`).
 - Pedido de mostrar a janela antes de ela existir é ignorado (vale também para o "Abrir" da notificação).
 - O `.lock` permanece no disco ao encerrar (apagar disputaria com outro processo); só o `.sock` é apagado.
+
+**Decisões da Fase 5 (03/11/2026):**
+
+- Período contado: entre criação e arquivamento (datas locais), dentro do início/fim da meta, nunca futuro; diária só em dias ativos, semanal se ao menos um dia conta.
+- Período em andamento só entra na contagem quando já cumprido; em aberto, não reduz o % nem quebra a sequência.
+- % cumprido: diária = dias cumpridos ÷ contados; semanal na semana = soma ÷ alvo (até 100%); no mês = semanas cumpridas ÷ contadas; sem período, "—"; geral = média dos que têm valor.
+- O % dos relatórios (dia cumprido ou não) difere do % do Hoje (fração parcial por dia).
+- Mês = semanas cuja segunda-feira cai nele, inteiras, também para diárias; domingo 01/11/2026 pertence a outubro.
+- Barras da semana contam só registros positivos; barras do mês são a média dos % das metas por semana.
+- Lembretes: respondidos = Feito ou Adiar; Ignorar e expiração não contam.
+- Sequências sobre todo o histórico até o fim do período mostrado ou hoje; mês passado "como estava"; dias inativos não quebram; arquivada para no arquivamento.
+- Melhor dia (semanal): maior soma positiva; empate, o mais cedo.
+- Tile "Sequência" do Hoje: maior sequência atual entre as ativas (semana = 7 dias; empate, meta mais antiga); sem sequência, "0 dias" sem título.
+- Navegação: abre no período atual; Próximo desabilitado nele; Anterior sem limite; período sem metas mostra "Nenhuma meta neste período.".
 
 **Pendências:** versão mínima do Android (Fase 7c; sugestão do spike: Android 8.0, API 26); sincronização entre dispositivos (fora do MVP).
 
