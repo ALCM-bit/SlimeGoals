@@ -253,6 +253,23 @@ public class ReminderServiceTests
         next.Should().Be(Today(16));
     }
 
+    [Fact]
+    public async Task Snooze_uses_configured_minutes()
+    {
+        await _settings.SetAsync(AppSettings.SnoozeMinutesKey, "30");
+        await Add();
+        var service = new ReminderService(_goals, _checkins, _timers, _log, _notifications, new FakeFormatter(), _time,
+            settings: new AppSettings(_settings));
+        At(10);
+        await service.SyncAsync();
+        var fired = _notifications.Shown.Should().ContainSingle().Subject.LogId;
+        await _log.RespondAsync(fired, ReminderResponse.Snooze, _time.GetUtcNow());
+
+        var next = await service.SyncAsync();
+
+        next.Should().Be(Today(10, 30));
+    }
+
     // Revisão final da Fase 4d: adiar respondido antes da pausa não pode disparar na retomada.
     [Fact]
     public async Task Resume_supersedes_snooze_answered_before_pause()
