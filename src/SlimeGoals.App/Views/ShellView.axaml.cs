@@ -2,6 +2,8 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using Avalonia;
+using Avalonia.Controls.Platform;
+using Avalonia.Threading;
 using SlimeGoals.App.ViewModels;
 
 namespace SlimeGoals.App.Views;
@@ -19,6 +21,7 @@ public partial class ShellView : UserControl
 
     private TopLevel? _topLevel;
     private bool _backSubscribed;
+    private IInputPane? _inputPane;
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -29,6 +32,11 @@ public partial class ShellView : UserControl
         {
             _topLevel.BackRequested += OnBackRequested;
             _backSubscribed = true;
+            if (_topLevel.InputPane is { } inputPane)
+            {
+                _inputPane = inputPane;
+                inputPane.StateChanged += OnInputPaneStateChanged;
+            }
         }
     }
 
@@ -37,8 +45,26 @@ public partial class ShellView : UserControl
         if (_topLevel is not null && _backSubscribed)
             _topLevel.BackRequested -= OnBackRequested;
         _backSubscribed = false;
+        if (_inputPane is not null)
+            _inputPane.StateChanged -= OnInputPaneStateChanged;
+        _inputPane = null;
         _topLevel = null;
         base.OnDetachedFromVisualTree(e);
+    }
+
+    /// <summary>
+    /// Teclado virtual (Android): o teclado cobre a janela sem redimensioná-la, então o ScrollViewer ainda "enxerga"
+    /// a área sob ele. Reserva embaixo a altura ocupada e, depois do novo layout, traz o campo em foco para a vista.
+    /// </summary>
+    private void OnInputPaneStateChanged(object? sender, InputPaneStateEventArgs e)
+    {
+        var open = e.NewState == InputPaneState.Open;
+        Padding = new Thickness(0, 0, 0, open ? _inputPane?.OccludedRect.Height ?? 0 : 0);
+        if (!open)
+            return;
+        DispatcherTimer.RunOnce(
+            () => (_topLevel?.FocusManager?.GetFocusedElement() as Control)?.BringIntoView(),
+            TimeSpan.FromMilliseconds(250));
     }
 
     /// <summary>Voltar do Android: o shell consome quando há algo a fechar; em Hoje o sistema segue o padrão.</summary>
