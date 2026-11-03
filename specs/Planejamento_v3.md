@@ -79,7 +79,7 @@ Aplicação multiplataforma para cadastrar metas (hábitos diários e metas sema
 
 **Por que separar as plataformas:** código que depende do workload Android não compila para Linux; manter os adaptadores do Android no head e o agendador (`SystemAlarmReminderScheduler`, com a porta `ISystemAlarm`) no `Core` mantém `Core` e `Infrastructure` portáteis e a lógica testável. Não há `Platform.Android` (Fase 7b, decisão 10): os receivers precisam do container do `AndroidApplication`, e um projeto a mais não ganharia teste.
 
-**Mapeamento:** `Core` é o hexágono; as interfaces abaixo são as portas de saída; `Infrastructure` e `Platform.*` contêm os adaptadores de saída; `App` é o adaptador de entrada (UI).
+**Mapeamento:** `Core` é o hexágono; as interfaces abaixo são as portas de saída; `Infrastructure`, `Platform.Linux` e o head Android (`SlimeGoals.Android/Reminders`) contêm os adaptadores de saída; `App` é o adaptador de entrada (UI).
 
 **Princípio dos lembretes:** o `ReminderPlanner` calcula o próximo disparo e o scheduler registra **um único** disparo. No Linux é um timer do processo; no Android é um alarme do sistema (o processo pode ser encerrado a qualquer momento).
 
@@ -162,7 +162,7 @@ Regras comuns:
     │   │   └── App.axaml          # inclui o ícone da bandeja
     │   ├── SlimeGoals.Desktop/              # head Linux: Program.cs, DI, liga a instância única e a suspensão ao app (SleepResumeHost)
     │   └── SlimeGoals.Android/              # head Android: AndroidApplication, MainActivity, AndroidCompositionRoot
-    │       └── Reminders/     # AndroidSystemAlarm (AlarmManager), AndroidNotificationService (canal, ações), ReminderReceivers (alarme, ação, boot e eventos do sistema), AndroidReminderPermissions, NoopWindowActivator
+    │       └── Reminders/     # AndroidSystemAlarm (AlarmManager), AndroidNotificationService (canal, ações), ReminderReceivers.cs (receivers de alarme, ação, boot e eventos do sistema), AndroidReminderPermissions, NoopWindowActivator
     ├── tools/SlimeGoals.Render/         # renderização headless de cada página (412×915 e 1100×720), fora das soluções
     ├── packaging/linux/                 # build.sh, install.sh, uninstall.sh, slimegoals.desktop.in, make-icons.sh, icons/, licenses/
     ├── tests/
