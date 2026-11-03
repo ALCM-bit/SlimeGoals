@@ -9,8 +9,8 @@ namespace SlimeGoals.App.Tests.ViewModels;
 
 public class ReportsPageViewModelTests
 {
-    // Terça, 03/11/2026 12:00 em São Paulo (UTC-3).
-    private static readonly DateTimeOffset Now = new(2026, 11, 3, 15, 0, 0, TimeSpan.Zero);
+    // Quarta, 04/11/2026 12:00 em São Paulo (UTC-3).
+    private static readonly DateTimeOffset Now = new(2026, 11, 4, 15, 0, 0, TimeSpan.Zero);
     private readonly FakeTimeProvider _time = new(Now);
     private readonly InMemoryGoalRepository _goals = new();
     private readonly InMemoryCheckinRepository _checkins = new();
@@ -41,20 +41,21 @@ public class ReportsPageViewModelTests
     [Fact]
     public async Task Opens_on_current_week_with_bars_and_rows()
     {
-        // Meta criada e cumprida em 02/11 (relógio próprio, o do teste não volta no tempo) e cumprida em 03/11.
-        var yesterday = new FakeTimeProvider(Now.AddDays(-1));
-        yesterday.SetLocalTimeZone(_time.LocalTimeZone);
-        var goal = await new GoalService(_goals, _checkins, _timers, yesterday).CreateAsync(new GoalDraft("Mesa",
-            Recurrence.Daily, 1, "water", GoalColor.Green, 60, new TimeOnly(8, 0), new TimeOnly(20, 0), WeekDays.All,
-            null, null, Measure.Completion, null));
-        await new CheckinService(_goals, _checkins, yesterday).AdjustAsync(goal.Id, 1);
-        await CheckinService.AdjustAsync(goal.Id, 1);
+        // Meta de 02/11, cumprida em 02/11 e 03/11; hoje (04/11) ainda em aberto não baixa o %.
+        var goal = await CreateDaily();
+        await _goals.UpdateAsync(goal with { CreatedAt = new DateTimeOffset(2026, 11, 2, 13, 0, 0, TimeSpan.Zero) });
+        foreach (var day in new[] { 2, 3 })
+            await _checkins.AddAsync(new Checkin
+            {
+                Id = Guid.NewGuid(), GoalId = goal.Id, Amount = 1, UpdatedAt = Now,
+                DoneAt = new DateTimeOffset(2026, 11, day, 13, 0, 0, TimeSpan.Zero),
+            });
 
         var page = await Loaded();
 
         page.PeriodTitle.Should().Be("2 a 8 nov 2026");
         page.Bars.Count.Should().Be(7);
-        page.Bars[1].IsCurrent.Should().BeTrue();
+        page.Bars[2].IsCurrent.Should().BeTrue();
         page.Rows.Single().Detail.Should().Be("2 de 2 dias");
         page.Rows.Single().PercentText.Should().Be("100%");
         page.RemindersText.Should().Be("0 disparados · 0 respondidos");
@@ -136,7 +137,6 @@ public class ReportsPageViewModelTests
         page.Rows[0].Detail.Should().Be("0 de 0 dias");
 
         await CheckinService.AdjustAsync(goal.Id, 1);
-        await page.LoadCommand.ExecuteAsync(null); // sem SynchronizationContext o recarregamento do evento já rodou inline
 
         page.Rows[0].Detail.Should().Be("1 de 1 dia");
     }
