@@ -69,6 +69,7 @@ internal sealed class AndroidNotificationService(Context context) : INotificatio
             .Notification?.Extras?.GetCharSequence(Notification.ExtraTitle);
         var builder = NewBuilder()
             .SetContentText(TimerConflictText)
+            .SetDeleteIntent(ActionIntent(logId, ReminderAction.Ignore))
             .SetOnlyAlertOnce(true);
         if (title is not null)
             builder.SetContentTitle(title);

@@ -1,4 +1,5 @@
 using Android.App;
+using System.Diagnostics;
 using Android.Content;
 using SlimeGoals.Core.Abstractions;
 
@@ -21,9 +22,19 @@ internal sealed class AndroidSystemAlarm(Context context) : ISystemAlarm
         var alarms = Alarms;
         var triggerAt = at.ToUnixTimeMilliseconds();
         if (!OperatingSystem.IsAndroidVersionAtLeast(31) || alarms.CanScheduleExactAlarms())
-            alarms.SetExactAndAllowWhileIdle(AlarmType.RtcWakeup, triggerAt, CreatePendingIntent());
-        else
-            alarms.SetAndAllowWhileIdle(AlarmType.RtcWakeup, triggerAt, CreatePendingIntent());
+        {
+            try
+            {
+                alarms.SetExactAndAllowWhileIdle(AlarmType.RtcWakeup, triggerAt, CreatePendingIntent());
+                return;
+            }
+            catch (Java.Lang.SecurityException e)
+            {
+                // Permissão revogada entre a checagem e a chamada: cai para o alarme inexato.
+                Trace.TraceWarning($"Alarme exato negado, usando inexato: {e.Message}");
+            }
+        }
+        alarms.SetAndAllowWhileIdle(AlarmType.RtcWakeup, triggerAt, CreatePendingIntent());
     }
 
     public void Cancel() => Alarms.Cancel(CreatePendingIntent());
