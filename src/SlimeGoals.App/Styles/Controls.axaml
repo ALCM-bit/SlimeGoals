@@ -1,8 +1,9 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:SlimeGoals.App.Views">
 
-  <!-- Fonte e cores padrão da janela -->
-  <Style Selector="Window">
+  <!-- Fonte e cores padrão da janela; no Android não há Window, e a ShellView é a raiz -->
+  <Style Selector="Window, views|ShellView">
     <Setter Property="FontFamily" Value="{DynamicResource FigtreeFont}" />
     <Setter Property="Background" Value="{DynamicResource BgDeep}" />
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
