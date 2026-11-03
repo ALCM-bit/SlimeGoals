@@ -76,3 +76,40 @@ public sealed class ReminderActionReceiver : BroadcastReceiver
         });
     }
 }
+
+/// <summary>
+/// Eventos do sistema que apagam ou deslocam o alarme (boot, atualização do app, relógio ou fuso alterados,
+/// permissão de alarme exato concedida): reagenda. Exportado só para receber essas ações protegidas.
+/// </summary>
+[BroadcastReceiver(Name = "dev.alcm.slimegoals.SystemEventReceiver", Enabled = true, Exported = true)]
+[IntentFilter([
+    Intent.ActionBootCompleted,
+    Intent.ActionMyPackageReplaced,
+    Intent.ActionTimeChanged,
+    Intent.ActionTimezoneChanged,
+    ExactAlarmPermissionChanged,
+])]
+public sealed class SystemEventReceiver : BroadcastReceiver
+{
+    private const string ExactAlarmPermissionChanged = "android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED";
+
+    private static readonly HashSet<string> Actions =
+    [
+        Intent.ActionBootCompleted,
+        Intent.ActionMyPackageReplaced,
+        Intent.ActionTimeChanged,
+        Intent.ActionTimezoneChanged,
+        ExactAlarmPermissionChanged,
+    ];
+
+    public override void OnReceive(Context? context, Intent? intent)
+    {
+        // Sendo exportado, aceita intents explícitos de outros apps: ignora o que não for uma das ações acima.
+        if (intent?.Action is not { } action || !Actions.Contains(action))
+            return;
+
+        Trace.TraceInformation($"Evento do sistema {action}: reagendando lembretes.");
+        ReceiverWork.Run(this, context!, services
+            => services.GetRequiredService<SystemAlarmReminderScheduler>().RescheduleAsync());
+    }
+}

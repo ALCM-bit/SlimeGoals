@@ -37,6 +37,8 @@ internal static class AndroidCompositionRoot
         services.AddSingleton<AndroidNotificationService>(_ => new AndroidNotificationService(context));
         services.AddSingleton<INotificationService>(sp => sp.GetRequiredService<AndroidNotificationService>());
         services.AddSingleton<ISystemAlarm>(_ => new AndroidSystemAlarm(context));
+        services.AddSingleton<AndroidReminderPermissions>(_ => new AndroidReminderPermissions(context));
+        services.AddSingleton<IReminderPermissions>(sp => sp.GetRequiredService<AndroidReminderPermissions>());
 
         // Lembretes — a mesma instância do agendador atende o ReminderHost e os receivers
         services.AddSingleton<SystemAlarmReminderScheduler>();
