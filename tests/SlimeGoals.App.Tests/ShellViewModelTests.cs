@@ -26,8 +26,15 @@ public class ShellViewModelTests
                 new ReminderFormatter(), time), new DataChangeNotifier());
     }
 
+    private static ReportsPageViewModel Reports()
+    {
+        var time = new FakeTimeProvider();
+        return new ReportsPageViewModel(new ReportService(new InMemoryGoalRepository(), new InMemoryCheckinRepository(),
+            new InMemoryReminderLogRepository(), time), time, new DataChangeNotifier());
+    }
+
     private static ShellViewModel Create() => new(new PageViewModel[]
-        { Today(), Goals(), new ReportsPageViewModel(), new SettingsPageViewModel() });
+        { Today(), Goals(), Reports(), new SettingsPageViewModel() });
 
     [Fact]
     public void Pages_follow_spec_order_and_start_on_today()
