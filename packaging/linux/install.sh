@@ -10,18 +10,27 @@ bin="$HOME/.local/bin"
 apps="$HOME/.local/share/applications"
 icons="$HOME/.local/share/icons/hicolor"
 
-# Mesma regra de XdgAutostart.QuoteExec: aspas duplas e escape de " ` $ \.
+# Mesma regra de XdgAutostart.QuoteExec (como escrito no arquivo): aspas duplas; " ` $ \ levam uma barra a mais
+# (o Desktop Entry desfaz o escape de string antes da regra de aspas do Exec) e % vira %%.
 quote_exec() {
     local s="$1" out="" c i
     for (( i = 0; i < ${#s}; i++ )); do
         c="${s:i:1}"
         case "$c" in
-            '"' | '`' | '$' | '\') out+="\\$c" ;;
+            '"' | '`' | '$') out+="\\\\$c" ;;
+            '\') out+='\\\\' ;;
+            '%') out+='%%' ;;
             *) out+="$c" ;;
         esac
     done
     printf '"%s"' "$out"
 }
+
+# Não mexe em nada com o app aberto (a instalação anterior seria apagada por baixo dele).
+if pgrep -u "$(id -u)" -x slimegoals >/dev/null 2>&1; then
+    echo "Feche o SlimeGoals (Sair) e rode o install.sh de novo." >&2
+    exit 1
+fi
 
 # Não apaga a própria origem (ex.: rodado de dentro de ~/.local/opt/slimegoals).
 opt_real="$(realpath -m "$opt")"
@@ -59,6 +68,3 @@ command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$
 command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -q -t "$icons" || true
 
 echo "SlimeGoals instalado em $opt"
-if pgrep -x slimegoals >/dev/null 2>&1; then
-    echo "Feche o SlimeGoals (Sair) e abra de novo para usar a versão nova."
-fi
