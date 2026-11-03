@@ -79,6 +79,7 @@ internal static class Program
     private static AppBuilder BuildAvaloniaApp(IServiceProvider services, SingleInstanceGuard? guard)
         => AppBuilder.Configure(() => new SlimeGoals.App.App(services))
             .UsePlatformDetect()
+            .With(new X11PlatformOptions { WmClass = "slimegoals" })
             .LogToTrace()
             .AfterSetup(builder => StopListeningOnExit(builder, guard));
 
