@@ -287,8 +287,8 @@ Sem tabela própria e sem query nova nos repositórios. Cada relatório faz uma 
 **Regras da Fase 5:**
 
 - **Período contado.** Uma meta conta num dia quando ele está entre a data local de criação e a de arquivamento (inclusive), dentro do início e fim da meta e não é futuro. Diária: só dias ativos. Semanal: a semana conta se ao menos um dia dela conta; a soma usa o período de avaliação recortado. O período em andamento (hoje, semana atual) só entra quando já cumprido; em aberto, não reduz o % nem quebra a sequência.
-- **% cumprido.** Diária: dias cumpridos ÷ dias contados. Semanal na semana: soma ÷ alvo, até 100% (a semana em andamento mostra o parcial). Semanal no mês: semanas cumpridas ÷ semanas contadas. Sem período contado, "—". O % geral é a média dos % que têm valor, com `MidpointRounding.AwayFromZero`; a semanal da semana em andamento só entra nele depois de cumprida (antes disso, só a linha dela mostra o parcial). Difere do % do Hoje, em que a diária conta a fração parcial de cada dia.
-- **Barras.** Semana: registros por dia local, só com valor positivo (ajustes negativos são correções). Mês: média dos % das metas em cada semana, com a mesma regra para a semanal na semana em andamento. Clicar numa barra mostra as metas que a compõem: na semana, o valor de cada meta no dia (✓ na diária cumprida); no mês, o % de cada meta na semana.
+- **% cumprido.** Diária: dias cumpridos ÷ dias contados. Semanal na semana: soma ÷ alvo, até 100% (a semana em andamento mostra o parcial). Semanal no mês: semanas cumpridas ÷ semanas contadas. Sem período contado, "—". O % geral é a média dos % que têm valor, com `MidpointRounding.AwayFromZero`. Difere do % do Hoje, em que a diária conta a fração parcial de cada dia.
+- **Barras.** Semana: registros por dia local, só com valor positivo (ajustes negativos são correções). Mês: média dos % das metas em cada semana. Clicar numa barra mostra as metas que a compõem: na semana, o valor de cada meta no dia (✓ na diária cumprida); no mês, o % de cada meta na semana.
 - **Lembretes.** Disparados = entradas do log no intervalo; respondidos = Feito ou Adiar. Ignorar e expiração ficam gravados do mesmo jeito (§9) e não contam como resposta.
 - **Sequências.** Calculadas sobre todo o histórico da meta até o fim do período mostrado ou até hoje. Num mês passado aparecem como estavam no fim dele. Dias inativos da diária não quebram a sequência; meta arquivada para no dia do arquivamento.
 - **Melhor dia** (só semanal): dia de maior soma positiva; no empate, o mais cedo.
@@ -462,7 +462,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 
 - Período contado: entre criação e arquivamento (datas locais), dentro do início/fim da meta, nunca futuro; diária só em dias ativos, semanal se ao menos um dia conta.
 - Período em andamento só entra na contagem quando já cumprido; em aberto, não reduz o % nem quebra a sequência.
-- % cumprido: diária = dias cumpridos ÷ contados; semanal na semana = soma ÷ alvo (até 100%); no mês = semanas cumpridas ÷ contadas; sem período, "—"; geral = média dos que têm valor, sem a semanal da semana em andamento enquanto não for cumprida (revisto em 03/11/2026, para o geral não começar a semana em 0%).
+- % cumprido: diária = dias cumpridos ÷ contados; semanal na semana = soma ÷ alvo (até 100%); no mês = semanas cumpridas ÷ contadas; sem período, "—"; geral = média dos que têm valor, com a semanal da semana em andamento entrando pelo parcial (confirmado pelo autor em 03/11/2026).
 - O % dos relatórios (dia cumprido ou não) difere do % do Hoje (fração parcial por dia).
 - Mês = semanas cuja segunda-feira cai nele, inteiras, também para diárias; domingo 01/11/2026 pertence a outubro.
 - Barras da semana contam só registros positivos; barras do mês são a média dos % das metas por semana; clicar numa barra mostra as metas que a compõem.

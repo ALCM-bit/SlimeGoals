@@ -60,27 +60,6 @@ public class ReportServiceMonthTests
     }
 
     [Fact]
-    public async Task Current_week_bar_leaves_out_open_weekly_goal_until_met()
-    {
-        var daily = await Create("Diária");
-        await Record(daily, D(11, 2), 1);
-        await Record(daily, D(11, 3), 1);
-        var weekly = await Create("Semanal", Recurrence.Weekly, target: 3);
-        await Record(weekly, D(11, 2), 1);
-
-        var report = await Service.GetMonthAsync(2026, 11);
-
-        report.Goals.Select(r => r.WeekPercents[0]).Should().Equal(100, 33); // a linha mostra o parcial
-        report.Weeks[0].Percent.Should().Be(100);
-
-        await Record(weekly, D(11, 3), 2);
-
-        report = await Service.GetMonthAsync(2026, 11);
-        report.Weeks[0].Percent.Should().Be(100);
-        report.Goals.Select(r => r.WeekPercents[0]).Should().Equal(100, 100);
-    }
-
-    [Fact]
     public void MonthRange_uses_weeks_whose_monday_is_in_month()
     {
         ReportService.MonthRange(2026, 11).Should().Be(new DateRange(D(11, 2), D(12, 7)));

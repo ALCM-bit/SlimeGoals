@@ -21,17 +21,11 @@ public sealed record DayBar(DateOnly Day, int Records, IReadOnlyList<DayGoalEntr
 /// </summary>
 public sealed record WeekGoalRow(Goal Goal, int Done, int MetPeriods, int CountedPeriods, int? Percent, DateOnly? BestDay);
 
-/// <summary>
-/// Relatório de uma semana (segunda a domingo). Percent = média dos % das metas que têm valor; a semanal
-/// da semana em andamento só entra depois de cumprida.
-/// </summary>
+/// <summary>Relatório de uma semana (segunda a domingo). Percent = média dos % das metas que têm valor.</summary>
 public sealed record WeekReport(DateRange Week, IReadOnlyList<DayBar> Days, IReadOnlyList<WeekGoalRow> Goals,
     int? Percent, int RemindersFired, int RemindersAnswered);
 
-/// <summary>
-/// Barra de uma semana do mês: média dos % das metas na semana (na semana em andamento, a semanal só entra
-/// depois de cumprida). Percent null = nenhuma meta com valor na semana.
-/// </summary>
+/// <summary>Barra de uma semana do mês. Percent null = nenhuma meta com valor na semana.</summary>
 public sealed record WeekBar(DateOnly Monday, int? Percent);
 
 /// <summary>
@@ -76,11 +70,7 @@ public sealed class ReportService(IGoalRepository goals, ICheckinRepository chec
         var reminders = (await log.ListAsync(from, to, ct)).Where(e => ids.Contains(e.GoalId)).ToList();
         var answered = reminders.Count(e => e.Response is ReminderResponse.Done or ReminderResponse.Snooze);
 
-        // Semanal ainda aberta e não cumprida (sem período contado) mostra o parcial na linha, mas fica fora do
-        // geral: como o dia de hoje da diária, o que está em andamento não conta contra.
-        var percents = rows
-            .Where(r => r.Percent is not null && (r.Goal.Recurrence == Recurrence.Daily || r.CountedPeriods > 0))
-            .Select(r => r.Percent!.Value).ToList();
+        var percents = rows.Where(r => r.Percent is not null).Select(r => r.Percent!.Value).ToList();
         int? overall = percents.Count == 0 ? null : Round(percents.Average());
 
         return new WeekReport(week, days, rows, overall, reminders.Count, answered);
@@ -118,11 +108,7 @@ public sealed class ReportService(IGoalRepository goals, ICheckinRepository chec
 
         var weeks = mondays.Select((monday, i) =>
         {
-            // Na semana em andamento, a semanal ainda não cumprida fica fora da média (mesma regra do semanal).
-            var open = monday <= today && today < monday.AddDays(7);
-            var values = rows
-                .Where(r => !(open && r.Goal.Recurrence == Recurrence.Weekly && r.WeekPercents[i] < 100))
-                .Select(r => r.WeekPercents[i]).Where(v => v is not null).Select(v => v!.Value).ToList();
+            var values = rows.Select(r => r.WeekPercents[i]).Where(v => v is not null).Select(v => v!.Value).ToList();
             return new WeekBar(monday, values.Count == 0 ? null : Round(values.Average()));
         }).ToList();
 
