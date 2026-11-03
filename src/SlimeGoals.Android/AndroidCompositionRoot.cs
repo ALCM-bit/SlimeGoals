@@ -1,4 +1,6 @@
+using Android.Content;
 using Microsoft.Extensions.DependencyInjection;
+using SlimeGoals.Android.Reminders;
 using SlimeGoals.App.Goals;
 using SlimeGoals.App.Hosting;
 using SlimeGoals.App.ViewModels;
@@ -11,12 +13,12 @@ namespace SlimeGoals.Android;
 /// <summary>Raiz de composição do head Android: espelha a do desktop, sem o que é só de desktop/Linux.</summary>
 internal static class AndroidCompositionRoot
 {
-    public static ServiceProvider Build(string databasePath)
+    public static ServiceProvider Build(Context context, string databasePath)
     {
         var services = new ServiceCollection();
 
         // Core — os serviços que escrevem recebem o DataChangeNotifier único
-        services.AddSingleton(new PlatformCapabilities(false, false, false, false));
+        services.AddSingleton(new PlatformCapabilities(true, false, false, false));
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<DataChangeNotifier>();
         services.AddSingleton<GoalService>();
@@ -32,7 +34,17 @@ internal static class AndroidCompositionRoot
         // Adaptadores
         services.AddSlimeGoalsInfrastructure(databasePath);
         services.AddSingleton<IReminderFormatter, ReminderFormatter>();
-        services.AddSingleton<INotificationService, NoopNotificationService>();
+        services.AddSingleton<AndroidNotificationService>(_ => new AndroidNotificationService(context));
+        services.AddSingleton<INotificationService>(sp => sp.GetRequiredService<AndroidNotificationService>());
+        services.AddSingleton<ISystemAlarm>(_ => new AndroidSystemAlarm(context));
+        services.AddSingleton<AndroidReminderPermissions>(_ => new AndroidReminderPermissions(context));
+        services.AddSingleton<IReminderPermissions>(sp => sp.GetRequiredService<AndroidReminderPermissions>());
+
+        // Lembretes — a mesma instância do agendador atende o ReminderHost e os receivers
+        services.AddSingleton<SystemAlarmReminderScheduler>();
+        services.AddSingleton<IReminderScheduler>(sp => sp.GetRequiredService<SystemAlarmReminderScheduler>());
+        services.AddSingleton<IWindowActivator, NoopWindowActivator>();
+        services.AddSingleton<IAppHostedService, ReminderHost>();
 
         // UI — ordem de registro = ordem na navegação
         services.AddSingleton<PageViewModel, TodayPageViewModel>();

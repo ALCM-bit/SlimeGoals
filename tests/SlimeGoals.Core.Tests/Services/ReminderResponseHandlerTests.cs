@@ -216,4 +216,20 @@ public class ReminderResponseHandlerTests
 
         (await _log.GetAsync(entry.Id))!.Response.Should().Be(ReminderResponse.Ignore);
     }
+
+    [Theory]
+    [InlineData(ReminderAction.Primary)]
+    [InlineData(ReminderAction.Snooze)]
+    public async Task Entry_fired_yesterday_is_stale_and_ignored(ReminderAction action)
+    {
+        var goal = await Create(Measure.Quantity);
+        // T0 = 02/11 09:00 em São Paulo; o lembrete disparou 01/11 21:00 locais (00:00 UTC), a resposta vem em T0 (02/11 09:00 locais).
+        var entry = new ReminderLogEntry(Guid.NewGuid(), goal.Id, new DateTimeOffset(2026, 11, 2, 0, 0, 0, TimeSpan.Zero));
+        await _log.AddAsync(entry);
+
+        (await Handler.HandleAsync(entry.Id, action)).Should().Be(ReminderOutcome.Stale);
+
+        (await _log.GetAsync(entry.Id))!.Response.Should().Be(ReminderResponse.Ignore);
+        (await Checkins.PeriodTotalAsync(goal.Id)).Should().Be(0);
+    }
 }

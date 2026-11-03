@@ -1,7 +1,11 @@
 using Android.App;
 using Android.Content.PM;
+using Android.OS;
+using Android.Runtime;
 using Android.Views;
 using Avalonia.Android;
+using Microsoft.Extensions.DependencyInjection;
+using SlimeGoals.Android.Reminders;
 
 namespace SlimeGoals.Android;
 
@@ -17,6 +21,32 @@ namespace SlimeGoals.Android;
 public class MainActivity : AvaloniaMainActivity
 {
     private bool _resumedBefore;
+
+    private static AndroidReminderPermissions? Permissions
+        => AndroidApplication.Services?.GetService<AndroidReminderPermissions>();
+
+    /// <summary>Registra-se como a Activity dos pedidos de permissão.</summary>
+    protected override void OnCreate(Bundle? savedInstanceState)
+    {
+        base.OnCreate(savedInstanceState);
+        if (Permissions is { } permissions)
+            permissions.CurrentActivity = this;
+    }
+
+    protected override void OnDestroy()
+    {
+        if (Permissions is { } permissions && ReferenceEquals(permissions.CurrentActivity, this))
+            permissions.CurrentActivity = null;
+        base.OnDestroy();
+    }
+
+    /// <summary>O usuário respondeu ao diálogo de permissão: a tela relê o estado.</summary>
+    public override void OnRequestPermissionsResult(int requestCode, string[] permissions,
+        [GeneratedEnum] Permission[] grantResults)
+    {
+        base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+        (Application as AndroidApplication)?.NotifyDataChanged();
+    }
 
     /// <summary>
     /// Ao voltar ao app (inclusive no dia seguinte, com o processo vivo) as telas recarregam.

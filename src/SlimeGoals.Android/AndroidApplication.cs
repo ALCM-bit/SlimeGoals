@@ -17,7 +17,8 @@ namespace SlimeGoals.Android;
 [Application]
 public class AndroidApplication : AvaloniaAndroidApplication<AndroidApplication.AppConstraintStub>
 {
-    private ServiceProvider? _services;
+    /// <summary>O container do processo; montado no <see cref="OnCreate"/>, antes de qualquer Activity ou receiver.</summary>
+    internal static ServiceProvider? Services { get; private set; }
 
     /// <summary>Nunca instanciada: existe só para a restrição <c>new()</c> do tipo base.</summary>
     public sealed class AppConstraintStub() : SlimeGoals.App.App(null!);
@@ -32,9 +33,10 @@ public class AndroidApplication : AvaloniaAndroidApplication<AndroidApplication.
         var databasePath = Path.Combine(FilesDir!.AbsolutePath, "slimegoals.db");
         try
         {
-            _services = AndroidCompositionRoot.Build(databasePath);
-            using var connection = _services.GetRequiredService<SqliteConnectionFactory>().Open();
-            MigrationRunner.Migrate(connection);
+            var services = AndroidCompositionRoot.Build(this, databasePath);
+            using (var connection = services.GetRequiredService<SqliteConnectionFactory>().Open())
+                MigrationRunner.Migrate(connection);
+            Services = services;
         }
         catch (Exception ex)
         {
@@ -46,8 +48,8 @@ public class AndroidApplication : AvaloniaAndroidApplication<AndroidApplication.
     }
 
     /// <summary>Avisa as telas de que os dados podem ter mudado (ao voltar ao app, por exemplo).</summary>
-    internal void NotifyDataChanged() => _services?.GetService<DataChangeNotifier>()?.NotifyChanged();
+    internal void NotifyDataChanged() => Services?.GetService<DataChangeNotifier>()?.NotifyChanged();
 
     protected override AppBuilder CreateAppBuilder()
-        => AppBuilder.Configure(() => new SlimeGoals.App.App(_services!)).UseAndroid();
+        => AppBuilder.Configure(() => new SlimeGoals.App.App(Services!)).UseAndroid();
 }

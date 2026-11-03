@@ -15,7 +15,8 @@ public sealed record SnoozeOptionViewModel(int Minutes, string Label);
 /// e a tela mostra o erro. Carregar não grava nada.
 /// </summary>
 public sealed partial class SettingsPageViewModel(AppSettings settings, IAutostart? autostart = null,
-    PlatformCapabilities? capabilities = null) : PageViewModel
+    PlatformCapabilities? capabilities = null, IReminderPermissions? permissions = null,
+    DataChangeNotifier? changes = null) : PageViewModel
 {
     private readonly PlatformCapabilities _capabilities = capabilities ?? PlatformCapabilities.Desktop;
 
@@ -23,6 +24,8 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
     private const string AutostartError = "Não foi possível alterar o início com o sistema.";
 
     private bool _loading;
+    private bool _subscribed;
+    private SynchronizationContext? _ui;
 
     public override string Title => "Configurações";
 
@@ -39,6 +42,41 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
 
     /// <summary>Nenhuma seção se aplica à plataforma: a tela mostra um aviso no lugar.</summary>
     public bool IsEmpty => !ShowGeneral && !ShowReminders && !ShowWindow;
+
+    /// <summary>Linhas "Notificações" e "Alarmes exatos" da seção Lembretes (só com a porta de permissões).</summary>
+    public bool ShowPermissions => permissions is not null && _capabilities.Reminders;
+
+    public string EmptyMessage => "Nada para configurar por enquanto.";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NotificationsText), nameof(CanRequestNotifications))]
+    public partial bool NotificationsAllowed { get; set; } = true;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ExactAlarmsText), nameof(CanRequestExactAlarms))]
+    public partial bool ExactAlarmsAllowed { get; set; } = true;
+
+    public string NotificationsText => NotificationsAllowed ? "Permitidas" : "Bloqueadas";
+
+    public string ExactAlarmsText => ExactAlarmsAllowed ? "Permitidos" : "Bloqueados";
+
+    public bool CanRequestNotifications => !NotificationsAllowed;
+
+    public bool CanRequestExactAlarms => !ExactAlarmsAllowed;
+
+    [RelayCommand]
+    private void RequestNotifications() => permissions?.RequestNotifications();
+
+    [RelayCommand]
+    private void RequestExactAlarms() => permissions?.RequestExactAlarms();
+
+    private void RefreshPermissions()
+    {
+        if (permissions is null)
+            return;
+        var status = permissions.Get();
+        (NotificationsAllowed, ExactAlarmsAllowed) = (status.Notifications, status.ExactAlarms);
+    }
 
     public bool CanAutostart => autostart is not null;
 
@@ -80,6 +118,20 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
     [RelayCommand]
     private async Task LoadAsync()
     {
+        _ui ??= SynchronizationContext.Current;
+        if (!_subscribed && changes is not null)
+        {
+            // O aviso pode chegar de qualquer thread (ex.: o app volta das configurações do sistema).
+            _subscribed = true;
+            changes.Changed += (_, _) =>
+            {
+                if (_ui is null)
+                    RefreshPermissions();
+                else
+                    _ui.Post(_ => RefreshPermissions(), null);
+            };
+        }
+        RefreshPermissions();
         ErrorMessage = null;
         try
         {
