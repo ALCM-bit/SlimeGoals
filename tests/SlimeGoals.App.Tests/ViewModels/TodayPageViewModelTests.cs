@@ -28,11 +28,11 @@ public class TodayPageViewModelTests
 
     private ReminderPause Pause => new(_settings, _time, _changes);
 
-    private TodayPageViewModel NewPage(PlatformCapabilities? capabilities = null) => new(
+    private TodayPageViewModel NewPage(PlatformCapabilities? capabilities = null, IReminderPermissions? permissions = null) => new(
         new ProgressService(_goals, _checkins, _timers, _time), CheckinService,
         new TimerService(_goals, _timers, CheckinService, _time), GoalService, _time,
         new ReminderService(_goals, _checkins, _timers, _log, _notifications, new ReminderFormatter(), _time, Pause),
-        _changes, Pause, new ReportService(_goals, _checkins, _log, _time), capabilities);
+        _changes, Pause, new ReportService(_goals, _checkins, _log, _time), capabilities, permissions);
 
     [Fact]
     public async Task Without_reminders_hides_upcoming_and_pause()
@@ -42,6 +42,77 @@ public class TodayPageViewModelTests
         await page.LoadCommand.ExecuteAsync(null);
 
         (page.Upcoming.Count, page.HasUpcoming, page.CanPause, page.ShowReminders).Should().Be((0, false, false, false));
+    }
+
+    private const string NotificationsWarning = "Os lembretes estão desligados: permita as notificações do SlimeGoals.";
+    private const string ExactAlarmsWarning = "Os lembretes podem atrasar alguns minutos: permita alarmes exatos.";
+
+    [Fact]
+    public async Task Today_warns_when_notifications_missing()
+    {
+        var permissions = new FakePermissions(new ReminderPermissionStatus(false, false));
+        var page = NewPage(permissions: permissions);
+        await page.LoadCommand.ExecuteAsync(null);
+
+        (page.HasPermissionWarning, page.PermissionWarning).Should().Be((true, NotificationsWarning));
+        page.RequestPermissionCommand.Execute(null);
+        (permissions.NotificationRequests, permissions.ExactAlarmRequests).Should().Be((1, 0));
+    }
+
+    [Fact]
+    public async Task Today_warns_when_only_exact_alarms_missing()
+    {
+        var permissions = new FakePermissions(new ReminderPermissionStatus(true, false));
+        var page = NewPage(permissions: permissions);
+        await page.LoadCommand.ExecuteAsync(null);
+
+        page.PermissionWarning.Should().Be(ExactAlarmsWarning);
+        page.RequestPermissionCommand.Execute(null);
+        (permissions.NotificationRequests, permissions.ExactAlarmRequests).Should().Be((0, 1));
+    }
+
+    [Fact]
+    public async Task Today_has_no_warning_when_granted_or_without_port()
+    {
+        var granted = NewPage(permissions: new FakePermissions(new ReminderPermissionStatus(true, true)));
+        await granted.LoadCommand.ExecuteAsync(null);
+        var noPort = NewPage();
+        await noPort.LoadCommand.ExecuteAsync(null);
+        var noReminders = NewPage(new PlatformCapabilities(false, false, false, false),
+            new FakePermissions(new ReminderPermissionStatus(false, false)));
+        await noReminders.LoadCommand.ExecuteAsync(null);
+
+        (granted.HasPermissionWarning, noPort.HasPermissionWarning, noReminders.HasPermissionWarning)
+            .Should().Be((false, false, false));
+        noPort.PermissionWarning.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Today_rechecks_permissions_on_data_change()
+    {
+        var permissions = new FakePermissions(new ReminderPermissionStatus(false, false));
+        var page = NewPage(permissions: permissions);
+        await page.LoadCommand.ExecuteAsync(null);
+        page.HasPermissionWarning.Should().BeTrue();
+
+        permissions.Status = new ReminderPermissionStatus(true, true);
+        _changes.NotifyChanged();
+        await Task.Delay(200);
+
+        page.HasPermissionWarning.Should().BeFalse();
+    }
+
+    private sealed class FakePermissions(ReminderPermissionStatus status) : IReminderPermissions
+    {
+        public ReminderPermissionStatus Status { get; set; } = status;
+        public int NotificationRequests { get; private set; }
+        public int ExactAlarmRequests { get; private set; }
+
+        public ReminderPermissionStatus Get() => Status;
+
+        public void RequestNotifications() => NotificationRequests++;
+
+        public void RequestExactAlarms() => ExactAlarmRequests++;
     }
 
     private async Task<TodayPageViewModel> Loaded()

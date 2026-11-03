@@ -46,18 +46,20 @@ public sealed class Sample : IDisposable
     /// </summary>
     public ShellViewModel CreateShell(bool phone)
     {
-        var capabilities = phone ? new PlatformCapabilities(false, false, false, false) : PlatformCapabilities.Desktop;
+        var capabilities = phone ? new PlatformCapabilities(true, false, false, false) : PlatformCapabilities.Desktop;
+        IReminderPermissions? permissions = phone ? new DeniedPermissions() : null;
         var s = _services;
         PageViewModel[] pages =
         [
             new TodayPageViewModel(s.GetRequiredService<ProgressService>(), s.GetRequiredService<CheckinService>(),
                 s.GetRequiredService<TimerService>(), s.GetRequiredService<GoalService>(), TimeProvider.System,
                 s.GetRequiredService<ReminderService>(), s.GetRequiredService<DataChangeNotifier>(),
-                s.GetRequiredService<ReminderPause>(), s.GetRequiredService<ReportService>(), capabilities),
+                s.GetRequiredService<ReminderPause>(), s.GetRequiredService<ReportService>(), capabilities, permissions),
             new GoalsPageViewModel(s.GetRequiredService<GoalService>(), TimeProvider.System),
             new ReportsPageViewModel(s.GetRequiredService<ReportService>(), TimeProvider.System,
                 s.GetRequiredService<DataChangeNotifier>()),
-            new SettingsPageViewModel(s.GetRequiredService<AppSettings>(), capabilities: capabilities),
+            new SettingsPageViewModel(s.GetRequiredService<AppSettings>(), capabilities: capabilities, permissions: permissions,
+                changes: s.GetRequiredService<DataChangeNotifier>()),
         ];
         return new ShellViewModel(pages, capabilities: capabilities);
     }
@@ -115,5 +117,19 @@ public sealed class Sample : IDisposable
         public event EventHandler<ReminderActionEventArgs>? ActionReceived { add { } remove { } }
         public Task ShowAsync(Reminder reminder, CancellationToken ct = default) => Task.CompletedTask;
         public Task WithdrawAsync(Guid logId, CancellationToken ct = default) => Task.CompletedTask;
+    }
+}
+
+/// <summary>Porta falsa do celular: as duas permissões negadas, para o aviso aparecer nas imagens.</summary>
+internal sealed class DeniedPermissions : IReminderPermissions
+{
+    public ReminderPermissionStatus Get() => new(false, false);
+
+    public void RequestNotifications()
+    {
+    }
+
+    public void RequestExactAlarms()
+    {
     }
 }

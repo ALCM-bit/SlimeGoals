@@ -25,6 +25,43 @@ public class SettingsPageViewModelTests
 
         (all.ShowGeneral, all.ShowReminders, all.ShowWindow, all.IsEmpty).Should().Be((true, true, true, false));
         (none.ShowGeneral, none.ShowReminders, none.ShowWindow, none.IsEmpty).Should().Be((false, false, false, true));
+        none.EmptyMessage.Should().Be("Nada para configurar por enquanto.");
+    }
+
+    [Fact]
+    public async Task Settings_shows_permission_state()
+    {
+        var permissions = new FakePermissions(new ReminderPermissionStatus(false, true));
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()), null, null, permissions);
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        (vm.ShowPermissions, vm.NotificationsText, vm.ExactAlarmsText, vm.CanRequestNotifications, vm.CanRequestExactAlarms)
+            .Should().Be((true, "Bloqueadas", "Permitidos", true, false));
+        vm.RequestNotificationsCommand.Execute(null);
+        vm.RequestExactAlarmsCommand.Execute(null);
+        (permissions.NotificationRequests, permissions.ExactAlarmRequests).Should().Be((1, 1));
+    }
+
+    [Fact]
+    public async Task Settings_rechecks_permissions_on_data_change()
+    {
+        var permissions = new FakePermissions(new ReminderPermissionStatus(false, false));
+        var changes = new DataChangeNotifier();
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()), null, null, permissions, changes);
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        permissions.Status = new ReminderPermissionStatus(true, true);
+        changes.NotifyChanged();
+
+        (vm.NotificationsText, vm.ExactAlarmsText, vm.CanRequestNotifications).Should().Be(("Permitidas", "Permitidos", false));
+    }
+
+    [Fact]
+    public void Settings_without_port_hides_permissions()
+    {
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()));
+
+        vm.ShowPermissions.Should().BeFalse();
     }
 
     [Fact]
@@ -136,6 +173,19 @@ public class SettingsPageViewModelTests
         var vm = new SettingsPageViewModel(new AppSettings(new InMemorySettingsRepository()));
 
         vm.SnoozeOptions.Select(o => o.Label).Should().Equal("5 min", "10 min", "15 min", "30 min", "1 h");
+    }
+
+    private sealed class FakePermissions(ReminderPermissionStatus status) : IReminderPermissions
+    {
+        public ReminderPermissionStatus Status { get; set; } = status;
+        public int NotificationRequests { get; private set; }
+        public int ExactAlarmRequests { get; private set; }
+
+        public ReminderPermissionStatus Get() => Status;
+
+        public void RequestNotifications() => NotificationRequests++;
+
+        public void RequestExactAlarms() => ExactAlarmRequests++;
     }
 
     private sealed class FakeAutostart : IAutostart

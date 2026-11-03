@@ -21,5 +21,5 @@ Quatro metas de exemplo (Beber água, Leitura, Treino, Aula de inglês) e regist
 
 ## Observações
 
-- A variação `phone` monta o shell com as capacidades do Android (`PlatformCapabilities(false, false, false, false)`): sem lembretes em Hoje, sem as seções Geral e Janela nas Configurações e sem "Sair"; a `desktop`, com `PlatformCapabilities.Desktop`.
+- A variação `phone` monta o shell com as capacidades do Android (`PlatformCapabilities(true, false, false, false)` e uma porta de permissões falsa com tudo negado, para o aviso aparecer): lembretes em Hoje, sem as seções Geral e Janela nas Configurações e sem "Sair"; a `desktop`, com `PlatformCapabilities.Desktop`.
 - A `RenderApp` espelha os `DataTemplates` do `App.axaml`: ao criar uma página nova, registre-a nos dois lugares.

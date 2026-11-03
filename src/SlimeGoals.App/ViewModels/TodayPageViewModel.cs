@@ -22,7 +22,8 @@ public sealed record UpcomingReminderViewModel(string Time, string Title);
 /// </summary>
 public sealed partial class TodayPageViewModel(ProgressService progress, CheckinService checkins, TimerService timers,
     GoalService goals, TimeProvider time, ReminderService reminders, DataChangeNotifier changes,
-    ReminderPause? pause = null, ReportService? reports = null, PlatformCapabilities? capabilities = null) : PageViewModel
+    ReminderPause? pause = null, ReportService? reports = null, PlatformCapabilities? capabilities = null,
+    IReminderPermissions? permissions = null) : PageViewModel
 {
     private readonly bool _reminders = (capabilities ?? PlatformCapabilities.Desktop).Reminders;
 
@@ -55,6 +56,37 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
 
     /// <summary>Próximos lembretes e pausa só existem onde a plataforma tem lembretes.</summary>
     public bool ShowReminders => _reminders;
+
+    /// <summary>Aviso do topo quando faltam permissões dos lembretes (Android); nulo se tudo certo ou sem a porta.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPermissionWarning))]
+    public partial string? PermissionWarning { get; set; }
+
+    public bool HasPermissionWarning => PermissionWarning is not null;
+
+    /// <summary>Botão "Permitir": pede as notificações; se elas já estão liberadas, os alarmes exatos.</summary>
+    [RelayCommand]
+    private void RequestPermission()
+    {
+        if (permissions is null)
+            return;
+        if (!permissions.Get().Notifications)
+            permissions.RequestNotifications();
+        else
+            permissions.RequestExactAlarms();
+    }
+
+    private void RefreshPermissions()
+    {
+        var status = _reminders ? permissions?.Get() : null;
+        PermissionWarning = status switch
+        {
+            null => null,
+            { Notifications: false } => "Os lembretes estão desligados: permita as notificações do SlimeGoals.",
+            { ExactAlarms: false } => "Os lembretes podem atrasar alguns minutos: permita alarmes exatos.",
+            _ => null,
+        };
+    }
 
     [ObservableProperty] public partial int WeekPercent { get; set; }
     [ObservableProperty] public partial int InProgress { get; set; }
@@ -89,6 +121,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         }
         var version = ++_loadVersion;
         ErrorMessage = null;
+        RefreshPermissions();
         try
         {
             await goals.ArchiveExpiredAsync();
