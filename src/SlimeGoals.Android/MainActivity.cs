@@ -16,4 +16,17 @@ namespace SlimeGoals.Android;
     WindowSoftInputMode = SoftInput.AdjustResize)]
 public class MainActivity : AvaloniaMainActivity
 {
+    private bool _resumedBefore;
+
+    /// <summary>
+    /// Ao voltar ao app (inclusive no dia seguinte, com o processo vivo) as telas recarregam.
+    /// A primeira retomada é a da abertura: as páginas já carregam sozinhas.
+    /// </summary>
+    protected override void OnResume()
+    {
+        base.OnResume();
+        if (_resumedBefore)
+            (Application as AndroidApplication)?.NotifyDataChanged();
+        _resumedBefore = true;
+    }
 }

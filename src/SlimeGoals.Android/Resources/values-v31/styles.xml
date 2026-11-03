@@ -10,9 +10,5 @@
     <item name="android:windowLightNavigationBar">false</item>
     <item name="android:windowSplashScreenBackground">@color/slime_bg</item>
     <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
-    <item name="postSplashScreenTheme">@style/SlimeGoals.Theme.Main</item>
-  </style>
-  <style name="SlimeGoals.Theme.Main" parent="SlimeGoals.Theme">
-    <item name="android:windowIsTranslucent">true</item>
   </style>
 </resources>

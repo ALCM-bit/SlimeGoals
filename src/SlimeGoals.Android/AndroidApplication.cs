@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using Android.App;
 using Android.Runtime;
 using Avalonia;
 using Avalonia.Android;
 using Microsoft.Extensions.DependencyInjection;
+using SlimeGoals.Core.Services;
 using SlimeGoals.Infrastructure.Data;
 
 namespace SlimeGoals.Android;
@@ -28,12 +30,23 @@ public class AndroidApplication : AvaloniaAndroidApplication<AndroidApplication.
     {
         // Armazenamento privado do app; desinstalar apaga os dados.
         var databasePath = Path.Combine(FilesDir!.AbsolutePath, "slimegoals.db");
-        _services = AndroidCompositionRoot.Build(databasePath);
-        using (var connection = _services.GetRequiredService<SqliteConnectionFactory>().Open())
+        try
+        {
+            _services = AndroidCompositionRoot.Build(databasePath);
+            using var connection = _services.GetRequiredService<SqliteConnectionFactory>().Open();
             MigrationRunner.Migrate(connection);
+        }
+        catch (Exception ex)
+        {
+            Trace.TraceError($"Falha ao montar o container ou migrar o banco: {ex}");
+            throw;
+        }
 
         base.OnCreate();
     }
+
+    /// <summary>Avisa as telas de que os dados podem ter mudado (ao voltar ao app, por exemplo).</summary>
+    internal void NotifyDataChanged() => _services?.GetService<DataChangeNotifier>()?.NotifyChanged();
 
     protected override AppBuilder CreateAppBuilder()
         => AppBuilder.Configure(() => new SlimeGoals.App.App(_services!)).UseAndroid();
