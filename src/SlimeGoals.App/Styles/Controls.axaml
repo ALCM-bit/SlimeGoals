@@ -40,7 +40,7 @@
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
   </Style>
   <Style Selector="ListBox.nav ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="#1D1928" />
+    <Setter Property="Background" Value="{DynamicResource NavHover}" />
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
   </Style>
   <Style Selector="ListBox.nav ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
@@ -106,7 +106,7 @@
     <Setter Property="Background" Value="Transparent" />
   </Style>
   <Style Selector="ListBox.bottom-nav ListBoxItem:pointerover Border.nav-pill">
-    <Setter Property="Background" Value="#1D1928" />
+    <Setter Property="Background" Value="{DynamicResource NavHover}" />
   </Style>
   <Style Selector="ListBox.bottom-nav ListBoxItem:selected Border.nav-pill">
     <Setter Property="Background" Value="{DynamicResource Selected}" />
@@ -476,6 +476,7 @@
     <Setter Property="Width" Value="640" />
     <Setter Property="MaxWidth" Value="640" />
     <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="Margin" Value="0,0,0,8" />
   </Style>
   <Style Selector="ContentControl.goal-actions.docked">
     <Setter Property="Width" Value="640" />
@@ -527,6 +528,8 @@
     <Setter Property="Width" Value="NaN" />
     <Setter Property="MaxWidth" Value="Infinity" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <!-- folga à direita para a barra de rolagem sobreposta não cobrir campos e o Salvar -->
+    <Setter Property="Margin" Value="0,0,8,8" />
   </Style>
   <Style Selector=".compact StackPanel.field-row">
     <Setter Property="Orientation" Value="Vertical" />

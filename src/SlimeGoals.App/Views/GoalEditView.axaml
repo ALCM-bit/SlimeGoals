@@ -44,7 +44,7 @@
                     ContentTemplate="{StaticResource GoalActions}" />
 
     <ScrollViewer>
-      <StackPanel Classes="goal-form" Margin="0,0,0,8">
+      <StackPanel Classes="goal-form">
         <StackPanel Spacing="18">
 
           <StackPanel Classes="field">

@@ -95,7 +95,7 @@ dotnet build SlimeGoals.Android.slnx -p:AndroidSdkDirectory=$HOME/Android/Sdk -p
 dotnet build src/SlimeGoals.Android -t:Install -f net10.0-android -p:AndroidSdkDirectory=$HOME/Android/Sdk -p:JavaSdkDirectory=/usr/lib/jvm/java-21-openjdk
 
 # abrir o app (ou toque no ícone do slime)
-adb shell monkey -p dev.alcm.slimegoals 1
+~/Android/Sdk/platform-tools/adb shell monkey -p dev.alcm.slimegoals 1
 ```
 
 Os dados ficam no armazenamento privado do app (`<FilesDir>/slimegoals.db`); desinstalar o app apaga tudo. Nesta fase o Android ainda não tem lembretes (Fase 7b).
@@ -141,7 +141,7 @@ Para desinstalar, rode `./uninstall.sh` de dentro da pasta extraída. Ele não a
 | 4 | Lembretes (planejador, agendador, notificação nativa, segundo plano) | |
 | 5 | Relatórios | |
 | 6 | Acabamento e empacotamento Linux | |
-| 7 | Android | |
+| 7 | Android (7a interface ✅ · 7b lembretes ⏳) | |
 | 8 | Mascote slime (opcional) | |
 
 ## Licença
