@@ -26,6 +26,28 @@ Os componentes abaixo mantêm suas próprias licenças.
 | AwesomeAssertions | Apache-2.0 |
 | Microsoft.Extensions.TimeProvider.Testing | MIT |
 
+## Distribuídos no pacote
+
+O `.tar.gz` do Linux (`packaging/linux/build.sh`) é *self-contained*: traz o runtime .NET, as bibliotecas gerenciadas e as nativas. Os textos ficam em `licenses/` dentro do pacote (origem em [packaging/linux/licenses](packaging/linux/licenses)).
+
+| Componente | Licença | Arquivo |
+|---|---|---|
+| Runtime .NET (`libcoreclr.so`, `libclrjit.so`, `System.*.dll`, `libSystem.*.so`) | MIT | `MIT-dotnet-runtime-and-Microsoft.Extensions.txt`; avisos de terceiros do runtime em `dotnet-runtime-THIRD-PARTY-NOTICES.txt` |
+| Avalonia (`Avalonia*.dll`, `MicroCom.Runtime.dll`) | MIT | `MIT-Avalonia.txt` |
+| SkiaSharp (`SkiaSharp.dll`, `libSkiaSharp.so`) e HarfBuzzSharp (`HarfBuzzSharp.dll`, `libHarfBuzzSharp.so`) | MIT | `MIT-SkiaSharp-HarfBuzzSharp.txt` |
+| Skia (dentro de `libSkiaSharp.so`) | BSD-3-Clause | `BSD-3-Clause-skia.txt` |
+| HarfBuzz (dentro de `libHarfBuzzSharp.so`) | "Old MIT" | `HarfBuzz-Old-MIT.txt` |
+| Demais bibliotecas embutidas no Skia/HarfBuzz (FreeType, libpng, ICU, libjpeg-turbo, libwebp, expat etc.) | licenças variadas | `SkiaSharp-HarfBuzzSharp-THIRD-PARTY-NOTICES.txt` |
+| CommunityToolkit.Mvvm | MIT | `MIT-CommunityToolkit.txt` |
+| Microsoft.Extensions.DependencyInjection(.Abstractions) | MIT | `MIT-dotnet-runtime-and-Microsoft.Extensions.txt` |
+| Microsoft.Data.Sqlite | MIT | `MIT-Microsoft.Data.Sqlite.txt` |
+| Tmds.DBus.Protocol | MIT | `MIT-Tmds.DBus.Protocol.txt` |
+| Dapper | Apache-2.0 | `Apache-2.0.txt`, `Apache-2.0-NOTICE.txt` |
+| SQLitePCLRaw (`SQLitePCLRaw.*.dll`) | Apache-2.0 | `Apache-2.0.txt`, `Apache-2.0-NOTICE.txt` |
+| SQLite (`libe_sqlite3.so`) | domínio público | `SQLite-public-domain.txt` |
+| Fonte Figtree (embutida em `slimegoals.dll`) | SIL OFL 1.1 | `OFL-1.1-Figtree.txt` |
+| Ícones do Lucide (embutidos em `SlimeGoals.App.dll`) | ISC | `ISC-Lucide.txt` |
+
 ## Texto da licença do Lucide
 
 ```

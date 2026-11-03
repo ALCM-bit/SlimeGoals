@@ -1,0 +1,4 @@
+Componentes distribuídos sob a Apache License 2.0 (texto completo em Apache-2.0.txt):
+
+- Dapper 2.1.89 - Copyright 2019 Stack Exchange, Inc. (Sam Saffron, Marc Gravell, Nick Craver)
+- SQLitePCLRaw (core, provider.e_sqlite3, batteries_v2, lib.e_sqlite3) 2.1.13 - Copyright 2014-2024 SourceGear, LLC (Eric Sink)

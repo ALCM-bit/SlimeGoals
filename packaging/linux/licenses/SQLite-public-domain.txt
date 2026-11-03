@@ -1,0 +1,9 @@
+SQLite (libe_sqlite3.so, fornecido pelo pacote SQLitePCLRaw.lib.e_sqlite3)
+
+O autor deste software cedeu o código do SQLite ao domínio público.
+
+Original (inglês, de https://sqlite.org/copyright.html):
+"All of the code and documentation in SQLite has been dedicated to the public
+domain by the authors. Anyone is free to copy, modify, publish, use, compile,
+sell, or distribute the original SQLite code, either in source code form or as
+a compiled binary, for any purpose, commercial or non-commercial, and by any means."
