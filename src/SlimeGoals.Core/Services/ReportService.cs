@@ -4,16 +4,16 @@ using SlimeGoals.Core.Domain;
 namespace SlimeGoals.Core.Services;
 
 /// <summary>
-/// Meta que compõe a barra de um dia (teve registro positivo nele). Done = soma líquida do dia;
+/// Meta com progresso no dia (soma líquida positiva), que compõe a barra dele. Done = soma do dia;
 /// Met = cumpriu o dia (só diária; null na semanal, cujo alvo é da semana).
 /// </summary>
 public sealed record DayGoalEntry(Goal Goal, int Done, bool? Met);
 
 /// <summary>
-/// Barra de um dia: quantos registros positivos houve (ajustes negativos são correções e não contam)
-/// e as metas que os fizeram, na ordem das linhas.
+/// Barra de um dia: as metas com progresso nele, na ordem das linhas. A altura é quantas são
+/// (não quantos lançamentos: oito +1 de água valem uma meta, como 40 min de leitura lançados de uma vez).
 /// </summary>
-public sealed record DayBar(DateOnly Day, int Records, IReadOnlyList<DayGoalEntry> Goals);
+public sealed record DayBar(DateOnly Day, IReadOnlyList<DayGoalEntry> Goals);
 
 /// <summary>
 /// Linha de uma meta na semana. Done: soma da semana (semanal: período de avaliação recortado).
@@ -65,7 +65,7 @@ public sealed class ReportService(IGoalRepository goals, ICheckinRepository chec
 
         var ids = rows.Select(r => r.Goal.Id).ToHashSet();
         var days = Enumerable.Range(0, 7).Select(i => monday.AddDays(i))
-            .Select(d => new DayBar(d, sums.PositiveCountOn(d, ids), DayEntries(rows, d, sums))).ToList();
+            .Select(d => new DayBar(d, DayEntries(rows, d, sums))).ToList();
 
         var reminders = (await log.ListAsync(from, to, ct)).Where(e => ids.Contains(e.GoalId)).ToList();
         var answered = reminders.Count(e => e.Response is ReminderResponse.Done or ReminderResponse.Snooze);
@@ -219,12 +219,9 @@ public sealed class ReportService(IGoalRepository goals, ICheckinRepository chec
     }
 
     private static List<DayGoalEntry> DayEntries(IEnumerable<WeekGoalRow> rows, DateOnly day, DailySums sums) =>
-        rows.Where(r => sums.PositiveCountOn(r.Goal.Id, day) > 0)
-            .Select(r =>
-            {
-                var done = sums.On(r.Goal.Id, day);
-                return new DayGoalEntry(r.Goal, done, r.Goal.Recurrence == Recurrence.Daily ? done >= r.Goal.Target : null);
-            })
+        rows.Select(r => (r.Goal, Done: sums.On(r.Goal.Id, day)))
+            .Where(e => e.Done > 0)
+            .Select(e => new DayGoalEntry(e.Goal, e.Done, e.Goal.Recurrence == Recurrence.Daily ? e.Done >= e.Goal.Target : null))
             .ToList();
 
     private static int Round(double value) => (int)Math.Round(value, MidpointRounding.AwayFromZero);

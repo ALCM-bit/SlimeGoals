@@ -56,7 +56,7 @@ public sealed partial class ReportsPageViewModel(ReportService reports, TimeProv
     [ObservableProperty] public partial string? PeriodSubtitle { get; set; }
     [ObservableProperty] public partial string PercentText { get; set; } = "—";
     [ObservableProperty] public partial string? RemindersText { get; set; }
-    [ObservableProperty] public partial string BarsTitle { get; set; } = "Registros por dia";
+    [ObservableProperty] public partial string BarsTitle { get; set; } = "Metas com progresso por dia";
     [ObservableProperty] public partial string? ErrorMessage { get; set; }
 
     public ObservableCollection<BarViewModel> Bars { get; } = [];
@@ -191,13 +191,13 @@ public sealed partial class ReportsPageViewModel(ReportService reports, TimeProv
         PeriodSubtitle = null;
         PercentText = ReportFormatting.Percent(report.Percent);
         RemindersText = ReportFormatting.Reminders(report.RemindersFired, report.RemindersAnswered);
-        BarsTitle = "Registros por dia";
+        BarsTitle = "Metas com progresso por dia";
 
-        var max = Math.Max(1, report.Days.Max(d => d.Records));
+        var max = Math.Max(1, report.Days.Max(d => d.Goals.Count));
         Bars.Clear();
         foreach (var day in report.Days)
             Bars.Add(new BarViewModel(WeekLabels[((int)day.Day.DayOfWeek + 6) % 7],
-                day.Records.ToString(CultureInfo.InvariantCulture), (double)day.Records / max, day.Day == today,
+                day.Goals.Count.ToString(CultureInfo.InvariantCulture), (double)day.Goals.Count / max, day.Day == today,
                 ReportFormatting.DayTitle(day.Day),
                 day.Goals.Select(e => Detail(e.Goal, ReportFormatting.DayEntry(e), e.Met == true)).ToList(),
                 "Nenhum registro neste dia."));

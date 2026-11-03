@@ -178,7 +178,7 @@ Ponto de partida: `dotnet new install Avalonia.Templates` e `dotnet new avalonia
 | **Hoje**          | Resumo da semana (%, metas em andamento/concluídas; tile "Sequência": maior sequência atual entre as metas ativas, com o título da meta); lista "Metas de hoje" com progresso no período atual e controles por medida (Feito/Desmarcar; −/+ e painel com valor e nota; cronômetro ▶/⏹ e lançamento manual); próximos lembretes do dia (Fase 4) |
 | **Metas**         | Lista (filtro ativas/arquivadas), criar, editar, arquivar, desarquivar. Meta arquivada é somente leitura (só desarquivar ou excluir)                            |
 | **Editar meta**   | Título, tipo (diária/semanal), medida (conclusão/quantidade/tempo; travada após o primeiro registro), alvo (+ unidade na quantidade; h + min no tempo; oculto na conclusão), ícone e cor, intervalo, horário ativo, dias da semana, início e fim opcionais. Abre como página no lugar da lista (desktop e celular); excluir com confirmação na própria página |
-| **Relatórios**    | Segmentos Semana/Mês e botões Anterior/Próximo (abre no período atual; Próximo desabilitado nele; Anterior sem limite). Resumo (% cumprido, lembretes disparados vs. respondidos na semana), barras ("Registros por dia" na semana, "Evolução por semana" no mês) e tabela "Metas" com sequências; meta arquivada leva a tag "Arquivada". Período sem metas: "Nenhuma meta neste período." |
+| **Relatórios**    | Segmentos Semana/Mês e botões Anterior/Próximo (abre no período atual; Próximo desabilitado nele; Anterior sem limite). Resumo (% cumprido, lembretes disparados vs. respondidos na semana), barras ("Metas com progresso por dia" na semana, "Evolução por semana" no mês) e tabela "Metas" com sequências; meta arquivada leva a tag "Arquivada". Período sem metas: "Nenhuma meta neste período." |
 | **Configurações** | Autostart, duração do "adiar", ao fechar a janela (desktop)                                                                                                     |
 | **Lembrete**      | Notificação nativa do SO com as três ações (janela própria do Avalonia só como fallback)                                                                       |
 
@@ -280,7 +280,7 @@ Sem tabela própria e sem query nova nos repositórios. Cada relatório faz uma 
 |----------|------------------------------------------------------------------------------------|
 | `weekly` | soma vs. alvo na unidade da meta, % cumprido, melhor dia                           |
 | `daily`  | dias cumpridos / dias contados da semana, %                                        |
-| Geral    | registros por dia (barras), lembretes disparados vs. respondidos                   |
+| Geral    | metas com progresso por dia (barras), lembretes disparados vs. respondidos         |
 
 **Mensal:** por meta, períodos cumpridos no mês (semanas para `weekly`, dias para `daily`), evolução semana a semana, sequência atual e maior sequência na unidade do tipo. O mês são as semanas cuja segunda-feira cai nele, inteiras; o cabeçalho mostra o intervalo real.
 
@@ -288,7 +288,7 @@ Sem tabela própria e sem query nova nos repositórios. Cada relatório faz uma 
 
 - **Período contado.** Uma meta conta num dia quando ele está entre a data local de criação e a de arquivamento (inclusive), dentro do início e fim da meta e não é futuro. Diária: só dias ativos. Semanal: a semana conta se ao menos um dia dela conta; a soma usa o período de avaliação recortado. O período em andamento (hoje, semana atual) só entra quando já cumprido; em aberto, não reduz o % nem quebra a sequência.
 - **% cumprido.** Diária: dias cumpridos ÷ dias contados. Semanal na semana: soma ÷ alvo, até 100% (a semana em andamento mostra o parcial). Semanal no mês: semanas cumpridas ÷ semanas contadas. Sem período contado, "—". O % geral é a média dos % que têm valor, com `MidpointRounding.AwayFromZero`. Difere do % do Hoje, em que a diária conta a fração parcial de cada dia.
-- **Barras.** Semana: registros por dia local, só com valor positivo (ajustes negativos são correções). Mês: média dos % das metas em cada semana. Clicar numa barra mostra as metas que a compõem: na semana, o valor de cada meta no dia (✓ na diária cumprida); no mês, o % de cada meta na semana.
+- **Barras.** Semana: metas com progresso no dia local (soma líquida positiva; oito +1 de água contam como uma meta, e +1 seguido de −1 não conta). Mês: média dos % das metas em cada semana. Clicar numa barra mostra as metas que a compõem: na semana, o valor de cada meta no dia (✓ na diária cumprida); no mês, o % de cada meta na semana.
 - **Lembretes.** Disparados = entradas do log no intervalo; respondidos = Feito ou Adiar. Ignorar e expiração ficam gravados do mesmo jeito (§9) e não contam como resposta.
 - **Sequências.** Calculadas sobre todo o histórico da meta até o fim do período mostrado ou até hoje. Num mês passado aparecem como estavam no fim dele. Dias inativos da diária não quebram a sequência; meta arquivada para no dia do arquivamento.
 - **Melhor dia** (só semanal): dia de maior soma positiva; no empate, o mais cedo.
@@ -465,7 +465,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 - % cumprido: diária = dias cumpridos ÷ contados; semanal na semana = soma ÷ alvo (até 100%); no mês = semanas cumpridas ÷ contadas; sem período, "—"; geral = média dos que têm valor, com a semanal da semana em andamento entrando pelo parcial (confirmado pelo autor em 03/11/2026).
 - O % dos relatórios (dia cumprido ou não) difere do % do Hoje (fração parcial por dia).
 - Mês = semanas cuja segunda-feira cai nele, inteiras, também para diárias; domingo 01/11/2026 pertence a outubro.
-- Barras da semana contam só registros positivos; barras do mês são a média dos % das metas por semana; clicar numa barra mostra as metas que a compõem.
+- Barras da semana contam as metas com progresso no dia (revisto em 03/11/2026: antes contavam lançamentos, e oito +1 de água pesavam mais que 40 min de leitura); barras do mês são a média dos % das metas por semana; clicar numa barra mostra as metas que a compõem.
 - Lembretes: respondidos = Feito ou Adiar; Ignorar e expiração não contam.
 - Sequências sobre todo o histórico até o fim do período mostrado ou hoje; mês passado "como estava"; dias inativos não quebram; arquivada para no arquivamento.
 - Melhor dia (semanal): maior soma positiva; empate, o mais cedo.

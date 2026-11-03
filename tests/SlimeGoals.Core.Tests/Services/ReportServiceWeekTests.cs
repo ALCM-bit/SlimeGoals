@@ -123,17 +123,22 @@ public class ReportServiceWeekTests
     }
 
     [Fact]
-    public async Task Day_bars_count_positive_records_by_local_day()
+    public async Task Day_bars_count_goals_with_progress_by_local_day()
     {
-        var goal = await Create("A");
-        await Record(goal, Mon, 1);
-        await Record(goal, Mon, 1);
-        await Record(goal, Mon, -1);
-        await Record(goal, Tue.AddDays(1), 1, new TimeOnly(2, 30)); // 23:30 locais de 03/11
+        var a = await Create("A", target: 5);
+        var b = await Create("B");
+        var undone = await Create("Desfeita");
+        await Record(a, Mon, 1);
+        await Record(a, Mon, 1);
+        await Record(a, Mon, 1);          // três lançamentos da mesma meta contam como uma
+        await Record(b, Mon, 1);
+        await Record(undone, Mon, 1);
+        await Record(undone, Mon, -1);    // +1 e −1 no dia: sem progresso
+        await Record(a, Tue.AddDays(1), 1, new TimeOnly(2, 30)); // 23:30 locais de 03/11
 
         var report = await Service.GetWeekAsync(Today);
 
-        report.Days.Select(d => d.Records).Should().Equal(2, 1, 0, 0, 0, 0, 0);
+        report.Days.Select(d => d.Goals.Count).Should().Equal(2, 1, 0, 0, 0, 0, 0);
         report.Days.Select(d => d.Day).Should().Equal(Enumerable.Range(0, 7).Select(i => Mon.AddDays(i)));
     }
 
@@ -147,7 +152,8 @@ public class ReportServiceWeekTests
         await Record(water, Mon, 1);
         await Record(gym, Mon, 60);
         await Record(gym, Mon, -15);
-        await Record(fixedOnly, Mon, -1); // só correção: não compõe a barra
+        await Record(fixedOnly, Mon, 1);
+        await Record(fixedOnly, Mon, -1); // desfeita no mesmo dia: não compõe a barra
         await Record(water, Tue, 1);
 
         var report = await Service.GetWeekAsync(Today);

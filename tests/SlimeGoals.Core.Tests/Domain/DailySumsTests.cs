@@ -28,16 +28,4 @@ public class DailySumsTests
         sums.In(a, new DateRange(D("2026-11-03"), D("2026-11-05"))).Should().Be(2);
         sums.On(b, D("2026-11-03")).Should().Be(0);
     }
-
-    [Fact]
-    public void PositiveCountOn_counts_only_positive_records_of_given_goals()
-    {
-        Guid a = Guid.NewGuid(), b = Guid.NewGuid();
-        var sums = new DailySums(
-            [C(a, "2026-11-03T13:00:00", 1), C(a, "2026-11-03T14:00:00", 1), C(a, "2026-11-03T15:00:00", -1),
-             C(b, "2026-11-03T16:00:00", 5)], Zone);
-
-        sums.PositiveCountOn(D("2026-11-03"), new HashSet<Guid> { a }).Should().Be(2);
-        sums.PositiveCountOn(D("2026-11-03"), new HashSet<Guid> { a, b }).Should().Be(3);
-    }
 }
