@@ -56,11 +56,18 @@ public partial class App(IServiceProvider services) : Application
             desktop.Exit += (_, _) => StopAll(hosted);
             CreateTrayIcon();
         }
+        else if (ApplicationLifetime is IActivityApplicationLifetime activity)
+        {
+            // A fábrica roda de novo quando a Activity é recriada; o ShellViewModel é singleton
+            // (estado preservado) e os serviços sobem uma vez por processo (abaixo).
+            activity.MainViewFactory = () => new ShellView { DataContext = shell };
+        }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime single)
             single.MainView = new ShellView { DataContext = shell };
 
         base.OnFrameworkInitializationCompleted();
 
+        // OnFrameworkInitializationCompleted roda uma vez por processo; a fábrica da view não.
         foreach (var service in hosted)
             _ = StartSafelyAsync(service);
     }
