@@ -6,7 +6,7 @@
   <DockPanel Margin="8,4,8,0">
     <TextBlock DockPanel.Dock="Top" Classes="page-title" Text="{Binding Title}" Margin="0,0,0,16" />
 
-    <!-- Resumo da semana (spec §7; spec §7) -->
+    <!-- Resumo da semana (spec §7) -->
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,*,*" ColumnSpacing="12" Margin="0,0,0,16">
       <Border Classes="stat">
         <StackPanel>

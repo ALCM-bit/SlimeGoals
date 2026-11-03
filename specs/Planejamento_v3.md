@@ -426,7 +426,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 - Cronômetro para metas de tempo, gravado no banco, um por vez; lançamento manual também disponível.
 - Ação principal da notificação conforme a medida (Feito, +1, Iniciar); cronômetro rodando pausa os lembretes da meta.
 - Medida travada após o primeiro registro.
-- Sequência no resumo do Hoje fica para a Fase 5, junto com os relatórios.
+- Sequência no resumo do Hoje fica para a Fase 5, junto com os relatórios (entregue na Fase 5).
 
 **Decisões da Fase 4 (02/11/2026):**
 
@@ -471,6 +471,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 - Melhor dia (semanal): maior soma positiva; empate, o mais cedo.
 - Tile "Sequência" do Hoje: maior sequência atual entre as ativas (semana = 7 dias; empate, meta mais antiga); sem sequência, "0 dias" sem título.
 - Navegação: abre no período atual; Próximo desabilitado nele; Anterior sem limite; período sem metas mostra "Nenhuma meta neste período.".
+- Desarquivar uma meta faz os dias em que ela ficou arquivada contarem como não cumpridos (o modelo guarda só o último arquivamento), o que reduz o % e pode quebrar a sequência; aceito no MVP.
 
 **Pendências:** versão mínima do Android (Fase 7c; sugestão do spike: Android 8.0, API 26); sincronização entre dispositivos (fora do MVP).
 
