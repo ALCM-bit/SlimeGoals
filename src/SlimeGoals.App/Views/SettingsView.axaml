@@ -25,7 +25,12 @@
           </StackPanel>
         </Border>
 
-        <Border Classes="card">
+        <Border Classes="card" IsVisible="{Binding IsEmpty}">
+          <TextBlock Text="Nada para configurar por enquanto. Os lembretes chegam ao Android na próxima versão."
+                     Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+        </Border>
+
+        <Border Classes="card" IsVisible="{Binding ShowReminders}">
           <StackPanel Spacing="12">
             <TextBlock Classes="section-title" Text="Lembretes" />
             <TextBlock Text="Adiar lembretes por" />

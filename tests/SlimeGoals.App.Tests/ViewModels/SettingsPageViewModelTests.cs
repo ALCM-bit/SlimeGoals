@@ -23,8 +23,8 @@ public class SettingsPageViewModelTests
         var all = new SettingsPageViewModel(settings);
         var none = new SettingsPageViewModel(settings, null, new PlatformCapabilities(false, false, false, false));
 
-        (all.ShowGeneral, all.ShowWindow).Should().Be((true, true));
-        (none.ShowGeneral, none.ShowWindow).Should().Be((false, false));
+        (all.ShowGeneral, all.ShowReminders, all.ShowWindow, all.IsEmpty).Should().Be((true, true, true, false));
+        (none.ShowGeneral, none.ShowReminders, none.ShowWindow, none.IsEmpty).Should().Be((false, false, false, true));
     }
 
     [Fact]

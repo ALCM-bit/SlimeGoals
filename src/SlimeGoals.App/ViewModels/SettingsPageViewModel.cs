@@ -31,8 +31,14 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
     /// <summary>Seção "Geral" (início com o sistema).</summary>
     public bool ShowGeneral => _capabilities.Autostart;
 
+    /// <summary>Seção "Lembretes" (tempo de adiar).</summary>
+    public bool ShowReminders => _capabilities.Reminders;
+
     /// <summary>Seção "Janela" (ao fechar).</summary>
     public bool ShowWindow => _capabilities.WindowClose;
+
+    /// <summary>Nenhuma seção se aplica à plataforma: a tela mostra um aviso no lugar.</summary>
+    public bool IsEmpty => !ShowGeneral && !ShowReminders && !ShowWindow;
 
     public bool CanAutostart => autostart is not null;
 
