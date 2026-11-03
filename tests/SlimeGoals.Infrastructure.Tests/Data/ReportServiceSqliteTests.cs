@@ -47,10 +47,10 @@ public class ReportServiceSqliteTests : IDisposable
         var first = await AddGoal("Água", Created);
         await Record(first, 11, 2);
         await Record(first, 11, 3);
-        await Record(first, 11, 1, deletedAt: Now);
 
         var archived = await AddGoal("Arquivada", Created.AddMinutes(1));
         await Record(archived, 11, 2);
+        await Record(archived, 11, 3, deletedAt: Now);
         await Goals.UpdateAsync(archived with { ArchivedAt = new DateTimeOffset(2026, 11, 3, 18, 0, 0, TimeSpan.Zero) });
 
         var deleted = await AddGoal("Excluída", Created.AddMinutes(2));
