@@ -98,7 +98,25 @@ dotnet build src/SlimeGoals.Android -t:Install -f net10.0-android -p:AndroidSdkD
 ~/Android/Sdk/platform-tools/adb shell monkey -p dev.alcm.slimegoals 1
 ```
 
-Os dados ficam no armazenamento privado do app (`<FilesDir>/slimegoals.db`); desinstalar o app apaga tudo. Nesta fase o Android ainda não tem lembretes (Fase 7b).
+Os dados ficam no armazenamento privado do app (`<FilesDir>/slimegoals.db`); desinstalar o app apaga tudo.
+
+**Lembretes:** o app precisa de duas permissões, que o Android 16 traz negadas num app recém-instalado: notificações e alarmes exatos. O aviso na tela Hoje oferece "Permitir" para as duas (Configurações mostra o estado de cada uma). Sem alarmes exatos os lembretes seguem, mas podem atrasar alguns minutos.
+
+Comandos `adb` úteis (`adb` em `~/Android/Sdk/platform-tools`):
+
+```bash
+# notificações
+adb shell pm grant dev.alcm.slimegoals android.permission.POST_NOTIFICATIONS
+
+# alarmes exatos (use --uid; a forma por pacote não tem efeito na API 36)
+adb shell appops set --uid dev.alcm.slimegoals SCHEDULE_EXACT_ALARM allow   # ou deny
+
+# alarme armado
+adb shell dumpsys alarm | grep -A3 slimegoals
+
+# encerrar o processo como o sistema faz (o alarme continua; force-stop o cancela)
+adb shell am kill dev.alcm.slimegoals
+```
 
 Para conferir os layouts sem emulador, `dotnet run --project tools/SlimeGoals.Render -- /tmp/render [phone|desktop|all]` grava PNGs de cada página em 412×915 (celular) e 1100×720 (desktop).
 
