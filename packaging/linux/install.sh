@@ -2,13 +2,13 @@
 # Instala o SlimeGoals no usuário (~/.local), sem root. Rode de dentro da pasta extraída.
 set -euo pipefail
 
-src="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+[ -n "${HOME:-}" ] || { echo "HOME está vazio; não sei onde instalar." >&2; exit 1; }
+
+src="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 opt="$HOME/.local/opt/slimegoals"
 bin="$HOME/.local/bin"
 apps="$HOME/.local/share/applications"
 icons="$HOME/.local/share/icons/hicolor"
-
-[ -x "$src/app/slimegoals" ] || { echo "Não achei app/slimegoals ao lado do install.sh." >&2; exit 1; }
 
 # Mesma regra de XdgAutostart.QuoteExec: aspas duplas e escape de " ` $ \.
 quote_exec() {
@@ -23,6 +23,21 @@ quote_exec() {
     printf '"%s"' "$out"
 }
 
+# Não apaga a própria origem (ex.: rodado de dentro de ~/.local/opt/slimegoals).
+opt_real="$(realpath -m "$opt")"
+case "$src/" in
+    "$opt_real"/* | "$opt_real/")
+        echo "Rode o install.sh a partir da pasta extraída do pacote, não de $opt." >&2
+        exit 1 ;;
+esac
+case "$opt_real/" in
+    "$src"/*)
+        echo "A pasta do pacote contém o destino da instalação ($opt); extraia o pacote em outro lugar." >&2
+        exit 1 ;;
+esac
+
+[ -x "$src/app/slimegoals" ] || { echo "Não achei app/slimegoals ao lado do install.sh." >&2; exit 1; }
+
 # Substitui a instalação anterior.
 rm -rf "$opt"
 mkdir -p "$opt" "$bin" "$apps"
@@ -31,7 +46,7 @@ ln -sfn "$opt/slimegoals" "$bin/slimegoals"
 
 exec_value="$(quote_exec "$opt/slimegoals")"
 template="$(cat "$src/slimegoals.desktop.in")"
-printf '%s\n' "${template//@EXEC@/$exec_value}" > "$apps/slimegoals.desktop"
+printf '%s\n' "${template//@EXEC@/"$exec_value"}" > "$apps/slimegoals.desktop"
 chmod 644 "$apps/slimegoals.desktop"
 
 for dir in "$src"/icons/hicolor/*/apps; do
