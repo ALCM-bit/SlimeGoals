@@ -17,6 +17,15 @@ public static class XdgPaths
         return Path.Combine(dataHome, AppFolder, DatabaseFile);
     }
 
+    /// <summary>Pasta de autostart: <c>$XDG_CONFIG_HOME/autostart</c> ou <c>~/.config/autostart</c>.</summary>
+    public static string AutostartDirectory(Func<string, string?> getEnv, string home)
+    {
+        var configHome = getEnv("XDG_CONFIG_HOME");
+        if (string.IsNullOrWhiteSpace(configHome))
+            configHome = Path.Combine(home, ".config");
+        return Path.Combine(configHome, "autostart");
+    }
+
     /// <summary>
     /// Pasta de arquivos de execução (trava e socket da instância única):
     /// <c>$XDG_RUNTIME_DIR</c>, ou <c>{tempPath}/slimegoals-{userName}</c> se ele faltar ou estiver vazio.
