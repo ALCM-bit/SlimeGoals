@@ -152,10 +152,10 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
 
     public bool CanRequestExactAlarms => !ExactAlarmsAllowed;
 
+    public bool CanRequestBattery => !BatteryUnrestricted;
+
     [RelayCommand]
     private void RequestNotifications() => permissions?.RequestNotifications();
-
-    public bool CanRequestBattery => !BatteryUnrestricted;
 
     [RelayCommand]
     private void RequestExactAlarms() => permissions?.RequestExactAlarms();

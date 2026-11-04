@@ -83,11 +83,24 @@ internal sealed class AndroidReminderPermissions(Context context) : IReminderPer
         if (CurrentActivity is not { } activity)
             return;
 
-        var intent = new Intent(AProvider.Settings.ActionRequestIgnoreBatteryOptimizations,
-            AUri.Parse($"package:{activity.PackageName}"));
-        // Sem tela que resolva o pedido direto, cai na lista geral de otimização de bateria.
-        if (intent.ResolveActivity(activity.PackageManager!) is null)
-            intent = new Intent(AProvider.Settings.ActionIgnoreBatteryOptimizationSettings);
-        activity.StartActivity(intent);
+        // Primeiro o diálogo direto; sem tela que o resolva, a lista geral de otimização de bateria.
+        try
+        {
+            activity.StartActivity(new Intent(AProvider.Settings.ActionRequestIgnoreBatteryOptimizations,
+                AUri.Parse($"package:{activity.PackageName}")));
+            return;
+        }
+        catch (ActivityNotFoundException)
+        {
+        }
+
+        try
+        {
+            activity.StartActivity(new Intent(AProvider.Settings.ActionIgnoreBatteryOptimizationSettings));
+        }
+        catch (ActivityNotFoundException ex)
+        {
+            System.Diagnostics.Trace.TraceError($"Nenhuma tela de otimização de bateria no sistema: {ex}");
+        }
     }
 }
