@@ -133,16 +133,18 @@ Para conferir os layouts sem emulador, `dotnet run --project tools/SlimeGoals.Re
 O pacote é um `.tar.gz` *self-contained* (não precisa do .NET instalado) para linux-x64. A instalação é só no seu usuário, sem root.
 
 ```bash
-# gerar o pacote (ou baixar o .tar.gz pronto)
+# gerar o pacote
 bash packaging/linux/build.sh
 tar -xzf artifacts/slimegoals-0.6.0-linux-x64.tar.gz
 cd slimegoals-0.6.0
 ./install.sh
 ```
 
+Ainda não há pacote pronto para baixar, então gere-o com o `build.sh`, que precisa do SDK do .NET. O `install.sh` só funciona de dentro da pasta extraída: rodar o de `packaging/linux/` dá erro, porque o app compilado não está ali.
+
 Isso instala o app em `~/.local/opt/slimegoals/`, o link em `~/.local/bin/slimegoals`, o atalho em `~/.local/share/applications/slimegoals.desktop` e os ícones em `~/.local/share/icons/hicolor/`. Rodar `./install.sh` de novo substitui a versão instalada.
 
-Para desinstalar, rode `./uninstall.sh` de dentro da pasta extraída. Ele não apaga seus dados: o banco de dados fica em `~/.local/share/SlimeGoals`. A entrada de "iniciar com o sistema" (`~/.config/autostart/slimegoals.desktop`) também fica; apague-a à mão se quiser.
+Para desinstalar, rode `./uninstall.sh` de dentro da pasta extraída. Ele pergunta se deve apagar também seus dados (a pasta `~/.local/share/SlimeGoals`, com o banco e os backups); a resposta padrão é não. Para apagar sem a pergunta, use `./uninstall.sh --apagar-dados` com o app fechado. Apagar os dados não tem volta. A entrada de "iniciar com o sistema" (`~/.config/autostart/slimegoals.desktop`) fica; apague-a à mão se quiser.
 
 ## Documentação
 
