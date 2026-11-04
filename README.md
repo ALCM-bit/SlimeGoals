@@ -7,8 +7,8 @@ com os dados guardados localmente em SQLite.
 
 ![Tela Hoje no desktop, com o slime e as metas do dia](docs/images/hoje-desktop.png)
 
-> **Status:** em desenvolvimento. O app já funciona no Linux, com pacote de instalação, e no Android, por enquanto
-> só em APK Debug. A próxima etapa é a Fase 7c: APK assinado para instalar num celular de verdade. Veja o [roteiro](#roteiro).
+> **Status:** em desenvolvimento. O app funciona no Linux, com pacote de instalação, e no Android, onde já dá para
+> gerar um APK assinado ([Instalar no Android](#instalar-no-android)). Falta o autor conferir o APK num celular de verdade. Veja o [roteiro](#roteiro).
 
 ## Funcionalidades do MVP
 
@@ -63,6 +63,7 @@ src/
 tests/                         testes do Core, Infrastructure, App e Platform.Linux; SlimeGoals.Testing (falsos)
 tools/SlimeGoals.Render/       grava PNGs das telas sem abrir o app
 packaging/linux/               pacote .tar.gz e instalador
+packaging/android/             APK assinado (build.sh) e criação da chave (make-keystore.sh)
 specs/                         especificação, protótipos, planos e conclusões de spikes
 ```
 
@@ -128,6 +129,36 @@ adb shell am kill dev.alcm.slimegoals
 
 Para conferir os layouts sem emulador, `dotnet run --project tools/SlimeGoals.Render -- /tmp/render [phone|desktop|all]` grava PNGs de cada página em 412×915 (celular) e 1100×720 (desktop).
 
+## Instalar no Android
+
+O APK é assinado com uma chave sua, que fica fora do repositório. Ele traz as arquiteturas arm64 (celulares) e x64 (emulador) e exige Android 8.0 ou mais novo (API 26). Pré-requisitos: os de [Rodar no Android](#rodar-no-android-desenvolvimento).
+
+1. **Crie a chave uma vez** e guarde uma cópia dela num lugar seguro:
+
+   ```bash
+   packaging/android/make-keystore.sh
+   ```
+
+   O script pede uma senha e grava a chave em `~/.android-keystores/slimegoals.keystore` (ou onde `SLIMEGOALS_KEYSTORE` apontar); ele não sobrescreve uma chave que já existe. **Perder a chave, ou a senha, impede atualizar o app instalado.**
+
+2. **Gere o APK**, com a senha da chave na variável de ambiente:
+
+   ```bash
+   SLIMEGOALS_KEYSTORE_PASS=… packaging/android/build.sh
+   ```
+
+   O resultado é `artifacts/slimegoals-0.7.0-android.apk`.
+
+3. **Instale no celular:** com a depuração USB ligada, `adb install artifacts/slimegoals-0.7.0-android.apk`; ou copie o APK para o aparelho e abra-o, permitindo "instalar apps desconhecidos" para o app que o abriu.
+
+4. **Primeira abertura:** no aviso do Hoje, toque em "Permitir" (notificações e alarmes exatos). Depois, em Configurações → Bateria, toque em "Liberar" e aceite: sem isso o sistema pode adiar ou suspender os lembretes com o celular parado. Liberar a bateria faz "Alarmes exatos" aparecer como permitido, porque o Android trata assim os apps sem restrição de bateria; se você tirar o app dessa isenção, o bloqueio volta.
+
+5. **No Samsung (One UI)**, confira também:
+   - Configurações → Aplicativos → SlimeGoals → Bateria → "Sem restrições";
+   - Configurações → Bateria → Limites de uso em segundo plano: o app não pode estar em "Apps em suspensão" nem em "Apps em suspensão profunda".
+
+6. **Atualizar:** gere o APK de novo com o mesmo comando e instale com `adb install -r artifacts/slimegoals-<versão>-android.apk`, mantendo os dados. **Com outra chave, só desinstalando o app, o que apaga os dados.**
+
 ## Instalar no Linux
 
 O pacote é um `.tar.gz` *self-contained* (não precisa do .NET instalado) para linux-x64. A instalação é só no seu usuário, sem root.
@@ -135,8 +166,8 @@ O pacote é um `.tar.gz` *self-contained* (não precisa do .NET instalado) para 
 ```bash
 # gerar o pacote
 bash packaging/linux/build.sh
-tar -xzf artifacts/slimegoals-0.6.0-linux-x64.tar.gz
-cd slimegoals-0.6.0
+tar -xzf artifacts/slimegoals-0.7.0-linux-x64.tar.gz
+cd slimegoals-0.7.0
 ./install.sh
 ```
 
@@ -169,7 +200,7 @@ Para desinstalar, rode `./uninstall.sh` de dentro da pasta extraída. Ele pergun
 | 4 | Lembretes (planejador, agendador, notificação nativa, segundo plano) | ✅ |
 | 5 | Relatórios | ✅ |
 | 6 | Acabamento e empacotamento Linux | ✅ |
-| 7 | Android (7a interface ✅ · 7b lembretes ✅ · 7c distribuição ⏳) | ⏳ |
+| 7 | Android (7a interface ✅ · 7b lembretes ✅ · 7c distribuição ✅ implementado · ⏳ aparelho real) | ⏳ |
 | 8 | Mascote slime | ✅ |
 
 ## Licença

@@ -29,7 +29,7 @@ Os componentes abaixo mantêm suas próprias licenças.
 | AwesomeAssertions | Apache-2.0 |
 | Microsoft.Extensions.TimeProvider.Testing | MIT |
 
-## Distribuídos no pacote
+## Distribuídos no pacote do Linux
 
 O `.tar.gz` do Linux (`packaging/linux/build.sh`) é *self-contained*: traz o runtime .NET, as bibliotecas gerenciadas e as nativas. Os textos ficam em `licenses/` dentro do pacote (origem em [src/SlimeGoals.App/Licenses](src/SlimeGoals.App/Licenses), embutidos no app para a tela "Sobre").
 
@@ -50,8 +50,33 @@ O `.tar.gz` do Linux (`packaging/linux/build.sh`) é *self-contained*: traz o ru
 | SQLite (`libe_sqlite3.so`) | domínio público | `SQLite-public-domain.txt` |
 | Fonte Figtree (embutida em `SlimeGoals.App.dll`) | SIL OFL 1.1 | `OFL-1.1-Figtree.txt` |
 | Ícones do Lucide (embutidos em `SlimeGoals.App.dll`) | ISC e MIT (Feather) | `ISC-Lucide.txt` |
-| Android: .NET para Android (Mono, `libmonosgen-2.0.so`) | MIT | `MIT-dotnet-runtime-and-Microsoft.Extensions.txt`; avisos de terceiros em `dotnet-android-THIRD-PARTY-NOTICES.txt` |
-| Android: bindings Xamarin (AndroidX, Kotlin, Guava ListenableFuture, JSpecify, JetBrains Annotations) | MIT (bindings) e Apache-2.0 (bibliotecas Java e Kotlin) | `MIT-Xamarin-bindings.txt`, `Apache-2.0.txt` |
+
+## Distribuídos no APK do Android
+
+O APK (`packaging/android/build.sh`) traz o runtime .NET para Android, as bibliotecas gerenciadas e as nativas (arm64-v8a e x86_64). Os textos têm a mesma origem do pacote do Linux, [src/SlimeGoals.App/Licenses](src/SlimeGoals.App/Licenses), e ficam embutidos no app.
+
+| Componente | Licença | Arquivo |
+|---|---|---|
+| .NET para Android (Mono, `libmonosgen-2.0.so`) e bibliotecas do runtime | MIT | `MIT-dotnet-runtime-and-Microsoft.Extensions.txt` (o texto do pacote do .NET para Android é idêntico ao do runtime); avisos de terceiros em `dotnet-android-THIRD-PARTY-NOTICES.txt` |
+| Avalonia, incluindo Avalonia.Android | MIT | `MIT-Avalonia.txt` |
+| SkiaSharp (`libSkiaSharp.so`) e HarfBuzzSharp (`libHarfBuzzSharp.so`) | MIT | `MIT-SkiaSharp-HarfBuzzSharp.txt` |
+| Skia (dentro de `libSkiaSharp.so`) | BSD-3-Clause | `BSD-3-Clause-skia.txt` |
+| HarfBuzz (dentro de `libHarfBuzzSharp.so`) | "Old MIT" | `HarfBuzz-Old-MIT.txt` |
+| Demais bibliotecas embutidas no Skia/HarfBuzz | licenças variadas | `SkiaSharp-HarfBuzzSharp-THIRD-PARTY-NOTICES.txt` |
+| CommunityToolkit.Mvvm | MIT | `MIT-CommunityToolkit.txt` |
+| Microsoft.Extensions.DependencyInjection(.Abstractions) | MIT | `MIT-dotnet-runtime-and-Microsoft.Extensions.txt` |
+| Microsoft.Data.Sqlite | MIT | `MIT-Microsoft.Data.Sqlite.txt` |
+| Dapper | Apache-2.0 | `Apache-2.0.txt`, `Apache-2.0-NOTICE.txt` |
+| SQLitePCLRaw | Apache-2.0 | `Apache-2.0.txt`, `Apache-2.0-NOTICE.txt` |
+| SQLite (`libe_sqlite3.so`) | domínio público | `SQLite-public-domain.txt` |
+| Bindings Xamarin (AndroidX, Kotlin e outros) | MIT | `MIT-Xamarin-bindings.txt` |
+| AndroidX, Kotlin e kotlinx.coroutines, Guava ListenableFuture, JSpecify, JetBrains Annotations (bibliotecas Java e Kotlin) | Apache-2.0 | `Apache-2.0.txt` |
+| Fonte Figtree (embutida em `SlimeGoals.App.dll`) | SIL OFL 1.1 | `OFL-1.1-Figtree.txt` |
+| Ícones do Lucide (embutidos em `SlimeGoals.App.dll`) | ISC e MIT (Feather) | `ISC-Lucide.txt` |
+
+## Onde ver os textos no app
+
+O app mostra todos os componentes e o texto de cada licença em Configurações → Sobre → Licenças. A lista é a mesma nas duas plataformas e indica onde cada componente é distribuído (Linux, Android ou ambos).
 
 ## Texto da licença do Lucide
 
