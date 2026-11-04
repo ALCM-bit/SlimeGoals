@@ -19,7 +19,7 @@ Os componentes abaixo mantêm suas próprias licenças.
 |---|---|
 | Avalonia, Avalonia.Desktop, Avalonia.Android, Avalonia.Themes.Fluent | MIT |
 | Avalonia.Headless, Avalonia.Skia (ferramenta de render) | MIT |
-| Xamarin.AndroidX.Core.SplashScreen | MIT e Apache-2.0 |
+| Xamarin.AndroidX.*, Xamarin.Kotlin.*, Xamarin.KotlinX.*, Xamarin.Google.Guava.ListenableFuture, Xamarin.JSpecify, Xamarin.Jetbrains.Annotations (dependências do Android) | MIT (bindings) e Apache-2.0 |
 | CommunityToolkit.Mvvm | MIT |
 | Microsoft.Extensions.DependencyInjection(.Abstractions) | MIT |
 | Microsoft.Data.Sqlite | MIT |
@@ -31,7 +31,7 @@ Os componentes abaixo mantêm suas próprias licenças.
 
 ## Distribuídos no pacote
 
-O `.tar.gz` do Linux (`packaging/linux/build.sh`) é *self-contained*: traz o runtime .NET, as bibliotecas gerenciadas e as nativas. Os textos ficam em `licenses/` dentro do pacote (origem em [packaging/linux/licenses](packaging/linux/licenses)).
+O `.tar.gz` do Linux (`packaging/linux/build.sh`) é *self-contained*: traz o runtime .NET, as bibliotecas gerenciadas e as nativas. Os textos ficam em `licenses/` dentro do pacote (origem em [src/SlimeGoals.App/Licenses](src/SlimeGoals.App/Licenses), embutidos no app para a tela "Sobre").
 
 | Componente | Licença | Arquivo |
 |---|---|---|
@@ -50,6 +50,8 @@ O `.tar.gz` do Linux (`packaging/linux/build.sh`) é *self-contained*: traz o ru
 | SQLite (`libe_sqlite3.so`) | domínio público | `SQLite-public-domain.txt` |
 | Fonte Figtree (embutida em `SlimeGoals.App.dll`) | SIL OFL 1.1 | `OFL-1.1-Figtree.txt` |
 | Ícones do Lucide (embutidos em `SlimeGoals.App.dll`) | ISC e MIT (Feather) | `ISC-Lucide.txt` |
+| Android: .NET para Android (Mono, `libmonosgen-2.0.so`) | MIT | `MIT-dotnet-runtime-and-Microsoft.Extensions.txt`; avisos de terceiros em `dotnet-android-THIRD-PARTY-NOTICES.txt` |
+| Android: bindings Xamarin (AndroidX, Kotlin, Guava ListenableFuture, JSpecify, JetBrains Annotations) | MIT (bindings) e Apache-2.0 (bibliotecas Java e Kotlin) | `MIT-Xamarin-bindings.txt`, `Apache-2.0.txt` |
 
 ## Texto da licença do Lucide
 
