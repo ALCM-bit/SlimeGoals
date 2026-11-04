@@ -523,6 +523,29 @@ public class TodayPageViewModelTests
     }
 
     [Fact]
+    public async Task Mascot_shows_only_after_first_load()
+    {
+        await Create("Água");
+        var page = NewPage();
+        page.HasMascot.Should().BeFalse();
+
+        await page.LoadCommand.ExecuteAsync(null);
+
+        (page.HasMascot, page.Mascot.Pose).Should().Be((true, MascotPose.Idle));
+    }
+
+    [Fact]
+    public async Task Mascot_stays_hidden_when_first_load_fails()
+    {
+        var page = NewPage();
+        _goals.FailReadsWith = new IOException("x");
+
+        await page.LoadCommand.ExecuteAsync(null);
+
+        page.HasMascot.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Mascot_keeps_pose_when_load_fails()
     {
         var goal = await Create("Mesa", Measure.Completion, 1);

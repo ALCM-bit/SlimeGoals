@@ -18,7 +18,7 @@
           </StackPanel>
           <ProgressBar Classes="hero" Minimum="0" Maximum="100" Value="{Binding WeekPercent}" />
         </StackPanel>
-        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6" IsVisible="{Binding HasMascot}">
           <Border Classes="hero-bubble">
             <TextBlock Text="{Binding Mascot.Message}" Foreground="{DynamicResource HeroBubbleText}"
                        FontSize="13" FontWeight="Bold" TextWrapping="Wrap" />
