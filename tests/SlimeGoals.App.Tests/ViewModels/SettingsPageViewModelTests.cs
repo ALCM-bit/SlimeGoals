@@ -38,6 +38,15 @@ public class SettingsPageViewModelTests
     }
 
     [Fact]
+    public void About_default_version_has_no_build_metadata()
+    {
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()));
+
+        vm.VersionText.Should().StartWith("SlimeGoals ");
+        vm.VersionText.Should().NotContain("+");
+    }
+
+    [Fact]
     public void Licenses_open_list_then_text()
     {
         var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()));

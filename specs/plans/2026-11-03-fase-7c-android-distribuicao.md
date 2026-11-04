@@ -353,13 +353,13 @@ public static class LicenseTexts
 
 No computador:
 1. `packaging/android/make-keystore.sh`: escolha uma senha e guarde uma cópia de `~/.android-keystores/slimegoals.keystore`.
-2. `SLIMEGOALS_KEYSTORE_PASS=… packaging/android/build.sh` → `artifacts/slimegoals-0.7.0-android.apk`.
+2. `packaging/android/build.sh` (pede a senha) → `artifacts/slimegoals-0.7.0-android.apk`.
 
 No Samsung:
 1. Instale o APK (por `adb install` ou copiando o arquivo).
 2. Abra o app: o Hoje mostra o aviso de permissões, e "Permitir" pede notificações e alarmes exatos.
 3. Em Configurações → Bateria, toque "Liberar" e aceite: a linha passa a "Sem restrição". Confira também os ajustes da Samsung no README.
-4. Em Configurações → Sobre, aparece "SlimeGoals 0.7.0". "Licenças" abre a lista, e tocar num item mostra o texto. O Voltar do sistema volta texto → lista → Configurações → Hoje.
+4. Em Configurações → Sobre, aparece "SlimeGoals 0.7.0". "Licenças" abre a lista, e tocar num item mostra o texto. O Voltar do sistema volta texto → lista → Configurações → Hoje. Abra também os dois avisos grandes (cerca de 140 KB) e role-os com o toque.
 5. Crie uma meta com lembrete a cada 15 min, bloqueie a tela e deixe o celular parado por 1 h ou mais: os lembretes chegam no horário, com "+1", "Adiar" e "Ignorar" funcionando sem abrir o app.
 6. Reinicie o celular sem abrir o app: o próximo lembrete chega.
 7. Toque um campo de texto no formulário de meta e feche o teclado: as margens continuam (correção do PR #18 num teclado de verdade).

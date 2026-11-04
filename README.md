@@ -141,11 +141,13 @@ O APK é assinado com uma chave sua, que fica fora do repositório. Ele traz as 
 
    O script pede uma senha e grava a chave em `~/.android-keystores/slimegoals.keystore` (ou onde `SLIMEGOALS_KEYSTORE` apontar); ele não sobrescreve uma chave que já existe. **Perder a chave, ou a senha, impede atualizar o app instalado.**
 
-2. **Gere o APK**, com a senha da chave na variável de ambiente:
+2. **Gere o APK:**
 
    ```bash
-   SLIMEGOALS_KEYSTORE_PASS=… packaging/android/build.sh
+   packaging/android/build.sh
    ```
+
+   O script pede a senha da chave (ela não fica no histórico do shell). Para uma chave em outro lugar, aponte `SLIMEGOALS_KEYSTORE`; sem terminal (CI, por exemplo), defina `SLIMEGOALS_KEYSTORE_PASS`. O SDK do Android e o JDK vêm de `ANDROID_HOME` e `JAVA_HOME`, com padrão `~/Android/Sdk` e `/usr/lib/jvm/java-21-openjdk`.
 
    O resultado é `artifacts/slimegoals-0.7.0-android.apk`.
 

@@ -101,7 +101,7 @@
               <TextBlock Classes="section-title" Text="Sobre" />
               <TextBlock Text="{Binding VersionText}" />
               <TextBlock Text="{Binding LicenseText}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
-              <Button Classes="ghost" MinHeight="44" HorizontalAlignment="Left" Content="Licenças de código aberto"
+              <Button Classes="ghost" MinHeight="44" HorizontalAlignment="Left" Content="Licenças"
                       Command="{Binding OpenLicensesCommand}" />
             </StackPanel>
           </Border>
@@ -128,7 +128,7 @@
       </ScrollViewer>
 
       <!-- Texto da licença -->
-      <ScrollViewer Classes="page" IsVisible="{Binding IsLicenseTextOpen}">
+      <ScrollViewer x:Name="LicenseTextScroller" Classes="page" IsVisible="{Binding IsLicenseTextOpen}">
         <SelectableTextBlock Text="{Binding SelectedLicenseText}" TextWrapping="Wrap" FontFamily="monospace"
                              FontSize="12" Margin="0,0,0,14" />
       </ScrollViewer>

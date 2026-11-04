@@ -2,6 +2,11 @@
 # Gera artifacts/slimegoals-<versão>-android.apk (Release, assinado).
 set -euo pipefail
 
+# Caminho relativo vale a partir de onde o script foi chamado, não da raiz do repositório.
+if [ -n "${SLIMEGOALS_KEYSTORE:-}" ]; then
+  SLIMEGOALS_KEYSTORE="$(realpath -m -- "$SLIMEGOALS_KEYSTORE")"
+fi
+
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/../.." && pwd)"
 cd "$root"
@@ -9,8 +14,16 @@ cd "$root"
 keystore="${SLIMEGOALS_KEYSTORE:-$HOME/.android-keystores/slimegoals.keystore}"
 android_home="${ANDROID_HOME:-$HOME/Android/Sdk}"
 java_home="${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk}"
+# O apksigner precisa do java no PATH.
+PATH="$java_home/bin:$PATH"
 
-[ -n "${SLIMEGOALS_KEYSTORE_PASS:-}" ] || { echo "Defina SLIMEGOALS_KEYSTORE_PASS com a senha da chave." >&2; exit 1; }
+if [ -z "${SLIMEGOALS_KEYSTORE_PASS:-}" ]; then
+  if [ -t 0 ]; then
+    read -r -s -p "Senha da chave: " SLIMEGOALS_KEYSTORE_PASS
+    echo
+  fi
+  [ -n "${SLIMEGOALS_KEYSTORE_PASS:-}" ] || { echo "Defina SLIMEGOALS_KEYSTORE_PASS com a senha da chave." >&2; exit 1; }
+fi
 [ -f "$keystore" ] || { echo "Chave não encontrada em $keystore; crie com packaging/android/make-keystore.sh." >&2; exit 1; }
 
 version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -n1)"

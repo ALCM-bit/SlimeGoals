@@ -49,7 +49,7 @@ Aplicação multiplataforma para cadastrar metas (hábitos diários e metas sema
 | Gráficos      | Barras desenhadas em XAML no MVP; LiveCharts2 só se surgirem gráficos que o justifiquem                                                                     |
 | Fonte         | Figtree (OFL), embutida no app como recurso Avalonia                                                                                                        |
 | Testes        | xUnit v3 + AwesomeAssertions (fork Apache-2.0 do FluentAssertions, que passou a ter licença comercial na v8) + `Microsoft.Extensions.TimeProvider.Testing` (`FakeTimeProvider`)                                                                 |
-| Empacotamento | `dotnet publish` por RID (linux-x64); `.tar.gz` *self-contained* com `install.sh` e arquivo `.desktop` no Linux (AppImage e PKGBUILD ficam como opcionais futuros); APK/AAB assinado no Android |
+| Empacotamento | `dotnet publish` por RID (linux-x64); `.tar.gz` *self-contained* com `install.sh` e arquivo `.desktop` no Linux (AppImage e PKGBUILD ficam como opcionais futuros); APK assinado no Android |
 
 **Justificativa das escolhas:**
 

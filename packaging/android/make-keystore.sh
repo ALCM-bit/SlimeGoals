@@ -14,6 +14,9 @@ if [ -z "${SLIMEGOALS_KEYSTORE_PASS:-}" ]; then
   read -r -s -p "Senha da chave (usada também como senha do alias): " SLIMEGOALS_KEYSTORE_PASS
   echo
   [ -n "$SLIMEGOALS_KEYSTORE_PASS" ] || { echo "Senha vazia." >&2; exit 1; }
+  read -r -s -p "Repita a senha: " confirm
+  echo
+  [ "$SLIMEGOALS_KEYSTORE_PASS" = "$confirm" ] || { echo "As senhas não conferem." >&2; exit 1; }
   export SLIMEGOALS_KEYSTORE_PASS
 fi
 
