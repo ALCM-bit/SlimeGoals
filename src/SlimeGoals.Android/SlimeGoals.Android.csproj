@@ -8,9 +8,15 @@
     <RootNamespace>SlimeGoals.Android</RootNamespace>
     <ApplicationId>dev.alcm.slimegoals</ApplicationId>
     <ApplicationTitle>SlimeGoals</ApplicationTitle>
-    <ApplicationVersion>1</ApplicationVersion>
+    <!-- versionCode = major*10000 + minor*100 + patch (0.7.0 -> 700); a versão vive só em Directory.Build.props. -->
+    <ApplicationVersion>$([MSBuild]::Add($([MSBuild]::Add($([MSBuild]::Multiply($([System.Version]::Parse('$(Version)').Major), 10000)), $([MSBuild]::Multiply($([System.Version]::Parse('$(Version)').Minor), 100)))), $([System.Version]::Parse('$(Version)').Build)))</ApplicationVersion>
     <ApplicationDisplayVersion>$(Version)</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
+  </PropertyGroup>
+
+  <!-- APK de distribuição: só arm64 (aparelhos) e x64 (emulador). Fica no Release para o Debug do dia a dia não mudar. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>
