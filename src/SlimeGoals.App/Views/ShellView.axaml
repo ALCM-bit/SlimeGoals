@@ -6,7 +6,7 @@
              x:DataType="vm:ShellViewModel">
   <!-- Largo (desktop): bento v4, barra lateral de 220px + conteúdo, espaçamento de 14px.
        Estreito (classe compact, abaixo de 720px; ver code-behind): navegação inferior, sem barra lateral. -->
-  <DockPanel>
+  <DockPanel x:Name="Root">
     <Border DockPanel.Dock="Bottom" Classes="bottom-nav">
       <ListBox Classes="bottom-nav" ItemsSource="{Binding Pages}" SelectionMode="Single,AlwaysSelected"
                SelectedItem="{Binding CurrentPage, Mode=TwoWay}"
