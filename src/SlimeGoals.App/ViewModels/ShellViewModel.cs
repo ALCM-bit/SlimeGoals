@@ -58,7 +58,7 @@ public sealed partial class ShellViewModel : ObservableObject
     /// </summary>
     public bool GoBack()
     {
-        if (CurrentPage is GoalsPageViewModel goals && goals.CloseEditorIfOpen())
+        if (CurrentPage.TryGoBack())
             return true;
         if (!ReferenceEquals(CurrentPage, Pages[0]))
         {

@@ -1,17 +1,27 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:SlimeGoals.App.ViewModels"
+             xmlns:about="using:SlimeGoals.App.About"
              x:Class="SlimeGoals.App.Views.SettingsView"
              x:DataType="vm:SettingsPageViewModel">
   <DockPanel Classes="page">
-    <TextBlock DockPanel.Dock="Top" Classes="page-title" Text="{Binding Title}" Margin="0,0,0,16" />
+    <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,16">
+      <Button Classes="ghost back" Content="← Configurações" Command="{Binding CloseLicensesCommand}"
+              HorizontalAlignment="Left" IsVisible="{Binding IsLicenseListOpen}" />
+      <Button Classes="ghost back" Content="← Licenças" Command="{Binding CloseLicenseTextCommand}"
+              HorizontalAlignment="Left" IsVisible="{Binding IsLicenseTextOpen}" />
+      <TextBlock Classes="page-title" Text="{Binding Title}" IsVisible="{Binding IsMainOpen}" />
+      <TextBlock Classes="page-title" Text="Licenças" IsVisible="{Binding IsLicenseListOpen}" />
+      <TextBlock Classes="page-title" Text="{Binding SelectedLicense.Component}" TextWrapping="Wrap"
+                 IsVisible="{Binding IsLicenseTextOpen}" />
+    </StackPanel>
 
     <Border DockPanel.Dock="Top" Classes="warning-band" Margin="0,0,0,12"
             IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
       <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
     </Border>
 
-    <ScrollViewer Classes="page">
+    <ScrollViewer Classes="page" IsVisible="{Binding IsMainOpen}">
       <StackPanel Classes="settings-list" Spacing="16" Margin="0,0,0,14">
         <Border Classes="card" IsVisible="{Binding ShowGeneral}">
           <StackPanel Spacing="12">
@@ -76,7 +86,42 @@
             <TextBlock Text="{Binding CloseHint}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
           </StackPanel>
         </Border>
+
+        <Border Classes="card">
+          <StackPanel Spacing="12">
+            <TextBlock Classes="section-title" Text="Sobre" />
+            <TextBlock Text="{Binding VersionText}" />
+            <TextBlock Text="{Binding LicenseText}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+            <Button Classes="ghost" MinHeight="44" HorizontalAlignment="Left" Content="Licenças de código aberto"
+                    Command="{Binding OpenLicensesCommand}" />
+          </StackPanel>
+        </Border>
       </StackPanel>
+    </ScrollViewer>
+
+    <!-- Lista de licenças -->
+    <ScrollViewer Classes="page" IsVisible="{Binding IsLicenseListOpen}">
+      <ItemsControl ItemsSource="{Binding Licenses}" Margin="0,0,0,14">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="about:LicenseEntry">
+            <Button Classes="ghost" MinHeight="44" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                    Command="{Binding $parent[ItemsControl].((vm:SettingsPageViewModel)DataContext).SelectLicenseCommand}"
+                    CommandParameter="{Binding}">
+              <StackPanel Margin="0,4">
+                <TextBlock Text="{Binding Component}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding License}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Where}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+              </StackPanel>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+    <!-- Texto da licença -->
+    <ScrollViewer Classes="page" IsVisible="{Binding IsLicenseTextOpen}">
+      <SelectableTextBlock Text="{Binding SelectedLicenseText}" TextWrapping="Wrap" FontFamily="monospace"
+                           FontSize="12" Margin="0,0,0,14" />
     </ScrollViewer>
   </DockPanel>
 </UserControl>

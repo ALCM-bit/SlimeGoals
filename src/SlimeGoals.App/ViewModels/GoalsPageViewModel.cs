@@ -148,6 +148,8 @@ public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider
     }
 
     /// <summary>Voltar do sistema: fecha o editor aberto sem salvar. Devolve falso se não havia editor.</summary>
+    public override bool TryGoBack() => CloseEditorIfOpen();
+
     public bool CloseEditorIfOpen()
     {
         if (Editor is null)

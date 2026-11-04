@@ -29,6 +29,46 @@ public class SettingsPageViewModelTests
     }
 
     [Fact]
+    public void About_shows_version()
+    {
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()), appVersion: "0.7.0");
+
+        vm.VersionText.Should().Be("SlimeGoals 0.7.0");
+        vm.LicenseText.Should().Be("Licença: PolyForm Noncommercial 1.0.0");
+    }
+
+    [Fact]
+    public void Licenses_open_list_then_text()
+    {
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()));
+
+        vm.OpenLicensesCommand.Execute(null);
+        vm.LicensesOpen.Should().BeTrue();
+        vm.SelectedLicense = vm.Licenses[0];
+        vm.SelectedLicenseText.Should().StartWith("Required Notice:");
+        vm.CloseLicenseTextCommand.Execute(null);
+        vm.SelectedLicense.Should().BeNull();
+        vm.LicensesOpen.Should().BeTrue();
+        vm.CloseLicensesCommand.Execute(null);
+        vm.LicensesOpen.Should().BeFalse();
+    }
+
+    [Fact]
+    public void TryGoBack_closes_text_then_list()
+    {
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()));
+        vm.OpenLicensesCommand.Execute(null);
+        vm.SelectedLicense = vm.Licenses[0];
+
+        vm.TryGoBack().Should().BeTrue();
+        vm.SelectedLicense.Should().BeNull();
+        vm.LicensesOpen.Should().BeTrue();
+        vm.TryGoBack().Should().BeTrue();
+        vm.LicensesOpen.Should().BeFalse();
+        vm.TryGoBack().Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Settings_shows_permission_state()
     {
         var permissions = new FakePermissions(new ReminderPermissionStatus(false, true));
