@@ -33,6 +33,7 @@ dotnet publish src/SlimeGoals.Android -c Release -f net10.0-android \
 
 apk="$(find "$pub" -name '*-Signed.apk' | head -n1)"
 [ -n "$apk" ] || { echo "APK assinado não encontrado em $pub" >&2; exit 1; }
+mkdir -p artifacts
 cp "$apk" "$out"
 
 apksigner="$(find "$android_home/build-tools" -name apksigner | sort | tail -n1)"
