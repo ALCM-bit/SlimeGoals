@@ -25,3 +25,4 @@ Quatro metas de exemplo (Beber água, Leitura, Treino, Aula de inglês) e regist
 
 - A variação `phone` monta o shell com as capacidades do Android (`PlatformCapabilities(true, false, false, false)` e uma porta de permissões falsa com tudo negado, para o aviso aparecer): lembretes em Hoje, sem as seções Geral e Janela nas Configurações e sem "Sair"; a `desktop`, com `PlatformCapabilities.Desktop`.
 - A `RenderApp` espelha os `DataTemplates` do `App.axaml`: ao criar uma página nova, registre-a nos dois lugares.
+- O slime sai no quadro parado da pose (partes da pose visíveis, sem movimento): a janela headless não fica ativa, então a pseudo-classe `:live` não liga. É o esperado; a captura não precisa da animação.

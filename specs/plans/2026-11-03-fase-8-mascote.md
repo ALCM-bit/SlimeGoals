@@ -46,7 +46,7 @@
    - Feliz: três pulinhos ao entrar na pose e depois pisca (3 s);
    - Dormindo: respira (4 s) e solta dois "z" (3 s, o segundo 1 s depois);
    - Comemorando: três pulinhos ao entrar e confete caindo sem fim (1,6 s, com atrasos de 0,4 s e 0,9 s).
-   A animação só reinicia quando a pose muda: recarregar o Hoje com a mesma pose não repete os pulinhos. Fora da tela Hoje, com a janela oculta ou com o app em segundo plano no Android, o Avalonia não desenha, e a animação não gasta nada.
+   A animação só reinicia quando a pose muda: recarregar o Hoje com a mesma pose não repete os pulinhos. A animação roda por até 60 s depois de entrar no Hoje, mudar de pose ou reativar a janela (pseudo-classe `:live`, desligada por um temporizador de disparo único); para antes com a janela oculta ou inativa e com o app em segundo plano no Android. Depois fica o quadro parado da pose, sem gastar CPU.
 5. **As cores do desenho ficam nos recursos do `SlimeMascot`** (gradiente `#B9A3F0` → `#9B7BEA` → `#6F56C4`, olhos e boca `#1A1226`, bochechas `#E58FB5`, confete `#7FD1AE`/`#E8B86D`/`#B9A3F0`, "z" `#B9A3F0`). São parte da arte, não do tema. Os textos do cartão usam tokens novos no `Theme.axaml`.
 6. **Acessibilidade:** o slime tem `AutomationProperties.Name` "Slime dormindo", "Slime parado", "Slime feliz" ou "Slime comemorando". O balão é texto comum.
 
