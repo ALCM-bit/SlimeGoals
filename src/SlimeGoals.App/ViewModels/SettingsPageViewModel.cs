@@ -38,10 +38,12 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
 
     public IReadOnlyList<LicenseEntry> Licenses => LicenseCatalog.All;
 
-    [ObservableProperty] public partial bool LicensesOpen { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLicenseListOpen), nameof(IsMainOpen))]
+    public partial bool LicensesOpen { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SelectedLicenseText), nameof(IsLicenseTextOpen))]
+    [NotifyPropertyChangedFor(nameof(IsLicenseListOpen), nameof(IsLicenseTextOpen))]
     public partial LicenseEntry? SelectedLicense { get; set; }
 
     /// <summary>A lista de licenças está aberta e nenhum texto foi escolhido.</summary>
@@ -52,7 +54,8 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
     /// <summary>Página principal (seções + Sobre): nem a lista nem o texto de licença estão abertos.</summary>
     public bool IsMainOpen => !LicensesOpen;
 
-    public string? SelectedLicenseText => SelectedLicense is null ? null : ReadLicense(SelectedLicense);
+    /// <summary>Texto do componente escolhido; lido uma vez, quando a escolha muda.</summary>
+    public string? SelectedLicenseText { get; private set; }
 
     private static string DefaultVersion()
     {
@@ -102,13 +105,11 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
         return true;
     }
 
-    partial void OnLicensesOpenChanged(bool value)
+    partial void OnSelectedLicenseChanged(LicenseEntry? value)
     {
-        OnPropertyChanged(nameof(IsLicenseListOpen));
-        OnPropertyChanged(nameof(IsMainOpen));
+        SelectedLicenseText = value is null ? null : ReadLicense(value);
+        OnPropertyChanged(nameof(SelectedLicenseText));
     }
-
-    partial void OnSelectedLicenseChanged(LicenseEntry? value) => OnPropertyChanged(nameof(IsLicenseListOpen));
 
     public override string IconKey => "NavSettings";
 

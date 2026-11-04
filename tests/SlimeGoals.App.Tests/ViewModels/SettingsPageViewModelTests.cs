@@ -41,16 +41,22 @@ public class SettingsPageViewModelTests
     public void Licenses_open_list_then_text()
     {
         var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()));
+        (vm.IsMainOpen, vm.IsLicenseListOpen, vm.IsLicenseTextOpen).Should().Be((true, false, false));
 
         vm.OpenLicensesCommand.Execute(null);
         vm.LicensesOpen.Should().BeTrue();
+        (vm.IsMainOpen, vm.IsLicenseListOpen, vm.IsLicenseTextOpen).Should().Be((false, true, false));
         vm.SelectedLicense = vm.Licenses[0];
         vm.SelectedLicenseText.Should().StartWith("Required Notice:");
+        (vm.IsMainOpen, vm.IsLicenseListOpen, vm.IsLicenseTextOpen).Should().Be((false, false, true));
         vm.CloseLicenseTextCommand.Execute(null);
         vm.SelectedLicense.Should().BeNull();
+        vm.SelectedLicenseText.Should().BeNull();
         vm.LicensesOpen.Should().BeTrue();
+        (vm.IsMainOpen, vm.IsLicenseListOpen, vm.IsLicenseTextOpen).Should().Be((false, true, false));
         vm.CloseLicensesCommand.Execute(null);
         vm.LicensesOpen.Should().BeFalse();
+        (vm.IsMainOpen, vm.IsLicenseListOpen, vm.IsLicenseTextOpen).Should().Be((true, false, false));
     }
 
     [Fact]

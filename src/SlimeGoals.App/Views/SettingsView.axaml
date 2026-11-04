@@ -21,107 +21,109 @@
       <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
     </Border>
 
-    <ScrollViewer Classes="page" IsVisible="{Binding IsMainOpen}">
-      <StackPanel Classes="settings-list" Spacing="16" Margin="0,0,0,14">
-        <Border Classes="card" IsVisible="{Binding ShowGeneral}">
-          <StackPanel Spacing="12">
-            <TextBlock Classes="section-title" Text="Geral" />
-            <ToggleSwitch MinHeight="44" Content="Iniciar com o sistema" OnContent="" OffContent="" IsChecked="{Binding StartWithSystem}"
-                          IsEnabled="{Binding CanAutostart}" />
-            <TextBlock Text="Abre em segundo plano ao entrar na sessão." Foreground="{DynamicResource Muted}"
-                       TextWrapping="Wrap" IsVisible="{Binding CanAutostart}" />
-            <TextBlock Text="{Binding AutostartUnavailableText}" Foreground="{DynamicResource Muted}"
-                       TextWrapping="Wrap" IsVisible="{Binding !CanAutostart}" />
-          </StackPanel>
-        </Border>
+    <Panel>
+      <ScrollViewer Classes="page" IsVisible="{Binding IsMainOpen}">
+        <StackPanel Classes="settings-list" Spacing="16" Margin="0,0,0,14">
+          <Border Classes="card" IsVisible="{Binding ShowGeneral}">
+            <StackPanel Spacing="12">
+              <TextBlock Classes="section-title" Text="Geral" />
+              <ToggleSwitch MinHeight="44" Content="Iniciar com o sistema" OnContent="" OffContent="" IsChecked="{Binding StartWithSystem}"
+                            IsEnabled="{Binding CanAutostart}" />
+              <TextBlock Text="Abre em segundo plano ao entrar na sessão." Foreground="{DynamicResource Muted}"
+                         TextWrapping="Wrap" IsVisible="{Binding CanAutostart}" />
+              <TextBlock Text="{Binding AutostartUnavailableText}" Foreground="{DynamicResource Muted}"
+                         TextWrapping="Wrap" IsVisible="{Binding !CanAutostart}" />
+            </StackPanel>
+          </Border>
 
-        <Border Classes="card" IsVisible="{Binding IsEmpty}">
-          <TextBlock Text="{Binding EmptyMessage}"
-                     Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
-        </Border>
+          <Border Classes="card" IsVisible="{Binding IsEmpty}">
+            <TextBlock Text="{Binding EmptyMessage}"
+                       Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+          </Border>
 
-        <Border Classes="card" IsVisible="{Binding ShowReminders}">
-          <StackPanel Spacing="12">
-            <TextBlock Classes="section-title" Text="Lembretes" />
-            <TextBlock Text="Adiar lembretes por" />
-            <ComboBox MinHeight="44" MinWidth="160" HorizontalAlignment="Left" ItemsSource="{Binding SnoozeOptions}"
-                      SelectedItem="{Binding SelectedSnooze}" AutomationProperties.Name="Adiar lembretes por">
-              <ComboBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:SnoozeOptionViewModel">
-                  <TextBlock Text="{Binding Label}" />
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-            </ComboBox>
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" MinHeight="44" IsVisible="{Binding ShowPermissions}">
-              <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="Notificações" />
-                <TextBlock Text="{Binding NotificationsText}" Foreground="{DynamicResource Muted}" />
-              </StackPanel>
-              <Button Grid.Column="1" Classes="ghost" MinHeight="44" Content="Permitir"
-                      IsVisible="{Binding CanRequestNotifications}" Command="{Binding RequestNotificationsCommand}" />
-            </Grid>
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" MinHeight="44" IsVisible="{Binding ShowPermissions}">
-              <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="Alarmes exatos" />
-                <TextBlock Text="{Binding ExactAlarmsText}" Foreground="{DynamicResource Muted}" />
-              </StackPanel>
-              <Button Grid.Column="1" Classes="ghost" MinHeight="44" Content="Permitir"
-                      IsVisible="{Binding CanRequestExactAlarms}" Command="{Binding RequestExactAlarmsCommand}" />
-            </Grid>
-          </StackPanel>
-        </Border>
+          <Border Classes="card" IsVisible="{Binding ShowReminders}">
+            <StackPanel Spacing="12">
+              <TextBlock Classes="section-title" Text="Lembretes" />
+              <TextBlock Text="Adiar lembretes por" />
+              <ComboBox MinHeight="44" MinWidth="160" HorizontalAlignment="Left" ItemsSource="{Binding SnoozeOptions}"
+                        SelectedItem="{Binding SelectedSnooze}" AutomationProperties.Name="Adiar lembretes por">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:SnoozeOptionViewModel">
+                    <TextBlock Text="{Binding Label}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" MinHeight="44" IsVisible="{Binding ShowPermissions}">
+                <StackPanel VerticalAlignment="Center">
+                  <TextBlock Text="Notificações" />
+                  <TextBlock Text="{Binding NotificationsText}" Foreground="{DynamicResource Muted}" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" MinHeight="44" Content="Permitir"
+                        IsVisible="{Binding CanRequestNotifications}" Command="{Binding RequestNotificationsCommand}" />
+              </Grid>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" MinHeight="44" IsVisible="{Binding ShowPermissions}">
+                <StackPanel VerticalAlignment="Center">
+                  <TextBlock Text="Alarmes exatos" />
+                  <TextBlock Text="{Binding ExactAlarmsText}" Foreground="{DynamicResource Muted}" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" MinHeight="44" Content="Permitir"
+                        IsVisible="{Binding CanRequestExactAlarms}" Command="{Binding RequestExactAlarmsCommand}" />
+              </Grid>
+            </StackPanel>
+          </Border>
 
-        <Border Classes="card" IsVisible="{Binding ShowWindow}">
-          <StackPanel Spacing="12">
-            <TextBlock Classes="section-title" Text="Janela" />
-            <TextBlock Text="Ao fechar a janela" />
-            <Border Classes="segment" HorizontalAlignment="Left">
-              <StackPanel Orientation="Horizontal">
-                <RadioButton Classes="segment" GroupName="close-action" Content="Manter em segundo plano"
-                             IsChecked="{Binding CloseHides}" />
-                <RadioButton Classes="segment" GroupName="close-action" Content="Encerrar o app"
-                             IsChecked="{Binding CloseQuits}" />
-              </StackPanel>
-            </Border>
-            <TextBlock Text="{Binding CloseHint}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
-          </StackPanel>
-        </Border>
+          <Border Classes="card" IsVisible="{Binding ShowWindow}">
+            <StackPanel Spacing="12">
+              <TextBlock Classes="section-title" Text="Janela" />
+              <TextBlock Text="Ao fechar a janela" />
+              <Border Classes="segment" HorizontalAlignment="Left">
+                <StackPanel Orientation="Horizontal">
+                  <RadioButton Classes="segment" GroupName="close-action" Content="Manter em segundo plano"
+                               IsChecked="{Binding CloseHides}" />
+                  <RadioButton Classes="segment" GroupName="close-action" Content="Encerrar o app"
+                               IsChecked="{Binding CloseQuits}" />
+                </StackPanel>
+              </Border>
+              <TextBlock Text="{Binding CloseHint}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
 
-        <Border Classes="card">
-          <StackPanel Spacing="12">
-            <TextBlock Classes="section-title" Text="Sobre" />
-            <TextBlock Text="{Binding VersionText}" />
-            <TextBlock Text="{Binding LicenseText}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
-            <Button Classes="ghost" MinHeight="44" HorizontalAlignment="Left" Content="Licenças de código aberto"
-                    Command="{Binding OpenLicensesCommand}" />
-          </StackPanel>
-        </Border>
-      </StackPanel>
-    </ScrollViewer>
+          <Border Classes="card">
+            <StackPanel Spacing="12">
+              <TextBlock Classes="section-title" Text="Sobre" />
+              <TextBlock Text="{Binding VersionText}" />
+              <TextBlock Text="{Binding LicenseText}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+              <Button Classes="ghost" MinHeight="44" HorizontalAlignment="Left" Content="Licenças de código aberto"
+                      Command="{Binding OpenLicensesCommand}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
 
-    <!-- Lista de licenças -->
-    <ScrollViewer Classes="page" IsVisible="{Binding IsLicenseListOpen}">
-      <ItemsControl ItemsSource="{Binding Licenses}" Margin="0,0,0,14">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="about:LicenseEntry">
-            <Button Classes="ghost" MinHeight="44" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                    Command="{Binding $parent[ItemsControl].((vm:SettingsPageViewModel)DataContext).SelectLicenseCommand}"
-                    CommandParameter="{Binding}">
-              <StackPanel Margin="0,4">
-                <TextBlock Text="{Binding Component}" TextWrapping="Wrap" />
-                <TextBlock Text="{Binding License}" TextWrapping="Wrap" />
-                <TextBlock Text="{Binding Where}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
-              </StackPanel>
-            </Button>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-    </ScrollViewer>
+      <!-- Lista de licenças -->
+      <ScrollViewer Classes="page" IsVisible="{Binding IsLicenseListOpen}">
+        <ItemsControl ItemsSource="{Binding Licenses}" Margin="0,0,0,14">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="about:LicenseEntry">
+              <Button Classes="ghost" MinHeight="44" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                      Command="{Binding $parent[ItemsControl].((vm:SettingsPageViewModel)DataContext).SelectLicenseCommand}"
+                      CommandParameter="{Binding}">
+                <StackPanel Margin="0,4">
+                  <TextBlock Text="{Binding Component}" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding License}" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding Where}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                </StackPanel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
 
-    <!-- Texto da licença -->
-    <ScrollViewer Classes="page" IsVisible="{Binding IsLicenseTextOpen}">
-      <SelectableTextBlock Text="{Binding SelectedLicenseText}" TextWrapping="Wrap" FontFamily="monospace"
-                           FontSize="12" Margin="0,0,0,14" />
-    </ScrollViewer>
+      <!-- Texto da licença -->
+      <ScrollViewer Classes="page" IsVisible="{Binding IsLicenseTextOpen}">
+        <SelectableTextBlock Text="{Binding SelectedLicenseText}" TextWrapping="Wrap" FontFamily="monospace"
+                             FontSize="12" Margin="0,0,0,14" />
+      </ScrollViewer>
+    </Panel>
   </DockPanel>
 </UserControl>
