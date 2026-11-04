@@ -69,6 +69,14 @@
                 <Button Grid.Column="1" Classes="ghost" MinHeight="44" Content="Permitir"
                         IsVisible="{Binding CanRequestExactAlarms}" Command="{Binding RequestExactAlarmsCommand}" />
               </Grid>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" MinHeight="44" IsVisible="{Binding ShowPermissions}">
+                <StackPanel VerticalAlignment="Center">
+                  <TextBlock Text="Bateria" />
+                  <TextBlock Text="{Binding BatteryText}" Foreground="{DynamicResource Muted}" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" MinHeight="44" Content="Liberar"
+                        IsVisible="{Binding CanRequestBattery}" Command="{Binding RequestBatteryCommand}" />
+              </Grid>
             </StackPanel>
           </Border>
 

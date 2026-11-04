@@ -103,6 +103,32 @@ public class SettingsPageViewModelTests
     }
 
     [Fact]
+    public async Task Settings_shows_battery_state()
+    {
+        var permissions = new FakePermissions(new ReminderPermissionStatus(true, true, false));
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()), null, null, permissions);
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        (vm.BatteryText, vm.CanRequestBattery).Should().Be(("Otimizada", true));
+        vm.RequestBatteryCommand.Execute(null);
+        permissions.BatteryRequests.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Settings_rechecks_battery_on_data_change()
+    {
+        var permissions = new FakePermissions(new ReminderPermissionStatus(true, true, false));
+        var changes = new DataChangeNotifier();
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()), null, null, permissions, changes);
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        permissions.Status = new ReminderPermissionStatus(true, true, true);
+        changes.NotifyChanged();
+
+        (vm.BatteryText, vm.CanRequestBattery).Should().Be(("Sem restrição", false));
+    }
+
+    [Fact]
     public void Settings_without_port_hides_permissions()
     {
         var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()));
@@ -226,12 +252,15 @@ public class SettingsPageViewModelTests
         public ReminderPermissionStatus Status { get; set; } = status;
         public int NotificationRequests { get; private set; }
         public int ExactAlarmRequests { get; private set; }
+        public int BatteryRequests { get; private set; }
 
         public ReminderPermissionStatus Get() => Status;
 
         public void RequestNotifications() => NotificationRequests++;
 
         public void RequestExactAlarms() => ExactAlarmRequests++;
+
+        public void RequestBatteryUnrestricted() => BatteryRequests++;
     }
 
     private sealed class FakeAutostart : IAutostart

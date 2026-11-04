@@ -2,6 +2,7 @@ using Android;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
+using Android.OS;
 using SlimeGoals.App.Hosting;
 using AProvider = Android.Provider;
 using AUri = Android.Net.Uri;
@@ -37,7 +38,10 @@ internal sealed class AndroidReminderPermissions(Context context) : IReminderPer
         var exactAlarms = !OperatingSystem.IsAndroidVersionAtLeast(31)
             || ((AlarmManager)context.GetSystemService(Context.AlarmService)!).CanScheduleExactAlarms();
 
-        return new ReminderPermissionStatus(notifications, exactAlarms);
+        var battery = ((PowerManager)context.GetSystemService(Context.PowerService)!)
+            .IsIgnoringBatteryOptimizations(context.PackageName);
+
+        return new ReminderPermissionStatus(notifications, exactAlarms, battery);
     }
 
     public void RequestNotifications()
@@ -71,6 +75,19 @@ internal sealed class AndroidReminderPermissions(Context context) : IReminderPer
 
         var intent = new Intent(AProvider.Settings.ActionRequestScheduleExactAlarm,
             AUri.Parse($"package:{activity.PackageName}"));
+        activity.StartActivity(intent);
+    }
+
+    public void RequestBatteryUnrestricted()
+    {
+        if (CurrentActivity is not { } activity)
+            return;
+
+        var intent = new Intent(AProvider.Settings.ActionRequestIgnoreBatteryOptimizations,
+            AUri.Parse($"package:{activity.PackageName}"));
+        // Sem tela que resolva o pedido direto, cai na lista geral de otimização de bateria.
+        if (intent.ResolveActivity(activity.PackageManager!) is null)
+            intent = new Intent(AProvider.Settings.ActionIgnoreBatteryOptimizationSettings);
         activity.StartActivity(intent);
     }
 }

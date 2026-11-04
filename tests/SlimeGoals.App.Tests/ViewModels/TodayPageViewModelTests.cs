@@ -102,6 +102,15 @@ public class TodayPageViewModelTests
         page.HasPermissionWarning.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task Today_warning_ignores_battery()
+    {
+        var page = NewPage(permissions: new FakePermissions(new ReminderPermissionStatus(true, true, false)));
+        await page.LoadCommand.ExecuteAsync(null);
+
+        page.HasPermissionWarning.Should().BeFalse();
+    }
+
     private sealed class FakePermissions(ReminderPermissionStatus status) : IReminderPermissions
     {
         public ReminderPermissionStatus Status { get; set; } = status;
@@ -113,6 +122,10 @@ public class TodayPageViewModelTests
         public void RequestNotifications() => NotificationRequests++;
 
         public void RequestExactAlarms() => ExactAlarmRequests++;
+
+        public void RequestBatteryUnrestricted()
+        {
+        }
     }
 
     private async Task<TodayPageViewModel> Loaded()

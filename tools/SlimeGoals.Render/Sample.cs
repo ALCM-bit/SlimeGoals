@@ -132,4 +132,8 @@ internal sealed class DeniedPermissions : IReminderPermissions
     public void RequestExactAlarms()
     {
     }
+
+    public void RequestBatteryUnrestricted()
+    {
+    }
 }

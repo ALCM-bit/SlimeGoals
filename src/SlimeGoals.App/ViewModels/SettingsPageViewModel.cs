@@ -125,7 +125,7 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
     /// <summary>Nenhuma seção se aplica à plataforma: a tela mostra um aviso no lugar.</summary>
     public bool IsEmpty => !ShowGeneral && !ShowReminders && !ShowWindow;
 
-    /// <summary>Linhas "Notificações" e "Alarmes exatos" da seção Lembretes (só com a porta de permissões).</summary>
+    /// <summary>Linhas "Notificações", "Alarmes exatos" e "Bateria" da seção Lembretes (só com a porta de permissões).</summary>
     public bool ShowPermissions => permissions is not null && _capabilities.Reminders;
 
     public string EmptyMessage => "Nada para configurar por enquanto.";
@@ -138,9 +138,15 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
     [NotifyPropertyChangedFor(nameof(ExactAlarmsText), nameof(CanRequestExactAlarms))]
     public partial bool ExactAlarmsAllowed { get; set; } = true;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(BatteryText), nameof(CanRequestBattery))]
+    public partial bool BatteryUnrestricted { get; set; } = true;
+
     public string NotificationsText => NotificationsAllowed ? "Permitidas" : "Bloqueadas";
 
     public string ExactAlarmsText => ExactAlarmsAllowed ? "Permitidos" : "Bloqueados";
+
+    public string BatteryText => BatteryUnrestricted ? "Sem restrição" : "Otimizada";
 
     public bool CanRequestNotifications => !NotificationsAllowed;
 
@@ -149,15 +155,21 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
     [RelayCommand]
     private void RequestNotifications() => permissions?.RequestNotifications();
 
+    public bool CanRequestBattery => !BatteryUnrestricted;
+
     [RelayCommand]
     private void RequestExactAlarms() => permissions?.RequestExactAlarms();
+
+    [RelayCommand]
+    private void RequestBattery() => permissions?.RequestBatteryUnrestricted();
 
     private void RefreshPermissions()
     {
         if (permissions is null)
             return;
         var status = permissions.Get();
-        (NotificationsAllowed, ExactAlarmsAllowed) = (status.Notifications, status.ExactAlarms);
+        (NotificationsAllowed, ExactAlarmsAllowed, BatteryUnrestricted) =
+            (status.Notifications, status.ExactAlarms, status.BatteryUnrestricted);
     }
 
     public bool CanAutostart => autostart is not null;
