@@ -11,7 +11,7 @@
       <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
     </Border>
 
-    <ScrollViewer>
+    <ScrollViewer Classes="page">
       <StackPanel Classes="settings-list" Spacing="16" Margin="0,0,0,14">
         <Border Classes="card" IsVisible="{Binding ShowGeneral}">
           <StackPanel Spacing="12">

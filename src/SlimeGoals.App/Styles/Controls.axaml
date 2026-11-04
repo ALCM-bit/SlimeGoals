@@ -9,6 +9,21 @@
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
   </Style>
 
+  <!-- O contorno de foco padrão do Fluent é um retângulo que ignora os cantos arredondados.
+       Cada controle focável mostra o próprio foco, no formato dele (estilos :focus-visible). -->
+  <Style Selector=":is(Control)">
+    <Setter Property="FocusAdorner" Value="{x:Null}" />
+  </Style>
+
+  <!-- Rolagem das páginas: a barra fica na borda da janela, longe do conteúdo. A margem direita do
+       shell-body passa para a DockPanel.page, e só a rolagem avança sobre ela; a margem negativa e o
+       Padding se compensam, e o conteúdo mantém a largura. A margem negativa precisa ficar dentro da
+       view: os controles com template cortam o que passa dos seus limites, e a barra sumiria. -->
+  <Style Selector="ScrollViewer.page">
+    <Setter Property="Margin" Value="0,0,-22,0" />
+    <Setter Property="Padding" Value="0,0,22,0" />
+  </Style>
+
   <!-- Painel (barra lateral do bento v4) -->
   <Style Selector="Border.panel">
     <Setter Property="Background" Value="{DynamicResource Panel}" />
@@ -58,7 +73,7 @@
   <!-- ===== Fase 7a: shell adaptativo. Largo = barra lateral; classe compact (ShellView < 720px) =
        navegação inferior, margens menores e os ajustes de cada tela (fim deste arquivo). ===== -->
   <Style Selector="DockPanel.shell-body">
-    <Setter Property="Margin" Value="14" />
+    <Setter Property="Margin" Value="14,14,0,14" />
   </Style>
   <Style Selector="Border.sidebar">
     <Setter Property="Width" Value="220" />
@@ -255,6 +270,14 @@
   <Style Selector="NumericUpDown">
     <Setter Property="VerticalContentAlignment" Value="Center" />
   </Style>
+  <!-- Os botões do NumericUpDown são retos: sem o recorte, os cantos vazam do campo arredondado -->
+  <Style Selector="ButtonSpinner /template/ Border">
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+  <Style Selector="ToggleSwitch:focus-visible /template/ Border#OuterBorder">
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimarySoft}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
   <!-- O TimePicker não repassa VerticalContentAlignment: os TextBlocks de hora e minuto esticam e o texto fica no topo -->
   <Style Selector="TimePicker /template/ TextBlock">
     <Setter Property="VerticalAlignment" Value="Center" />
@@ -293,6 +316,11 @@
   </Style>
   <Style Selector="ListBox.icon-picker ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter, ListBox.color-picker ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource Selected}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimarySoft}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+
+  <Style Selector="ListBox.icon-picker ListBoxItem:focus-visible /template/ ContentPresenter#PART_ContentPresenter, ListBox.color-picker ListBoxItem:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="BorderBrush" Value="{DynamicResource PrimarySoft}" />
     <Setter Property="BorderThickness" Value="2" />
   </Style>
@@ -489,7 +517,7 @@
 
   <!-- Classes das telas que o layout estreito ajusta; aqui, os valores do layout largo -->
   <Style Selector="DockPanel.page">
-    <Setter Property="Margin" Value="8,4,8,0" />
+    <Setter Property="Margin" Value="8,4,22,0" />
   </Style>
   <Style Selector="UniformGrid.tiles">
     <Setter Property="Columns" Value="3" />
@@ -500,6 +528,10 @@
     <Setter Property="Columns" Value="2" />
     <Setter Property="ColumnSpacing" Value="12" />
     <Setter Property="RowSpacing" Value="12" />
+  </Style>
+  <!-- "N disparados · N atendidos" não cabe numa linha em janelas menores -->
+  <Style Selector="UniformGrid.report-tiles TextBlock.stat-value">
+    <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
   <!-- Coluna e linha por estilo (valor local venceria o do layout estreito) -->
   <Style Selector="StackPanel.card-actions">
@@ -545,10 +577,14 @@
     <Setter Property="IsVisible" Value="False" />
   </Style>
   <Style Selector=".compact DockPanel.shell-body">
-    <Setter Property="Margin" Value="12" />
+    <Setter Property="Margin" Value="12,12,0,12" />
   </Style>
   <Style Selector=".compact DockPanel.page">
-    <Setter Property="Margin" Value="0,4,0,0" />
+    <Setter Property="Margin" Value="0,4,12,0" />
+  </Style>
+  <Style Selector=".compact ScrollViewer.page">
+    <Setter Property="Margin" Value="0,0,-12,0" />
+    <Setter Property="Padding" Value="0,0,12,0" />
   </Style>
   <Style Selector=".compact TextBlock.page-title">
     <Setter Property="FontSize" Value="22" />
@@ -622,7 +658,6 @@
   <!-- "N disparados · N respondidos" cabe numa linha em 22px; quebra só se os números crescerem -->
   <Style Selector=".compact UniformGrid.report-tiles TextBlock.stat-value">
     <Setter Property="FontSize" Value="22" />
-    <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
   <Style Selector=".compact Border.bar">
     <Setter Property="Width" Value="22" />
