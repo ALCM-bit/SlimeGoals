@@ -1,22 +1,34 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:SlimeGoals.App.Views"
              xmlns:vm="using:SlimeGoals.App.ViewModels"
              x:Class="SlimeGoals.App.Views.TodayView"
              x:DataType="vm:TodayPageViewModel">
   <DockPanel Classes="page">
     <TextBlock DockPanel.Dock="Top" Classes="page-title" Text="{Binding Title}" Margin="0,0,0,16" />
 
-    <!-- Resumo da semana (spec §7) -->
-    <UniformGrid DockPanel.Dock="Top" Classes="tiles" Margin="0,0,0,16">
-      <Border Classes="stat">
-        <StackPanel>
-          <TextBlock Classes="stat-label" Text="Progresso da semana" />
+    <!-- Cartão de destaque: progresso da semana e mascote -->
+    <Border DockPanel.Dock="Top" Classes="hero" Margin="0,0,0,16">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+        <StackPanel VerticalAlignment="Center" Spacing="4">
+          <TextBlock Classes="hero-label" Text="Progresso da semana" TextWrapping="Wrap" />
           <StackPanel Orientation="Horizontal" Spacing="2">
-            <TextBlock Classes="stat-value" Text="{Binding WeekPercent}" />
-            <TextBlock Classes="stat-unit" Text="%" />
+            <TextBlock Classes="hero-value" Text="{Binding WeekPercent}" />
+            <TextBlock Classes="hero-unit" Text="%" />
           </StackPanel>
+          <ProgressBar Classes="hero" Minimum="0" Maximum="100" Value="{Binding WeekPercent}" />
         </StackPanel>
-      </Border>
+        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+          <Border Classes="hero-bubble">
+            <TextBlock Text="{Binding Mascot.Message}" Foreground="{DynamicResource HeroBubbleText}"
+                       FontSize="13" FontWeight="Bold" TextWrapping="Wrap" />
+          </Border>
+          <views:SlimeMascot Classes="hero-slime" Pose="{Binding Mascot.Pose}" HorizontalAlignment="Center" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <UniformGrid DockPanel.Dock="Top" Classes="tiles" Margin="0,0,0,16">
       <Border Classes="stat">
         <StackPanel>
           <TextBlock Classes="stat-label" Text="Em andamento" />

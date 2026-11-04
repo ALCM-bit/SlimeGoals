@@ -51,6 +51,11 @@
     <GradientStop Offset="0" Color="#7656D0" />
     <GradientStop Offset="1" Color="#43347F" />
   </LinearGradientBrush>
+  <SolidColorBrush x:Key="HeroText" Color="#FFFFFF" />
+  <SolidColorBrush x:Key="HeroMuted" Color="#EDE6FD" />
+  <SolidColorBrush x:Key="HeroTrack" Color="#40FFFFFF" />
+  <SolidColorBrush x:Key="HeroBubble" Color="#FFFFFF" />
+  <SolidColorBrush x:Key="HeroBubbleText" Color="#2B2150" />
 
   <!-- Paleta de metas (campo goals.color): fundo suave + ícone -->
   <SolidColorBrush x:Key="GoalPurpleBg" Color="#2A2145" />
