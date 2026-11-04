@@ -74,7 +74,7 @@
   <!-- Tipografia: Figtree embutida (OFL) -->
   <FontFamily x:Key="FigtreeFont">avares://SlimeGoals.App/Assets/Fonts#Figtree</FontFamily>
 
-  <!-- Ícones dos botões de ação (Lucide, ISC; grade 24×24, só traço). Use com Path.btn-icon. -->
+  <!-- Ícones dos botões de ação (Lucide, ISC e MIT; grade 24×24, só traço). Use com Path.btn-icon. -->
   <StreamGeometry x:Key="IconCheck">M 20 6 L 9 17 L 4 12</StreamGeometry>
   <StreamGeometry x:Key="IconX">M 18 6 L 6 18 M 6 6 L 18 18</StreamGeometry>
   <StreamGeometry x:Key="IconChevronLeft">M 15 18 L 9 12 L 15 6</StreamGeometry>

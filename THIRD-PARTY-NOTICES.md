@@ -8,16 +8,18 @@ Os componentes abaixo mantêm suas próprias licenças.
 | Componente | Local | Licença |
 |---|---|---|
 | Fonte [Figtree](https://github.com/erikdkennedy/figtree) | `src/SlimeGoals.App/Assets/Fonts/` | SIL Open Font License 1.1 ([OFL.txt](src/SlimeGoals.App/Assets/Fonts/OFL.txt)) |
-| 16 ícones do [Lucide](https://lucide.dev) (lucide-static 1.66.0), convertidos para path data | `src/SlimeGoals.App/Goals/GoalIcons.cs` | ISC (texto abaixo) |
-| 7 ícones do Lucide para botões de ação (check, x, minus, plus, play, square, ellipsis), convertidos para path data | `src/SlimeGoals.App/Styles/Theme.axaml` | ISC (texto abaixo) |
+| 16 ícones do [Lucide](https://lucide.dev) (lucide-static 1.66.0), convertidos para path data | `src/SlimeGoals.App/Goals/GoalIcons.cs` | ISC; code, music e target também MIT, do Feather (texto abaixo) |
+| 9 ícones do Lucide para botões de ação (check, x, chevron-left, chevron-right, minus, plus, play, square, ellipsis), convertidos para path data | `src/SlimeGoals.App/Styles/Theme.axaml` | ISC; todos menos play também MIT, do Feather (texto abaixo) |
 | 4 ícones do Lucide para a navegação inferior (sun, list-checks, chart-column, sliders-horizontal), convertidos para path data | `src/SlimeGoals.App/Styles/Theme.axaml` | ISC (texto abaixo) |
-| O ícone "target" do Lucide (um dos 16 acima) continua como ícone de meta; o ícone do app e da bandeja é o mascote do próprio projeto (código do repositório, não é do Lucide) | `src/SlimeGoals.App/Goals/GoalIcons.cs` | ISC (texto abaixo), só para o "target" |
+| O ícone "target" do Lucide (um dos 16 acima) continua como ícone de meta; o ícone do app e da bandeja é o mascote do próprio projeto (código do repositório, não é do Lucide) | `src/SlimeGoals.App/Goals/GoalIcons.cs` | ISC e MIT (texto abaixo), só para o "target" |
 
 ## Dependências NuGet (baixadas na compilação)
 
 | Pacote | Licença |
 |---|---|
-| Avalonia, Avalonia.Desktop, Avalonia.Themes.Fluent | MIT |
+| Avalonia, Avalonia.Desktop, Avalonia.Android, Avalonia.Themes.Fluent | MIT |
+| Avalonia.Headless, Avalonia.Skia (ferramenta de render) | MIT |
+| Xamarin.AndroidX.Core.SplashScreen | MIT e Apache-2.0 |
 | CommunityToolkit.Mvvm | MIT |
 | Microsoft.Extensions.DependencyInjection(.Abstractions) | MIT |
 | Microsoft.Data.Sqlite | MIT |
@@ -46,10 +48,12 @@ O `.tar.gz` do Linux (`packaging/linux/build.sh`) é *self-contained*: traz o ru
 | Dapper | Apache-2.0 | `Apache-2.0.txt`, `Apache-2.0-NOTICE.txt` |
 | SQLitePCLRaw (`SQLitePCLRaw.*.dll`) | Apache-2.0 | `Apache-2.0.txt`, `Apache-2.0-NOTICE.txt` |
 | SQLite (`libe_sqlite3.so`) | domínio público | `SQLite-public-domain.txt` |
-| Fonte Figtree (embutida em `slimegoals.dll`) | SIL OFL 1.1 | `OFL-1.1-Figtree.txt` |
-| Ícones do Lucide (embutidos em `SlimeGoals.App.dll`) | ISC | `ISC-Lucide.txt` |
+| Fonte Figtree (embutida em `SlimeGoals.App.dll`) | SIL OFL 1.1 | `OFL-1.1-Figtree.txt` |
+| Ícones do Lucide (embutidos em `SlimeGoals.App.dll`) | ISC e MIT (Feather) | `ISC-Lucide.txt` |
 
 ## Texto da licença do Lucide
+
+A licença tem duas partes: ISC para o Lucide e MIT para os ícones derivados do Feather. Dos ícones que usamos, 11 estão nessa lista: code, music, target, check, x, minus, plus, square, chevron-left, chevron-right e ellipsis (na lista, com o nome antigo more-horizontal).
 
 ```
 ISC License
@@ -67,4 +71,32 @@ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
 WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+---
+
+The following Lucide icons are derived from the Feather project:
+
+airplay, alert-circle, alert-octagon, alert-triangle, aperture, arrow-down-circle, arrow-down-left, arrow-down-right, arrow-down, arrow-left-circle, arrow-left, arrow-right-circle, arrow-right, arrow-up-circle, arrow-up-left, arrow-up-right, arrow-up, at-sign, calendar, cast, check, chevron-down, chevron-left, chevron-right, chevron-up, chevrons-down, chevrons-left, chevrons-right, chevrons-up, circle, clipboard, clock, code, columns, command, compass, corner-down-left, corner-down-right, corner-left-down, corner-left-up, corner-right-down, corner-right-up, corner-up-left, corner-up-right, crosshair, database, divide-circle, divide-square, dollar-sign, download, external-link, feather, frown, hash, headphones, help-circle, info, italic, key, layout, life-buoy, link-2, link, loader, lock, log-in, log-out, maximize, meh, minimize, minimize-2, minus-circle, minus-square, minus, monitor, moon, more-horizontal, more-vertical, move, music, navigation-2, navigation, octagon, pause-circle, percent, plus-circle, plus-square, plus, power, radio, rss, search, server, share, shopping-bag, sidebar, smartphone, smile, square, table-2, tablet, target, terminal, trash-2, trash, triangle, tv, type, upload, x-circle, x-octagon, x-square, x, zoom-in, zoom-out
+
+The MIT License (MIT) (for the icons listed above)
+
+Copyright (c) 2013-present Cole Bemis
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```

@@ -418,7 +418,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 - Desarquivar é permitido, exceto para meta cujo fim já passou (seria arquivada de novo; cria-se outra meta).
 - Data de fim no passado é recusada ao criar ou editar.
 - O arquivamento automático por fim do período roda ao abrir a tela Metas; a virada de dia em tempo real fica para a Fase 4.
-- Ícones: subconjunto fixo de 16 ícones de traço do Lucide (licença ISC), embutidos como geometria; chave desconhecida no banco cai no ícone padrão `target`.
+- Ícones: subconjunto fixo de 16 ícones de traço do Lucide (licenças ISC e MIT), embutidos como geometria; chave desconhecida no banco cai no ícone padrão `target`.
 - Formulário de meta como página dentro da tela Metas (mesma solução no desktop e no celular).
 - **Tarefa única (`once`) removida** a pedido do autor: simplifica domínio, telas, lembretes e relatórios. A migração `002` recria `goals` sem `'once'` e sem `completed_at` e **exclui** as tarefas únicas existentes (com check-ins e lembretes). As migrações rodam com chaves estrangeiras desligadas e conferidas por `PRAGMA foreign_key_check` antes do `COMMIT`.
 - Linux: o app define `AVALONIA_IM_MODULE=none` (se não definido) para usar XIM; o IME via DBus do Avalonia perdia a composição de teclas mortas (`ç` no layout US internacional).

@@ -5,7 +5,7 @@ public sealed record GoalIcon(string Key, string Name, string PathData);
 
 /// <summary>
 /// Conjunto fixo de ícones de meta (spec §15, Fase 2). Desenhos de traço do Lucide
-/// (lucide-static 1.66.0, licença ISC, © Lucide Icons and Contributors — ver THIRD-PARTY-NOTICES.md),
+/// (lucide-static 1.66.0, licenças ISC e MIT, © Lucide Icons and Contributors — ver THIRD-PARTY-NOTICES.md),
 /// convertidos para um único path (círculos viram arcos; flags de arco normalizadas).
 /// </summary>
 public static class GoalIcons
