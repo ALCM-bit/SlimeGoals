@@ -43,8 +43,8 @@
     <ContentControl DockPanel.Dock="Bottom" Classes="goal-actions docked" Content="{Binding}"
                     ContentTemplate="{StaticResource GoalActions}" />
 
-    <ScrollViewer>
-      <StackPanel Classes="goal-form">
+    <ScrollViewer Classes="page">
+      <StackPanel x:Name="Form" Classes="goal-form">
         <StackPanel Spacing="18">
 
           <StackPanel Classes="field">

@@ -31,7 +31,7 @@
       <Panel>
         <TextBlock Text="{Binding EmptyMessage}" IsVisible="{Binding IsEmpty}" Foreground="{DynamicResource Muted}"
                    HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="15" />
-        <ScrollViewer IsVisible="{Binding !IsEmpty}">
+        <ScrollViewer Classes="page" IsVisible="{Binding !IsEmpty}">
           <ItemsControl ItemsSource="{Binding Goals}" Margin="0,0,0,14">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:GoalItemViewModel">
