@@ -342,6 +342,47 @@
     <Setter Property="VerticalAlignment" Value="Bottom" />
     <Setter Property="Margin" Value="0,0,0,5" />
   </Style>
+  <Style Selector="Border.hero">
+    <Setter Property="Background" Value="{DynamicResource HeroBrush}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
+    <Setter Property="Padding" Value="22" />
+    <Setter Property="MinHeight" Value="170" />
+  </Style>
+  <Style Selector="TextBlock.hero-label">
+    <Setter Property="Foreground" Value="{DynamicResource HeroMuted}" />
+    <Setter Property="FontSize" Value="14" />
+  </Style>
+  <Style Selector="TextBlock.hero-value">
+    <Setter Property="Foreground" Value="{DynamicResource HeroText}" />
+    <Setter Property="FontSize" Value="56" />
+    <Setter Property="FontWeight" Value="ExtraBold" />
+  </Style>
+  <Style Selector="TextBlock.hero-unit">
+    <Setter Property="Foreground" Value="{DynamicResource HeroText}" />
+    <Setter Property="FontSize" Value="28" />
+    <Setter Property="FontWeight" Value="ExtraBold" />
+    <Setter Property="VerticalAlignment" Value="Bottom" />
+    <Setter Property="Margin" Value="0,0,0,8" />
+  </Style>
+  <Style Selector="ProgressBar.hero">
+    <Setter Property="Width" Value="170" />
+    <Setter Property="MinHeight" Value="10" />
+    <Setter Property="Height" Value="10" />
+    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="Background" Value="{DynamicResource HeroTrack}" />
+    <Setter Property="Foreground" Value="{DynamicResource HeroText}" />
+  </Style>
+  <Style Selector="views|SlimeMascot.hero-slime">
+    <Setter Property="Width" Value="130" />
+    <Setter Property="Height" Value="130" />
+  </Style>
+  <Style Selector="Border.hero-bubble">
+    <Setter Property="Background" Value="{DynamicResource HeroBubble}" />
+    <Setter Property="CornerRadius" Value="14,14,4,14" />
+    <Setter Property="Padding" Value="12,8" />
+    <Setter Property="HorizontalAlignment" Value="Right" />
+  </Style>
   <Style Selector="TextBlock.section-title">
     <Setter Property="FontSize" Value="16" />
     <Setter Property="FontWeight" Value="SemiBold" />
@@ -451,7 +492,7 @@
     <Setter Property="Margin" Value="8,4,8,0" />
   </Style>
   <Style Selector="UniformGrid.tiles">
-    <Setter Property="Columns" Value="4" />
+    <Setter Property="Columns" Value="3" />
     <Setter Property="ColumnSpacing" Value="12" />
     <Setter Property="RowSpacing" Value="12" />
   </Style>
@@ -512,9 +553,29 @@
   <Style Selector=".compact TextBlock.page-title">
     <Setter Property="FontSize" Value="22" />
   </Style>
-  <!-- Hoje: resumo em 2×2 -->
-  <Style Selector=".compact UniformGrid.tiles">
-    <Setter Property="Columns" Value="2" />
+  <!-- Hoje: cartão de destaque e tiles mais compactos -->
+  <Style Selector=".compact Border.hero">
+    <Setter Property="Padding" Value="16" />
+    <Setter Property="MinHeight" Value="150" />
+  </Style>
+  <Style Selector=".compact Border.hero TextBlock.hero-value">
+    <Setter Property="FontSize" Value="44" />
+  </Style>
+  <Style Selector=".compact Border.hero TextBlock.hero-unit">
+    <Setter Property="FontSize" Value="22" />
+  </Style>
+  <Style Selector=".compact views|SlimeMascot.hero-slime">
+    <Setter Property="Width" Value="110" />
+    <Setter Property="Height" Value="110" />
+  </Style>
+  <Style Selector=".compact UniformGrid.tiles Border.stat">
+    <Setter Property="Padding" Value="12,10" />
+  </Style>
+  <Style Selector=".compact UniformGrid.tiles TextBlock.stat-label">
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector=".compact UniformGrid.tiles TextBlock.stat-value">
+    <Setter Property="FontSize" Value="24" />
   </Style>
   <!-- Metas: ações do cartão na linha de baixo, sob o texto -->
   <Style Selector=".compact StackPanel.card-actions">

@@ -1,5 +1,9 @@
 using Avalonia;
+using Avalonia.Automation;
+using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using SlimeGoals.App.ViewModels;
@@ -8,9 +12,9 @@ using SlimeGoals.Render;
 using ScrollViewer = Avalonia.Controls.ScrollViewer;
 using Window = Avalonia.Controls.Window;
 
-if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all")))
+if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot")))
 {
-    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all]");
+    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot]");
     return 1;
 }
 
@@ -29,7 +33,46 @@ if (which is "phone" or "all")
     Render(true, "phone", 412, 915);
 if (which is "desktop" or "all")
     Render(false, "desktop", 1100, 720);
+if (which == "mascot")
+    RenderMascot();
 return 0;
+
+void RenderMascot()
+{
+    var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16 };
+    foreach (var pose in Enum.GetValues<MascotPose>())
+    {
+        var slime = new SlimeMascot { Pose = pose, Width = 160, Height = 160 };
+        var cell = new StackPanel { Spacing = 8 };
+        cell.Children.Add(slime);
+        cell.Children.Add(new TextBlock
+        {
+            Text = AutomationProperties.GetName(slime),
+            Foreground = Brushes.White,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        });
+        row.Children.Add(cell);
+    }
+    var hero = (IBrush)Application.Current!.FindResource("HeroBrush")!;
+    var window = new Window
+    {
+        Width = 4 * 160 + 3 * 16 + 48,
+        Height = 160 + 8 + 20 + 48,
+        Content = new Border { Background = hero, Padding = new Thickness(24), Child = row },
+    };
+    window.Show();
+    Pump();
+    var path = Path.Combine(outDir, "mascot.png");
+    var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para mascot.");
+    using (var stream = File.Create(path))
+    {
+#pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
+        frame.Save(stream);
+#pragma warning restore CS0618
+    }
+    Console.WriteLine(path);
+    window.Close();
+}
 
 void Render(bool phone, string suffix, int width, int height)
 {

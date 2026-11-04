@@ -1,0 +1,233 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:SlimeGoals.App.Views"
+             x:Class="SlimeGoals.App.Views.SlimeMascot"
+             Focusable="False">
+  <UserControl.Resources>
+    <!-- Cores do desenho: pertencem ao slime, não ao tema do app -->
+    <RadialGradientBrush x:Key="SlimeBodyBrush" Center="40%,30%" GradientOrigin="40%,30%" RadiusX="80%" RadiusY="80%">
+      <GradientStop Offset="0" Color="#B9A3F0" />
+      <GradientStop Offset="0.55" Color="#9B7BEA" />
+      <GradientStop Offset="1" Color="#6F56C4" />
+    </RadialGradientBrush>
+    <SolidColorBrush x:Key="SlimeInk" Color="#1A1226" />
+    <SolidColorBrush x:Key="SlimeCheek" Color="#E58FB5" />
+    <SolidColorBrush x:Key="SlimeLilac" Color="#B9A3F0" />
+  </UserControl.Resources>
+
+  <UserControl.Styles>
+    <!-- Partes por pose: o padrão fica aqui (e não no elemento) para os estilos das poses poderem sobrescrever -->
+    <Style Selector="Canvas#EyesClosed, Path#MouthIdle, Path#MouthHappy, Path#MouthSleep, Canvas#Zzz, Canvas#Confetti">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Ellipse.cheek">
+      <Setter Property="Opacity" Value="0.5" />
+    </Style>
+    <Style Selector="local|SlimeMascot:sleeping Canvas#Eyes">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="local|SlimeMascot:sleeping Canvas#EyesClosed">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="local|SlimeMascot:sleeping Path#MouthSleep">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="local|SlimeMascot:sleeping Canvas#Zzz">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="local|SlimeMascot:idle Path#MouthIdle">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="local|SlimeMascot:happy Path#MouthHappy, local|SlimeMascot:celebrating Path#MouthHappy">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="local|SlimeMascot:happy Ellipse.cheek, local|SlimeMascot:celebrating Ellipse.cheek">
+      <Setter Property="Opacity" Value="0.8" />
+    </Style>
+    <Style Selector="local|SlimeMascot:celebrating Canvas#Confetti">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+
+    <!-- Animações: Avalonia 12.1.4 não anima RenderTransform, então a escala e o pulo vão por propriedades próprias
+         (BodyScaleX/Y, EyesScaleY, HopOffset) e o translate dos "z" e do confete por Canvas.Left/Top.
+         Todas exigem :live (ligada pelo código por um tempo limitado); sem ela fica o quadro de repouso da pose. -->
+    <!-- Parado -->
+    <Style Selector="local|SlimeMascot:live:idle">
+      <Style.Animations>
+          <Animation Duration="0:0:2.6" IterationCount="INFINITE" Easing="SineEaseInOut">
+            <KeyFrame Cue="0%"><Setter Property="BodyScaleX" Value="1" /><Setter Property="BodyScaleY" Value="1" /></KeyFrame>
+            <KeyFrame Cue="50%"><Setter Property="BodyScaleX" Value="1.07" /><Setter Property="BodyScaleY" Value="0.92" /></KeyFrame>
+            <KeyFrame Cue="100%"><Setter Property="BodyScaleX" Value="1" /><Setter Property="BodyScaleY" Value="1" /></KeyFrame>
+          </Animation>
+          <Animation Duration="0:0:4" IterationCount="INFINITE">
+            <KeyFrame Cue="0%"><Setter Property="EyesScaleY" Value="1" /></KeyFrame>
+            <KeyFrame Cue="92%"><Setter Property="EyesScaleY" Value="1" /></KeyFrame>
+            <KeyFrame Cue="96%"><Setter Property="EyesScaleY" Value="0.08" /></KeyFrame>
+            <KeyFrame Cue="100%"><Setter Property="EyesScaleY" Value="1" /></KeyFrame>
+          </Animation>
+      </Style.Animations>
+    </Style>
+    <!-- Feliz -->
+    <Style Selector="local|SlimeMascot:live:happy">
+      <Style.Animations>
+          <Animation Duration="0:0:0.7" IterationCount="3" Easing="CubicEaseOut">
+            <KeyFrame Cue="0%"><Setter Property="HopOffset" Value="0" /></KeyFrame>
+            <KeyFrame Cue="45%"><Setter Property="HopOffset" Value="-30" /></KeyFrame>
+            <KeyFrame Cue="100%"><Setter Property="HopOffset" Value="0" /></KeyFrame>
+          </Animation>
+          <Animation Duration="0:0:0.7" IterationCount="3" Easing="SineEaseInOut">
+            <KeyFrame Cue="0%"><Setter Property="BodyScaleX" Value="1" /><Setter Property="BodyScaleY" Value="1" /></KeyFrame>
+            <KeyFrame Cue="50%"><Setter Property="BodyScaleX" Value="1.07" /><Setter Property="BodyScaleY" Value="0.92" /></KeyFrame>
+            <KeyFrame Cue="100%"><Setter Property="BodyScaleX" Value="1" /><Setter Property="BodyScaleY" Value="1" /></KeyFrame>
+          </Animation>
+          <Animation Duration="0:0:3" IterationCount="INFINITE">
+            <KeyFrame Cue="0%"><Setter Property="EyesScaleY" Value="1" /></KeyFrame>
+            <KeyFrame Cue="92%"><Setter Property="EyesScaleY" Value="1" /></KeyFrame>
+            <KeyFrame Cue="96%"><Setter Property="EyesScaleY" Value="0.08" /></KeyFrame>
+            <KeyFrame Cue="100%"><Setter Property="EyesScaleY" Value="1" /></KeyFrame>
+          </Animation>
+      </Style.Animations>
+    </Style>
+    <!-- Dormindo -->
+    <Style Selector="local|SlimeMascot:live:sleeping">
+      <Style.Animations>
+          <Animation Duration="0:0:4" IterationCount="INFINITE" Easing="SineEaseInOut">
+            <KeyFrame Cue="0%"><Setter Property="BodyScaleX" Value="1" /><Setter Property="BodyScaleY" Value="1" /></KeyFrame>
+            <KeyFrame Cue="50%"><Setter Property="BodyScaleX" Value="1.03" /><Setter Property="BodyScaleY" Value="0.96" /></KeyFrame>
+            <KeyFrame Cue="100%"><Setter Property="BodyScaleX" Value="1" /><Setter Property="BodyScaleY" Value="1" /></KeyFrame>
+          </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector="local|SlimeMascot:live:sleeping Canvas#Z1Box">
+      <Style.Animations>
+          <Animation Duration="0:0:3" IterationCount="INFINITE" Easing="CubicEaseOut">
+            <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Left" Value="0" /><Setter Property="Canvas.Top" Value="0" /></KeyFrame>
+            <KeyFrame Cue="30%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+            <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Left" Value="14" /><Setter Property="Canvas.Top" Value="-26" /></KeyFrame>
+          </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector="local|SlimeMascot:live:sleeping Canvas#Z2Box">
+      <Style.Animations>
+          <Animation Duration="0:0:3" Delay="0:0:1" FillMode="Backward" IterationCount="INFINITE" Easing="CubicEaseOut">
+            <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Left" Value="0" /><Setter Property="Canvas.Top" Value="0" /></KeyFrame>
+            <KeyFrame Cue="30%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+            <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Left" Value="14" /><Setter Property="Canvas.Top" Value="-26" /></KeyFrame>
+          </Animation>
+      </Style.Animations>
+    </Style>
+    <!-- Comemorando -->
+    <Style Selector="local|SlimeMascot:live:celebrating">
+      <Style.Animations>
+          <Animation Duration="0:0:0.6" IterationCount="3" Easing="CubicEaseOut">
+            <KeyFrame Cue="0%"><Setter Property="HopOffset" Value="0" /></KeyFrame>
+            <KeyFrame Cue="45%"><Setter Property="HopOffset" Value="-30" /></KeyFrame>
+            <KeyFrame Cue="100%"><Setter Property="HopOffset" Value="0" /></KeyFrame>
+          </Animation>
+          <Animation Duration="0:0:0.6" IterationCount="3" Easing="SineEaseInOut">
+            <KeyFrame Cue="0%"><Setter Property="BodyScaleX" Value="1" /><Setter Property="BodyScaleY" Value="1" /></KeyFrame>
+            <KeyFrame Cue="50%"><Setter Property="BodyScaleX" Value="1.07" /><Setter Property="BodyScaleY" Value="0.92" /></KeyFrame>
+            <KeyFrame Cue="100%"><Setter Property="BodyScaleX" Value="1" /><Setter Property="BodyScaleY" Value="1" /></KeyFrame>
+          </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector="local|SlimeMascot:live:celebrating Canvas.d0">
+      <Style.Animations>
+          <Animation Duration="0:0:1.6" IterationCount="INFINITE">
+            <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Top" Value="-10" /></KeyFrame>
+            <KeyFrame Cue="15%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+            <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Top" Value="110" /></KeyFrame>
+          </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector="local|SlimeMascot:live:celebrating Canvas.d4">
+      <Style.Animations>
+          <Animation Duration="0:0:1.6" Delay="0:0:0.4" FillMode="Backward" IterationCount="INFINITE">
+            <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Top" Value="-10" /></KeyFrame>
+            <KeyFrame Cue="15%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+            <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Top" Value="110" /></KeyFrame>
+          </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector="local|SlimeMascot:live:celebrating Canvas.d9">
+      <Style.Animations>
+          <Animation Duration="0:0:1.6" Delay="0:0:0.9" FillMode="Backward" IterationCount="INFINITE">
+            <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Top" Value="-10" /></KeyFrame>
+            <KeyFrame Cue="15%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+            <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Top" Value="110" /></KeyFrame>
+          </Animation>
+      </Style.Animations>
+    </Style>
+  </UserControl.Styles>
+
+  <Viewbox Stretch="Uniform">
+    <Canvas Width="200" Height="200">
+      <Ellipse Canvas.Left="34" Canvas.Top="168" Width="132" Height="18" Fill="Black" Opacity="0.35" />
+
+      <Canvas Name="Confetti" Width="200" Height="200">
+        <Canvas Classes="d0" Width="200" Height="200">
+          <Ellipse Canvas.Left="36" Canvas.Top="26" Width="8" Height="8" Fill="#7FD1AE"  />
+        </Canvas>
+        <Canvas Classes="d4" Width="200" Height="200">
+          <Ellipse Canvas.Left="66.5" Canvas.Top="16.5" Width="7" Height="7" Fill="#E8B86D"  />
+        </Canvas>
+        <Canvas Classes="d9" Width="200" Height="200">
+          <Ellipse Canvas.Left="101" Canvas.Top="22" Width="8" Height="8" Fill="#B9A3F0"  />
+        </Canvas>
+        <Canvas Classes="d4" Width="200" Height="200">
+          <Ellipse Canvas.Left="136.5" Canvas.Top="14.5" Width="7" Height="7" Fill="#7FD1AE"  />
+        </Canvas>
+        <Canvas Classes="d0" Width="200" Height="200">
+          <Ellipse Canvas.Left="161" Canvas.Top="28" Width="8" Height="8" Fill="#E8B86D"  />
+        </Canvas>
+        <Canvas Classes="d9" Width="200" Height="200">
+          <Ellipse Canvas.Left="52" Canvas.Top="41" Width="6" Height="6" Fill="#B9A3F0"  />
+        </Canvas>
+      </Canvas>
+
+      <Canvas Name="Hop" Width="200" Height="200">
+        <Canvas Name="Body" Width="200" Height="200" RenderTransformOrigin="100,174">
+          <Canvas.RenderTransform><ScaleTransform /></Canvas.RenderTransform>
+          <Path Data="M20 146 C20 98 56 66 100 66 C144 66 180 98 180 146 C180 165 158 174 100 174 C42 174 20 165 20 146 Z"
+                Fill="{StaticResource SlimeBodyBrush}" />
+          <Ellipse Canvas.Left="47" Canvas.Top="85" Width="34" Height="18" Fill="White" Opacity="0.4"
+                   RenderTransform="rotate(-28deg)" />
+          <Ellipse Canvas.Left="82.5" Canvas.Top="76.5" Width="7" Height="7" Fill="White" Opacity="0.35" />
+          <Ellipse Classes="cheek" Canvas.Left="41" Canvas.Top="138" Width="18" Height="10"
+                   Fill="{StaticResource SlimeCheek}" />
+          <Ellipse Classes="cheek" Canvas.Left="141" Canvas.Top="138" Width="18" Height="10"
+                   Fill="{StaticResource SlimeCheek}" />
+
+          <Canvas Name="Eyes" Width="200" Height="200" RenderTransformOrigin="100,128">
+            <Canvas.RenderTransform><ScaleTransform /></Canvas.RenderTransform>
+            <Ellipse Canvas.Left="60.5" Canvas.Top="119" Width="15" Height="18" Fill="{StaticResource SlimeInk}" />
+            <Ellipse Canvas.Left="124.5" Canvas.Top="119" Width="15" Height="18" Fill="{StaticResource SlimeInk}" />
+            <Ellipse Canvas.Left="67.7" Canvas.Top="121.7" Width="5.6" Height="5.6" Fill="White" />
+            <Ellipse Canvas.Left="131.7" Canvas.Top="121.7" Width="5.6" Height="5.6" Fill="White" />
+          </Canvas>
+          <Canvas Name="EyesClosed" Width="200" Height="200">
+            <Path Data="M59 130 Q68 138 77 130" Stroke="{StaticResource SlimeInk}" StrokeThickness="3.5" StrokeLineCap="Round" />
+            <Path Data="M123 130 Q132 138 141 130" Stroke="{StaticResource SlimeInk}" StrokeThickness="3.5" StrokeLineCap="Round" />
+          </Canvas>
+
+          <Path Name="MouthIdle" Data="M87 143 Q93.5 151 100 143 Q106.5 151 113 143"
+                Stroke="{StaticResource SlimeInk}" StrokeThickness="3.5" StrokeLineCap="Round" />
+          <Path Name="MouthHappy" Data="M87 139 Q100 162 113 139 Z" Fill="{StaticResource SlimeInk}" />
+          <Path Name="MouthSleep" Data="M94 147 Q100 150 106 147"
+                Stroke="{StaticResource SlimeInk}" StrokeThickness="3" StrokeLineCap="Round" />
+        </Canvas>
+      </Canvas>
+
+      <Canvas Name="Zzz" Width="200" Height="200">
+        <Canvas Name="Z1Box" Width="200" Height="200">
+          <TextBlock Text="z" FontSize="22" FontWeight="Bold" Canvas.Left="142" Canvas.Top="58"
+                   Foreground="{StaticResource SlimeLilac}" />
+        </Canvas>
+        <Canvas Name="Z2Box" Width="200" Height="200">
+          <TextBlock Text="z" FontSize="16" FontWeight="Bold" Canvas.Left="158" Canvas.Top="46"
+                   Foreground="{StaticResource SlimeLilac}" />
+        </Canvas>
+      </Canvas>
+    </Canvas>
+  </Viewbox>
+</UserControl>

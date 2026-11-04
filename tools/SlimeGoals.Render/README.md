@@ -5,7 +5,7 @@ Ferramenta de desenvolvimento que renderiza as telas do app sem janela (Avalonia
 ## Uso
 
 ```
-dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all]
+dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot]
 ```
 
 Sem o segundo argumento, vale `all`. Grava um PNG por tela e tamanho, sempre o `ShellView` inteiro:
@@ -13,6 +13,8 @@ Sem o segundo argumento, vale `all`. Grava um PNG por tela e tamanho, sempre o `
 - `today-<tamanho>.png`, `goals-<tamanho>.png`, `goal-edit-<tamanho>.png`, `goal-edit-end-<tamanho>.png` (o formulário rolado até o fim),
   `reports-week-<tamanho>.png`, `reports-month-<tamanho>.png`, `settings-<tamanho>.png`;
 - `<tamanho>` é `phone` (412×915) ou `desktop` (1100×720).
+
+O modo `mascot` grava só `mascot.png`: as quatro poses do slime (dormindo, parado, feliz, comemorando), lado a lado em 160×160 sobre o `HeroBrush`, com o nome acessível embaixo. O quadro é capturado cerca de 0,8 s depois de montar a tela, com as animações já em andamento.
 
 ## Dados
 
@@ -23,3 +25,4 @@ Quatro metas de exemplo (Beber água, Leitura, Treino, Aula de inglês) e regist
 
 - A variação `phone` monta o shell com as capacidades do Android (`PlatformCapabilities(true, false, false, false)` e uma porta de permissões falsa com tudo negado, para o aviso aparecer): lembretes em Hoje, sem as seções Geral e Janela nas Configurações e sem "Sair"; a `desktop`, com `PlatformCapabilities.Desktop`.
 - A `RenderApp` espelha os `DataTemplates` do `App.axaml`: ao criar uma página nova, registre-a nos dois lugares.
+- O slime sai no quadro parado da pose (partes da pose visíveis, sem movimento): a janela headless não fica ativa, então a pseudo-classe `:live` não liga. É o esperado; a captura não precisa da animação.

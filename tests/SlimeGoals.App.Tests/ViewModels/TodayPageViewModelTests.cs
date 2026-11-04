@@ -483,4 +483,79 @@ public class TodayPageViewModelTests
         (page.IsPaused, page.CanPause).Should().Be((true, false));
         (await Pause.GetAsync()).IsPaused.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task Mascot_follows_today_progress()
+    {
+        var page = await Loaded();
+        page.Mascot.Pose.Should().Be(MascotPose.Sleeping);
+
+        var water = await Create("Água");
+        await Create("Mesa", Measure.Completion, 1);
+        await page.LoadCommand.ExecuteAsync(null);
+        page.Mascot.Pose.Should().Be(MascotPose.Idle);
+
+        await page.CompleteCommand.ExecuteAsync(Card(page, "Mesa"));
+        (page.Mascot.Pose, page.Mascot.Message).Should().Be((MascotPose.Happy, "Falta pouco!"));
+
+        await CheckinService.AdjustAsync(water.Id, 8);
+        await page.LoadCommand.ExecuteAsync(null);
+        page.Mascot.Pose.Should().Be(MascotPose.Celebrating);
+
+        await page.UncompleteCommand.ExecuteAsync(Card(page, "Mesa"));
+        page.Mascot.Pose.Should().Be(MascotPose.Happy);
+    }
+
+    [Fact]
+    public async Task Mascot_sleeps_while_paused()
+    {
+        await Create("Água");
+        var page = await Loaded();
+        page.Mascot.Pose.Should().Be(MascotPose.Idle);
+
+        await page.TogglePauseCommand.ExecuteAsync(null);
+        await page.LoadCommand.ExecuteAsync(null);
+        page.Mascot.Pose.Should().Be(MascotPose.Sleeping);
+
+        await page.TogglePauseCommand.ExecuteAsync(null);
+        await page.LoadCommand.ExecuteAsync(null);
+        page.Mascot.Pose.Should().Be(MascotPose.Idle);
+    }
+
+    [Fact]
+    public async Task Mascot_shows_only_after_first_load()
+    {
+        await Create("Água");
+        var page = NewPage();
+        page.HasMascot.Should().BeFalse();
+
+        await page.LoadCommand.ExecuteAsync(null);
+
+        (page.HasMascot, page.Mascot.Pose).Should().Be((true, MascotPose.Idle));
+    }
+
+    [Fact]
+    public async Task Mascot_stays_hidden_when_first_load_fails()
+    {
+        var page = NewPage();
+        _goals.FailReadsWith = new IOException("x");
+
+        await page.LoadCommand.ExecuteAsync(null);
+
+        page.HasMascot.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Mascot_keeps_pose_when_load_fails()
+    {
+        var goal = await Create("Mesa", Measure.Completion, 1);
+        await CheckinService.AdjustAsync(goal.Id, 1);
+        var page = await Loaded();
+        page.Mascot.Pose.Should().Be(MascotPose.Celebrating);
+
+        _goals.FailReadsWith = new IOException("x");
+        await page.LoadCommand.ExecuteAsync(null);
+
+        (page.ErrorMessage, page.Mascot.Pose).Should().Be(("Não foi possível carregar o dia.", MascotPose.Celebrating));
+    }
 }
