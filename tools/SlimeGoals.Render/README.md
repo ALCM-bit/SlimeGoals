@@ -14,7 +14,7 @@ Sem o segundo argumento, vale `all`. Grava um PNG por tela e tamanho, sempre o `
   `reports-week-<tamanho>.png`, `reports-month-<tamanho>.png`, `settings-<tamanho>.png`;
 - `<tamanho>` é `phone` (412×915) ou `desktop` (1100×720).
 
-O modo `mascot` grava só `mascot.png`: as quatro poses do slime (dormindo, parado, feliz, comemorando), lado a lado em 160×160 sobre o `HeroBrush`, com o nome acessível embaixo. O quadro mostra o instante zero das animações.
+O modo `mascot` grava só `mascot.png`: as quatro poses do slime (dormindo, parado, feliz, comemorando), lado a lado em 160×160 sobre o `HeroBrush`, com o nome acessível embaixo. O quadro é capturado cerca de 0,8 s depois de montar a tela, com as animações já em andamento.
 
 ## Dados
 

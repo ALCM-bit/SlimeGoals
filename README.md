@@ -15,6 +15,7 @@ com os dados guardados localmente em SQLite.
 - **Dois tipos de meta:** diária (alvo por dia nos dias escolhidos) e semanal (alvo por semana, de segunda a domingo)
 - **Lembretes** dentro de uma janela de horário, com as ações **Feito**, **Adiar** e **Ignorar** direto na notificação do sistema
 - **Tela Hoje** com o progresso do período atual e check-in rápido
+- **Slime** no Hoje, que muda de pose e de frase conforme o andamento do dia
 - **Relatórios** semanais e mensais, com sequências em dias ou semanas
 - **Arquivamento** sem perda de histórico; tema escuro roxo
 
