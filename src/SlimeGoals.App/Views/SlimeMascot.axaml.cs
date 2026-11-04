@@ -1,12 +1,19 @@
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media;
+using Avalonia.Threading;
 using SlimeGoals.App.ViewModels;
 
 namespace SlimeGoals.App.Views;
 
-/// <summary>Slime desenhado em um canvas 200×200; a pose liga uma pseudo-classe que escolhe as partes e a animação.</summary>
+/// <summary>
+/// Slime desenhado em um canvas 200×200; a pose liga uma pseudo-classe que escolhe as partes e a animação.
+/// As animações só rodam com a pseudo-classe <c>:live</c>: ligada por até <see cref="LiveDuration"/> depois de entrar
+/// na tela, mudar de pose ou reativar a janela, e desligada quando a janela fica oculta/inativa ou o app vai para
+/// segundo plano. Sem ela o slime fica parado na pose (sem tiques do relógio de animação, CPU ociosa).
+/// </summary>
 public partial class SlimeMascot : UserControl
 {
     public static readonly StyledProperty<MascotPose> PoseProperty =
@@ -34,10 +41,22 @@ public partial class SlimeMascot : UserControl
         (MascotPose.Celebrating, ":celebrating", "Slime comemorando"),
     ];
 
+    /// <summary>Quanto tempo a animação roda depois de cada gatilho (entrar na tela, mudar de pose, reativar a janela).</summary>
+    public static readonly TimeSpan LiveDuration = TimeSpan.FromSeconds(60);
+
+    private const string LivePseudoClass = ":live";
+
+    // Temporizador de disparo único (sem polling): ao vencer, desliga a animação.
+    private readonly DispatcherTimer _liveTimer = new() { Interval = LiveDuration };
+    private TopLevel? _topLevel;
+    private IActivatableLifetime? _lifetime;
+    private bool _inBackground;
+
     public SlimeMascot()
     {
         InitializeComponent();
         ApplyPose(Pose);
+        _liveTimer.Tick += (_, _) => StopLive();
     }
 
     public MascotPose Pose
@@ -78,7 +97,10 @@ public partial class SlimeMascot : UserControl
     {
         base.OnPropertyChanged(change);
         if (change.Property == PoseProperty)
+        {
             ApplyPose(change.GetNewValue<MascotPose>());
+            ArmLive();
+        }
         else if (change.Property == BodyScaleXProperty)
             ((ScaleTransform)Body.RenderTransform!).ScaleX = change.GetNewValue<double>();
         else if (change.Property == BodyScaleYProperty)
@@ -87,6 +109,93 @@ public partial class SlimeMascot : UserControl
             ((ScaleTransform)Eyes.RenderTransform!).ScaleY = change.GetNewValue<double>();
         else if (change.Property == HopOffsetProperty)
             Canvas.SetTop(Hop, change.GetNewValue<double>());
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _topLevel = TopLevel.GetTopLevel(this);
+        if (_topLevel is not null)
+            _topLevel.PropertyChanged += OnTopLevelPropertyChanged;
+        if (_topLevel is Window window)
+        {
+            window.Activated += OnWindowActivated;
+            window.Deactivated += OnWindowDeactivated;
+        }
+        // Android: a Activity em segundo plano chega pelo ciclo de vida do app, não pela TopLevel.
+        _lifetime = Application.Current?.TryGetFeature<IActivatableLifetime>();
+        if (_lifetime is not null)
+        {
+            _lifetime.Activated += OnLifetimeActivated;
+            _lifetime.Deactivated += OnLifetimeDeactivated;
+        }
+        _inBackground = false;
+        ArmLive();
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        if (_topLevel is not null)
+            _topLevel.PropertyChanged -= OnTopLevelPropertyChanged;
+        if (_topLevel is Window window)
+        {
+            window.Activated -= OnWindowActivated;
+            window.Deactivated -= OnWindowDeactivated;
+        }
+        if (_lifetime is not null)
+        {
+            _lifetime.Activated -= OnLifetimeActivated;
+            _lifetime.Deactivated -= OnLifetimeDeactivated;
+        }
+        (_topLevel, _lifetime) = (null, null);
+        StopLive();
+        base.OnDetachedFromVisualTree(e);
+    }
+
+    private void OnTopLevelPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property == IsVisibleProperty)
+            ArmLive();
+    }
+
+    private void OnWindowActivated(object? sender, EventArgs e) => ArmLive();
+
+    private void OnWindowDeactivated(object? sender, EventArgs e) => StopLive();
+
+    private void OnLifetimeActivated(object? sender, ActivatedEventArgs e)
+    {
+        if (e.Kind != ActivationKind.Background)
+            return;
+        _inBackground = false;
+        ArmLive();
+    }
+
+    private void OnLifetimeDeactivated(object? sender, ActivatedEventArgs e)
+    {
+        if (e.Kind != ActivationKind.Background)
+            return;
+        _inBackground = true;
+        StopLive();
+    }
+
+    /// <summary>Liga a animação por <see cref="LiveDuration"/> se o slime está à vista; senão, desliga.</summary>
+    private void ArmLive()
+    {
+        var visible = _topLevel is { IsVisible: true } && (_topLevel is not Window window || window.IsActive) && !_inBackground;
+        if (!visible)
+        {
+            StopLive();
+            return;
+        }
+        _liveTimer.Stop();
+        _liveTimer.Start();
+        PseudoClasses.Set(LivePseudoClass, true);
+    }
+
+    private void StopLive()
+    {
+        _liveTimer.Stop();
+        PseudoClasses.Set(LivePseudoClass, false);
     }
 
     private void ApplyPose(MascotPose pose)

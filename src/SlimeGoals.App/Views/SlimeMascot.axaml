@@ -49,9 +49,10 @@
     </Style>
 
     <!-- Animações: Avalonia 12.1.4 não anima RenderTransform, então a escala e o pulo vão por propriedades próprias
-         (BodyScaleX/Y, EyesScaleY, HopOffset) e o translate dos "z" e do confete por Canvas.Left/Top -->
+         (BodyScaleX/Y, EyesScaleY, HopOffset) e o translate dos "z" e do confete por Canvas.Left/Top.
+         Todas exigem :live (ligada pelo código por um tempo limitado); sem ela fica o quadro de repouso da pose. -->
     <!-- Parado -->
-    <Style Selector="local|SlimeMascot:idle">
+    <Style Selector="local|SlimeMascot:live:idle">
       <Style.Animations>
           <Animation Duration="0:0:2.6" IterationCount="INFINITE" Easing="SineEaseInOut">
             <KeyFrame Cue="0%"><Setter Property="BodyScaleX" Value="1" /><Setter Property="BodyScaleY" Value="1" /></KeyFrame>
@@ -67,7 +68,7 @@
       </Style.Animations>
     </Style>
     <!-- Feliz -->
-    <Style Selector="local|SlimeMascot:happy">
+    <Style Selector="local|SlimeMascot:live:happy">
       <Style.Animations>
           <Animation Duration="0:0:0.7" IterationCount="3" Easing="CubicEaseOut">
             <KeyFrame Cue="0%"><Setter Property="HopOffset" Value="0" /></KeyFrame>
@@ -88,7 +89,7 @@
       </Style.Animations>
     </Style>
     <!-- Dormindo -->
-    <Style Selector="local|SlimeMascot:sleeping">
+    <Style Selector="local|SlimeMascot:live:sleeping">
       <Style.Animations>
           <Animation Duration="0:0:4" IterationCount="INFINITE" Easing="SineEaseInOut">
             <KeyFrame Cue="0%"><Setter Property="BodyScaleX" Value="1" /><Setter Property="BodyScaleY" Value="1" /></KeyFrame>
@@ -97,7 +98,7 @@
           </Animation>
       </Style.Animations>
     </Style>
-    <Style Selector="local|SlimeMascot:sleeping Canvas#Z1Box">
+    <Style Selector="local|SlimeMascot:live:sleeping Canvas#Z1Box">
       <Style.Animations>
           <Animation Duration="0:0:3" IterationCount="INFINITE" Easing="CubicEaseOut">
             <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Left" Value="0" /><Setter Property="Canvas.Top" Value="0" /></KeyFrame>
@@ -106,9 +107,9 @@
           </Animation>
       </Style.Animations>
     </Style>
-    <Style Selector="local|SlimeMascot:sleeping Canvas#Z2Box">
+    <Style Selector="local|SlimeMascot:live:sleeping Canvas#Z2Box">
       <Style.Animations>
-          <Animation Duration="0:0:3" Delay="0:0:1" IterationCount="INFINITE" Easing="CubicEaseOut">
+          <Animation Duration="0:0:3" Delay="0:0:1" FillMode="Backward" IterationCount="INFINITE" Easing="CubicEaseOut">
             <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Left" Value="0" /><Setter Property="Canvas.Top" Value="0" /></KeyFrame>
             <KeyFrame Cue="30%"><Setter Property="Opacity" Value="1" /></KeyFrame>
             <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Left" Value="14" /><Setter Property="Canvas.Top" Value="-26" /></KeyFrame>
@@ -116,7 +117,7 @@
       </Style.Animations>
     </Style>
     <!-- Comemorando -->
-    <Style Selector="local|SlimeMascot:celebrating">
+    <Style Selector="local|SlimeMascot:live:celebrating">
       <Style.Animations>
           <Animation Duration="0:0:0.6" IterationCount="3" Easing="CubicEaseOut">
             <KeyFrame Cue="0%"><Setter Property="HopOffset" Value="0" /></KeyFrame>
@@ -130,7 +131,7 @@
           </Animation>
       </Style.Animations>
     </Style>
-    <Style Selector="local|SlimeMascot:celebrating Canvas.d0">
+    <Style Selector="local|SlimeMascot:live:celebrating Canvas.d0">
       <Style.Animations>
           <Animation Duration="0:0:1.6" IterationCount="INFINITE">
             <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Top" Value="-10" /></KeyFrame>
@@ -139,18 +140,18 @@
           </Animation>
       </Style.Animations>
     </Style>
-    <Style Selector="local|SlimeMascot:celebrating Canvas.d4">
+    <Style Selector="local|SlimeMascot:live:celebrating Canvas.d4">
       <Style.Animations>
-          <Animation Duration="0:0:1.6" Delay="0:0:0.4" IterationCount="INFINITE">
+          <Animation Duration="0:0:1.6" Delay="0:0:0.4" FillMode="Backward" IterationCount="INFINITE">
             <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Top" Value="-10" /></KeyFrame>
             <KeyFrame Cue="15%"><Setter Property="Opacity" Value="1" /></KeyFrame>
             <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Top" Value="110" /></KeyFrame>
           </Animation>
       </Style.Animations>
     </Style>
-    <Style Selector="local|SlimeMascot:celebrating Canvas.d9">
+    <Style Selector="local|SlimeMascot:live:celebrating Canvas.d9">
       <Style.Animations>
-          <Animation Duration="0:0:1.6" Delay="0:0:0.9" IterationCount="INFINITE">
+          <Animation Duration="0:0:1.6" Delay="0:0:0.9" FillMode="Backward" IterationCount="INFINITE">
             <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Top" Value="-10" /></KeyFrame>
             <KeyFrame Cue="15%"><Setter Property="Opacity" Value="1" /></KeyFrame>
             <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0" /><Setter Property="Canvas.Top" Value="110" /></KeyFrame>
