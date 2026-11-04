@@ -507,6 +507,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 7. Identidade: `dev.alcm.slimegoals`, rótulo "SlimeGoals", API mínima 26, APK Debug, ícone do slime em `mipmap-*`, tema escuro com barras em `#0F0D15`, orientação livre sem recriar a Activity, `AdjustResize` para o teclado.
 8. O head Android fica fora de `SlimeGoals.slnx` e entra em `SlimeGoals.Android.slnx` (Core, Infrastructure, App e Android).
 9. `tools/SlimeGoals.Render`, fora das duas soluções: semeia banco temporário e grava PNGs de cada página em 412×915 (celular, com as capacidades do Android) e 1100×720 (desktop) para revisão dos layouts.
+10. Teclado virtual: o espaço reservado sob o teclado vai na margem do conteúdo do `ShellView`, não no seu `Padding`, que o Avalonia usa para as áreas das barras do sistema (o Android 15+ força *edge-to-edge*). Pôr o valor no `Padding` apagava essas margens ao fechar o teclado: o topo ia para baixo do relógio e a navegação inferior entrava na barra de gestos (corrigido depois da Fase 8).
 
 **Decisões da Fase 7b (03/11/2026):**
 
@@ -523,6 +524,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 11. `PlatformCapabilities.Reminders` verdadeiro no Android; o aviso de Configurações vira "Nada para configurar por enquanto.".
 12. `ReminderHost` também no Android, com `NoopWindowActivator`: inicia o agendador ao abrir o app (recupera alarmes após "Forçar parada"); o `ActionReceived` do `AndroidNotificationService` nunca dispara, as ações chegam pelo receiver.
 13. Verificado no emulador (API 36): `adb shell appops set --uid dev.alcm.slimegoals SCHEDULE_EXACT_ALARM allow|deny` (a forma por pacote não tem efeito); `am kill` encerra como o sistema, `force-stop` cancela alarmes. Restrições de fabricantes ficam para a 7c.
+9. "Próximos lembretes" fica no fim da rolagem do Hoje, depois das metas, e não fixo embaixo: fixo, cada meta com lembrete tirava uma linha da lista no celular (corrigido depois da Fase 8).
 
 **Decisões da Fase 8 (03/11/2026):**
 

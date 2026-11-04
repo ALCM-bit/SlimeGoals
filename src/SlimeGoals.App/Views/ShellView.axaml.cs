@@ -55,11 +55,13 @@ public partial class ShellView : UserControl
     /// <summary>
     /// Teclado virtual (Android): o teclado cobre a janela sem redimensioná-la, então o ScrollViewer ainda "enxerga"
     /// a área sob ele. Reserva embaixo a altura ocupada e, depois do novo layout, traz o campo em foco para a vista.
+    /// A reserva vai na margem do conteúdo, não no Padding do shell: o Avalonia põe ali as áreas das barras do
+    /// sistema, e um valor local apagaria essas margens de vez.
     /// </summary>
     private void OnInputPaneStateChanged(object? sender, InputPaneStateEventArgs e)
     {
         var open = e.NewState == InputPaneState.Open;
-        Padding = new Thickness(0, 0, 0, open ? _inputPane?.OccludedRect.Height ?? 0 : 0);
+        Root.Margin = new Thickness(0, 0, 0, open ? _inputPane?.OccludedRect.Height ?? 0 : 0);
         if (!open)
             return;
         DispatcherTimer.RunOnce(
