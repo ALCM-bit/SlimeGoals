@@ -1,20 +1,21 @@
 # SlimeGoals
 
-Gestor de metas pessoais com lembretes, para **Linux (GNOME)** e, em seguida, **Android**.
+Gestor de metas pessoais com lembretes, para **Linux (GNOME)** e **Android**.
 Você cadastra hábitos diários ou metas semanais, recebe lembretes até cumpri-las,
 registra o progresso com um check-in e acompanha relatórios semanais e mensais. Funciona offline,
 com os dados guardados localmente em SQLite.
 
-![Shell do app na Fase 0](docs/images/shell-fase-0.png)
+![Tela Hoje no desktop, com o slime e as metas do dia](docs/images/hoje-desktop.png)
 
-> **Status:** em desenvolvimento. Fases 0 (fundação) e 1 (domínio e persistência de metas) concluídas;
-> as telas de metas são o próximo passo. Veja o [roteiro](#roteiro).
+> **Status:** em desenvolvimento. O app já funciona no Linux, com pacote de instalação, e no Android, por enquanto
+> só em APK Debug. A próxima etapa é a Fase 7c: APK assinado para instalar num celular de verdade. Veja o [roteiro](#roteiro).
 
 ## Funcionalidades do MVP
 
 - **Dois tipos de meta:** diária (alvo por dia nos dias escolhidos) e semanal (alvo por semana, de segunda a domingo)
-- **Lembretes** dentro de uma janela de horário, com as ações **Feito**, **Adiar** e **Ignorar** direto na notificação do sistema
-- **Tela Hoje** com o progresso do período atual e check-in rápido
+- **Três medidas por meta:** conclusão, quantidade ou tempo (com cronômetro)
+- **Lembretes** dentro de uma janela de horário, com a ação da medida (**Feito**, **+1** ou **Iniciar**), **Adiar** e **Ignorar** direto na notificação do sistema
+- **Tela Hoje** com o progresso do período atual e registro rápido
 - **Slime** no Hoje, que muda de pose e de frase conforme o andamento do dia
 - **Relatórios** semanais e mensais, com sequências em dias ou semanas
 - **Arquivamento** sem perda de histórico; tema escuro roxo
@@ -34,28 +35,34 @@ Hexagonal pragmática: o **Core** concentra domínio e regras e não depende de 
 projetos implementam suas portas, e a composição (injeção de dependência) acontece só nos *heads*.
 
 ```
-SlimeGoals.Desktop ─┐            (SlimeGoals.Android — Fase 7)
-                    ▼
-                SlimeGoals.App          Views + ViewModels Avalonia
-                    │
-                    ▼
-                SlimeGoals.Core         domínio, serviços, interfaces
-                    ▲
-       ┌────────────┴─────────────┐
+SlimeGoals.Desktop   SlimeGoals.Android
+         └─────────┬─────────┘
+                   ▼
+            SlimeGoals.App          Views + ViewModels Avalonia
+                   │
+                   ▼
+            SlimeGoals.Core         domínio, serviços, interfaces
+                   ▲
+       ┌───────────┴──────────────┐
 SlimeGoals.Infrastructure   SlimeGoals.Platform.Linux
-(SQLite, repositórios)      (caminhos XDG; notificações e autostart nas próximas fases)
+(SQLite, repositórios)      (caminhos XDG, notificações D-Bus, agendador,
+                             autostart, instância única)
 ```
 
+O head Android implementa as portas de lembretes direto no projeto (`AlarmManager`, notificações, permissões).
 Um teste de arquitetura garante que o Core não referencia UI, banco ou plataforma.
 
 ```
 src/
   SlimeGoals.Core/             Domain/, Services/, Validation/, Abstractions/
   SlimeGoals.Infrastructure/   Data/ (conexão, migrações SQL, repositórios)
-  SlimeGoals.Platform.Linux/
+  SlimeGoals.Platform.Linux/   Notifications/, Scheduling/, Autostart/, Power/, SingleInstance/
   SlimeGoals.App/              Views/, ViewModels/, Styles/ (tokens do tema), Assets/Fonts/
   SlimeGoals.Desktop/          Program.cs, CompositionRoot.cs
-tests/                         um projeto de teste por projeto de src/
+  SlimeGoals.Android/          MainActivity, AndroidCompositionRoot, Reminders/
+tests/                         testes do Core, Infrastructure, App e Platform.Linux; SlimeGoals.Testing (falsos)
+tools/SlimeGoals.Render/       grava PNGs das telas sem abrir o app
+packaging/linux/               pacote .tar.gz e instalador
 specs/                         especificação, protótipos, planos e conclusões de spikes
 ```
 
@@ -139,7 +146,7 @@ Para desinstalar, rode `./uninstall.sh` de dentro da pasta extraída. Ele não a
 
 ## Documentação
 
-- [Especificação (v1.3)](specs/Planejamento_v3.md): requisitos, modelo de dados, regras de lembrete e design system
+- [Especificação (v1.4)](specs/Planejamento_v3.md): requisitos, modelo de dados, regras de lembrete e design system
 - [Protótipos visuais](specs/design/): desktop (`v4-bento-desktop.html`) e mobile (`v3-*-mobile.html`)
 - [Planos de implementação](specs/plans/)
 
@@ -153,15 +160,15 @@ Para desinstalar, rode `./uninstall.sh` de dentro da pasta extraída. Ele não a
 
 | Fase | Entrega | Status |
 |---|---|---|
-| 0 | Fundação, tema, navegação e spikes (notificações GNOME, Android) | ✅ fundação · ⏳ spikes |
+| 0 | Fundação, tema, navegação e spikes (notificações GNOME, Android) | ✅ |
 | 1 | Domínio e persistência de metas | ✅ |
-| 2 | Telas de metas | ⏳ |
-| 3 | Check-ins e tela Hoje | |
-| 4 | Lembretes (planejador, agendador, notificação nativa, segundo plano) | |
-| 5 | Relatórios | |
-| 6 | Acabamento e empacotamento Linux | |
-| 7 | Android (7a interface ✅ · 7b lembretes ⏳) | |
-| 8 | Mascote slime (opcional) | |
+| 2 | Telas de metas | ✅ |
+| 3 | Medidas, registros e tela Hoje | ✅ |
+| 4 | Lembretes (planejador, agendador, notificação nativa, segundo plano) | ✅ |
+| 5 | Relatórios | ✅ |
+| 6 | Acabamento e empacotamento Linux | ✅ |
+| 7 | Android (7a interface ✅ · 7b lembretes ✅ · 7c distribuição ⏳) | ⏳ |
+| 8 | Mascote slime | ✅ |
 
 ## Licença
 
