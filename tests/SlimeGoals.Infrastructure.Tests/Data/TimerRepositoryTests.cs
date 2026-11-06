@@ -1,3 +1,4 @@
+using Dapper;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Infrastructure.Data;
 
@@ -43,6 +44,20 @@ public class TimerRepositoryTests : IDisposable
 
         await Repo.ClearAsync();
         (await Repo.GetAsync()).Should().BeNull();
+        (await Repo.TryStartAsync(new ActiveTimer(_b, T0))).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("started_at", "'ontem'")]
+    [InlineData("stopped_at", "'nunca'")]
+    [InlineData("started_at", "42")]
+    public async Task Unreadable_row_counts_as_no_timer_and_frees_the_slot(string column, string value)
+    {
+        await Repo.TryStartAsync(new ActiveTimer(_a, T0));
+        _db.Anchor.Execute($"UPDATE active_timer SET {column} = {value}");
+
+        (await Repo.GetAsync()).Should().BeNull();
+
         (await Repo.TryStartAsync(new ActiveTimer(_b, T0))).Should().BeTrue();
     }
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Dapper;
 using Microsoft.Data.Sqlite;
 using SlimeGoals.Core;
@@ -12,13 +13,23 @@ public sealed class TimerRepository(SqliteConnectionFactory db) : ITimerReposito
     public async Task<ActiveTimer?> GetAsync(CancellationToken ct = default)
     {
         await using var c = db.Open();
-        var row = await c.QuerySingleOrDefaultAsync<Row>(new CommandDefinition(
-            "SELECT goal_id AS GoalId, started_at AS StartedAt, stopped_at AS StoppedAt FROM active_timer WHERE id = 1",
-            cancellationToken: ct));
-        return row is null
-            ? null
-            : new ActiveTimer(Guid.ParseExact(row.GoalId, "D"), SqlText.ParseInstant(row.StartedAt),
-                row.StoppedAt is null ? null : SqlText.ParseInstant(row.StoppedAt));
+        try
+        {
+            var row = await c.QuerySingleOrDefaultAsync<Row>(new CommandDefinition(
+                "SELECT goal_id AS GoalId, started_at AS StartedAt, stopped_at AS StoppedAt FROM active_timer WHERE id = 1",
+                cancellationToken: ct));
+            return row is null
+                ? null
+                : new ActiveTimer(Guid.ParseExact(row.GoalId, "D"), SqlText.ParseInstant(row.StartedAt),
+                    row.StoppedAt is null ? null : SqlText.ParseInstant(row.StoppedAt));
+        }
+        catch (Exception e) when (RowReader.IsInvalidRow(e))
+        {
+            // Sem o início não há tempo a recuperar, e a linha ocuparia a vaga do único cronômetro para sempre.
+            Trace.TraceError($"Cronômetro inválido descartado: {e.Message}");
+            await c.ExecuteAsync(new CommandDefinition("DELETE FROM active_timer", cancellationToken: ct));
+            return null;
+        }
     }
 
     public async Task<bool> TryStartAsync(ActiveTimer timer, CancellationToken ct = default)
