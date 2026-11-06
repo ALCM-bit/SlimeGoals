@@ -51,6 +51,19 @@ public class ReportServiceWeekTests
         _log.AddAsync(new ReminderLogEntry(Guid.NewGuid(), goal.Id, firedAt, response, response is null ? null : firedAt));
 
     [Fact]
+    public async Task Superseded_row_does_not_count()
+    {
+        var goal = await Create("Água", target: 2);
+        await Record(goal, Mon, 1);
+        await Record(goal, Mon, 5);
+        _checkins.Superseded.Add(_checkins.All[^1].Id);
+
+        var row = (await Service.GetWeekAsync(Today)).Goals.Single();
+
+        (row.Done, row.MetPeriods).Should().Be((1, 0));
+    }
+
+    [Fact]
     public async Task Daily_row_counts_met_days_and_today_as_pending()
     {
         var goal = await Create("Água", target: 2);

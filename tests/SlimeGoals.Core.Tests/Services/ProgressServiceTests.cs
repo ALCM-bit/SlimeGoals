@@ -48,6 +48,19 @@ public class ProgressServiceTests
     });
 
     [Fact]
+    public async Task Superseded_row_does_not_count()
+    {
+        var goal = await Create("Água", target: 2);
+        await Record(goal, Today, 1);
+        await Record(goal, Today, 5);
+        _checkins.Superseded.Add(_checkins.All[^1].Id);
+
+        var progress = (await Service.GetTodayAsync()).Goals.Single();
+
+        (progress.Done, progress.IsMet).Should().Be((1, false));
+    }
+
+    [Fact]
     public async Task Lists_goals_shown_today_pending_first_then_met()
     {
         var a = await Create("A", target: 2);
