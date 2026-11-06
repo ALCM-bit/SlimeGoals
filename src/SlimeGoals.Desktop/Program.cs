@@ -26,7 +26,7 @@ internal static class Program
         PrivateDirectory.TryEnsure(Path.GetDirectoryName(databasePath)!);
 
         // Instância única por banco: a segunda só pede à primeira que mostre a janela e sai, sem abrir o banco.
-        var runtime = XdgPaths.RuntimeDirectory(Environment.GetEnvironmentVariable, Environment.UserName, Path.GetTempPath());
+        var runtime = XdgPaths.RuntimeDirectory(Environment.GetEnvironmentVariable, home);
         var key = Path.GetFullPath(databasePath);
         SingleInstanceGuard? guard;
         try

@@ -28,14 +28,19 @@ public class XdgPathsTests
 
     [Fact]
     public void Runtime_directory_uses_xdg_runtime_dir_when_set() =>
-        XdgPaths.RuntimeDirectory(v => v == "XDG_RUNTIME_DIR" ? "/run/user/1000" : null, "ana", "/tmp")
+        XdgPaths.RuntimeDirectory(v => v == "XDG_RUNTIME_DIR" ? "/run/user/1000" : null, "/home/u")
             .Should().Be("/run/user/1000");
 
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Runtime_directory_falls_back_to_temp_per_user_when_unset_or_empty(string? value) =>
-        XdgPaths.RuntimeDirectory(_ => value, "ana", "/tmp")
-            .Should().Be("/tmp/slimegoals-ana");
+    public void Runtime_directory_falls_back_to_user_cache_when_unset_or_empty(string? value) =>
+        XdgPaths.RuntimeDirectory(_ => value, "/home/u")
+            .Should().Be("/home/u/.cache/SlimeGoals");
+
+    [Fact]
+    public void Runtime_directory_fallback_honors_xdg_cache_home() =>
+        XdgPaths.RuntimeDirectory(v => v == "XDG_CACHE_HOME" ? "/data/cache" : null, "/home/u")
+            .Should().Be("/data/cache/SlimeGoals");
 }
