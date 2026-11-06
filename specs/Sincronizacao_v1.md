@@ -39,9 +39,11 @@ As mesmas metas e registros aparecem em todos os aparelhos de uma pessoa, sem qu
 **Consequências aceitas:**
 
 1. A edição perdedora some sem aviso.
-2. A regra depende do relógio do aparelho: um relógio adiantado vence edições mais recentes de outro.
+2. A regra depende do relógio do aparelho: entre edições feitas sem que um aparelho visse a do outro, um relógio adiantado vence a mais recente.
 3. Lembretes podem tocar nos dois aparelhos até a sincronização seguinte.
 4. Entrar com dados em dois aparelhos une tudo, sem deduplicar.
+
+**Data de uma edição de meta:** ao gravar, `updated_at` é o maior valor entre a hora atual e o `updated_at` que o aparelho já tem para a meta mais 1 ms. Assim, uma edição feita depois de ver outra sempre vence essa outra, mesmo com o relógio atrasado. Gravar em UTC resolve o fuso, não a hora errada do aparelho. A regra vale para toda gravação que muda `updated_at` da meta, com ou sem sincronização ligada.
 
 **Totais depois de juntar:** dois aparelhos offline podem marcar a mesma meta de conclusão (total 2) ou tirar mais do que havia (total negativo). Os registros não são alterados. Telas e relatórios limitam o total a `[0, alvo]` nas metas de conclusão e a no mínimo 0 nas demais. A validação de `CheckinService` continua valendo para novos registros.
 
@@ -159,7 +161,7 @@ O código do spike é descartável, como em `specs/spikes/`.
 ## 9. Testes
 
 - **Convergência:** dois e três aparelhos simulados, com ordens de envio embaralhadas, terminam iguais.
-- **Motor:** exclusão contra edição, registro antes da meta, página interrompida, reenvio, relógio divergente, versão desconhecida.
+- **Motor:** exclusão contra edição, registro antes da meta, página interrompida, reenvio, relógio divergente, edição com relógio atrasado depois de receber outra mais nova, versão desconhecida.
 - **Totais:** conclusão com total 2, total negativo, em Hoje e nos relatórios.
 - **Servidor** (PostgreSQL em contêiner): isolamento entre contas, envios simultâneos sem buracos, conflito parcial, `410`, limites.
 - **Criptografia:** blob adulterado ou trocado é recusado; vetores fixos entre plataformas.
