@@ -16,6 +16,7 @@ public sealed class DbusNotificationService : INotificationService, IDisposable
     private readonly object _lock = new();
     private readonly Dictionary<uint, Entry> _byId = [];
     private readonly Dictionary<Guid, uint> _byLogId = [];
+    private bool? _bodyMarkup;
 
     public DbusNotificationService(INotificationBus bus)
     {
@@ -37,13 +38,37 @@ public sealed class DbusNotificationService : INotificationService, IDisposable
             ("ignore", "Ignorar"),
             ("default", "Abrir"),
         ];
-        var id = await _bus.NotifyAsync(reminder.Text.Title, reminder.Text.Body, actions, ct).ConfigureAwait(false);
+        var body = await BodyMarkupAsync(ct).ConfigureAwait(false) ? Escape(reminder.Text.Body) : reminder.Text.Body;
+        var id = await _bus.NotifyAsync(reminder.Text.Title, body, actions, ct).ConfigureAwait(false);
         lock (_lock)
         {
             _byId[id] = new Entry(reminder.LogId);
             _byLogId[reminder.LogId] = id;
         }
     }
+
+    /// <summary>
+    /// Pergunta ao servidor uma vez. Se a pergunta falhar, o lembrete sai com o corpo sem escape e a próxima
+    /// notificação pergunta de novo: um texto mal formatado é melhor que um lembrete perdido.
+    /// </summary>
+    private async Task<bool> BodyMarkupAsync(CancellationToken ct)
+    {
+        if (_bodyMarkup is { } known) return known;
+        try
+        {
+            var supported = await _bus.SupportsBodyMarkupAsync(ct).ConfigureAwait(false);
+            _bodyMarkup = supported;
+            return supported;
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            Trace.TraceError($"Falha ao consultar as capacidades do servidor de notificações: {e}");
+            return false;
+        }
+    }
+
+    private static string Escape(string text) =>
+        text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
 
     /// <inheritdoc />
     public async Task WithdrawAsync(Guid logId, CancellationToken ct = default)

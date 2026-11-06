@@ -53,6 +53,22 @@ public sealed class TmdsNotificationBus : INotificationBus
     }
 
     /// <inheritdoc />
+    public async Task<bool> SupportsBodyMarkupAsync(CancellationToken ct = default)
+    {
+        var connection = await GetConnectionAsync(ct).ConfigureAwait(false);
+        var capabilities = await connection.CallMethodAsync(BuildGetCapabilities(connection),
+            (m, _) => m.GetBodyReader().ReadArrayOfString(), null).ConfigureAwait(false);
+        return capabilities.Contains("body-markup");
+    }
+
+    private static MessageBuffer BuildGetCapabilities(DBusConnection connection)
+    {
+        using var w = connection.GetMessageWriter();
+        w.WriteMethodCallHeader(Service, Path, Service, "GetCapabilities", null, MessageFlags.None);
+        return w.CreateMessage();
+    }
+
+    /// <inheritdoc />
     public async Task CloseAsync(uint id, CancellationToken ct = default)
     {
         var connection = await GetConnectionAsync(ct).ConfigureAwait(false);

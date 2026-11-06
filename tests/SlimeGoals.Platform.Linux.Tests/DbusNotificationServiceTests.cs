@@ -11,6 +11,9 @@ public sealed class DbusNotificationServiceTests
         private uint _next;
         public List<(string Summary, string Body, IReadOnlyList<(string Key, string Label)> Actions)> Notified { get; } = [];
         public List<uint> Closed { get; } = [];
+        public bool BodyMarkup { get; init; }
+        public Exception? CapabilitiesFailure { get; init; }
+        public int CapabilityQueries { get; private set; }
         public event Action<uint, string>? ActionInvoked;
         public event Action<uint, uint>? NotificationClosed;
 
@@ -19,6 +22,12 @@ public sealed class DbusNotificationServiceTests
         {
             Notified.Add((summary, body, actions));
             return Task.FromResult(++_next);
+        }
+
+        public Task<bool> SupportsBodyMarkupAsync(CancellationToken ct = default)
+        {
+            CapabilityQueries++;
+            return CapabilitiesFailure is null ? Task.FromResult(BodyMarkup) : Task.FromException<bool>(CapabilitiesFailure);
         }
 
         public Task CloseAsync(uint id, CancellationToken ct = default)
@@ -30,6 +39,55 @@ public sealed class DbusNotificationServiceTests
         public void RaiseAction(uint id, string key) => ActionInvoked?.Invoke(id, key);
         public void RaiseClosed(uint id, uint reason) => NotificationClosed?.Invoke(id, reason);
         public void Dispose() { }
+    }
+
+    private static Reminder ReminderWith(string body) =>
+        new(Guid.NewGuid(), Guid.NewGuid(), new ReminderText("P&D <título>", body, "Feito"));
+
+    [Fact]
+    public async Task Body_is_escaped_when_the_server_reads_markup_and_the_title_stays_plain()
+    {
+        var bus = new FakeBus { BodyMarkup = true };
+        using var service = new DbusNotificationService(bus);
+
+        await service.ShowAsync(ReminderWith("3 de 5 P&D <b>x</b>"));
+
+        bus.Notified.Single().Body.Should().Be("3 de 5 P&amp;D &lt;b&gt;x&lt;/b&gt;");
+        bus.Notified.Single().Summary.Should().Be("P&D <título>");
+    }
+
+    [Fact]
+    public async Task Body_stays_plain_when_the_server_has_no_markup()
+    {
+        var bus = new FakeBus();
+        using var service = new DbusNotificationService(bus);
+
+        await service.ShowAsync(ReminderWith("P&D"));
+
+        bus.Notified.Single().Body.Should().Be("P&D");
+    }
+
+    [Fact]
+    public async Task Capability_failure_still_shows_the_reminder_with_plain_body()
+    {
+        var bus = new FakeBus { CapabilitiesFailure = new InvalidOperationException("sem servidor") };
+        using var service = new DbusNotificationService(bus);
+
+        await service.ShowAsync(ReminderWith("P&D"));
+
+        bus.Notified.Single().Body.Should().Be("P&D");
+    }
+
+    [Fact]
+    public async Task Capabilities_are_asked_only_once()
+    {
+        var bus = new FakeBus { BodyMarkup = true };
+        using var service = new DbusNotificationService(bus);
+
+        await service.ShowAsync(ReminderWith("a"));
+        await service.ShowAsync(ReminderWith("b"));
+
+        bus.CapabilityQueries.Should().Be(1);
     }
 
     private static Reminder NewReminder() =>
