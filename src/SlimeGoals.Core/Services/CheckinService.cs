@@ -50,7 +50,8 @@ public sealed class CheckinService(IGoalRepository goals, ICheckinRepository che
             Id = Guid.CreateVersion7(now),
             GoalId = goalId,
             DoneAt = now,
-            // Sem sincronização raw e o total limitado são iguais, e o valor gravado é `amount`.
+            // Normalmente raw e o total limitado são iguais; só diferem após trocar a recorrência da meta,
+            // e aí a tela já parte do total limitado.
             Amount = total - raw,
             Note = note,
             UpdatedAt = now,

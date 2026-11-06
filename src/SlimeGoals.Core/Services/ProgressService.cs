@@ -3,7 +3,7 @@ using SlimeGoals.Core.Domain;
 
 namespace SlimeGoals.Core.Services;
 
-/// <summary>Progresso de uma meta no período atual. Done = soma (com sinal) dos registros do período.</summary>
+/// <summary>Progresso de uma meta no período atual. Done = soma (com sinal) dos registros do período, limitada a [0, alvo] na conclusão e a no mínimo 0 nas demais.</summary>
 public sealed record GoalProgress(Goal Goal, int Done, bool IsMet);
 
 /// <summary>Resumo da semana do Hoje: % médio por meta, metas em andamento e concluídas hoje.</summary>

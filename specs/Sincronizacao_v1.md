@@ -42,10 +42,11 @@ As mesmas metas e registros aparecem em todos os aparelhos de uma pessoa, sem qu
 2. A regra depende do relógio do aparelho: entre edições feitas sem que um aparelho visse a do outro, um relógio adiantado vence a mais recente.
 3. Lembretes podem tocar nos dois aparelhos até a sincronização seguinte.
 4. Entrar com dados em dois aparelhos une tudo, sem deduplicar.
+5. Com total real negativo e edição offline em dois aparelhos, as compensações somam, e uma meta de quantidade pode ficar acima do que a pessoa pediu.
 
 **Data de uma edição de meta:** ao gravar, `updated_at` é o maior valor entre a hora atual e o `updated_at` que o aparelho já tem para a meta mais 1 ms. Assim, uma edição feita depois de ver outra sempre vence essa outra, mesmo com o relógio atrasado. Gravar em UTC resolve o fuso, não a hora errada do aparelho. A regra vale para toda gravação que muda `updated_at` da meta, com ou sem sincronização ligada.
 
-**Totais depois de juntar:** dois aparelhos offline podem marcar a mesma meta de conclusão (total 2) ou tirar mais do que havia (total negativo). Os registros não são alterados. Telas e relatórios limitam o total a `[0, alvo]` nas metas de conclusão e a no mínimo 0 nas demais. A validação de `CheckinService` parte do total limitado, e o valor gravado é a diferença até o total real, para que um toque tenha o efeito visível. Sem sincronização, os dois totais são iguais.
+**Totais depois de juntar:** dois aparelhos offline podem marcar a mesma meta de conclusão (total 2) ou tirar mais do que havia (total negativo). Os registros não são alterados. Telas e relatórios limitam o total a `[0, alvo]` nas metas de conclusão e a no mínimo 0 nas demais. A validação de `CheckinService` parte do total limitado, e o valor gravado é a diferença até o total real, para que um toque tenha o efeito visível. Os dois totais são normalmente iguais; só diferem depois de trocar a recorrência da meta, e aí a tela já parte do total limitado. O limite vale para o total do período, nunca para o dia dentro de uma semana. O valor gravado pode passar de `MaxAmount` por causa da compensação, então a 9.2 não pode recusar isso ao aplicar o que chega.
 
 ## 4. Lado do aparelho
 
@@ -56,6 +57,8 @@ Migração `005_sync.sql`:
 - `sync_records`: `record_id`, tipo, `seq` conhecido. Sabe o `base_seq` de cada registro.
 - `sync_tombstones`: ids de metas excluídas, para descartar dados atrasados.
 - `sync_pending`: registros recebidos cuja meta ainda não chegou.
+
+**Depois da exclusão:** as linhas de `sync_records` (só id, tipo e `seq`) ficam até o aceite do `delete`, e a 9.2 as limpa nesse aceite.
 
 **Fila só com a sincronização ligada.** Sem conta, nada é gravado na fila, senão ela cresceria para sempre. Ao ligar, todas as metas e registros entram na fila de uma vez.
 
@@ -73,11 +76,11 @@ Migração `005_sync.sql`:
 - Metas antes de registros, dentro da página.
 - Registro de meta desconhecida vai para `sync_pending` e é aplicado quando a meta chegar. Isso é necessário porque editar uma meta aumenta o `seq` dela, e um aparelho novo pode receber registros antes da meta.
 - Registro de meta em `sync_tombstones` é descartado, e o aparelho envia a exclusão dele.
-- Exclusão usa `GoalRepository.DeleteAsync` e retira as notificações como `ReminderService.DeleteGoalAsync`, sob o mesmo `_gate`.
+- Exclusão usa `GoalRepository.DeleteAsync` e retira as notificações como `ReminderService.DeleteGoalAsync`, sob o mesmo `_gate`. Hoje `DeleteAsync` sempre enfileira, então a 9.2 precisa de um caminho de exclusão sem fila, com a mesma limpeza.
 - Linha que não converte vai para o Trace e não trava a sincronização, como no `RowReader`.
 - Versão de formato desconhecida pausa a sincronização, com o aviso "atualize o app". `last_seq` não avança e nada se perde.
 - Um `DataChangeNotifier.Defer` agrupa a página num único aviso.
-- Dados aplicados não voltam para a fila.
+- Dados aplicados não voltam para a fila (inclusive a exclusão recebida, que usa o caminho sem fila).
 
 **Quando roda:** ao abrir o app, 5 s depois da última mudança local, a cada 15 min com o app aberto e, no Android, ao voltar ao primeiro plano. Falhas de rede repetem com espera crescente, até 15 min.
 
@@ -161,7 +164,7 @@ O código do spike é descartável, como em `specs/spikes/`.
 ## 9. Testes
 
 - **Convergência:** dois e três aparelhos simulados, com ordens de envio embaralhadas, terminam iguais.
-- **Motor:** exclusão contra edição, registro antes da meta, página interrompida, reenvio, relógio divergente, edição com relógio atrasado depois de receber outra mais nova, versão desconhecida.
+- **Motor:** exclusão contra edição, registro antes da meta, página interrompida, reenvio, relógio divergente, edição com relógio atrasado depois de receber outra mais nova, versão desconhecida, meta excluída com envio em andamento ou com o aceite perdido (o item sai da fila sem gerar `delete`, e o registro que volta no `pull`, inclusive o da meta, é removido pela marca de exclusão e o aparelho envia o `delete`).
 - **Totais:** conclusão com total 2, total negativo, em Hoje e nos relatórios.
 - **Servidor** (PostgreSQL em contêiner): isolamento entre contas, envios simultâneos sem buracos, conflito parcial, `410`, limites.
 - **Criptografia:** blob adulterado ou trocado é recusado; vetores fixos entre plataformas.
@@ -189,3 +192,4 @@ Até a 9.6, a confirmação de e-mail é simulada: o link sai no log do servidor
 2. Onde hospedar e qual serviço de e-mail (fase 9.6).
 3. Sincronização em segundo plano no Android (depois da primeira versão).
 4. Fila no servidor (broker e consumidor) para muitos usuários: fica para depois da funcionalidade combinada.
+5. `DisableAsync` descarta exclusões pendentes e marcas: excluir uma meta offline, sair e entrar de novo faz ela voltar do servidor, contra a exclusão definitiva. Decidir antes da 9.5 (por exemplo, enviar a fila antes de sair ou avisar a pessoa).

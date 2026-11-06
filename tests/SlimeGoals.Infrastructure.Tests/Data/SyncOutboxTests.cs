@@ -232,6 +232,24 @@ public class SyncOutboxTests : IDisposable
     }
 
     [Fact]
+    public async Task Deleting_goal_leaves_other_goals_queue_intact()
+    {
+        EnableSync();
+        var goal = NewGoal();
+        var other = NewGoal();
+        await Goals.AddAsync(goal);
+        await Goals.AddAsync(other);
+        var otherCheckin = NewCheckin(other);
+        await Checkins.AddAsync(otherCheckin);
+        await Checkins.AddAsync(NewCheckin(goal));
+
+        await Goals.DeleteAsync(goal.Id);
+
+        (await _db.Anchor.QueryAsync<string>("SELECT record_id FROM sync_outbox"))
+            .Should().BeEquivalentTo(Text(other.Id), Text(otherCheckin.Id));
+    }
+
+    [Fact]
     public async Task Deleting_missing_goal_changes_no_sync_table()
     {
         EnableSync();
