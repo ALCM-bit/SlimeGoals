@@ -42,11 +42,11 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
 
     public async Task<Goal> UpdateAsync(Guid id, GoalDraft draft, CancellationToken ct = default)
     {
-        draft = Normalize(draft);
-        EnsureValid(draft);
         var current = await GetExistingAsync(id, ct);
         if (current.ArchivedAt is not null)
             throw new GoalStateException(id, "Meta arquivada não pode ser editada. Desarquive-a primeiro.");
+        draft = Normalize(draft);
+        EnsureValid(draft);
         if (draft.Measure != current.Measure && await timers.GetAsync(ct) is { } timer && timer.GoalId == id)
             throw new GoalValidationException(
                 [new ValidationError(nameof(GoalDraft.Measure), "Pare o cronômetro antes de mudar a medida.")]);

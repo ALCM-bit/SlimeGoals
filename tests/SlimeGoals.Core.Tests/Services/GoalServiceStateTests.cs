@@ -44,6 +44,17 @@ public class GoalServiceStateTests
     }
 
     [Fact]
+    public async Task Update_of_archived_goal_with_invalid_draft_reports_the_state_first()
+    {
+        var goal = await Service.CreateAsync(Draft());
+        await Service.ArchiveAsync(goal.Id);
+
+        var act = () => Service.UpdateAsync(goal.Id, Draft() with { Title = "" });
+
+        await act.Should().ThrowAsync<GoalStateException>();
+    }
+
+    [Fact]
     public async Task Create_with_end_date_in_the_past_reports_EndDate_error()
     {
         var act = () => Service.CreateAsync(Draft() with { EndDate = Today.AddDays(-1) });
