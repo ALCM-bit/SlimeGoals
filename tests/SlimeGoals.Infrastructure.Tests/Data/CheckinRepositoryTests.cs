@@ -35,6 +35,30 @@ public class CheckinRepositoryTests : IDisposable
         Id = Guid.CreateVersion7(), GoalId = goal.Id, DoneAt = doneAt, Amount = amount, Note = note, UpdatedAt = doneAt,
     };
 
+    [Theory]
+    [InlineData("id = 'não é um guid'")]
+    [InlineData("updated_at = 'agora'")]
+    [InlineData("done_at = '2026-11-02T12:30:00 lixo'")]
+    [InlineData("amount = 'muitos'")]
+    public async Task List_skips_invalid_row_in_any_position_and_keeps_the_others(string assignment)
+    {
+        foreach (var position in Enumerable.Range(0, 3))
+        {
+            _db.Anchor.Execute("DELETE FROM checkins");
+            var checkins = Enumerable.Range(0, 3).Select(i => At(_goal, T0.AddHours(i), 1)).ToList();
+            foreach (var checkin in checkins)
+                await Repo.AddAsync(checkin);
+            var bad = checkins[position];
+            _db.Anchor.Execute($"UPDATE checkins SET {assignment} WHERE id = @Id", new { Id = bad.Id.ToString("D") });
+            using var trace = new TraceCapture();
+
+            var listed = await Repo.ListAsync(T0.AddDays(-1), T0.AddDays(1));
+
+            listed.Select(c => c.Id).Should().Equal(checkins.Where(c => c != bad).Select(c => c.Id));
+            trace.Messages.Should().Contain(m => m.Contains("checkins"));
+        }
+    }
+
     [Fact]
     public async Task Checkin_round_trip_and_sum_ignore_deleted_and_respect_half_open_range()
     {

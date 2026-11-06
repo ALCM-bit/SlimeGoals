@@ -10,6 +10,12 @@ public interface IGoalRepository
     /// <summary>Substitui a meta. Lança <see cref="GoalNotFoundException"/> se o id não existe.</summary>
     Task UpdateAsync(Goal goal, CancellationToken ct = default);
 
+    /// <summary>
+    /// Apaga de vez, numa única transação, a meta e tudo ligado a ela: registros, log de lembretes e cronômetro.
+    /// Lança <see cref="GoalNotFoundException"/> se o id não existe.
+    /// </summary>
+    Task DeleteAsync(Guid id, CancellationToken ct = default);
+
     /// <summary>Null se não existe ou se foi excluída (DeletedAt preenchido).</summary>
     Task<Goal?> GetAsync(Guid id, CancellationToken ct = default);
 

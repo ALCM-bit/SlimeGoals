@@ -10,7 +10,7 @@ public class ReminderResponseHandlerTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 11, 2, 12, 0, 0, TimeSpan.Zero);
     private readonly FakeTimeProvider _time = new(T0);
-    private readonly InMemoryGoalRepository _goals = new();
+    private readonly InMemoryGoalRepository _goals;
     private readonly InMemoryCheckinRepository _checkins = new();
     private readonly InMemoryTimerRepository _timers = new();
     private readonly InMemoryReminderLogRepository _log = new();
@@ -19,6 +19,7 @@ public class ReminderResponseHandlerTests
 
     public ReminderResponseHandlerTests()
     {
+        _goals = new InMemoryGoalRepository(_checkins, _log, _timers);
         _time.SetLocalTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
         _changes.Changed += (_, _) => _changeCount++;
     }
@@ -112,16 +113,44 @@ public class ReminderResponseHandlerTests
         (await Checkins.PeriodTotalAsync(goal.Id)).Should().Be(1);
     }
 
+    // O log existe e a meta não: é o que o tratador vê se a meta sai entre a leitura do log e a ação.
     [Fact]
     public async Task Primary_on_missing_goal_logs_ignore()
     {
         var goal = await Create(Measure.Completion);
         var entry = await Fire(goal);
-        await Goals.DeleteAsync(goal.Id);
+        await _goals.UpdateAsync(goal with { DeletedAt = T0 });
 
         (await Handler.HandleAsync(entry.Id, ReminderAction.Primary)).Should().Be(ReminderOutcome.Handled);
 
         (await _log.GetAsync(entry.Id))!.Response.Should().Be(ReminderResponse.Ignore);
+    }
+
+    // A exclusão apaga o log: o toque numa notificação que sobrou não acha nada, e não pode lançar nem registrar.
+    [Theory]
+    [InlineData(ReminderAction.Primary)]
+    [InlineData(ReminderAction.Snooze)]
+    [InlineData(ReminderAction.Ignore)]
+    public async Task Action_on_deleted_goal_is_stale_and_records_nothing(ReminderAction action)
+    {
+        var goal = await Create(Measure.Quantity);
+        var entry = await Fire(goal);
+        await Goals.DeleteAsync(goal.Id);
+
+        (await Handler.HandleAsync(entry.Id, action)).Should().Be(ReminderOutcome.Stale);
+
+        _checkins.All.Should().BeEmpty();
+        _log.All.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Open_on_deleted_goal_still_opens_the_app()
+    {
+        var goal = await Create(Measure.Quantity);
+        var entry = await Fire(goal);
+        await Goals.DeleteAsync(goal.Id);
+
+        (await Handler.HandleAsync(entry.Id, ReminderAction.Open)).Should().Be(ReminderOutcome.OpenApp);
     }
 
     [Fact]

@@ -55,7 +55,7 @@ public sealed class ProgressService(IGoalRepository goals, ICheckinRepository ch
         var met = list.Count(p => p.IsMet);
 
         var timer = await timers.GetAsync(ct);
-        var timerGoal = timer is null ? null : await goals.GetAsync(timer.GoalId, ct);
+        var timerGoal = timer is null ? null : await goals.GetIfReadableAsync(timer.GoalId, ct);
 
         return new TodaySnapshot(list, new WeekSummary(percent, list.Count - met, met), timer, timerGoal);
     }

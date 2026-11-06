@@ -23,9 +23,10 @@ internal static class Program
 
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var databasePath = XdgPaths.DatabasePath(Environment.GetEnvironmentVariable, home);
+        PrivateDirectory.TryEnsure(Path.GetDirectoryName(databasePath)!);
 
         // Instância única por banco: a segunda só pede à primeira que mostre a janela e sai, sem abrir o banco.
-        var runtime = XdgPaths.RuntimeDirectory(Environment.GetEnvironmentVariable, Environment.UserName, Path.GetTempPath());
+        var runtime = XdgPaths.RuntimeDirectory(Environment.GetEnvironmentVariable, home);
         var key = Path.GetFullPath(databasePath);
         SingleInstanceGuard? guard;
         try
@@ -54,28 +55,56 @@ internal static class Program
 
         using (guard)
         {
-            using var services = CompositionRoot.Build(databasePath, home, options);
-            using (var connection = services.GetRequiredService<SqliteConnectionFactory>().Open())
-                MigrationRunner.Migrate(connection);
-
-            if (guard is not null)
+            using var services = OpenServices(databasePath, home, options);
+            if (services is null)
             {
-                var activator = services.GetRequiredService<MainWindowActivator>();
-                guard.ShowRequested += (_, _) =>
-                {
-                    try
-                    {
-                        activator.Activate();
-                    }
-                    catch (Exception e)
-                    {
-                        Trace.TraceError($"Falha ao mostrar a janela a pedido da segunda instância: {e}");
-                    }
-                };
+                using var failure = StartupFailureServices.Create(databasePath);
+                Run(failure, guard, args);
+                return;
             }
 
-            BuildAvaloniaApp(services, guard).StartWithClassicDesktopLifetime(args);
+            Run(services, guard, args);
         }
+    }
+
+    /// <summary>Monta o container e abre o banco; se falhar, registra e devolve null. O arquivo fica como está.</summary>
+    private static ServiceProvider? OpenServices(string databasePath, string home, AppStartOptions options)
+    {
+        ServiceProvider? services = null;
+        try
+        {
+            services = CompositionRoot.Build(databasePath, home, options);
+            using (var connection = services.GetRequiredService<SqliteConnectionFactory>().Open())
+                MigrationRunner.Migrate(connection);
+            return services;
+        }
+        catch (Exception e)
+        {
+            Trace.TraceError($"Falha ao abrir ou migrar o banco em {databasePath}: {e}");
+            services?.Dispose();
+            return null;
+        }
+    }
+
+    private static void Run(IServiceProvider services, SingleInstanceGuard? guard, string[] args)
+    {
+        if (guard is not null)
+        {
+            var activator = services.GetRequiredService<MainWindowActivator>();
+            guard.ShowRequested += (_, _) =>
+            {
+                try
+                {
+                    activator.Activate();
+                }
+                catch (Exception e)
+                {
+                    Trace.TraceError($"Falha ao mostrar a janela a pedido da segunda instância: {e}");
+                }
+            };
+        }
+
+        BuildAvaloniaApp(services, guard).StartWithClassicDesktopLifetime(args);
     }
 
     private static AppBuilder BuildAvaloniaApp(IServiceProvider services, SingleInstanceGuard? guard)

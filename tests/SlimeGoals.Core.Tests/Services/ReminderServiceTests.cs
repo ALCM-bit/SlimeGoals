@@ -48,6 +48,21 @@ public class ReminderServiceTests
     private void At(int hour, int minute = 0) => _time.SetUtcNow(Today(hour, minute));
 
     [Fact]
+    public async Task Sync_with_pending_reminder_of_unreadable_goal_ignores_it_and_serves_the_others()
+    {
+        var unreadable = await Add("Ilegível");
+        var pending = new ReminderLogEntry(Guid.NewGuid(), unreadable.Id, Today(7));
+        await _log.AddAsync(pending);
+        _goals.MarkUnreadable(unreadable.Id);
+        var goal = await Add("Legível");
+
+        await Service.SyncAsync();
+
+        _log.All.Single(e => e.Id == pending.Id).Response.Should().Be(ReminderResponse.Ignore);
+        _notifications.Shown.Should().ContainSingle().Which.GoalId.Should().Be(goal.Id);
+    }
+
+    [Fact]
     public async Task Sync_fires_due_goal_logs_it_and_returns_next_interval()
     {
         var goal = await Add();

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -13,6 +14,9 @@ namespace SlimeGoals.Infrastructure.Data;
 /// </summary>
 public static partial class MigrationRunner
 {
+    /// <summary>Script que expurga o que a exclusão lógica deixou; ao passar por ele, o arquivo é reescrito.</summary>
+    private const int PurgeVersion = 4;
+
     [GeneratedRegex(@"\.Migrations\.(\d{3})_[^.]+\.sql$")]
     private static partial Regex ScriptName();
 
@@ -20,8 +24,9 @@ public static partial class MigrationRunner
     public static int Migrate(SqliteConnection connection, int upTo = int.MaxValue)
     {
         var all = Scripts().ToList();
+        var before = ReadVersion(connection, tx: null);
         // "Mais novo que o app" compara com o último script existente, não com o limite upTo.
-        EnsureNotNewer(ReadVersion(connection, tx: null), all.Count == 0 ? 0 : all[^1].Number);
+        EnsureNotNewer(before, all.Count == 0 ? 0 : all[^1].Number);
         var scripts = all.Where(s => s.Number <= upTo).ToList();
 
         // foreign_keys só pode mudar fora de transação.
@@ -36,7 +41,29 @@ public static partial class MigrationRunner
             SetForeignKeys(connection, foreignKeys == 1);
         }
 
-        return ReadVersion(connection, tx: null);
+        var after = ReadVersion(connection, tx: null);
+        if (before is > 0 and < PurgeVersion && after >= PurgeVersion)
+            Vacuum(connection);
+        return after;
+    }
+
+    /// <summary>
+    /// secure_delete só zera o que for apagado com ele ligado: cópias velhas de linhas e páginas livres das versões
+    /// anteriores só somem reescrevendo o arquivo. VACUUM não roda em transação, por isso fica fora do script. Falhar
+    /// aqui (disco cheio, banco ocupado) não pode impedir o app de abrir: os dados já estão certos.
+    /// </summary>
+    private static void Vacuum(SqliteConnection connection)
+    {
+        try
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "VACUUM;";
+            cmd.ExecuteNonQuery();
+        }
+        catch (SqliteException e)
+        {
+            Trace.TraceError($"Falha no VACUUM depois da migração {PurgeVersion:000}: {e}");
+        }
     }
 
     private static void ApplyScripts(SqliteConnection connection, List<(int Number, string Resource)> scripts)

@@ -1,3 +1,4 @@
+using Dapper;
 using Microsoft.Extensions.Time.Testing;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
@@ -40,6 +41,48 @@ public class ReportServiceSqliteTests : IDisposable
             Id = Guid.CreateVersion7(), GoalId = goal.Id, Amount = 1, UpdatedAt = Now, DeletedAt = deletedAt,
             DoneAt = new DateTimeOffset(2026, month, day, 13, 0, 0, TimeSpan.Zero),
         });
+
+    [Fact]
+    public async Task Skipped_rows_only_remove_their_own_contribution_from_the_reports()
+    {
+        var kept = await AddGoal("Água", Created);
+        await Record(kept, 11, 2);
+        await Record(kept, 11, 3);
+
+        var unreadable = await AddGoal("Ilegível", Created.AddMinutes(1));
+        await Record(unreadable, 11, 2);
+        await new ReminderLogRepository(_db.Factory).AddAsync(new ReminderLogEntry(Guid.CreateVersion7(), unreadable.Id,
+            new DateTimeOffset(2026, 11, 2, 13, 0, 0, TimeSpan.Zero)));
+        _db.Anchor.Execute("UPDATE goals SET color = 'azul' WHERE id = @Id", new { Id = unreadable.Id.ToString("D") });
+
+        // Linha de progresso inválida numa meta legível: aquele dia deixa de contar, os outros não.
+        _db.Anchor.Execute("""
+            UPDATE checkins SET updated_at = 'agora'
+            WHERE goal_id = @Id AND done_at LIKE '2026-11-03%'
+            """, new { Id = kept.Id.ToString("D") });
+
+        var week = await Service.GetWeekAsync(new DateOnly(2026, 11, 4));
+        week.Goals.Select(r => (r.Goal.Id, r.MetPeriods, r.CountedPeriods, r.Percent)).Should().Equal((kept.Id, 1, 3, 33));
+        week.Percent.Should().Be(33);
+        week.RemindersFired.Should().Be(0); // o disparo da meta ilegível sai junto com ela
+
+        var month = await Service.GetMonthAsync(2026, 11);
+        month.Goals.Select(r => (r.Goal.Id, r.MetPeriods, r.CountedPeriods)).Should().Equal((kept.Id, 1, 3));
+
+        (await Service.GetTopStreakAsync()).Should().BeNull(); // sem 03/11, a sequência de 02/11 quebrou
+    }
+
+    [Fact]
+    public async Task Reports_with_every_goal_unreadable_are_empty_and_do_not_fail()
+    {
+        var unreadable = await AddGoal("Ilegível", Created);
+        await Record(unreadable, 11, 2);
+        _db.Anchor.Execute("UPDATE goals SET color = 'azul'");
+
+        (await Service.GetWeekAsync(new DateOnly(2026, 11, 4))).Percent.Should().BeNull();
+        (await Service.GetMonthAsync(2026, 11)).Percent.Should().BeNull();
+        (await Service.GetTopStreakAsync()).Should().BeNull();
+    }
 
     [Fact]
     public async Task Reports_match_checkins_including_archived_goal_and_deleted_records()

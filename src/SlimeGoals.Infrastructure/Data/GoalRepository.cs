@@ -1,3 +1,4 @@
+using System.Data;
 using Dapper;
 using SlimeGoals.Core;
 using SlimeGoals.Core.Abstractions;
@@ -46,23 +47,49 @@ public sealed class GoalRepository(SqliteConnectionFactory db) : IGoalRepository
             throw new GoalNotFoundException(goal.Id);
     }
 
+    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        await using var c = db.Open();
+        await using var tx = await c.BeginTransactionAsync(ct);
+        var parameters = new { Id = SqlText.Id(id) };
+        // Filhas antes da meta: as chaves estrangeiras estão ligadas e não há ON DELETE CASCADE.
+        await c.ExecuteAsync(new CommandDefinition("""
+            DELETE FROM active_timer WHERE goal_id = @Id;
+            DELETE FROM checkins WHERE goal_id = @Id;
+            DELETE FROM reminder_log WHERE goal_id = @Id;
+            """, parameters, tx, cancellationToken: ct));
+        var affected = await c.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM goals WHERE id = @Id", parameters, tx, cancellationToken: ct));
+
+        if (affected == 0)
+            throw new GoalNotFoundException(id);
+        await tx.CommitAsync(ct);
+    }
+
     public async Task<Goal?> GetAsync(Guid id, CancellationToken ct = default)
     {
         await using var c = db.Open();
-        var row = await c.QuerySingleOrDefaultAsync<GoalRow>(new CommandDefinition(
-            SelectColumns + " WHERE id = @Id AND deleted_at IS NULL",
-            new { Id = id.ToString("D") }, cancellationToken: ct));
-        return row?.ToDomain();
+        try
+        {
+            var row = await c.QuerySingleOrDefaultAsync<GoalRow>(new CommandDefinition(
+                SelectColumns + " WHERE id = @Id AND deleted_at IS NULL",
+                new { Id = id.ToString("D") }, cancellationToken: ct));
+            return row?.ToDomain();
+        }
+        catch (DataException e)
+        {
+            // Tipo errado numa coluna: o Dapper embrulha; quem lê por id só precisa saber que a linha é inválida.
+            throw new FormatException($"Linha inválida em goals: {id}.", e);
+        }
     }
 
     public async Task<IReadOnlyList<Goal>> ListAsync(bool includeArchived, CancellationToken ct = default)
     {
         await using var c = db.Open();
-        var rows = await c.QueryAsync<GoalRow>(new CommandDefinition(
+        return await RowReader.ReadValidAsync<GoalRow, Goal>(c, new CommandDefinition(
             SelectColumns + """
              WHERE deleted_at IS NULL AND (@IncludeArchived OR archived_at IS NULL)
              ORDER BY created_at
-            """, new { IncludeArchived = includeArchived }, cancellationToken: ct));
-        return rows.Select(r => r.ToDomain()).ToList();
+            """, new { IncludeArchived = includeArchived }, cancellationToken: ct), "goals", r => r.ToDomain());
     }
 }

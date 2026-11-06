@@ -25,6 +25,13 @@ public partial class App(IServiceProvider services) : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        if (services.GetService<StartupFailureViewModel>() is { } failure)
+        {
+            ShowStartupFailure(failure);
+            base.OnFrameworkInitializationCompleted();
+            return;
+        }
+
         var shell = services.GetRequiredService<ShellViewModel>();
         var hosted = services.GetServices<IAppHostedService>().ToList();
 
@@ -70,6 +77,27 @@ public partial class App(IServiceProvider services) : Application
         // OnFrameworkInitializationCompleted roda uma vez por processo; a fábrica da view não.
         foreach (var service in hosted)
             _ = StartSafelyAsync(service);
+    }
+
+    /// <summary>
+    /// O banco não abriu: só a tela de erro, sem shell, bandeja nem serviços. No desktop a janela abre mesmo com
+    /// <c>--background</c>, e fechá-la encerra o processo: sem banco, não há lembrete a esperar.
+    /// </summary>
+    private void ShowStartupFailure(StartupFailureViewModel failure)
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
+            var window = new StartupFailureWindow { DataContext = failure };
+            failure.CloseRequested += (_, _) => window.Close();
+            desktop.MainWindow = window;
+            if (services.GetService<MainWindowActivator>() is { } activator)
+                activator.Window = window;
+        }
+        else if (ApplicationLifetime is IActivityApplicationLifetime activity)
+            activity.MainViewFactory = () => new StartupFailureView { DataContext = failure };
+        else if (ApplicationLifetime is ISingleViewApplicationLifetime single)
+            single.MainView = new StartupFailureView { DataContext = failure };
     }
 
     /// <summary>

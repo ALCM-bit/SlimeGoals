@@ -6,7 +6,7 @@ namespace SlimeGoals.Infrastructure.Tests.Data;
 
 public class MigrationRunnerTests
 {
-    private const int Latest = 3;
+    private const int Latest = 4;
 
     private const string GoalColumns =
         "id, title, recurrence, target, icon, color, reminder_every_min, active_from, active_until, active_days, created_at, updated_at";
@@ -156,7 +156,7 @@ public class Migration003Tests
         db.Anchor.Execute(Insert("g"));
         var before = db.Anchor.QuerySingle($"SELECT {Columns} FROM goals");
 
-        MigrationRunner.Migrate(db.Anchor).Should().Be(3);
+        MigrationRunner.Migrate(db.Anchor, upTo: 3).Should().Be(3);
 
         db.Anchor.QuerySingle<(string, string)>("SELECT measure, unit FROM goals").Should().Be(("quantity", "vezes"));
         ((IDictionary<string, object>)db.Anchor.QuerySingle($"SELECT {Columns} FROM goals"))
@@ -220,7 +220,7 @@ public class MigrationRunnerConcurrencyTests
                     return MigrationRunner.Migrate(c);
                 }));
 
-                (await Task.WhenAll(runs)).Should().AllBeEquivalentTo(3);
+                (await Task.WhenAll(runs)).Should().AllBeEquivalentTo(4);
             }
             finally
             {
@@ -231,6 +231,46 @@ public class MigrationRunnerConcurrencyTests
     }
 
     // Revisão final #5b: banco criado por uma versão mais nova do app.
+    [Theory]
+    [InlineData("lixo")]
+    [InlineData("truncado")]
+    public void Unreadable_file_fails_to_open_and_is_left_untouched(string kind)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"slimegoals-corrupt-{Guid.NewGuid():N}.db");
+        try
+        {
+            var factory = new SqliteConnectionFactory($"Data Source={path}");
+            if (kind == "lixo")
+            {
+                File.WriteAllText(path, "isto não é um banco SQLite, é só um arquivo qualquer com texto suficiente");
+            }
+            else
+            {
+                using (var connection = factory.Open())
+                    MigrationRunner.Migrate(connection);
+                SqliteConnection.ClearAllPools();
+                var full = File.ReadAllBytes(path);
+                File.WriteAllBytes(path, full[..(full.Length / 2)]);
+            }
+            var before = File.ReadAllBytes(path);
+
+            var act = () =>
+            {
+                using var connection = factory.Open();
+                MigrationRunner.Migrate(connection);
+            };
+
+            act.Should().Throw<SqliteException>();
+            SqliteConnection.ClearAllPools();
+            File.ReadAllBytes(path).Should().Equal(before);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            File.Delete(path);
+        }
+    }
+
     [Fact]
     public void Database_newer_than_app_is_rejected()
     {

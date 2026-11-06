@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SlimeGoals.App.ViewModels"
+             x:Class="SlimeGoals.App.Views.StartupFailureView"
+             x:DataType="vm:StartupFailureViewModel">
+  <!-- Sem Padding aqui: no Android, como raiz, o Avalonia põe nele as áreas das barras do sistema. -->
+  <ScrollViewer>
+    <StackPanel Spacing="16" Margin="24" MaxWidth="520" VerticalAlignment="Center">
+      <TextBlock Classes="page-title" Text="{Binding Message}" TextWrapping="Wrap" />
+      <StackPanel Classes="field">
+        <TextBlock Classes="field-label" Text="Arquivo de dados" />
+        <!-- TextBox só de leitura: dá para selecionar e copiar também pelo toque; sem teclado virtual. -->
+        <TextBox Text="{Binding DatabasePath, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
+                 InputMethod.IsInputMethodEnabled="False" AutomationProperties.Name="Arquivo de dados" />
+      </StackPanel>
+      <Button Classes="primary" Content="Fechar" Command="{Binding CloseCommand}" HorizontalAlignment="Right" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

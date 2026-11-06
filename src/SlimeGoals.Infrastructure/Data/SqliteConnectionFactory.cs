@@ -2,7 +2,10 @@ using Microsoft.Data.Sqlite;
 
 namespace SlimeGoals.Infrastructure.Data;
 
-/// <summary>Abre conexões já configuradas. SQLite vem com chaves estrangeiras desligadas por padrão.</summary>
+/// <summary>
+/// Abre conexões já configuradas. SQLite vem com chaves estrangeiras desligadas por padrão, e sem
+/// secure_delete o que é apagado continua legível no arquivo até a página ser reaproveitada.
+/// </summary>
 public sealed class SqliteConnectionFactory(string connectionString)
 {
     public SqliteConnection Open()
@@ -10,7 +13,7 @@ public sealed class SqliteConnectionFactory(string connectionString)
         var connection = new SqliteConnection(connectionString);
         connection.Open();
         using var pragma = connection.CreateCommand();
-        pragma.CommandText = "PRAGMA foreign_keys = ON;";
+        pragma.CommandText = "PRAGMA foreign_keys = ON; PRAGMA secure_delete = ON;";
         pragma.ExecuteNonQuery();
         return connection;
     }

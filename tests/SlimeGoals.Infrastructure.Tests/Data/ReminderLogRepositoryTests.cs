@@ -30,6 +30,47 @@ public class ReminderLogRepositoryTests : IDisposable
         DateTimeOffset? respondedAt = null) =>
         new(Guid.CreateVersion7(), goalId, firedAt, response, respondedAt);
 
+    [Theory]
+    [InlineData("id = 'não é um guid'")]
+    [InlineData("fired_at = '2026-11-02T12:30:00 lixo'")]
+    [InlineData("responded_at = 'agora'")]
+    [InlineData("response = 'later'")]
+    public async Task List_skips_invalid_row_in_any_position_and_keeps_the_others(string assignment)
+    {
+        foreach (var position in Enumerable.Range(0, 3))
+        {
+            _db.Anchor.Execute("DELETE FROM reminder_log");
+            var entries = Enumerable.Range(0, 3).Select(i => Entry(_goal, T0.AddHours(i))).ToList();
+            foreach (var entry in entries)
+                await Repo.AddAsync(entry);
+            var bad = entries[position];
+            _db.Anchor.Execute($"UPDATE reminder_log SET {assignment} WHERE id = @Id", new { Id = bad.Id.ToString("D") });
+            using var trace = new TraceCapture();
+
+            var listed = await Repo.ListAsync(T0.AddDays(-1), T0.AddDays(1));
+
+            listed.Select(e => e.Id).Should().Equal(entries.Where(e => e != bad).Select(e => e.Id));
+            trace.Messages.Should().Contain(m => m.Contains("reminder_log"));
+        }
+    }
+
+    [Theory]
+    [InlineData("id = 'não é um guid'")]
+    [InlineData("fired_at = 'agora'")]
+    [InlineData("responded_at = 'agora'")]
+    public async Task List_pending_skips_invalid_row_and_keeps_the_others(string assignment)
+    {
+        var bad = Entry(_goal, T0);
+        var good = Entry(_goal, T0.AddHours(1));
+        await Repo.AddAsync(bad);
+        await Repo.AddAsync(good);
+        _db.Anchor.Execute($"UPDATE reminder_log SET {assignment} WHERE id = @Id", new { Id = bad.Id.ToString("D") });
+
+        var pending = await Repo.ListPendingAsync();
+
+        pending.Should().ContainSingle().Which.Id.Should().Be(good.Id);
+    }
+
     [Fact]
     public async Task Add_then_get_round_trips_utc_instants()
     {

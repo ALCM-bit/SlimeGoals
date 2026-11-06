@@ -6,12 +6,13 @@ using SlimeGoals.Core.Validation;
 namespace SlimeGoals.Core.Services;
 
 /// <summary>
-/// Casos de uso de metas: criar, editar, arquivar e excluir (logicamente).
+/// Casos de uso de metas: criar, editar, arquivar e excluir (de vez, com tudo ligado à meta).
 /// O relógio vem de <see cref="TimeProvider"/> para os testes controlarem o tempo.
 /// Registros entram para travar a medida; o cronômetro, para ser limpo quando a meta sai de cena.
+/// Os lembretes entram na exclusão, para as notificações pendentes saírem junto; sem eles, só o banco é limpo.
 /// </summary>
 public sealed class GoalService(IGoalRepository goals, ICheckinRepository checkins, ITimerRepository timers, TimeProvider time,
-    DataChangeNotifier? changes = null)
+    DataChangeNotifier? changes = null, ReminderService? reminders = null)
 {
     public async Task<Goal> CreateAsync(GoalDraft draft, CancellationToken ct = default)
     {
@@ -107,12 +108,11 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
         return expired.Count;
     }
 
+    /// <summary>Apaga a meta com seus registros, lembretes e cronômetro. Não há como desfazer.</summary>
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var goal = await GetExistingAsync(id, ct);
-        var now = time.GetUtcNow();
-        await goals.UpdateAsync(goal with { DeletedAt = now, UpdatedAt = now }, ct);
-        await ClearTimerOfAsync(id, ct);
+        await GetExistingAsync(id, ct);
+        await (reminders?.DeleteGoalAsync(id, ct) ?? goals.DeleteAsync(id, ct));
         changes?.NotifyChanged();
     }
 

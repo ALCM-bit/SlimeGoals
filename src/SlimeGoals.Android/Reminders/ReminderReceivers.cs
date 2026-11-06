@@ -14,19 +14,23 @@ internal static class ReceiverWork
 
     /// <summary>
     /// Roda <paramref name="work"/> fora da thread principal com <c>GoAsync()</c>; falha ou estouro do prazo
-    /// vão para o Trace, e o <c>Finish()</c> é sempre chamado.
+    /// vão para o Trace, e o <c>Finish()</c> é sempre chamado. Se o banco não abriu, termina sem fazer nada.
     /// </summary>
     public static void Run(BroadcastReceiver receiver, Context context, Func<IServiceProvider, Task> work)
     {
-        var pending = receiver.GoAsync();
         var name = receiver.GetType().Name;
+        // O AndroidApplication.OnCreate roda antes de qualquer receiver: nulo aqui é banco que não abriu.
+        if (AndroidApplication.Services is not { } services)
+        {
+            Trace.TraceWarning($"Receiver {name} ignorado: o banco não abriu.");
+            return;
+        }
+
+        var pending = receiver.GoAsync();
         _ = Task.Run(async () =>
         {
             try
             {
-                // O AndroidApplication.OnCreate monta o container antes de qualquer receiver.
-                var services = AndroidApplication.Services
-                    ?? throw new InvalidOperationException("Container do processo ainda não montado.");
                 await work(services).WaitAsync(Timeout).ConfigureAwait(false);
             }
             catch (Exception e)

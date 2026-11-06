@@ -11,6 +11,9 @@ public sealed class InMemoryReminderLogRepository : IReminderLogRepository
     /// <summary>Todas as entradas, na ordem de gravação.</summary>
     public IReadOnlyList<ReminderLogEntry> All => _entries;
 
+    /// <summary>Apaga os disparos da meta (a exclusão da meta).</summary>
+    public void RemoveOf(Guid goalId) => _entries.RemoveAll(e => e.GoalId == goalId);
+
     public Task AddAsync(ReminderLogEntry entry, CancellationToken ct = default)
     {
         _entries.Add(entry);

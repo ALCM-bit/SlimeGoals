@@ -61,6 +61,7 @@ public class SystemAlarmReminderSchedulerTests : IDisposable
     {
         public Task AddAsync(Goal goal, CancellationToken ct = default) => throw new InvalidOperationException("falha");
         public Task UpdateAsync(Goal goal, CancellationToken ct = default) => throw new InvalidOperationException("falha");
+        public Task DeleteAsync(Guid id, CancellationToken ct = default) => throw new InvalidOperationException("falha");
         public Task<Goal?> GetAsync(Guid id, CancellationToken ct = default) => throw new InvalidOperationException("falha");
         public Task<IReadOnlyList<Goal>> ListAsync(bool includeArchived, CancellationToken ct = default) =>
             throw new InvalidOperationException("falha");

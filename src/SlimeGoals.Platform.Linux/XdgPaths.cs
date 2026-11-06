@@ -28,13 +28,18 @@ public static class XdgPaths
 
     /// <summary>
     /// Pasta de arquivos de execução (trava e socket da instância única):
-    /// <c>$XDG_RUNTIME_DIR</c>, ou <c>{tempPath}/slimegoals-{userName}</c> se ele faltar ou estiver vazio.
+    /// <c>$XDG_RUNTIME_DIR</c>, ou a pasta de cache do usuário se ele faltar ou estiver vazio.
+    /// Nunca uma pasta em <c>/tmp</c>: outro usuário da máquina poderia criá-la antes e controlar a trava.
     /// </summary>
-    public static string RuntimeDirectory(Func<string, string?> getEnv, string userName, string tempPath)
+    public static string RuntimeDirectory(Func<string, string?> getEnv, string home)
     {
         var runtimeDir = getEnv("XDG_RUNTIME_DIR");
-        return string.IsNullOrWhiteSpace(runtimeDir)
-            ? Path.Combine(tempPath, $"slimegoals-{userName}")
-            : runtimeDir;
+        if (!string.IsNullOrWhiteSpace(runtimeDir))
+            return runtimeDir;
+
+        var cacheHome = getEnv("XDG_CACHE_HOME");
+        if (string.IsNullOrWhiteSpace(cacheHome))
+            cacheHome = Path.Combine(home, ".cache");
+        return Path.Combine(cacheHome, AppFolder);
     }
 }

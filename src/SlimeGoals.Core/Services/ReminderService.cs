@@ -15,8 +15,45 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
     IReminderLogRepository log, INotificationService notifications, IReminderFormatter formatter, TimeProvider time,
     ReminderPause? pause = null, AppSettings? settings = null)
 {
+    // Disparo e exclusão não se cruzam: um disparo em andamento já gravou o log, mas ainda não mostrou a notificação.
+    private readonly SemaphoreSlim _gate = new(1, 1);
+
     /// <summary>Retira pendentes que não valem mais, dispara os devidos (Next ≤ agora) e devolve o próximo disparo.</summary>
     public async Task<DateTimeOffset?> SyncAsync(CancellationToken ct = default)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return await SyncLockedAsync(ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Apaga a meta e retira da central as notificações pendentes dela. A ordem importa: só o log sabe quais são,
+    /// então elas são lidas antes de apagar; e só saem da central depois que o banco aceitou, senão uma falha
+    /// deixaria a meta viva sem o lembrete. Depois disso o log não existe mais, e o <see cref="SyncAsync"/> não as acharia.
+    /// </summary>
+    public async Task DeleteGoalAsync(Guid goalId, CancellationToken ct = default)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var pending = (await log.ListPendingAsync(ct).ConfigureAwait(false)).Where(e => e.GoalId == goalId).ToList();
+            await goals.DeleteAsync(goalId, ct).ConfigureAwait(false);
+            foreach (var entry in pending)
+                await WithdrawAsync(entry.Id, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task<DateTimeOffset?> SyncLockedAsync(CancellationToken ct)
     {
         var now = time.GetUtcNow();
         var snapshot = await LoadAsync(now, ct);
@@ -37,7 +74,7 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
         foreach (var entry in pending)
         {
             var goal = snapshot.Goals.FirstOrDefault(g => g.Id == entry.GoalId)
-                       ?? await goals.GetAsync(entry.GoalId, ct);
+                       ?? await goals.GetIfReadableAsync(entry.GoalId, ct);
             // Disparado antes de hoje (dia local): não vale mais depois da meia-noite.
             var stale = goal is null || goal.ArchivedAt is not null
                         || entry.FiredAt < snapshot.TodayStart
@@ -104,13 +141,18 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
     private async Task IgnoreAsync(ReminderLogEntry entry, DateTimeOffset now, CancellationToken ct)
     {
         await log.RespondAsync(entry.Id, ReminderResponse.Ignore, now, ct);
+        await WithdrawAsync(entry.Id, ct);
+    }
+
+    private async Task WithdrawAsync(Guid logId, CancellationToken ct)
+    {
         try
         {
-            await notifications.WithdrawAsync(entry.Id, ct);
+            await notifications.WithdrawAsync(logId, ct);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
-            Trace.TraceError($"Falha ao retirar o lembrete {entry.Id}: {e}");
+            Trace.TraceError($"Falha ao retirar o lembrete {logId}: {e}");
         }
     }
 

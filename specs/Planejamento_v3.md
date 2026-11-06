@@ -211,7 +211,7 @@ CREATE TABLE goals (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   archived_at TEXT,
-  deleted_at TEXT,                    -- exclusão lógica
+  deleted_at TEXT,                    -- sem uso desde a 004: excluir apaga a linha; a coluna fica para não recriar a tabela
   measure TEXT NOT NULL DEFAULT 'quantity', -- 'completion' | 'quantity' | 'duration' (v1.4)
   unit TEXT,                          -- só 'quantity': unidade livre, até 20 caracteres
   CHECK (recurrence IN ('daily','weekly')),
@@ -220,9 +220,9 @@ CREATE TABLE goals (
   CHECK (measure <> 'completion' OR target = 1),
   CHECK ((measure = 'quantity') = (unit IS NOT NULL))
 );
--- Esquema alvo após 001_init + 002_remove_once + 003_measures. A 002 recriou goals sem 'once' e sem
--- completed_at; a 003 adiciona measure/unit (metas existentes viram 'quantity' com unidade 'vezes')
--- e a tabela active_timer.
+-- Esquema alvo após 001_init + 002_remove_once + 003_measures + 004_purge_deleted. A 002 recriou goals
+-- sem 'once' e sem completed_at; a 003 adiciona measure/unit (metas existentes viram 'quantity' com
+-- unidade 'vezes') e a tabela active_timer; a 004 só apaga dados (seção 15, exclusão definitiva).
 
 CREATE TABLE checkins (
   id TEXT PRIMARY KEY,                -- GUID
@@ -231,7 +231,7 @@ CREATE TABLE checkins (
   amount INTEGER NOT NULL DEFAULT 1,  -- com sinal, na unidade base da medida (seção 5.2); <> 0
   note TEXT,
   updated_at TEXT NOT NULL,
-  deleted_at TEXT
+  deleted_at TEXT                     -- sem uso desde a 004, como em goals
 );
 
 CREATE TABLE reminder_log (
@@ -256,7 +256,9 @@ CREATE INDEX idx_reminder_log_goal ON reminder_log(goal_id, fired_at);
 
 Guarde **instantes** (`done_at`, `fired_at`, `created_at`…) em UTC e converta para o fuso local na camada de apresentação e no cálculo de período. `start_date` e `end_date` são **datas de calendário locais**, não instantes: gravá-las em UTC deslocaria o dia em alguns fusos. Para consultar check-ins de um período, o Core converte `[início, fim)` local para UTC (via `GoalPeriod`) e o repositório filtra `done_at` nesse intervalo.
 
-**Persistência e usuários (decisão do MVP):** sem login e sem sincronização. Os dados ficam em um arquivo SQLite na pasta do usuário do sistema operacional, que já isola um usuário do outro. Para não precisar refatorar se a sincronização vier depois, o modelo já usa GUIDs, `updated_at` e exclusão lógica (`deleted_at`); todas as consultas e relatórios devem ignorar registros com `deleted_at` preenchido.
+**Persistência e usuários (decisão do MVP):** sem login e sem sincronização. Os dados ficam em um arquivo SQLite na pasta do usuário do sistema operacional, que já isola um usuário do outro. Para não precisar refatorar se a sincronização vier depois, o modelo já usa GUIDs e `updated_at`.
+
+**Exclusão (decisão de 06/11/2026):** excluir uma meta apaga de vez, numa única transação, a linha em `goals` e tudo ligado a ela (`checkins`, `reminder_log`, `active_timer`), e o histórico dela some dos relatórios. Não há como desfazer. Toda conexão liga `PRAGMA secure_delete = ON`, para o conteúdo apagado não ficar legível no arquivo. As colunas `deleted_at` continuam no esquema, sem uso, e as consultas seguem ignorando as linhas com elas preenchidas. Se a sincronização vier, ela precisará de outro jeito de propagar exclusões (por exemplo, uma tabela só com os ids apagados).
 
 No Linux, o arquivo fica em `$XDG_DATA_HOME` (padrão `~/.local/share/SlimeGoals`); no Android, no armazenamento privado do app.
 
@@ -267,7 +269,7 @@ No Linux, o arquivo fica em `$XDG_DATA_HOME` (padrão `~/.local/share/SlimeGoals
 3.  O estado do adiamento é reconstruído a partir do `reminder_log` (último disparo + resposta), para sobreviver a reinício.
 4.  O scheduler mantém **um único disparo** apontado para o mais próximo entre todas as metas e reagenda ao criar/editar meta, registrar check-in, responder lembrete ou retomar do repouso. **Linux:** timer do processo, que também acorda à meia-noite local para avisar o `DataChangeNotifier`; a tela Hoje recarrega na virada do dia e depois de cada disparo, mantendo "Próximos lembretes" em dia. **Android:** `SystemAlarmReminderScheduler` arma um único alarme do sistema (`AlarmManager`) no próximo lembrete e o cancela se não houver nenhum; **sem alarme à meia-noite** (a tela Hoje recarrega ao voltar ao app). Receivers reagendam depois de boot, atualização do app, mudança de hora ou fuso e mudança da permissão de alarme exato. Se a sincronização falhar, arma nova tentativa em 15 min e registra em `Trace`.
 5.  Ao disparar: grava em `reminder_log` e chama `INotificationService.Show`. A resposta chega depois e é tratada pelo `ReminderResponseHandler`. Notificações não bloqueiam o código, por isso o modelo é baseado em evento (Linux) ou receiver (Android).
-6.  Notificação sem resposta conta como ignorada ao expirar e é retirada da central quando: dispara o próximo lembrete da mesma meta; a meta deixa de precisar de lembrete (cumprida, arquivada, excluída, cronômetro iniciado, fora da janela); o app encerra; ou o app abre e encontra registros pendentes de uma execução anterior. **Android:** pendentes **não expiram ao abrir o app** (a notificação segue na gaveta com ações que funcionam, pois o Android recria o processo para o receiver); valem as demais regras, e arrastar a notificação conta como ignorada. O prazo é controlado pelo app: o GNOME ignora `expire_timeout` e mantém a notificação na central (confirmado no spike, `specs/spikes/gnome-notificacoes.md`). Fechar a notificação no X (`NotificationClosed`, motivo 2, sem `ActionInvoked` antes) também conta como ignorada. Notificações deixadas por uma execução que caiu ficam na central do GNOME com ações que não funcionam (o mapa de ids do D-Bus estava na memória); a próxima abertura as marca como ignoradas.
+6.  Notificação sem resposta conta como ignorada ao expirar e é retirada da central quando: dispara o próximo lembrete da mesma meta; a meta deixa de precisar de lembrete (cumprida, arquivada, cronômetro iniciado, fora da janela); a meta é excluída (nesse caso a exclusão retira a notificação e apaga o log: não sobra resposta gravada); o app encerra; ou o app abre e encontra registros pendentes de uma execução anterior. **Android:** pendentes **não expiram ao abrir o app** (a notificação segue na gaveta com ações que funcionam, pois o Android recria o processo para o receiver); valem as demais regras, e arrastar a notificação conta como ignorada. O prazo é controlado pelo app: o GNOME ignora `expire_timeout` e mantém a notificação na central (confirmado no spike, `specs/spikes/gnome-notificacoes.md`). Fechar a notificação no X (`NotificationClosed`, motivo 2, sem `ActionInvoked` antes) também conta como ignorada. Notificações deixadas por uma execução que caiu ficam na central do GNOME com ações que não funcionam (o mapa de ids do D-Bus estava na memória); a próxima abertura as marca como ignoradas.
 7.  **Entrega das ações no Linux:** o GNOME envia `ActionInvoked` apenas para a conexão D-Bus que criou a notificação; com o processo encerrado, o clique é perdido sem aviso. Por isso o adaptador mantém uma única conexão de vida longa e, ao encerrar o app, retira as notificações pendentes (`CloseNotification`). A ativação via D-Bus (`org.gtk.Notifications` ou portal) é avaliada na Fase 4c.
 8.  **Linux (GNOME):** o app continua em segundo plano com a janela fechada; fechar oculta por padrão, e a configuração "Ao fechar a janela" (`window.close_action`: `hide` ou `quit`) permite encerrar o app, o que equivale a "Sair"; sair por "Sair" na barra lateral, `Ctrl+Q` ou bandeja. "Iniciar com o sistema" grava `~/.config/autostart/slimegoals.desktop` com `--background`: o app abre sem janela e segue com lembretes e bandeja; uma segunda instância iniciada com `--background` sai sem mostrar a janela. Instância única por banco de dados (trava + socket Unix em `XDG_RUNTIME_DIR`): a segunda execução mostra a janela existente (no Wayland, o GNOME pode exibir "está pronto" em vez de trazê-la). Lembretes podem ser pausados e retomados (pausa persistida; ao retomar o intervalo recomeça, sem rajada). O GNOME não exibe ícone de bandeja por padrão, então a bandeja é opcional (extensão AppIndicator). Sem ela, o app é reaberto pelo atalho do aplicativo (instância única) ou pela notificação. No Wayland, clicar na notificação e chamar `Show()` + `Activate()` trouxe a janela à frente (spike); o GNOME também envia `ActivationToken` (xdg-activation), disponível se for preciso.
 9.  **Android:** exige permissão de notificações (Android 13+) e de alarme exato (Android 12+); no Android 16 as duas vêm **negadas** num app recém-instalado e são pedidas num fluxo de primeira execução (`ACTION_REQUEST_SCHEDULE_EXACT_ALARM` abre direto a página do app). `SetExactAndAllowWhileIdle` dispara no horário mesmo com o processo morto e em Doze profundo; o Android cria o processo só para o receiver, e a ação da notificação chega a um `BroadcastReceiver` sem UI (confirmado no spike, `specs/spikes/android-alarme.md`). Desligar a permissão de alarme exato cancela os alarmes: reagendar quando ela voltar e avisar na tela Hoje se faltar alguma permissão. **Fase 7b:** o aviso na tela Hoje, com "Permitir", é o fluxo de primeira execução (aparece já na primeira abertura, sem tela de boas-vindas); "Permitir" pede notificações e depois alarmes exatos, e Configurações mostra o estado das duas. Sem a permissão de alarme exato, os lembretes seguem **inexatos** (`SetAndAllowWhileIdle`, que o sistema pode atrasar alguns minutos); quando ela volta, o sistema envia `ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED` e o app reagenda exato. Notificação: canal `lembretes`, uma por disparo (tag = id do registro), botões da ação principal, "Adiar" e "Ignorar"; tocar no corpo abre o app sem registrar resposta. "Iniciar" com outro cronômetro rodando troca o texto por "Outro cronômetro está rodando. Toque para abrir o app." (o Android 12+ não deixa o receiver abrir uma tela), e o registro segue pendente. **Fase 7c:** Configurações ganha a linha "Bateria" ("Sem restrição" ou "Otimizada", com o botão "Liberar" que abre o diálogo do sistema, `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, pedindo a permissão `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, aceitável fora da Play Store); ela só aparece no Android e não entra no aviso do Hoje. Medido no emulador: o Android considera permitido o alarme exato de um app isento de otimização de bateria, então "Liberar" também faz "Alarmes exatos" aparecer como permitido, e remover a isenção traz o bloqueio de volta.
@@ -276,7 +278,7 @@ No Linux, o arquivo fica em `$XDG_DATA_HOME` (padrão `~/.local/share/SlimeGoals
 
 ## 10. Relatórios
 
-Sem tabela própria e sem query nova nos repositórios. Cada relatório faz uma leitura de registros do período (`deleted_at` ignorado pelos repositórios), agrupa por dia local no Core (`DailySums`) e calcula o resto em `GoalHistory`, `Streaks` e `ReportService` (`GetWeekAsync`, `GetMonthAsync`, `MonthRange`, `GetTopStreakAsync`). Limites locais convertidos para UTC com `DateRange.ToUtc`; semana sempre de segunda a domingo; metas arquivadas entram quando estavam ativas no período (RF09).
+Sem tabela própria e sem query nova nos repositórios. Cada relatório faz uma leitura de registros do período (linhas com `deleted_at` ignoradas pelos repositórios), agrupa por dia local no Core (`DailySums`) e calcula o resto em `GoalHistory`, `Streaks` e `ReportService` (`GetWeekAsync`, `GetMonthAsync`, `MonthRange`, `GetTopStreakAsync`). Limites locais convertidos para UTC com `DateRange.ToUtc`; semana sempre de segunda a domingo; metas arquivadas entram quando estavam ativas no período (RF09).
 
 **Semanal:**
 
@@ -366,7 +368,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 ## 13. Estratégia de testes
 
 - **Core (unitários):** `GoalPeriod` (dois tipos, recorte por início/fim, virada de semana, horário de verão), `ReminderPlanner`, progresso, `GoalHistory` (períodos contados), `Streaks`, `ReportService`. Use `FakeTimeProvider` e fuso explícito nos testes.
-- **Infrastructure (integração):** SQLite em memória (`Data Source=:memory:`) para repositórios e migrações, incluindo as restrições `CHECK`, e um teste dos relatórios com meta arquivada e registro excluído.
+- **Infrastructure (integração):** SQLite em memória (`Data Source=:memory:`) para repositórios e migrações, incluindo as restrições `CHECK`, um teste dos relatórios com meta arquivada e registro excluído e, em arquivo, testes de que o conteúdo apagado não fica legível nos bytes do banco.
 - **UI:** testes de ViewModel (sem renderizar; inclui `ReportsPageViewModel`); validação visual manual contra os protótipos.
 
 ## 14. Riscos e decisões em aberto
@@ -436,13 +438,13 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 
 - Adiar = 10 min fixos (`ReminderService.SnoozeMinutes`); a configuração veio na Fase 6.
 - Lembrete atrasado dispara uma vez na hora, e o intervalo recomeça desse disparo.
-- Notificação sem resposta vira "ignorada" e é retirada da central: no próximo disparo da meta, quando a meta não precisa mais de lembrete, quando a meta é excluída, ao encerrar o app ou ao abrir com pendentes de execução anterior.
+- Notificação sem resposta vira "ignorada" e é retirada da central: no próximo disparo da meta, quando a meta não precisa mais de lembrete, quando a meta é excluída (desde 06/11/2026 a exclusão retira a notificação e apaga o log junto), ao encerrar o app ou ao abrir com pendentes de execução anterior.
 - Cronômetro parado aguardando registro também suspende os lembretes da meta.
 - Sem fallback em janela: se o D-Bus falhar, o app segue sem notificações, registra em `Trace` e tenta conectar de novo só no próximo lembrete (uma vez por disparo), sem laço (fallback na Fase 6, se preciso; não foi feito na Fase 6).
 - Fechar a janela continua encerrando o app até a 4d; o critério "janela fechada" da 4c passou para a 4d.
 - Virada do dia: o agendador acorda à meia-noite local e avisa o `DataChangeNotifier`; a tela Hoje recarrega (resolve a pendência da Fase 3).
 - `IReminderScheduler`/`INotificationService` ficaram assíncronos (`Task`); `Pause`/`Resume`: ver Decisões da Fase 4d (ficaram no Core, em `ReminderPause`).
-- Pendente de meta excluída ou inexistente é tratado como ignorado e retirado da central.
+- Pendente de meta excluída ou inexistente é tratado como ignorado e retirado da central. Desde 06/11/2026 a exclusão apaga o log: quem retira é a própria exclusão, e uma ação numa notificação que tenha sobrado encontra o log vazio e não faz nada (ver Exclusão definitiva, no fim desta seção).
 - **Iniciar** numa meta de tempo com cronômetro de outra meta rodando abre o app e não altera o cronômetro; cronômetro órfão (meta arquivada/inexistente) não conta como conflito.
 - O tratador de respostas é serializado, para que ações simultâneas no mesmo lembrete não registrem duas vezes.
 - O agendador avisa `Changed` depois de todo disparo, para "Próximos lembretes" não ficar desatualizado.
@@ -502,7 +504,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 2. Layout adaptativo por largura, não por plataforma: abaixo de 720 px o `ShellView` usa `compact`; o mínimo de 900 px da janela do desktop continua.
 3. Navegação inferior com os quatro itens e ícones do Lucide (sun, list-checks, chart-column, sliders-horizontal); o item ativo usa `Selected` e `PrimarySoft`.
 4. Voltar: `ShellViewModel.GoBack()` fecha o editor, senão volta para Hoje, senão devolve falso (o sistema decide); no desktop ninguém o chama.
-5. Dados no Android em `<FilesDir>/slimegoals.db` (armazenamento privado), com migrações ao abrir; desinstalar apaga os dados.
+5. Dados no Android em `<FilesDir>/slimegoals.db` (armazenamento privado), com migrações ao abrir; desinstalar apaga os dados. Fora do backup do Android e da transferência entre aparelhos (`allowBackup=false` e `data_extraction_rules.xml`): trocar de celular não leva as metas.
 6. Lembretes na 7a: `NoopNotificationService` só para satisfazer o `ReminderService`; sem `ReminderHost` nem agendador; a 7b usa o `AlarmManager`.
 7. Identidade: `dev.alcm.slimegoals`, rótulo "SlimeGoals", API mínima 26, APK Debug, ícone do slime em `mipmap-*`, tema escuro com barras em `#0F0D15`, orientação livre sem recriar a Activity, `AdjustResize` para o teclado.
 8. O head Android fica fora de `SlimeGoals.slnx` e entra em `SlimeGoals.Android.slnx` (Core, Infrastructure, App e Android).
@@ -550,3 +552,20 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 9. Bateria: linha em Configurações, descrita na §9.9; fora do aviso do Hoje.
 10. Samsung: os ajustes manuais (Bateria → "Sem restrições"; fora de "Apps em suspensão" e "Apps em suspensão profunda") ficam no README e na verificação manual.
 11. Conferido pelo autor num celular real em 06/11/2026, com um APK assinado por chave descartável: instalação, permissão de notificação, lembrete e recuperação depois de religar o aparelho. Pendente: lembretes com a tela bloqueada por 1 h ou mais, teclado e consumo de bateria do slime.
+
+**Exclusão definitiva (06/11/2026):**
+
+1. "Excluir" apaga a meta e tudo ligado a ela numa transação (`IGoalRepository.DeleteAsync`), a pedido do autor, sabendo que o histórico some dos relatórios. Regra na seção 8; a confirmação avisa: "Excluir esta meta? Os registros dela também serão apagados."
+2. `PRAGMA secure_delete = ON` em toda conexão (`SqliteConnectionFactory`).
+3. A migração `004` apaga as metas com `deleted_at` e tudo ligado a elas, além dos registros com `deleted_at` (o app nunca os gravou). As colunas ficam no esquema, para não recriar tabelas; remover as colunas e `Goal.DeletedAt`/`Checkin.DeletedAt` fica para quando uma migração já precisar recriá-las.
+4. Depois da `004`, o `MigrationRunner` roda `VACUUM`, fora da transação e uma vez só: as cópias velhas de linhas e as páginas livres deixadas pelas versões anteriores (inclusive a recriação de `goals` na 002 e na 003) não são alcançadas pelo `secure_delete`. Se o `VACUUM` falhar, o app abre assim mesmo, registra em `Trace` e não tenta de novo.
+5. Lembretes: `ReminderService.DeleteGoalAsync` lê os pendentes da meta, apaga e só então retira as notificações. Só o log sabe quais são, e, se o banco recusar, a meta fica com o lembrete. Ele usa a mesma trava do `SyncAsync`, para a exclusão não cruzar um disparo que já gravou o log e ainda não mostrou a notificação.
+6. Sobrou uma notificação (processo morto depois do `COMMIT`, falha ao retirar): qualquer ação dá `Stale`; no Android o receiver a retira, e no Linux o próprio servidor a fecha ao acionar. A meta sumir no meio de uma ação vira `GoalNotFoundException` nos repositórios (violação de chave estrangeira em `checkins` e `active_timer`), que o tratador já entende.
+7. O alcance é o arquivo do banco: cópias feitas pelo usuário, *snapshots* do sistema de arquivos e o que o disco retém do diário de transações apagado ficam fora.
+
+**Decisões do banco corrompido (06/11/2026):**
+
+1. Banco que não abre ou não migra (inclusive mais novo que o app) mostra uma tela de erro com o caminho do arquivo e "Fechar", nos dois heads; no Linux, mesmo com `--background`. O app só avisa: nunca apaga, sobrescreve nem conserta o arquivo. Não há `integrity_check` na abertura: dano que não atinge o cabeçalho aparece nas leituras, como erro das telas.
+2. No Android, o `OnCreate` não relança: `Services` fica nulo, a `MainActivity` mostra a tela de erro, e os receivers terminam sem fazer nada. Sem receiver, os alarmes não são rearmados até o banco abrir de novo.
+3. Listas pulam a linha inválida e a registram no Trace (`RowReader`, que converte linha a linha, porque o Dapper falharia a lista inteira por tipo errado numa coluna); leitura por id continua lançando `FormatException`. Quem chega à meta por referência usa `GetIfReadableAsync` e a trata como inexistente: lembrete pendente dela vira "ignorado", e o cronômetro dela vira órfão no Hoje. Iniciar outro cronômetro com o dela rodando continua falhando, para não descartar o registro em andamento.
+4. Pular linha não quebra os relatórios: as médias já tratam lista vazia, e os registros de uma meta pulada ficam de fora porque tudo é somado por meta. Os números ficam sem a contribuição da linha: uma meta pulada sai da média, e um registro pulado reduz a soma (ou a aumenta, se for um ajuste negativo). `SumAsync`, em SQL, ainda conta a linha cujo `amount` é válido, então pode divergir do Hoje e dos relatórios nesse caso.

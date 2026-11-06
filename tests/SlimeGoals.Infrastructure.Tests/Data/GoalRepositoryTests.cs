@@ -28,6 +28,85 @@ public class GoalRepositoryTests : IDisposable
         await act.Should().ThrowAsync<FormatException>();
     }
 
+    private void Corrupt(Goal goal, string assignment) =>
+        _db.Anchor.Execute($"UPDATE goals SET {assignment} WHERE id = @Id", new { Id = goal.Id.ToString("D") });
+
+    [Theory]
+    [InlineData("color = 'azul'")]
+    [InlineData("color = x'00ff'")]
+    [InlineData("active_from = 'cedo'")]
+    [InlineData("active_days = '9'")]
+    [InlineData("start_date = 'ontem'")]
+    [InlineData("updated_at = 'agora'")]
+    [InlineData("archived_at = 'antes'")]
+    [InlineData("target = 'muitos'")]
+    [InlineData("target = 99999999999")]
+    [InlineData("id = 'não é um guid'")]
+    public async Task List_skips_invalid_row_in_any_position_and_keeps_the_others(string assignment)
+    {
+        var t0 = new DateTimeOffset(2026, 11, 2, 9, 0, 0, TimeSpan.Zero);
+
+        // A posição importa: o leitor de colunas nasce da primeira linha do resultado.
+        foreach (var position in Enumerable.Range(0, 3))
+        {
+            _db.Anchor.Execute("DELETE FROM goals");
+            var goals = Enumerable.Range(0, 3).Select(i => NewGoal($"Meta {i}", t0.AddMinutes(i))).ToList();
+            foreach (var goal in goals)
+                await Repo.AddAsync(goal);
+            var bad = goals[position];
+            Corrupt(bad, assignment);
+
+            var listed = await Repo.ListAsync(includeArchived: true);
+
+            listed.Select(g => g.Id).Should().Equal(goals.Where(g => g != bad).Select(g => g.Id));
+        }
+    }
+
+    [Fact]
+    public async Task List_with_only_invalid_rows_is_empty()
+    {
+        var goal = NewGoal();
+        await Repo.AddAsync(goal);
+        Corrupt(goal, "color = 'azul'");
+
+        (await Repo.ListAsync(includeArchived: true)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task List_records_the_skipped_row_in_trace()
+    {
+        var goal = NewGoal();
+        await Repo.AddAsync(goal);
+        Corrupt(goal, "color = 'azul'");
+        using var trace = new TraceCapture();
+
+        await Repo.ListAsync(includeArchived: true);
+
+        trace.Messages.Should().Contain(m => m.Contains(goal.Id.ToString("D")) && m.Contains("goals"));
+    }
+
+    [Fact]
+    public async Task List_does_not_hide_database_failure()
+    {
+        _db.Anchor.Execute("DROP TABLE reminder_log; DROP TABLE checkins; DROP TABLE active_timer; DROP TABLE goals;");
+
+        var act = () => Repo.ListAsync(includeArchived: true);
+
+        await act.Should().ThrowAsync<SqliteException>();
+    }
+
+    [Fact]
+    public async Task Get_of_row_with_wrong_column_type_throws_format_exception()
+    {
+        var goal = NewGoal();
+        await Repo.AddAsync(goal);
+        Corrupt(goal, "target = 'muitos'");
+
+        var act = () => Repo.GetAsync(goal.Id);
+
+        await act.Should().ThrowAsync<FormatException>();
+    }
+
     private static Goal NewGoal(string title = "Ler 📚 ação", DateTimeOffset? createdAt = null) => new()
     {
         Id = Guid.CreateVersion7(),
@@ -149,8 +228,8 @@ public class GoalRepositoryTests : IDisposable
             var reopened = new SqliteConnectionFactory($"Data Source={path}");
             using (var c = reopened.Open())
             {
-                MigrationRunner.Migrate(c).Should().Be(3);
-                c.ExecuteScalar<long>("PRAGMA user_version").Should().Be(3);
+                MigrationRunner.Migrate(c).Should().Be(4);
+                c.ExecuteScalar<long>("PRAGMA user_version").Should().Be(4);
             }
             (await new GoalRepository(reopened).GetAsync(goal.Id)).Should().Be(goal);
         }
