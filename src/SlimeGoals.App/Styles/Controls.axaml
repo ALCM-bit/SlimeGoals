@@ -148,6 +148,9 @@
     <Setter Property="TextWrapping" Value="Wrap" />
     <Setter Property="MaxWidth" Value="240" />
   </Style>
+  <Style Selector="StackPanel.delete-actions">
+    <Setter Property="Orientation" Value="Horizontal" />
+  </Style>
 
   <!-- Botões: primário (ação principal), fantasma (secundária), perigo (excluir) -->
   <Style Selector="Button.primary, Button.ghost, Button.danger, Button.danger-solid">
@@ -641,9 +644,13 @@
     <Setter Property="MinWidth" Value="40" />
   </Style>
   <Style Selector=".compact StackPanel.delete-actions">
+    <Setter Property="Orientation" Value="Vertical" />
     <Setter Property="Grid.Row" Value="1" />
     <Setter Property="Grid.ColumnSpan" Value="2" />
     <Setter Property="Margin" Value="0,10,0,0" />
+  </Style>
+  <Style Selector=".compact TextBlock.delete-warning">
+    <Setter Property="HorizontalAlignment" Value="Left" />
   </Style>
   <Style Selector=".compact ContentControl.goal-actions.docked">
     <Setter Property="IsVisible" Value="False" />
