@@ -16,10 +16,16 @@ public sealed record PushAccepted(string RecordKey, long Seq);
 
 public sealed record PushResult(IReadOnlyList<PushAccepted> Accepted, IReadOnlyList<string> Conflicts);
 
-/// <summary>Registro já aberto, pronto para aplicar. Envelope nulo = excluído.</summary>
-public sealed record IncomingRecord(string RecordKey, long Seq, SyncEnvelope? Envelope);
+/// <summary>
+/// Registro já aberto, pronto para aplicar. Envelope nulo = excluído, salvo com <paramref name="Unreadable"/>:
+/// o registro existe no servidor, mas o blob não abriu, e a cópia local fica como está.
+/// </summary>
+public sealed record IncomingRecord(string RecordKey, long Seq, SyncEnvelope? Envelope, bool Unreadable = false);
 
 public sealed record OutboxItem(Guid RecordId, SyncRecordKind Kind, bool IsDelete, long BaseSeq, long Revision, string? Payload);
+
+/// <summary>Chave que o item da fila terá no servidor, guardada antes do envio.</summary>
+public sealed record OutboxKey(Guid RecordId, string RecordKey);
 
 public sealed record PushConfirmation(Guid RecordId, SyncRecordKind Kind, bool IsDelete, string RecordKey, long Seq, long Revision);
 

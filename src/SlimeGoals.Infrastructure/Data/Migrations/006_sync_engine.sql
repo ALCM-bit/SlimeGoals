@@ -9,4 +9,6 @@ ALTER TABLE sync_records ADD COLUMN record_key TEXT NOT NULL DEFAULT '';
 ALTER TABLE sync_records ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 1 CHECK (confirmed IN (0, 1));
 CREATE INDEX idx_sync_records_key ON sync_records(record_key);
 
+ALTER TABLE sync_outbox ADD COLUMN record_key TEXT;         -- guardada antes do envio: o aceite pode se perder
+
 ALTER TABLE sync_state ADD COLUMN full_resync INTEGER NOT NULL DEFAULT 0 CHECK (full_resync IN (0, 1));

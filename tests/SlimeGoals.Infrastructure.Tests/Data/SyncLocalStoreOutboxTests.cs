@@ -68,6 +68,19 @@ public class SyncLocalStoreOutboxTests : IDisposable
     }
 
     [Fact]
+    public async Task Remembering_keys_keeps_the_item_as_it_was()
+    {
+        var goal = NewGoal();
+        await Goals.AddAsync(goal);
+        var before = QueueRow(goal.Id);
+
+        await Store.RememberKeysAsync([new OutboxKey(goal.Id, "k1"), new OutboxKey(Guid.CreateVersion7(), "k2")]);
+
+        QueueRow(goal.Id).Should().Be(before);
+        _db.Anchor.Query<string>("SELECT record_key FROM sync_outbox").Should().Equal("k1");
+    }
+
+    [Fact]
     public async Task Delete_item_has_no_payload()
     {
         var id = Guid.CreateVersion7();

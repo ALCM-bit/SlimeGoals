@@ -80,6 +80,17 @@ public sealed class SyncLocalStore(SqliteConnectionFactory db) : ISyncLocalStore
         return new OutboxItem(id, kind, false, row.BaseSeq, row.Revision, payload);
     }
 
+    public async Task RememberKeysAsync(IReadOnlyList<OutboxKey> keys, CancellationToken ct = default)
+    {
+        await using var c = db.Open();
+        await using var tx = await c.BeginTransactionAsync(ct);
+        foreach (var key in keys)
+            await c.ExecuteAsync(new CommandDefinition(
+                "UPDATE sync_outbox SET record_key = @RecordKey WHERE record_id = @Id",
+                new { Id = SqlText.Id(key.RecordId), key.RecordKey }, tx, cancellationToken: ct));
+        await tx.CommitAsync(ct);
+    }
+
     public async Task ConfirmPushAsync(IReadOnlyList<PushConfirmation> confirmations, CancellationToken ct = default)
     {
         await using var c = db.Open();

@@ -29,5 +29,6 @@ public class Migration006Tests
         ((object?)row.Period).Should().BeNull();
         ((object?)row.Seen).Should().BeNull();
         c.ExecuteScalar<long>("SELECT full_resync FROM sync_state").Should().Be(0);
+        c.ExecuteScalar<long>("SELECT COUNT(*) FROM pragma_table_info('sync_outbox') WHERE name = 'record_key'").Should().Be(1);
     }
 }

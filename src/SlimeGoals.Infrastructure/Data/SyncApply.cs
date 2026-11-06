@@ -98,16 +98,23 @@ internal sealed class SyncApply
         var deleted = new List<Guid>();
         foreach (var record in records)
         {
-            if (record.Envelope is { Kind: SyncRecordKind.Goal } envelope)
+            if (record.Unreadable || record.Envelope is null)
             {
-                await ApplyGoalAsync(record, envelope, deviceId);
-            }
-            else if (record.Envelope is null && await FindAsync(record.RecordKey) is { Kind: SyncOutbox.Goal } known)
-            {
+                if (await FindAsync(record.RecordKey) is not { Kind: SyncOutbox.Goal } known)
+                    continue;
+                if (record.Unreadable)
+                {
+                    await KeepLocalCopyAsync(record, known);
+                    continue;
+                }
                 var goalId = Guid.ParseExact(known.RecordId, "D");
                 await RemoveGoalAsync(goalId);
                 await RunAsync("INSERT OR IGNORE INTO sync_tombstones (goal_id) VALUES (@Id)", new { Id = known.RecordId });
                 deleted.Add(goalId);
+            }
+            else if (record.Envelope.Kind == SyncRecordKind.Goal)
+            {
+                await ApplyGoalAsync(record, record.Envelope, deviceId);
             }
         }
         return deleted;
@@ -118,10 +125,19 @@ internal sealed class SyncApply
     {
         foreach (var record in records)
         {
-            if (record.Envelope is { Kind: SyncRecordKind.Checkin } envelope)
-                await ApplyCheckinAsync(record, envelope);
-            else if (record.Envelope is null && await FindAsync(record.RecordKey) is { Kind: SyncOutbox.Checkin } known)
-                await RemoveCheckinAsync(known.RecordId);
+            if (record.Unreadable || record.Envelope is null)
+            {
+                if (await FindAsync(record.RecordKey) is not { Kind: SyncOutbox.Checkin } known)
+                    continue;
+                if (record.Unreadable)
+                    await KeepLocalCopyAsync(record, known);
+                else
+                    await RemoveCheckinAsync(known.RecordId);
+            }
+            else if (record.Envelope.Kind == SyncRecordKind.Checkin)
+            {
+                await ApplyCheckinAsync(record, record.Envelope);
+            }
         }
     }
 
@@ -130,7 +146,7 @@ internal sealed class SyncApply
         var goal = Decode(envelope, SyncCodec.DecodeGoal, g => g.Id);
         if (goal is null)
         {
-            await KeepUnreadableAsync(envelope);
+            await KeepUnreadableAsync(record);
             return;
         }
         if (await IsTombstonedAsync(goal.Id))
@@ -149,13 +165,13 @@ internal sealed class SyncApply
         {
             if (!await UpsertGoalAsync(goal))
             {
-                await KeepUnreadableAsync(envelope);
+                await KeepUnreadableAsync(record);
                 return;
             }
             await RunAsync("DELETE FROM sync_outbox WHERE record_id = @Id AND op = 'upsert'", parameters);
         }
 
-        await MapAsync(record, envelope.RecordId, SyncOutbox.Goal);
+        await MapAsync(record, SqlText.Id(envelope.RecordId), SyncOutbox.Goal);
         await ApplyPendingAsync(goal.Id);
     }
 
@@ -164,7 +180,7 @@ internal sealed class SyncApply
         var checkin = Decode(envelope, SyncCodec.DecodeCheckin, r => r.Id);
         if (checkin is null)
         {
-            await KeepUnreadableAsync(envelope);
+            await KeepUnreadableAsync(record);
             return;
         }
         if (await IsTombstonedAsync(checkin.GoalId))
@@ -173,7 +189,7 @@ internal sealed class SyncApply
             return;
         }
 
-        await MapAsync(record, envelope.RecordId, SyncOutbox.Checkin);
+        await MapAsync(record, SqlText.Id(envelope.RecordId), SyncOutbox.Checkin);
         if (await GoalExistsAsync(checkin.GoalId))
             await InsertCheckinAsync(checkin);
         else
@@ -277,19 +293,28 @@ internal sealed class SyncApply
     /// <summary>A meta foi excluída aqui: o conteúdo não entra, e o servidor recebe a exclusão com a base que acabou de mostrar.</summary>
     private async Task DiscardAsync(IncomingRecord record, SyncEnvelope envelope, string kind)
     {
-        await MapAsync(record, envelope.RecordId, kind);
+        await MapAsync(record, SqlText.Id(envelope.RecordId), kind);
         await RunAsync("""
             INSERT INTO sync_outbox (record_id, kind, op, base_seq) VALUES (@Id, @Kind, 'delete', @Seq)
             ON CONFLICT (record_id) DO UPDATE SET op = 'delete', base_seq = excluded.base_seq, revision = revision + 1
             """, new { Id = SqlText.Id(envelope.RecordId), Kind = kind, record.Seq });
     }
 
+    private async Task KeepUnreadableAsync(IncomingRecord record)
+    {
+        if (await FindAsync(record.RecordKey) is { } known)
+            await KeepLocalCopyAsync(record, known);
+    }
+
     /// <summary>
-    /// A linha é pulada, mas o registro existe no servidor: sem confirmar, o fim de uma sincronização completa
-    /// apagaria a cópia boa que o aparelho tem.
+    /// O conteúdo não entra, mas o registro existe no servidor. Sem confirmar, o fim de uma sincronização completa
+    /// apagaria a cópia boa do aparelho; sem a base nova, a edição na fila daria conflito em todo ciclo.
     /// </summary>
-    private Task KeepUnreadableAsync(SyncEnvelope envelope) =>
-        RunAsync("UPDATE sync_records SET confirmed = 1 WHERE record_id = @Id", new { Id = SqlText.Id(envelope.RecordId) });
+    private async Task KeepLocalCopyAsync(IncomingRecord record, KnownRecord known)
+    {
+        await MapAsync(record, known.RecordId, known.Kind);
+        await RunAsync("UPDATE sync_outbox SET base_seq = @Seq WHERE record_id = @Id", new { Id = known.RecordId, record.Seq });
+    }
 
     private async Task RecalculateCompensationsAsync()
     {
@@ -323,10 +348,14 @@ internal sealed class SyncApply
         return null;
     }
 
+    /// <summary>Procura a chave no mapa e, para o aceite que se perdeu, na fila.</summary>
     private Task<KnownRecord?> FindAsync(string recordKey) =>
-        _c.QueryFirstOrDefaultAsync<KnownRecord?>(new CommandDefinition(
-            "SELECT record_id AS RecordId, kind AS Kind FROM sync_records WHERE record_key = @Key",
-            new { Key = recordKey }, _tx, cancellationToken: _ct));
+        _c.QueryFirstOrDefaultAsync<KnownRecord?>(new CommandDefinition("""
+            SELECT record_id AS RecordId, kind AS Kind FROM sync_records WHERE record_key = @Key
+            UNION ALL
+            SELECT record_id, kind FROM sync_outbox WHERE record_key = @Key
+            LIMIT 1
+            """, new { Key = recordKey }, _tx, cancellationToken: _ct));
 
     /// <summary>Data da edição local que espera envio. Data que não converte não disputa: a linha já não seria enviada.</summary>
     private async Task<DateTimeOffset?> QueuedEditAsync(Guid goalId)
@@ -351,10 +380,10 @@ internal sealed class SyncApply
         WHERE kind = @Kind AND confirmed = 0 AND record_id NOT IN (SELECT record_id FROM sync_outbox)
         """, new { Kind = kind }, _tx, cancellationToken: _ct))).ToList();
 
-    private Task MapAsync(IncomingRecord record, Guid recordId, string kind) => RunAsync("""
+    private Task MapAsync(IncomingRecord record, string recordId, string kind) => RunAsync("""
         INSERT INTO sync_records (record_id, kind, seq, record_key, confirmed) VALUES (@Id, @Kind, @Seq, @RecordKey, 1)
         ON CONFLICT (record_id) DO UPDATE SET kind = excluded.kind, seq = excluded.seq, record_key = excluded.record_key, confirmed = 1
-        """, new { Id = SqlText.Id(recordId), Kind = kind, record.Seq, record.RecordKey });
+        """, new { Id = recordId, Kind = kind, record.Seq, record.RecordKey });
 
     private Task<int> RunAsync(string sql, object? parameters) =>
         _c.ExecuteAsync(new CommandDefinition(sql, parameters, _tx, cancellationToken: _ct));

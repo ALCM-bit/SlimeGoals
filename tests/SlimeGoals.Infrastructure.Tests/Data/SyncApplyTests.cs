@@ -56,6 +56,10 @@ public class SyncApplyTests : IDisposable
 
     private static IncomingRecord Deleted(Guid id, long seq) => new(Key(id), seq, null);
 
+    private static IncomingRecord Sealed(Guid id, long seq) => new(Key(id), seq, null, Unreadable: true);
+
+    private Task RememberAsync(params Guid[] ids) => Store.RememberKeysAsync(ids.Select(id => new OutboxKey(id, Key(id))).ToList());
+
     private Task<IReadOnlyList<Guid>> ApplyAsync(long lastSeq, params IncomingRecord[] records) => Store.ApplyPageAsync(records, lastSeq, Me);
 
     private QueueLine? QueueRow(Guid id) => _db.Anchor.QuerySingleOrDefault<QueueLine>(
@@ -519,6 +523,181 @@ public class SyncApplyTests : IDisposable
 
         (await Goals.GetAsync(goal.Id))!.Title.Should().Be("Remota");
         QueueRow(goal.Id).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Invalid_payload_moves_seq_and_base_seq_of_queued_record()
+    {
+        var goal = NewGoal();
+        await ApplyAsync(1, In(goal, 1));
+        await Goals.UpdateAsync(goal with { Title = "Local", UpdatedAt = T0.AddMinutes(1) });
+
+        await ApplyAsync(5, Unreadable(goal.Id, SyncRecordKind.Goal, 5));
+
+        (await Goals.GetAsync(goal.Id))!.Title.Should().Be("Local");
+        QueueRow(goal.Id).Should().Be(new QueueLine("upsert", 5, "goal"));
+        Record(goal.Id)!.Seq.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task Goal_refused_by_the_table_moves_base_seq_of_queued_record()
+    {
+        var goal = NewGoal();
+        await ApplyAsync(1, In(goal, 1));
+        await Goals.UpdateAsync(goal with { Title = "Local", UpdatedAt = T0.AddMinutes(1) });
+        var refused = goal with { Measure = Measure.Completion, Target = 5, Unit = null, UpdatedAt = T0.AddMinutes(9) };
+
+        await ApplyAsync(5, In(refused, 5));
+
+        (await Goals.GetAsync(goal.Id))!.Title.Should().Be("Local");
+        QueueRow(goal.Id).Should().Be(new QueueLine("upsert", 5, "goal"));
+        Record(goal.Id)!.Seq.Should().Be(5);
+    }
+
+    // Blob que não abriu
+
+    [Fact]
+    public async Task Sealed_record_is_not_a_deletion()
+    {
+        var goal = NewGoal();
+        var checkin = NewCheckin(goal.Id);
+        await ApplyAsync(2, In(goal, 1), In(checkin, 2));
+
+        var deleted = await ApplyAsync(6, Sealed(goal.Id, 5), Sealed(checkin.Id, 6));
+
+        deleted.Should().BeEmpty();
+        RowExists("goals", goal.Id).Should().BeTrue();
+        RowExists("checkins", checkin.Id).Should().BeTrue();
+        Count("sync_tombstones").Should().Be(0);
+        Count("sync_outbox").Should().Be(0);
+        Record(goal.Id).Should().Be(new RecordLine(5, Key(goal.Id), "goal", 1));
+        Record(checkin.Id).Should().Be(new RecordLine(6, Key(checkin.Id), "checkin", 1));
+        LastSeq.Should().Be(6);
+    }
+
+    [Fact]
+    public async Task Sealed_record_moves_base_seq_of_queued_record()
+    {
+        var goal = NewGoal();
+        await ApplyAsync(1, In(goal, 1));
+        await Goals.UpdateAsync(goal with { Title = "Local", UpdatedAt = T0.AddMinutes(1) });
+
+        await ApplyAsync(5, Sealed(goal.Id, 5));
+
+        (await Goals.GetAsync(goal.Id))!.Title.Should().Be("Local");
+        QueueRow(goal.Id).Should().Be(new QueueLine("upsert", 5, "goal"));
+    }
+
+    [Fact]
+    public async Task Sealed_record_with_unknown_key_is_ignored()
+    {
+        var id = Guid.CreateVersion7();
+
+        var deleted = await ApplyAsync(5, Sealed(id, 5));
+
+        deleted.Should().BeEmpty();
+        Record(id).Should().BeNull();
+        Count("sync_outbox").Should().Be(0);
+        LastSeq.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task Sealed_record_known_only_by_the_queue_gets_its_base_seq()
+    {
+        var goal = NewGoal();
+        await Goals.AddAsync(goal);
+        await RememberAsync(goal.Id);
+
+        await ApplyAsync(5, Sealed(goal.Id, 5));
+
+        QueueRow(goal.Id).Should().Be(new QueueLine("upsert", 5, "goal"));
+        Record(goal.Id).Should().Be(new RecordLine(5, Key(goal.Id), "goal", 1));
+    }
+
+    [Fact]
+    public async Task Sealed_record_survives_finish()
+    {
+        var goal = NewGoal();
+        var checkin = NewCheckin(goal.Id);
+        await ApplyAsync(2, In(goal, 1), In(checkin, 2));
+        await Store.BeginFullResyncAsync();
+        await ApplyAsync(6, Sealed(goal.Id, 5), Sealed(checkin.Id, 6));
+
+        var removed = await Store.FinishFullResyncAsync();
+
+        removed.Should().BeEmpty();
+        RowExists("goals", goal.Id).Should().BeTrue();
+        RowExists("checkins", checkin.Id).Should().BeTrue();
+        Record(goal.Id)!.Seq.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task Queued_record_with_sealed_copy_keeps_its_base_seq_after_finish()
+    {
+        var goal = NewGoal();
+        await ApplyAsync(1, In(goal, 1));
+        await Goals.UpdateAsync(goal with { Title = "Local", UpdatedAt = T0.AddMinutes(1) });
+        await Store.BeginFullResyncAsync();
+        await ApplyAsync(5, Sealed(goal.Id, 5));
+
+        await Store.FinishFullResyncAsync();
+
+        QueueRow(goal.Id).Should().Be(new QueueLine("upsert", 5, "goal"));
+    }
+
+    // Aceite perdido
+
+    [Fact]
+    public async Task Deletion_after_lost_ack_of_goal_is_applied_through_the_queue_key()
+    {
+        var goal = NewGoal();
+        var checkin = NewCheckin(goal.Id);
+        await Goals.AddAsync(goal);
+        await Checkins.AddAsync(checkin);
+        StartTimer(goal.Id);
+        await RememberAsync(goal.Id, checkin.Id);
+
+        var deleted = await ApplyAsync(8, Deleted(checkin.Id, 7), Deleted(goal.Id, 8));
+
+        deleted.Should().Equal(goal.Id);
+        RowExists("goals", goal.Id).Should().BeFalse();
+        Count("checkins").Should().Be(0);
+        Count("active_timer").Should().Be(0);
+        Count("sync_outbox").Should().Be(0);
+        Count("sync_records").Should().Be(0);
+        _db.Anchor.ExecuteScalar<string>("SELECT goal_id FROM sync_tombstones").Should().Be(goal.Id.ToString("D"));
+    }
+
+    [Fact]
+    public async Task Deletion_after_lost_ack_of_checkin_is_applied_through_the_queue_key()
+    {
+        var goal = NewGoal();
+        await ApplyAsync(1, In(goal, 1));
+        var checkin = NewCheckin(goal.Id);
+        await Checkins.AddAsync(checkin);
+        await RememberAsync(checkin.Id);
+
+        var deleted = await ApplyAsync(7, Deleted(checkin.Id, 7));
+
+        deleted.Should().BeEmpty();
+        RowExists("checkins", checkin.Id).Should().BeFalse();
+        RowExists("goals", goal.Id).Should().BeTrue();
+        Count("sync_outbox").Should().Be(0);
+        Count("sync_tombstones").Should().Be(0);
+        Record(checkin.Id).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Queued_record_without_remembered_key_is_not_found_by_deletion()
+    {
+        var goal = NewGoal();
+        await Goals.AddAsync(goal);
+
+        var deleted = await ApplyAsync(7, Deleted(goal.Id, 7));
+
+        deleted.Should().BeEmpty();
+        RowExists("goals", goal.Id).Should().BeTrue();
+        QueueRow(goal.Id).Should().NotBeNull();
     }
 
     // Compensações
