@@ -228,8 +228,8 @@ public class GoalRepositoryTests : IDisposable
             var reopened = new SqliteConnectionFactory($"Data Source={path}");
             using (var c = reopened.Open())
             {
-                MigrationRunner.Migrate(c).Should().Be(4);
-                c.ExecuteScalar<long>("PRAGMA user_version").Should().Be(4);
+                MigrationRunner.Migrate(c).Should().Be(5);
+                c.ExecuteScalar<long>("PRAGMA user_version").Should().Be(5);
             }
             (await new GoalRepository(reopened).GetAsync(goal.Id)).Should().Be(goal);
         }
