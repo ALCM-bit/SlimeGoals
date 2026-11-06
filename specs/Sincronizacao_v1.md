@@ -48,7 +48,7 @@ As mesmas metas e registros aparecem em todos os aparelhos de uma pessoa, sem qu
 
 **Totais depois de juntar:** dois aparelhos offline podem marcar a mesma meta de conclusão (total 2) ou tirar mais do que havia (total negativo). Os registros não são alterados. Telas e relatórios limitam o total a `[0, alvo]` nas metas de conclusão e a no mínimo 0 nas demais. A validação de `CheckinService` parte do total limitado, e o valor gravado é a diferença até o total real, para que um toque tenha o efeito visível. Os dois totais são normalmente iguais; só diferem depois de trocar a recorrência da meta, e aí a tela já parte do total limitado. O limite vale para o total do período, nunca para o dia dentro de uma semana. O valor gravado pode passar de `MaxAmount` por causa da compensação, então a 9.2 não pode recusar isso ao aplicar o que chega.
 
-**Compensações concorrentes:** compensação é o registro gravado com valor diferente do pedido. Quando dois aparelhos compensam a mesma meta no mesmo período sem que um visse o registro do outro, só a mais recente conta: vence o `done_at` mais novo; empate, o maior id de aparelho. A mais antiga continua guardada, mas fica fora dos totais, para todos os aparelhos chegarem ao mesmo resultado em qualquer ordem. Exemplo: com total real −3, somar 2 em cada aparelho grava 5 nos dois, e o total final é 2, não 7. A 9.2 define como o registro indica que é compensação e o que ele já tinha visto. A 9.1 não precisa disso, porque sem sincronização não há concorrência.
+**Compensações concorrentes:** compensação é o registro gravado com valor diferente do pedido. Quando dois aparelhos compensam a mesma meta no mesmo período sem que um visse o registro do outro, só a mais recente conta: vence o `done_at` mais novo; empate, o maior id do registro (`checkins` não guarda o aparelho). A mais antiga continua guardada, mas fica fora dos totais, para todos os aparelhos chegarem ao mesmo resultado em qualquer ordem. Exemplo: com total real −3, somar 2 em cada aparelho grava 5 nos dois, e o total final é 2, não 7. O registro indica que é compensação com `Compensation`: o início do período (`Period`, gravado porque fusos diferentes dariam períodos diferentes) e os ids das compensações que o aparelho já tinha naquele período (`Seen`). Duas compensações são concorrentes quando nenhuma está no `Seen` da outra. Da mais nova para a mais antiga, uma compensação só conta se não for concorrente com nenhuma das que já contam. O resultado depende só do conjunto de registros, não da ordem de chegada. A 9.1 não precisa disso, porque sem sincronização não há concorrência.
 
 ## 4. Lado do aparelho
 
@@ -60,6 +60,13 @@ Migração `005_sync.sql`:
 - `sync_tombstones`: ids de metas excluídas, para descartar dados atrasados.
 - `sync_pending`: registros recebidos cuja meta ainda não chegou.
 
+Migração `006_sync_engine.sql`:
+
+- `sync_records` ganha `record_key` e `confirmed`. Exclusão chega sem blob, só com a chave, e sem esse mapa o aparelho não saberia o que apagar. Chave que não está em `sync_records` nem na fila é ignorada: o aparelho nunca teve o registro. `confirmed` marca o que o servidor já confirmou.
+- `sync_outbox` ganha `record_key`, gravada antes de cada envio. Assim a exclusão por chave encontra o item cujo aceite se perdeu.
+- `sync_state` ganha `full_resync`. Na sincronização completa, o estado fica salvo ali, e uma interrupção continua de onde parou.
+- `checkins` ganha as colunas da compensação, e a coluna local `superseded`, que não sincroniza. Cada aparelho a recalcula depois de aplicar uma página. Listas e somas ignoram essas linhas, mas a medida continua travada, porque o registro existe.
+
 **Depois da exclusão:** as linhas de `sync_records` (só id, tipo e `seq`) ficam até o aceite do `delete`, e a 9.2 as limpa nesse aceite.
 
 **Fila só com a sincronização ligada.** Sem conta, nada é gravado na fila, senão ela cresceria para sempre. Ao ligar, todas as metas e registros entram na fila de uma vez.
@@ -70,7 +77,7 @@ Migração `005_sync.sql`:
 
 1. Busca páginas de `GET /sync/pull?after=last_seq` e aplica cada uma numa transação, avançando `last_seq` no mesmo `COMMIT`.
 2. Envia a fila em lotes. Os itens aceitos saem da fila na mesma transação que atualiza `sync_records`.
-3. Em conflito, volta ao passo 1. O registro local e o remoto passam pela regra da seção 3, e o vencedor é reenviado se for o local.
+3. Em conflito, volta ao passo 1. Qualquer conflito em um lote interrompe o envio: os itens aceitos saem da fila e o aparelho busca de novo. O registro local e o remoto passam pela regra da seção 3, e o vencedor é reenviado se for o local. Sem item pendente, o registro recebido é aplicado direto, porque o servidor já resolveu a ordem.
 4. Depois de 3 tentativas seguidas, para e tenta no próximo ciclo.
 
 **Aplicação do que chega:**
@@ -80,6 +87,7 @@ Migração `005_sync.sql`:
 - Registro de meta em `sync_tombstones` é descartado, e o aparelho envia a exclusão dele.
 - Exclusão usa `GoalRepository.DeleteAsync` e retira as notificações como `ReminderService.DeleteGoalAsync`, sob o mesmo `_gate`. Hoje `DeleteAsync` sempre enfileira, então a 9.2 precisa de um caminho de exclusão sem fila, com a mesma limpeza.
 - Linha que não converte vai para o Trace e não trava a sincronização, como no `RowReader`.
+- Registro que não pode ser lido mantém a cópia local: o `seq` dele e o `base_seq` da fila avançam, e ele continua confirmado.
 - Versão de formato desconhecida pausa a sincronização, com o aviso "atualize o app". `last_seq` não avança e nada se perde.
 - Um `DataChangeNotifier.Defer` agrupa a página num único aviso.
 - Dados aplicados não voltam para a fila (inclusive a exclusão recebida, que usa o caminho sem fila).
@@ -104,16 +112,19 @@ records(account_id, record_key, seq, blob, deleted_at)   -- PK (account_id, reco
 | `POST /auth/recover`, `/auth/password` | Recuperar com o código, trocar senha |
 | `GET /devices`, `DELETE /devices/{id}` | Aparelhos da conta |
 | `DELETE /account` | Apaga conta e dados |
-| `GET /sync/pull?after=N&limit=M` | Registros com `seq > N`, em ordem |
+| `GET /sync/pull?after=N&limit=M&full=1\|0` | Registros com `seq > N`, em ordem |
 | `POST /sync/push` | Lote de `{record_key, base_seq, blob ou delete}` |
 
 **Regras:**
 
 1. **Ordem sem buracos.** Cada envio roda numa transação que trava a linha da conta e usa `accounts.next_seq`. Uma sequência global do PostgreSQL permitiria a um `pull` pular um `seq` ainda não confirmado, e esse dado se perderia.
-2. **Conflito por registro.** O item cujo `base_seq` difere do atual volta na lista de conflitos. Os demais do lote são aceitos.
+2. **Conflito por registro.** O item cujo `base_seq` difere do atual volta na lista de conflitos. Os demais do lote são aceitos. Um `delete` com `base_seq` 0 para uma chave que o servidor não tem é aceito.
 3. **Reenvio seguro.** Repetir um envio já aceito responde com conflito, resolvido no ciclo seguinte sem duplicar.
 4. **Exclusão.** Zera `blob`, grava `deleted_at` e aumenta o `seq`.
-5. **Marcas antigas.** Limpas depois de 180 dias. Aparelho com `last_seq` anterior à limpeza recebe `410` e refaz a sincronização completa.
+5. **Marcas antigas.** Limpas depois de 180 dias. A limpeza remove só marcas de exclusão, então registros vivos mantêm `seq` antigos. Com `full=0`, o servidor responde `410` quando `N` está abaixo do ponto da limpeza, inclusive `N = 0`, depois que uma limpeza aconteceu. Com `full=1`, nunca responde `410`. Sem o `full`, um aparelho que lê tudo receberia `410` na segunda página.
+   - O aparelho usa `full=1` quando não tem registros confirmados, durante a sincronização completa e depois de um `410` no mesmo ciclo. Nos demais casos usa `full=0`, inclusive em `N = 0`: uma resposta sem `410` nunca remove dados locais, então uma resposta vazia de servidor restaurado de backup não faz perder nada.
+   - Depois do `410`, o aparelho zera `last_seq`, marca `sync_records.confirmed = 0` e baixa tudo. O que não voltou e não está na fila foi excluído há mais de 180 dias, e sai do aparelho sem voltar para a fila.
+   - No máximo um `410` por ciclo. O segundo conta como falha.
 6. **Isolamento.** Toda consulta filtra pela conta da sessão, nunca por parâmetro do cliente.
 7. **Limites.** Taxa por IP e por conta nas rotas `/auth`; tamanho máximo de blob e de lote. Cotas por conta configuráveis, desligadas por padrão.
 8. **Logs.** Nunca registram e-mail completo, token ou blob.
@@ -126,7 +137,7 @@ records(account_id, record_key, seq, blob, deleted_at)   -- PK (account_id, reco
 | Chaves derivadas da senha | HKDF gera a `auth_key` (enviada ao servidor) e a `wrap_key` (nunca sai do aparelho) |
 | Chave de dados | 256 bits aleatórios, criada no cadastro |
 | Conteúdo | AES-256-GCM, nonce aleatório de 96 bits, com subchave da chave de dados |
-| Dado autenticado | Versão do formato, tipo e id do registro. O servidor não consegue trocar um blob por outro |
+| Dado autenticado | Versão do formato, tipo e id do registro ficam dentro do conteúdo cifrado, porque quem baixa um blob só tem a `record_key`. `Open` recebe a chave, abre o blob e recusa se `RecordKey(id)` não bater. O servidor não consegue trocar um blob por outro |
 | `record_key` | HMAC-SHA-256 do id, com subchave da chave de dados |
 | Código de recuperação | 128 bits aleatórios, mostrado uma vez. Gera outro par de chaves, como a senha |
 | Guarda no servidor | Hash da `auth_key` e do código, e a chave de dados cifrada duas vezes |
