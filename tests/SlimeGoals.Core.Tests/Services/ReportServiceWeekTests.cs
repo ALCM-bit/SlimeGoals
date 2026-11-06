@@ -213,4 +213,35 @@ public class ReportServiceWeekTests
         var row = report.Goals.Single();
         (row.MetPeriods, row.CountedPeriods, row.Percent).Should().Be((5, 7, 71));
     }
+
+    [Fact]
+    public async Task Week_row_limits_negative_weekly_total()
+    {
+        var goal = await Create("Semanal", Recurrence.Weekly, target: 3);
+        await Record(goal, Mon, -2);
+
+        var row = (await Service.GetWeekAsync(Today)).Goals.Single();
+
+        (row.Done, row.Percent).Should().Be((0, 0));
+    }
+
+    [Fact]
+    public async Task Daily_negative_day_does_not_lower_week_done()
+    {
+        var goal = await Create("Diária", target: 2);
+        await Record(goal, Mon, -2);
+        await Record(goal, Tue, 3);
+
+        (await Service.GetWeekAsync(Today)).Goals.Single().Done.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Weekly_negative_day_is_not_limited()
+    {
+        var goal = await Create("Semanal", Recurrence.Weekly, target: 10);
+        await Record(goal, Mon, 5);
+        await Record(goal, Tue, -2);
+
+        (await Service.GetWeekAsync(Today)).Goals.Single().Done.Should().Be(3);
+    }
 }

@@ -12,12 +12,15 @@ public sealed class CheckinRepository(SqliteConnectionFactory db) : ICheckinRepo
     public async Task AddAsync(Checkin checkin, CancellationToken ct = default)
     {
         await using var c = db.Open();
+        await using var tx = await c.BeginTransactionAsync(ct);
         try
         {
             await c.ExecuteAsync(new CommandDefinition("""
                 INSERT INTO checkins (id, goal_id, done_at, amount, note, updated_at, deleted_at)
                 VALUES (@Id, @GoalId, @DoneAt, @Amount, @Note, @UpdatedAt, @DeletedAt)
-                """, Row.FromDomain(checkin), cancellationToken: ct));
+                """, Row.FromDomain(checkin), tx, cancellationToken: ct));
+            await SyncOutbox.EnqueueAsync(c, tx, checkin.Id, SyncOutbox.Checkin, ct);
+            await tx.CommitAsync(ct);
         }
         catch (SqliteException e) when (e.SqliteExtendedErrorCode == SqlText.ForeignKeyViolation)
         {

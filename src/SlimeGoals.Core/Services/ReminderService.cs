@@ -198,7 +198,7 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
 
         public int PeriodTotal(Goal goal) =>
             GoalPeriod.EvaluationPeriod(goal, today) is { } range
-                ? sums.Where(kv => kv.Key.GoalId == goal.Id && range.Contains(kv.Key.Day)).Sum(kv => kv.Value)
+                ? GoalTotals.Effective(goal, sums.Where(kv => kv.Key.GoalId == goal.Id && range.Contains(kv.Key.Day)).Sum(kv => kv.Value))
                 : 0;
 
         public ReminderState StateOf(Goal goal)

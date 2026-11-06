@@ -54,7 +54,7 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
         if (draft.Measure != current.Measure && await checkins.HasAnyAsync(id, ct))
             throw new GoalValidationException(
                 [new ValidationError(nameof(GoalDraft.Measure), "A medida não muda depois do primeiro registro.")]);
-        var updated = Apply(current, draft) with { UpdatedAt = time.GetUtcNow() };
+        var updated = Apply(current, draft) with { UpdatedAt = NextUpdatedAt(current) };
         await goals.UpdateAsync(updated, ct);
         changes?.NotifyChanged();
         return updated;
@@ -67,7 +67,7 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
             return; // idempotente: preserva a data original do arquivamento
 
         var now = time.GetUtcNow();
-        await goals.UpdateAsync(goal with { ArchivedAt = now, UpdatedAt = now }, ct);
+        await goals.UpdateAsync(goal with { ArchivedAt = now, UpdatedAt = NextUpdatedAt(goal) }, ct);
         await ClearTimerOfAsync(id, ct);
         changes?.NotifyChanged();
     }
@@ -85,7 +85,7 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
             throw new GoalStateException(id,
                 $"O período desta meta terminou em {end.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)}. Crie uma nova meta para continuar.");
 
-        await goals.UpdateAsync(goal with { ArchivedAt = null, UpdatedAt = time.GetUtcNow() }, ct);
+        await goals.UpdateAsync(goal with { ArchivedAt = null, UpdatedAt = NextUpdatedAt(goal) }, ct);
         changes?.NotifyChanged();
     }
 
@@ -100,7 +100,7 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
 
         foreach (var goal in expired)
         {
-            await goals.UpdateAsync(goal with { ArchivedAt = now, UpdatedAt = now }, ct);
+            await goals.UpdateAsync(goal with { ArchivedAt = now, UpdatedAt = NextUpdatedAt(goal) }, ct);
             await ClearTimerOfAsync(goal.Id, ct);
         }
         if (expired.Count > 0)
@@ -141,6 +141,17 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
         Target = draft.Measure == Measure.Completion ? 1 : draft.Target,
         Unit = draft.Measure == Measure.Quantity ? draft.Unit?.Trim() : null,
     };
+
+    /// <summary>
+    /// Data de edição: a de agora, ou 1 ms depois da conhecida se o relógio estiver atrasado,
+    /// para a edição sempre vencer a versão que o aparelho já viu.
+    /// </summary>
+    private DateTimeOffset NextUpdatedAt(Goal current)
+    {
+        var now = time.GetUtcNow();
+        var after = current.UpdatedAt.AddMilliseconds(1);
+        return now > after ? now : after;
+    }
 
     /// <summary>Data de hoje no fuso local do relógio injetado.</summary>
     private DateOnly Today() => DateOnly.FromDateTime(time.GetLocalNow().DateTime);

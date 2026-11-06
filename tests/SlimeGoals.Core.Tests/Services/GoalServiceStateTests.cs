@@ -150,4 +150,63 @@ public class GoalServiceStateTests
 
         (await Service.CreateAsync(Draft() with { EndDate = Today })).EndDate.Should().Be(Today);
     }
+
+    // O relógio do teste não volta: o "relógio atrasado" é uma meta gravada com UpdatedAt à frente de agora.
+    private static readonly DateTimeOffset Known = T0.AddMinutes(10);
+
+    [Fact]
+    public async Task Edit_with_late_clock_beats_the_known_date()
+    {
+        var goal = await Seed(g => g with { UpdatedAt = Known });
+
+        var updated = await Service.UpdateAsync(goal.Id, Draft() with { Title = "Outro" });
+
+        updated.UpdatedAt.Should().Be(Known.AddMilliseconds(1));
+        (await _repo.GetAsync(goal.Id))!.UpdatedAt.Should().Be(Known.AddMilliseconds(1));
+    }
+
+    [Fact]
+    public async Task Archive_with_late_clock_beats_the_known_date_and_keeps_real_archive_date()
+    {
+        var goal = await Seed(g => g with { UpdatedAt = Known });
+
+        await Service.ArchiveAsync(goal.Id);
+
+        var archived = (await _repo.GetAsync(goal.Id))!;
+        archived.UpdatedAt.Should().Be(Known.AddMilliseconds(1));
+        archived.ArchivedAt.Should().Be(T0);
+    }
+
+    [Fact]
+    public async Task Unarchive_with_late_clock_beats_the_known_date()
+    {
+        var goal = await Seed(g => g with { ArchivedAt = T0.AddDays(-1), UpdatedAt = Known });
+
+        await Service.UnarchiveAsync(goal.Id);
+
+        (await _repo.GetAsync(goal.Id))!.UpdatedAt.Should().Be(Known.AddMilliseconds(1));
+    }
+
+    [Fact]
+    public async Task ArchiveExpired_with_late_clock_beats_the_known_date_and_keeps_real_archive_date()
+    {
+        var goal = await Seed(g => g with { EndDate = Today.AddDays(-1), UpdatedAt = Known });
+
+        await Service.ArchiveExpiredAsync();
+
+        var archived = (await _repo.GetAsync(goal.Id))!;
+        archived.UpdatedAt.Should().Be(Known.AddMilliseconds(1));
+        archived.ArchivedAt.Should().Be(T0);
+    }
+
+    [Fact]
+    public async Task Edit_with_correct_clock_uses_now()
+    {
+        var goal = await Service.CreateAsync(Draft());
+        _time.Advance(TimeSpan.FromMinutes(5));
+
+        var updated = await Service.UpdateAsync(goal.Id, Draft() with { Title = "Outro" });
+
+        updated.UpdatedAt.Should().Be(_time.GetUtcNow());
+    }
 }
