@@ -32,7 +32,7 @@ As mesmas metas e registros aparecem em todos os aparelhos de uma pessoa, sem qu
 | Dado | Sincroniza | Conflito |
 |---|---|---|
 | `goals` | Sim | Vence o `updated_at` mais novo; empate, o maior id de aparelho. A meta inteira, não campo a campo |
-| `checkins` | Sim | Não há: só são acrescentados, e ajuste é valor negativo |
+| `checkins` | Sim | Só são acrescentados, e ajuste é valor negativo. A exceção são as compensações concorrentes: vale a mais recente |
 | Exclusão de meta | Sim | Vence qualquer edição e apaga os registros da meta |
 | `reminder_log`, `settings`, `active_timer` | Não | Pertencem ao aparelho |
 
@@ -42,11 +42,13 @@ As mesmas metas e registros aparecem em todos os aparelhos de uma pessoa, sem qu
 2. A regra depende do relógio do aparelho: entre edições feitas sem que um aparelho visse a do outro, um relógio adiantado vence a mais recente.
 3. Lembretes podem tocar nos dois aparelhos até a sincronização seguinte.
 4. Entrar com dados em dois aparelhos une tudo, sem deduplicar.
-5. Com total real negativo e edição offline em dois aparelhos, as compensações somam, e uma meta de quantidade pode ficar acima do que a pessoa pediu.
+5. Entre compensações concorrentes, o progresso da mais antiga deixa de contar no total.
 
 **Data de uma edição de meta:** ao gravar, `updated_at` é o maior valor entre a hora atual e o `updated_at` que o aparelho já tem para a meta mais 1 ms. Assim, uma edição feita depois de ver outra sempre vence essa outra, mesmo com o relógio atrasado. Gravar em UTC resolve o fuso, não a hora errada do aparelho. A regra vale para toda gravação que muda `updated_at` da meta, com ou sem sincronização ligada.
 
 **Totais depois de juntar:** dois aparelhos offline podem marcar a mesma meta de conclusão (total 2) ou tirar mais do que havia (total negativo). Os registros não são alterados. Telas e relatórios limitam o total a `[0, alvo]` nas metas de conclusão e a no mínimo 0 nas demais. A validação de `CheckinService` parte do total limitado, e o valor gravado é a diferença até o total real, para que um toque tenha o efeito visível. Os dois totais são normalmente iguais; só diferem depois de trocar a recorrência da meta, e aí a tela já parte do total limitado. O limite vale para o total do período, nunca para o dia dentro de uma semana. O valor gravado pode passar de `MaxAmount` por causa da compensação, então a 9.2 não pode recusar isso ao aplicar o que chega.
+
+**Compensações concorrentes:** compensação é o registro gravado com valor diferente do pedido. Quando dois aparelhos compensam a mesma meta no mesmo período sem que um visse o registro do outro, só a mais recente conta: vence o `done_at` mais novo; empate, o maior id de aparelho. A mais antiga continua guardada, mas fica fora dos totais, para todos os aparelhos chegarem ao mesmo resultado em qualquer ordem. Exemplo: com total real −3, somar 2 em cada aparelho grava 5 nos dois, e o total final é 2, não 7. A 9.2 define como o registro indica que é compensação e o que ele já tinha visto. A 9.1 não precisa disso, porque sem sincronização não há concorrência.
 
 ## 4. Lado do aparelho
 
@@ -144,6 +146,7 @@ records(account_id, record_key, seq, blob, deleted_at)   -- PK (account_id, reco
 - Configurações ganha a seção **Conta e sincronização**, visível por `PlatformCapabilities`.
 - O cadastro mostra o código de recuperação e exige confirmação antes de continuar.
 - O texto explica, antes do cadastro, que perder senha e código perde a cópia da nuvem.
+- **Sair da conta** tenta enviar a fila antes de chamar `DisableAsync`, que apaga a fila e as marcas de exclusão. Sem isso, uma meta excluída offline voltaria do servidor ao entrar de novo. Se o envio falhar, o app avisa que há alterações não enviadas, que elas se perdem ao sair e que metas excluídas depois de sair podem voltar, e a pessoa escolhe esperar ou sair mesmo assim.
 - O Android passa a declarar `INTERNET`, com `network_security_config.xml` sem tráfego em texto puro. Build de desenvolvimento libera só o servidor local.
 - README e tela Sobre deixam de dizer que os dados nunca saem do aparelho: passam a explicar que, com conta, saem cifrados.
 
@@ -165,7 +168,7 @@ O código do spike é descartável, como em `specs/spikes/`.
 
 - **Convergência:** dois e três aparelhos simulados, com ordens de envio embaralhadas, terminam iguais.
 - **Motor:** exclusão contra edição, registro antes da meta, página interrompida, reenvio, relógio divergente, edição com relógio atrasado depois de receber outra mais nova, versão desconhecida, meta excluída com envio em andamento ou com o aceite perdido (o item sai da fila sem gerar `delete`, e o registro que volta no `pull`, inclusive o da meta, é removido pela marca de exclusão e o aparelho envia o `delete`).
-- **Totais:** conclusão com total 2, total negativo, em Hoje e nos relatórios.
+- **Totais:** conclusão com total 2, total negativo, em Hoje e nos relatórios. Compensações concorrentes em dois e três aparelhos: só a mais recente conta, em qualquer ordem de chegada; compensação feita depois de ver a outra conta normalmente.
 - **Servidor** (PostgreSQL em contêiner): isolamento entre contas, envios simultâneos sem buracos, conflito parcial, `410`, limites.
 - **Criptografia:** blob adulterado ou trocado é recusado; vetores fixos entre plataformas.
 - **Privacidade:** busca por título, unidade e nota conhecidos no dump do banco não encontra nada.
@@ -178,7 +181,7 @@ O código do spike é descartável, como em `specs/spikes/`.
 |---|---|
 | 9.0 | Esta spec e o spike |
 | 9.1 | Migração 005 e fila, sem rede. Limite de totais. Data de edição |
-| 9.2 | Motor e merge com servidor falso |
+| 9.2 | Motor e merge com servidor falso. Compensações concorrentes |
 | 9.3 | Servidor e Docker Compose |
 | 9.4 | Criptografia e conta |
 | 9.5 | Interface, permissão de internet, Linux e Android sincronizando |
@@ -192,4 +195,3 @@ Até a 9.6, a confirmação de e-mail é simulada: o link sai no log do servidor
 2. Onde hospedar e qual serviço de e-mail (fase 9.6).
 3. Sincronização em segundo plano no Android (depois da primeira versão).
 4. Fila no servidor (broker e consumidor) para muitos usuários: fica para depois da funcionalidade combinada.
-5. `DisableAsync` descarta exclusões pendentes e marcas: excluir uma meta offline, sair e entrar de novo faz ela voltar do servidor, contra a exclusão definitiva. Decidir antes da 9.5 (por exemplo, enviar a fila antes de sair ou avisar a pessoa).
