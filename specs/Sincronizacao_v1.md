@@ -63,7 +63,7 @@ Migração `005_sync.sql`:
 Migração `006_sync_engine.sql`:
 
 - `sync_records` ganha `record_key` e `confirmed`. Exclusão chega sem blob, só com a chave, e sem esse mapa o aparelho não saberia o que apagar. Chave que não está em `sync_records` nem na fila é ignorada: o aparelho nunca teve o registro. `confirmed` marca o que o servidor já confirmou.
-- `sync_outbox` ganha `record_key`, gravada antes de cada envio. Assim a exclusão por chave encontra o item cujo aceite se perdeu.
+- `sync_outbox` ganha `record_key`, gravada antes de cada envio, com índice. Assim a exclusão por chave encontra o item cujo aceite se perdeu, sem varrer a fila.
 - `sync_state` ganha `full_resync`. Na sincronização completa, o estado fica salvo ali, e uma interrupção continua de onde parou.
 - `checkins` ganha as colunas da compensação, e a coluna local `superseded`, que não sincroniza. Cada aparelho a recalcula depois de aplicar uma página. Listas e somas ignoram essas linhas, mas a medida continua travada, porque o registro existe.
 
@@ -85,14 +85,14 @@ Migração `006_sync_engine.sql`:
 - Metas antes de registros, dentro da página.
 - Registro de meta desconhecida vai para `sync_pending` e é aplicado quando a meta chegar. Isso é necessário porque editar uma meta aumenta o `seq` dela, e um aparelho novo pode receber registros antes da meta.
 - Registro de meta em `sync_tombstones` é descartado, e o aparelho envia a exclusão dele.
-- Exclusão usa `GoalRepository.DeleteAsync` e retira as notificações como `ReminderService.DeleteGoalAsync`, sob o mesmo `_gate`. Hoje `DeleteAsync` sempre enfileira, então a 9.2 precisa de um caminho de exclusão sem fila, com a mesma limpeza.
+- Exclusão usa `GoalDeletion.DeleteRowsAsync`, a mesma limpeza de `GoalRepository.DeleteAsync`, sem passar pela fila. As notificações saem por `IRemoteDeletionGate`, que o `ReminderService` implementa sob o mesmo `_gate` de `DeleteGoalAsync`.
 - Linha que não converte vai para o Trace e não trava a sincronização, como no `RowReader`.
 - Registro que não pode ser lido mantém a cópia local: o `seq` dele e o `base_seq` da fila avançam, e ele continua confirmado.
 - Versão de formato desconhecida pausa a sincronização, com o aviso "atualize o app". `last_seq` não avança e nada se perde.
 - Um `DataChangeNotifier.Defer` agrupa a página num único aviso.
 - Dados aplicados não voltam para a fila (inclusive a exclusão recebida, que usa o caminho sem fila).
 
-**Quando roda:** ao abrir o app, 5 s depois da última mudança local, a cada 15 min com o app aberto e, no Android, ao voltar ao primeiro plano. Falhas de rede repetem com espera crescente, até 15 min.
+**Quando roda:** ao abrir o app, 5 s depois da última mudança, a cada 15 min com o app aberto e, no Android, ao voltar ao primeiro plano. Mudança é todo aviso do `DataChangeNotifier`, inclusive o de uma página aplicada: depois de baixar algo, roda mais um ciclo, que normalmente não encontra nada e não avisa. Falhas repetem com espera crescente, de 30 s até 15 min. Uma mudança durante essa espera a encurta para 5 s, e a contagem de falhas continua. Página que não foi aplicada não avisa, então não encurta a espera.
 
 ## 5. Servidor
 
@@ -115,14 +115,20 @@ records(account_id, record_key, seq, blob, deleted_at)   -- PK (account_id, reco
 | `GET /sync/pull?after=N&limit=M&full=1\|0` | Registros com `seq > N`, em ordem |
 | `POST /sync/push` | Lote de `{record_key, base_seq, blob ou delete}` |
 
+**Respostas de que o motor depende** (`key` é a `record_key`):
+
+- `pull`: `{records: [{key, seq, blob}], has_more}`. `records` vem em ordem de `seq`, com no máximo `limit` itens. `blob` nulo é registro excluído. `has_more` diz se ainda há registros depois da página. O aparelho trata como falha uma página vazia com `has_more` verdadeiro e uma página cujo maior `seq` não passa de `after`.
+- `push`: `{accepted: [{key, seq}], conflicts: [key]}`. `seq` é o novo `seq` do registro. Todo item do lote aparece em uma das listas. Um lote sem nenhum item aceito faz o aparelho parar de enviar e baixar de novo.
+
 **Regras:**
 
 1. **Ordem sem buracos.** Cada envio roda numa transação que trava a linha da conta e usa `accounts.next_seq`. Uma sequência global do PostgreSQL permitiria a um `pull` pular um `seq` ainda não confirmado, e esse dado se perderia.
-2. **Conflito por registro.** O item cujo `base_seq` difere do atual volta na lista de conflitos. Os demais do lote são aceitos. Um `delete` com `base_seq` 0 para uma chave que o servidor não tem é aceito.
+2. **Conflito por registro.** O item cujo `base_seq` difere do atual volta na lista de conflitos. Os demais do lote são aceitos, e o item recusado não gasta `seq`. O atual de uma chave que o servidor não tem é 0: `upsert` ou `delete` com base acima de 0 dá conflito. Um `delete` com `base_seq` 0 para essa chave é aceito e cria uma marca de exclusão, com `seq` novo.
 3. **Reenvio seguro.** Repetir um envio já aceito responde com conflito, resolvido no ciclo seguinte sem duplicar.
 4. **Exclusão.** Zera `blob`, grava `deleted_at` e aumenta o `seq`.
-5. **Marcas antigas.** Limpas depois de 180 dias. A limpeza remove só marcas de exclusão, então registros vivos mantêm `seq` antigos. Com `full=0`, o servidor responde `410` quando `N` está abaixo do ponto da limpeza, inclusive `N = 0`, depois que uma limpeza aconteceu. Com `full=1`, nunca responde `410`. Sem o `full`, um aparelho que lê tudo receberia `410` na segunda página.
-   - O aparelho usa `full=1` quando não tem registros confirmados, durante a sincronização completa e depois de um `410` no mesmo ciclo. Nos demais casos usa `full=0`, inclusive em `N = 0`: uma resposta sem `410` nunca remove dados locais, então uma resposta vazia de servidor restaurado de backup não faz perder nada.
+5. **Marcas antigas.** Limpas depois de 180 dias. A limpeza remove só marcas de exclusão, então registros vivos mantêm `seq` antigos. O ponto da limpeza nunca passa do maior `seq` da conta. Marcas com `seq` igual ou acima do ponto ficam, mesmo depois dos 180 dias, então o registro mais novo da conta sempre sobrevive. Sem isso, quem lê tudo terminaria abaixo do ponto, e cada ciclo daria `410` e outra leitura completa. Com `full=0`, o servidor responde `410` quando `N` está abaixo do ponto da limpeza, inclusive `N = 0`, depois que uma limpeza aconteceu. Com `N` igual ao ponto ou acima dele, não responde `410`. Com `full=1`, nunca responde `410`. Sem o `full`, um aparelho que lê tudo receberia `410` na segunda página.
+   - O aparelho ignora marca de exclusão de chave desconhecida, mas `last_seq` avança com ela. É assim que um aparelho novo alcança o ponto da limpeza.
+   - O aparelho usa `full=1` quando está em `N = 0` sem nenhuma linha em `sync_records`, durante a sincronização completa e depois de um `410` no mesmo ciclo. Nos demais casos usa `full=0`, inclusive em `N = 0`: uma resposta sem `410` nunca remove dados locais, então uma resposta vazia de servidor restaurado de backup não faz perder nada.
    - Depois do `410`, o aparelho zera `last_seq`, marca `sync_records.confirmed = 0` e baixa tudo. O que não voltou e não está na fila foi excluído há mais de 180 dias, e sai do aparelho sem voltar para a fila.
    - No máximo um `410` por ciclo. O segundo conta como falha.
 6. **Isolamento.** Toda consulta filtra pela conta da sessão, nunca por parâmetro do cliente.
