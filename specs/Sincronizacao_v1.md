@@ -45,14 +45,14 @@ As mesmas metas e registros aparecem em todos os aparelhos de uma pessoa, sem qu
 
 **Data de uma edição de meta:** ao gravar, `updated_at` é o maior valor entre a hora atual e o `updated_at` que o aparelho já tem para a meta mais 1 ms. Assim, uma edição feita depois de ver outra sempre vence essa outra, mesmo com o relógio atrasado. Gravar em UTC resolve o fuso, não a hora errada do aparelho. A regra vale para toda gravação que muda `updated_at` da meta, com ou sem sincronização ligada.
 
-**Totais depois de juntar:** dois aparelhos offline podem marcar a mesma meta de conclusão (total 2) ou tirar mais do que havia (total negativo). Os registros não são alterados. Telas e relatórios limitam o total a `[0, alvo]` nas metas de conclusão e a no mínimo 0 nas demais. A validação de `CheckinService` continua valendo para novos registros.
+**Totais depois de juntar:** dois aparelhos offline podem marcar a mesma meta de conclusão (total 2) ou tirar mais do que havia (total negativo). Os registros não são alterados. Telas e relatórios limitam o total a `[0, alvo]` nas metas de conclusão e a no mínimo 0 nas demais. A validação de `CheckinService` parte do total limitado, e o valor gravado é a diferença até o total real, para que um toque tenha o efeito visível. Sem sincronização, os dois totais são iguais.
 
 ## 4. Lado do aparelho
 
 Migração `005_sync.sql`:
 
 - `sync_state`: uma linha, com `enabled`, id do aparelho, `last_seq`, última sincronização e último erro.
-- `sync_outbox`: `record_id`, tipo (`goal` ou `checkin`), operação (`upsert` ou `delete`), `base_seq`, ordem de criação. Uma linha por registro: nova mudança substitui a anterior.
+- `sync_outbox`: `record_id`, tipo (`goal` ou `checkin`), operação (`upsert` ou `delete`), `base_seq`, `revision`, ordem de criação. Uma linha por registro: nova mudança substitui a anterior e mantém a posição na fila. `revision` muda a cada substituição e impede que um envio em andamento tire da fila uma edição mais nova. Registro que o servidor nunca viu (sem `seq` conhecido) sai da fila ao ser excluído.
 - `sync_records`: `record_id`, tipo, `seq` conhecido. Sabe o `base_seq` de cada registro.
 - `sync_tombstones`: ids de metas excluídas, para descartar dados atrasados.
 - `sync_pending`: registros recebidos cuja meta ainda não chegou.
@@ -174,7 +174,7 @@ O código do spike é descartável, como em `specs/spikes/`.
 | Fase | Entrega |
 |---|---|
 | 9.0 | Esta spec e o spike |
-| 9.1 | Migração 005 e fila, sem rede. Limite de totais |
+| 9.1 | Migração 005 e fila, sem rede. Limite de totais. Data de edição |
 | 9.2 | Motor e merge com servidor falso |
 | 9.3 | Servidor e Docker Compose |
 | 9.4 | Criptografia e conta |
@@ -188,3 +188,4 @@ Até a 9.6, a confirmação de e-mail é simulada: o link sai no log do servidor
 1. Grátis com limites ou pago (fase 9.6).
 2. Onde hospedar e qual serviço de e-mail (fase 9.6).
 3. Sincronização em segundo plano no Android (depois da primeira versão).
+4. Fila no servidor (broker e consumidor) para muitos usuários: fica para depois da funcionalidade combinada.
