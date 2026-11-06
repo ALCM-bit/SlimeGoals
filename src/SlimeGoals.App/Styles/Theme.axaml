@@ -36,6 +36,8 @@
   <SolidColorBrush x:Key="Text" Color="{StaticResource TextColor}" />
   <SolidColorBrush x:Key="Muted" Color="{StaticResource MutedColor}" />
   <SolidColorBrush x:Key="NavHover" Color="#1D1928" />
+  <SolidColorBrush x:Key="NavSelectedText" Color="White" />
+  <SolidColorBrush x:Key="PanelBorder" Color="#241F30" />
   <SolidColorBrush x:Key="Primary" Color="{StaticResource PrimaryColor}" />
   <SolidColorBrush x:Key="PrimarySoft" Color="{StaticResource PrimarySoftColor}" />
   <SolidColorBrush x:Key="PrimaryTint" Color="{StaticResource PrimaryTintColor}" />

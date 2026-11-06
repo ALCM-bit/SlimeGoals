@@ -27,7 +27,7 @@
   <!-- Painel (barra lateral do bento v4) -->
   <Style Selector="Border.panel">
     <Setter Property="Background" Value="{DynamicResource Panel}" />
-    <Setter Property="BorderBrush" Value="#241F30" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PanelBorder}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
   </Style>
@@ -60,7 +60,7 @@
   </Style>
   <Style Selector="ListBox.nav ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource Selected}" />
-    <Setter Property="Foreground" Value="White" />
+    <Setter Property="Foreground" Value="{DynamicResource NavSelectedText}" />
   </Style>
   <Style Selector="ListBox.nav ListBoxItem:selected">
     <Setter Property="FontWeight" Value="Bold" />

@@ -86,7 +86,14 @@ internal sealed class GoalRow
         },
         Unit = Unit,
         Icon = Icon,
-        Color = Enum.Parse<GoalColor>(Color, ignoreCase: true),
+        Color = Color switch
+        {
+            "purple" => GoalColor.Purple,
+            "pink" => GoalColor.Pink,
+            "amber" => GoalColor.Amber,
+            "green" => GoalColor.Green,
+            _ => throw new FormatException($"Cor desconhecida no banco: '{Color}'."),
+        },
         ReminderEveryMinutes = ReminderEveryMin,
         ActiveFrom = TimeOnly.ParseExact(ActiveFrom, TimeFormat, Inv),
         ActiveUntil = TimeOnly.ParseExact(ActiveUntil, TimeFormat, Inv),

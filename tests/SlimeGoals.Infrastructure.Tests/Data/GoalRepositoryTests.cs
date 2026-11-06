@@ -13,6 +13,21 @@ public class GoalRepositoryTests : IDisposable
 
     public void Dispose() => _db.Dispose();
 
+    [Theory]
+    [InlineData("7")]
+    [InlineData("1")]
+    [InlineData("azul")]
+    public async Task Unknown_color_in_database_throws_format_exception(string color)
+    {
+        var goal = NewGoal();
+        await Repo.AddAsync(goal);
+        _db.Anchor.Execute("UPDATE goals SET color = @Color WHERE id = @Id", new { Color = color, Id = goal.Id.ToString("D") });
+
+        var act = () => Repo.GetAsync(goal.Id);
+
+        await act.Should().ThrowAsync<FormatException>();
+    }
+
     private static Goal NewGoal(string title = "Ler 📚 ação", DateTimeOffset? createdAt = null) => new()
     {
         Id = Guid.CreateVersion7(),

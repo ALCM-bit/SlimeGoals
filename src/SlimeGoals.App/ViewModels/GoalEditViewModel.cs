@@ -24,6 +24,9 @@ public sealed partial class GoalEditViewModel : ObservableObject
     private readonly Goal? _existing;
     private readonly Action<bool> _close;
     private readonly Dictionary<string, string> _errors = [];
+
+    /// <summary>Erros que só o serviço conhece (ex.: fim no passado). Valem até o campo mudar ou até salvar de novo.</summary>
+    private readonly Dictionary<string, string> _serviceErrors = [];
     private bool _submitted;
     private bool _targetMissing;
 
@@ -207,6 +210,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
     {
         _submitted = true;
         GeneralError = null;
+        _serviceErrors.Clear();
         if (!Revalidate(out var draft))
             return;
 
@@ -220,6 +224,8 @@ public sealed partial class GoalEditViewModel : ObservableObject
         }
         catch (GoalValidationException ex)
         {
+            foreach (var error in ex.Errors)
+                _serviceErrors.TryAdd(error.Field, error.Message);
             SetErrors(ex.Errors.Select(e => (e.Field, e.Message)));
         }
         catch (GoalStateException ex)
@@ -276,8 +282,10 @@ public sealed partial class GoalEditViewModel : ObservableObject
 
     private void OnInputChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is { } name && Inputs.Contains(name))
-            RevalidateIfSubmitted();
+        if (e.PropertyName is not { } name || !Inputs.Contains(name))
+            return;
+        _serviceErrors.Remove(name);
+        RevalidateIfSubmitted();
     }
 
     private void RevalidateIfSubmitted()
@@ -334,6 +342,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
             errors.Add((nameof(GoalDraft.Target), targetMissing));
         }
 
+        errors.AddRange(_serviceErrors.Select(x => (x.Key, x.Value)));
         SetErrors(errors);
         return errors.Count == 0;
     }

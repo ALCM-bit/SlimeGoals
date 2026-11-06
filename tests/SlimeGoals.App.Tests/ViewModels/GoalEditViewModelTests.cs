@@ -209,6 +209,49 @@ public class GoalEditViewModelTests
     }
 
     [Fact]
+    public async Task Past_end_date_error_survives_editing_another_field()
+    {
+        var vm = New();
+        vm.Title = "Beber água";
+        vm.EndDate = new DateTime(2026, 11, 1);
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        vm.Title = "Beber mais água";
+
+        vm.EndDateError.Should().Be("A data de fim não pode estar no passado.");
+    }
+
+    [Fact]
+    public async Task Past_end_date_error_clears_when_the_date_changes()
+    {
+        var vm = New();
+        vm.Title = "Beber água";
+        vm.EndDate = new DateTime(2026, 11, 1);
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        vm.EndDate = new DateTime(2026, 12, 1);
+
+        vm.EndDateError.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Service_error_does_not_block_the_next_save_after_its_cause_is_gone()
+    {
+        var goal = await Existing();
+        await _timers.SaveAsync(new ActiveTimer(goal.Id, _time.GetUtcNow()));
+        var vm = Edit(goal);
+        vm.Measure = Measure.Duration;
+        vm.DurationHoursInput = 1;
+        await vm.SaveCommand.ExecuteAsync(null);
+        vm.MeasureError.Should().Be("Pare o cronômetro antes de mudar a medida.");
+
+        await _timers.ClearAsync();
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        _closed.Should().Equal(true);
+    }
+
+    [Fact]
     public async Task Delete_requires_confirmation_then_deletes_and_closes()
     {
         var goal = await Existing();

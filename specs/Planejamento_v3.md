@@ -415,7 +415,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 
 - O tipo de recorrência pode ser alterado a qualquer momento; relatórios passados passam a ser calculados com o tipo atual.
 - Meta arquivada é somente leitura: só pode ser desarquivada ou excluída (a exclusão fica no próprio cartão da lista de arquivadas).
-- Desarquivar é permitido, exceto para meta cujo fim já passou (seria arquivada de novo; cria-se outra meta).
+- Desarquivar é permitido, exceto para meta cujo fim já passou (seria arquivada de novo; cria-se outra meta). Nesse caso o botão "Desarquivar" não aparece e o cartão mostra "período encerrado".
 - Data de fim no passado é recusada ao criar ou editar.
 - O arquivamento automático por fim do período roda ao abrir a tela Metas; a virada de dia em tempo real fica para a Fase 4.
 - Ícones: subconjunto fixo de 16 ícones de traço do Lucide (licenças ISC e MIT), embutidos como geometria; chave desconhecida no banco cai no ícone padrão `target`.
