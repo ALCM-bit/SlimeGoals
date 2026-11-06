@@ -177,7 +177,7 @@ Ainda não há pacote pronto para baixar, então gere-o com o `build.sh`, que pr
 
 Isso instala o app em `~/.local/opt/slimegoals/`, o link em `~/.local/bin/slimegoals`, o atalho em `~/.local/share/applications/slimegoals.desktop` e os ícones em `~/.local/share/icons/hicolor/`. Rodar `./install.sh` de novo substitui a versão instalada.
 
-Para desinstalar, rode `./uninstall.sh` de dentro da pasta extraída. Ele pergunta se deve apagar também seus dados (a pasta `~/.local/share/SlimeGoals`, com o banco e os backups); a resposta padrão é não. Para apagar sem a pergunta, use `./uninstall.sh --apagar-dados` com o app fechado. Apagar os dados não tem volta. A entrada de "iniciar com o sistema" (`~/.config/autostart/slimegoals.desktop`) fica; apague-a à mão se quiser.
+Para desinstalar, rode `./uninstall.sh` de dentro da pasta extraída. Ele pergunta se deve apagar também seus dados (a pasta `~/.local/share/SlimeGoals`, com o banco); a resposta padrão é não. Para apagar sem a pergunta, use `./uninstall.sh --apagar-dados` com o app fechado. Apagar os dados não tem volta. A entrada de "iniciar com o sistema" (`~/.config/autostart/slimegoals.desktop`) fica; apague-a à mão se quiser.
 
 ## Documentação
 
