@@ -1,4 +1,5 @@
 using SlimeGoals.Core.Domain;
+using SlimeGoals.Core.Validation;
 
 namespace SlimeGoals.Core.Services;
 
@@ -69,6 +70,8 @@ public static class ReminderPlanner
         var anchor = new[] { state.LastFiredAt, state.LastCheckinAt, state.IntervalStartAt }
             .Where(t => t is { } v && v >= windowStart)
             .Max();
-        return anchor is { } baseTime ? baseTime.AddMinutes(goal.ReminderEveryMinutes) : windowStart;
+        // O mínimo vale aqui também: um intervalo zerado no banco dispararia em laço.
+        var every = Math.Max(goal.ReminderEveryMinutes, GoalValidator.MinReminderMinutes);
+        return anchor is { } baseTime ? baseTime.AddMinutes(every) : windowStart;
     }
 }

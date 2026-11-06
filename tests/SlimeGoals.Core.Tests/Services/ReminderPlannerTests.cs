@@ -31,6 +31,13 @@ public class ReminderPlannerTests
     public void First_reminder_is_window_start_when_nothing_happened_today() =>
         Next(Daily(), Nothing, Today(7)).Should().Be(Today(8));
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-30)]
+    public void Invalid_interval_in_database_uses_the_minimum_instead_of_firing_in_a_loop(int interval) =>
+        Next(Daily() with { ReminderEveryMinutes = interval }, Nothing with { LastFiredAt = Today(9) }, Today(9, 1))
+            .Should().Be(Today(9, 5));
+
     [Fact]
     public void Next_is_last_fire_plus_interval() =>
         Next(Daily(), Nothing with { LastFiredAt = Today(9) }, Today(9, 1)).Should().Be(Today(10));
