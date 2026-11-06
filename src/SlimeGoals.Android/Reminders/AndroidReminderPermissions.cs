@@ -63,9 +63,10 @@ internal sealed class AndroidReminderPermissions(Context context) : IReminderPer
             }
         }
 
-        var intent = new Intent(AProvider.Settings.ActionAppNotificationSettings)
-            .PutExtra(AProvider.Settings.ExtraAppPackage, activity.PackageName);
-        activity.StartActivity(intent);
+        TryStart(activity,
+            new Intent(AProvider.Settings.ActionAppNotificationSettings)
+                .PutExtra(AProvider.Settings.ExtraAppPackage, activity.PackageName),
+            AppDetails(activity));
     }
 
     public void RequestExactAlarms()
@@ -73,9 +74,9 @@ internal sealed class AndroidReminderPermissions(Context context) : IReminderPer
         if (CurrentActivity is not { } activity || !OperatingSystem.IsAndroidVersionAtLeast(31))
             return;
 
-        var intent = new Intent(AProvider.Settings.ActionRequestScheduleExactAlarm,
-            AUri.Parse($"package:{activity.PackageName}"));
-        activity.StartActivity(intent);
+        TryStart(activity,
+            new Intent(AProvider.Settings.ActionRequestScheduleExactAlarm, PackageUri(activity)),
+            AppDetails(activity));
     }
 
     public void RequestBatteryUnrestricted()
@@ -84,23 +85,34 @@ internal sealed class AndroidReminderPermissions(Context context) : IReminderPer
             return;
 
         // Primeiro o diálogo direto; sem tela que o resolva, a lista geral de otimização de bateria.
-        try
+        TryStart(activity,
+            new Intent(AProvider.Settings.ActionRequestIgnoreBatteryOptimizations, PackageUri(activity)),
+            new Intent(AProvider.Settings.ActionIgnoreBatteryOptimizationSettings));
+    }
+
+    private static AUri PackageUri(Activity activity) => AUri.Parse($"package:{activity.PackageName}")!;
+
+    private static Intent AppDetails(Activity activity)
+        => new(AProvider.Settings.ActionApplicationDetailsSettings, PackageUri(activity));
+
+    /// <summary>
+    /// Abre a primeira tela que o sistema tiver. Fabricantes podem remover telas de configuração, e a exceção
+    /// derrubaria o app dentro do comando; sem nenhuma tela, o pedido só fica no Trace.
+    /// </summary>
+    private static void TryStart(Activity activity, params Intent[] intents)
+    {
+        foreach (var intent in intents)
         {
-            activity.StartActivity(new Intent(AProvider.Settings.ActionRequestIgnoreBatteryOptimizations,
-                AUri.Parse($"package:{activity.PackageName}")));
-            return;
-        }
-        catch (ActivityNotFoundException)
-        {
+            try
+            {
+                activity.StartActivity(intent);
+                return;
+            }
+            catch (ActivityNotFoundException)
+            {
+            }
         }
 
-        try
-        {
-            activity.StartActivity(new Intent(AProvider.Settings.ActionIgnoreBatteryOptimizationSettings));
-        }
-        catch (ActivityNotFoundException ex)
-        {
-            System.Diagnostics.Trace.TraceError($"Nenhuma tela de otimização de bateria no sistema: {ex}");
-        }
+        System.Diagnostics.Trace.TraceError($"Nenhuma tela do sistema para: {intents[0].Action}");
     }
 }
