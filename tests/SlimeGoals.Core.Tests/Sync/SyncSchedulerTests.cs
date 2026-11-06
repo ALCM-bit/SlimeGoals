@@ -169,6 +169,26 @@ public class SyncSchedulerTests
     }
 
     [Fact]
+    public void Change_during_the_failure_wait_shortens_it_and_keeps_the_count()
+    {
+        _results.Enqueue(SyncCycleResult.Failed);
+        _results.Enqueue(SyncCycleResult.Failed);
+        using var scheduler = Create();
+        scheduler.Start();
+        _time.Advance(TimeSpan.FromSeconds(10));
+        _changes.NotifyChanged();
+        _time.Advance(TimeSpan.FromSeconds(4));
+        _runs.Should().Be(1);
+        _time.Advance(TimeSpan.FromSeconds(1));
+        _runs.Should().Be(2);
+
+        _time.Advance(TimeSpan.FromSeconds(59));
+        _runs.Should().Be(2);
+        _time.Advance(TimeSpan.FromSeconds(1));
+        _runs.Should().Be(3);
+    }
+
+    [Fact]
     public void RequestNow_during_a_cycle_runs_again_when_it_ends()
     {
         var gate = new TaskCompletionSource<SyncCycleResult>();

@@ -793,6 +793,20 @@ public class SyncEngineTests : IDisposable
         _notices.Should().Be(1);
     }
 
+    /// <summary>Sem COMMIT, nada mudou: o aviso só cortaria a espera da falha para 5 s.</summary>
+    [Fact]
+    public async Task Failure_of_the_apply_raises_none()
+    {
+        await SendFromOtherAsync(NewGoal());
+        _db.Anchor.Execute("CREATE TRIGGER no_goals BEFORE INSERT ON goals BEGIN SELECT RAISE(ABORT, 'recusada'); END");
+
+        var result = await Engine().RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Failed);
+        _notices.Should().Be(0);
+        (await State.GetAsync()).LastSeq.Should().Be(0);
+    }
+
     [Fact]
     public async Task Failure_after_the_full_resync_removal_still_raises_the_notice()
     {

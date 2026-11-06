@@ -136,16 +136,23 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
     private async Task ApplyAsync(SyncPullPage page, long lastSeq, Guid deviceId, CancellationToken ct)
     {
         var records = page.Records.Select(Open).ToList();
+        var applied = false;
         using (changes.Defer())
         {
-            // O portão pode falhar depois do COMMIT, e aí as telas ainda precisam recarregar.
+            // O portão pode falhar depois do COMMIT, e aí as telas ainda precisam recarregar. Sem COMMIT, nada mudou.
             try
             {
-                await gate.RunAsync(c => store.ApplyPageAsync(records, lastSeq, deviceId, c), ct).ConfigureAwait(false);
+                await gate.RunAsync(async c =>
+                {
+                    var goals = await store.ApplyPageAsync(records, lastSeq, deviceId, c).ConfigureAwait(false);
+                    applied = true;
+                    return goals;
+                }, ct).ConfigureAwait(false);
             }
             finally
             {
-                changes.NotifyChanged();
+                if (applied)
+                    changes.NotifyChanged();
             }
         }
     }
