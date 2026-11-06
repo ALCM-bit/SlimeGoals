@@ -39,7 +39,7 @@ public static class GoalHistory
             {
                 if (!ExistedOn(goal, d, zone) || !goal.ActiveDays.Includes(d.DayOfWeek))
                     continue;
-                var done = sums.On(goal.Id, d);
+                var done = GoalTotals.Effective(goal, sums.On(goal.Id, d));
                 result.Add(new PeriodResult(new DateRange(d, d.AddDays(1)), done, done >= goal.Target, d == today));
             }
             return result;
@@ -60,7 +60,7 @@ public static class GoalHistory
             if (first is not { } day)
                 continue;
 
-            var done = sums.In(goal.Id, GoalPeriod.EvaluationPeriod(goal, day)!.Value);
+            var done = GoalTotals.Effective(goal, sums.In(goal.Id, GoalPeriod.EvaluationPeriod(goal, day)!.Value));
             result.Add(new PeriodResult(week, done, done >= goal.Target, week.Contains(today)));
         }
         return result;

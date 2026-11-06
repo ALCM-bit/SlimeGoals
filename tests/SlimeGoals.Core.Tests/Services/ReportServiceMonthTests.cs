@@ -193,4 +193,15 @@ public class ReportServiceMonthTests
 
         top!.Goal.Id.Should().Be(older.Id);
     }
+
+    [Fact]
+    public async Task Month_week_percent_is_never_negative()
+    {
+        var goal = await Create("Semanal", Recurrence.Weekly, target: 3);
+        await Record(goal, Mon, -2);
+
+        var row = (await Service.GetMonthAsync(2026, 11)).Goals.Single();
+
+        row.WeekPercents[0].Should().Be(0);
+    }
 }

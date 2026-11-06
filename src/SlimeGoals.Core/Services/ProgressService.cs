@@ -41,7 +41,7 @@ public sealed class ProgressService(IGoalRepository goals, ICheckinRepository ch
             .Where(g => GoalPeriod.IsShownOn(g, today))
             .Select(g =>
             {
-                var done = SumIn(g, GoalPeriod.EvaluationPeriod(g, today)!.Value);
+                var done = GoalTotals.Effective(g, SumIn(g, GoalPeriod.EvaluationPeriod(g, today)!.Value));
                 return new GoalProgress(g, done, done >= g.Target);
             })
             .OrderBy(p => p.IsMet).ThenBy(p => p.Goal.CreatedAt)

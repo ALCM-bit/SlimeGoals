@@ -164,7 +164,7 @@ public sealed class ReportService(IGoalRepository goals, ICheckinRepository chec
             }
             if (FirstExistingDay(goal, week, today, zone) is not { } first)
                 return null;
-            var done = sums.In(goal.Id, GoalPeriod.EvaluationPeriod(goal, first)!.Value);
+            var done = GoalTotals.Effective(goal, sums.In(goal.Id, GoalPeriod.EvaluationPeriod(goal, first)!.Value));
             return Round(Math.Min(1.0, (double)done / goal.Target) * 100);
         }).ToList();
 
@@ -191,7 +191,7 @@ public sealed class ReportService(IGoalRepository goals, ICheckinRepository chec
 
         var first = FirstExistingDay(goal, week, today, zone)!.Value;
         var evaluation = GoalPeriod.EvaluationPeriod(goal, first)!.Value;
-        var weekDone = sums.In(goal.Id, evaluation);
+        var weekDone = GoalTotals.Effective(goal, sums.In(goal.Id, evaluation));
         var weeklyPercent = Round(Math.Min(1.0, (double)weekDone / goal.Target) * 100);
 
         DateOnly? best = null;
@@ -219,10 +219,14 @@ public sealed class ReportService(IGoalRepository goals, ICheckinRepository chec
     }
 
     private static List<DayGoalEntry> DayEntries(IEnumerable<WeekGoalRow> rows, DateOnly day, DailySums sums) =>
-        rows.Select(r => (r.Goal, Done: sums.On(r.Goal.Id, day)))
+        rows.Select(r => (r.Goal, Done: DayDone(r.Goal, day, sums)))
             .Where(e => e.Done > 0)
             .Select(e => new DayGoalEntry(e.Goal, e.Done, e.Goal.Recurrence == Recurrence.Daily ? e.Done >= e.Goal.Target : null))
             .ToList();
+
+    /// <summary>Total do dia; só a diária limita, porque na semanal o dia é parte do total da semana.</summary>
+    private static int DayDone(Goal goal, DateOnly day, DailySums sums) =>
+        goal.Recurrence == Recurrence.Daily ? GoalTotals.Effective(goal, sums.On(goal.Id, day)) : sums.On(goal.Id, day);
 
     private static int Round(double value) => (int)Math.Round(value, MidpointRounding.AwayFromZero);
 }

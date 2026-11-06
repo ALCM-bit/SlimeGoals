@@ -188,4 +188,20 @@ public class ProgressServiceTests
         var orphan = await Service.GetTodayAsync();
         (orphan.Timer is not null, orphan.TimerGoal).Should().Be((true, (Goal?)null));
     }
+
+    [Fact]
+    public async Task Today_limits_totals()
+    {
+        var completion = await Create("Conclusão", measure: Measure.Completion);
+        var quantity = await Create("Quantidade", target: 3);
+        await Record(completion, Today, 1);
+        await Record(completion, Today, 1);
+        await Record(quantity, Today, -2);
+
+        var goals = (await Service.GetTodayAsync()).Goals;
+
+        goals.Single(p => p.Goal.Id == completion.Id).Done.Should().Be(1);
+        var q = goals.Single(p => p.Goal.Id == quantity.Id);
+        (q.Done, q.IsMet).Should().Be((0, false));
+    }
 }
