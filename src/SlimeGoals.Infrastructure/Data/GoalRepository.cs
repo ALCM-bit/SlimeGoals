@@ -21,6 +21,7 @@ public sealed class GoalRepository(SqliteConnectionFactory db) : IGoalRepository
     public async Task AddAsync(Goal goal, CancellationToken ct = default)
     {
         await using var c = db.Open();
+        await using var tx = await c.BeginTransactionAsync(ct);
         await c.ExecuteAsync(new CommandDefinition("""
             INSERT INTO goals (id, title, recurrence, target, measure, unit, icon, color, reminder_every_min, active_from,
                                active_until, active_days, start_date, end_date, created_at, updated_at,
@@ -28,12 +29,15 @@ public sealed class GoalRepository(SqliteConnectionFactory db) : IGoalRepository
             VALUES (@Id, @Title, @Recurrence, @Target, @Measure, @Unit, @Icon, @Color, @ReminderEveryMin, @ActiveFrom,
                     @ActiveUntil, @ActiveDays, @StartDate, @EndDate, @CreatedAt, @UpdatedAt,
                     @ArchivedAt, @DeletedAt)
-            """, GoalRow.FromDomain(goal), cancellationToken: ct));
+            """, GoalRow.FromDomain(goal), tx, cancellationToken: ct));
+        await SyncOutbox.EnqueueAsync(c, tx, goal.Id, SyncOutbox.Goal, ct);
+        await tx.CommitAsync(ct);
     }
 
     public async Task UpdateAsync(Goal goal, CancellationToken ct = default)
     {
         await using var c = db.Open();
+        await using var tx = await c.BeginTransactionAsync(ct);
         var affected = await c.ExecuteAsync(new CommandDefinition("""
             UPDATE goals SET title = @Title, recurrence = @Recurrence, target = @Target, measure = @Measure, unit = @Unit, icon = @Icon,
                    color = @Color, reminder_every_min = @ReminderEveryMin, active_from = @ActiveFrom,
@@ -41,10 +45,12 @@ public sealed class GoalRepository(SqliteConnectionFactory db) : IGoalRepository
                    end_date = @EndDate, updated_at = @UpdatedAt,
                    archived_at = @ArchivedAt, deleted_at = @DeletedAt
             WHERE id = @Id
-            """, GoalRow.FromDomain(goal), cancellationToken: ct));
+            """, GoalRow.FromDomain(goal), tx, cancellationToken: ct));
 
         if (affected == 0)
             throw new GoalNotFoundException(goal.Id);
+        await SyncOutbox.EnqueueAsync(c, tx, goal.Id, SyncOutbox.Goal, ct);
+        await tx.CommitAsync(ct);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
