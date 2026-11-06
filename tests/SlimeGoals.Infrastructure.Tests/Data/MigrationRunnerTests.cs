@@ -231,6 +231,46 @@ public class MigrationRunnerConcurrencyTests
     }
 
     // Revisão final #5b: banco criado por uma versão mais nova do app.
+    [Theory]
+    [InlineData("lixo")]
+    [InlineData("truncado")]
+    public void Unreadable_file_fails_to_open_and_is_left_untouched(string kind)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"slimegoals-corrupt-{Guid.NewGuid():N}.db");
+        try
+        {
+            var factory = new SqliteConnectionFactory($"Data Source={path}");
+            if (kind == "lixo")
+            {
+                File.WriteAllText(path, "isto não é um banco SQLite, é só um arquivo qualquer com texto suficiente");
+            }
+            else
+            {
+                using (var connection = factory.Open())
+                    MigrationRunner.Migrate(connection);
+                SqliteConnection.ClearAllPools();
+                var full = File.ReadAllBytes(path);
+                File.WriteAllBytes(path, full[..(full.Length / 2)]);
+            }
+            var before = File.ReadAllBytes(path);
+
+            var act = () =>
+            {
+                using var connection = factory.Open();
+                MigrationRunner.Migrate(connection);
+            };
+
+            act.Should().Throw<SqliteException>();
+            SqliteConnection.ClearAllPools();
+            File.ReadAllBytes(path).Should().Equal(before);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            File.Delete(path);
+        }
+    }
+
     [Fact]
     public void Database_newer_than_app_is_rejected()
     {

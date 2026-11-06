@@ -31,14 +31,21 @@ public class MainActivity : AvaloniaMainActivity
         base.OnCreate(savedInstanceState);
         if (Permissions is { } permissions)
             permissions.CurrentActivity = this;
+        if (AndroidApplication.StartupFailure is { } failure)
+            failure.CloseRequested += OnStartupFailureClose;
     }
 
     protected override void OnDestroy()
     {
         if (Permissions is { } permissions && ReferenceEquals(permissions.CurrentActivity, this))
             permissions.CurrentActivity = null;
+        if (AndroidApplication.StartupFailure is { } failure)
+            failure.CloseRequested -= OnStartupFailureClose;
         base.OnDestroy();
     }
+
+    /// <summary>"Fechar" da tela de erro: sai do app e da lista de recentes.</summary>
+    private void OnStartupFailureClose(object? sender, EventArgs e) => FinishAndRemoveTask();
 
     /// <summary>O usuário respondeu ao diálogo de permissão: a tela relê o estado.</summary>
     public override void OnRequestPermissionsResult(int requestCode, string[] permissions,

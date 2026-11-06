@@ -158,6 +158,20 @@ public class ProgressServiceTests
 
     // Revisão final #1: cronômetro de meta fora da lista de hoje continua visível (senão bloqueia os outros sem saída).
     [Fact]
+    public async Task Timer_of_unreadable_goal_is_treated_as_orphan_and_today_still_loads()
+    {
+        var unreadable = await Create("Ilegível", target: 60, measure: Measure.Duration);
+        var other = await Create("Legível");
+        await _timers.TryStartAsync(new ActiveTimer(unreadable.Id, Now));
+        _goals.MarkUnreadable(unreadable.Id);
+
+        var today = await Service.GetTodayAsync();
+
+        today.Goals.Select(p => p.Goal.Id).Should().Equal(other.Id);
+        (today.Timer is not null, today.TimerGoal).Should().Be((true, (Goal?)null));
+    }
+
+    [Fact]
     public async Task Timer_is_returned_with_its_goal_even_when_goal_is_not_listed()
     {
         var study = await Create("Estudar", target: 60, measure: Measure.Duration);

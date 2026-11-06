@@ -44,25 +44,24 @@ public sealed class ReminderLogRepository(SqliteConnectionFactory db) : IReminde
     public async Task<IReadOnlyList<ReminderLogEntry>> ListAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken ct = default)
     {
         await using var c = db.Open();
-        var rows = await c.QueryAsync<Row>(new CommandDefinition("""
+        return await RowReader.ReadValidAsync<Row, ReminderLogEntry>(c, new CommandDefinition("""
             SELECT id AS Id, goal_id AS GoalId, fired_at AS FiredAt, response AS Response, responded_at AS RespondedAt
             FROM reminder_log
             WHERE fired_at >= @From AND fired_at < @To
             ORDER BY fired_at
-            """, new { From = SqlText.Instant(fromUtc), To = SqlText.Instant(toUtc) }, cancellationToken: ct));
-        return rows.Select(r => r.ToDomain()).ToList();
+            """, new { From = SqlText.Instant(fromUtc), To = SqlText.Instant(toUtc) }, cancellationToken: ct),
+            "reminder_log", r => r.ToDomain());
     }
 
     public async Task<IReadOnlyList<ReminderLogEntry>> ListPendingAsync(CancellationToken ct = default)
     {
         await using var c = db.Open();
-        var rows = await c.QueryAsync<Row>(new CommandDefinition("""
+        return await RowReader.ReadValidAsync<Row, ReminderLogEntry>(c, new CommandDefinition("""
             SELECT id AS Id, goal_id AS GoalId, fired_at AS FiredAt, response AS Response, responded_at AS RespondedAt
             FROM reminder_log
             WHERE response IS NULL
             ORDER BY fired_at
-            """, cancellationToken: ct));
-        return rows.Select(r => r.ToDomain()).ToList();
+            """, cancellationToken: ct), "reminder_log", r => r.ToDomain());
     }
 
     /// <summary>Linha crua de reminder_log, tudo como TEXT nos formatos da spec §8.</summary>

@@ -74,7 +74,7 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
         foreach (var entry in pending)
         {
             var goal = snapshot.Goals.FirstOrDefault(g => g.Id == entry.GoalId)
-                       ?? await goals.GetAsync(entry.GoalId, ct);
+                       ?? await goals.GetIfReadableAsync(entry.GoalId, ct);
             // Disparado antes de hoje (dia local): não vale mais depois da meia-noite.
             var stale = goal is null || goal.ArchivedAt is not null
                         || entry.FiredAt < snapshot.TodayStart

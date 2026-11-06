@@ -1,3 +1,4 @@
+using System.Data;
 using Dapper;
 using SlimeGoals.Core;
 using SlimeGoals.Core.Abstractions;
@@ -68,20 +69,27 @@ public sealed class GoalRepository(SqliteConnectionFactory db) : IGoalRepository
     public async Task<Goal?> GetAsync(Guid id, CancellationToken ct = default)
     {
         await using var c = db.Open();
-        var row = await c.QuerySingleOrDefaultAsync<GoalRow>(new CommandDefinition(
-            SelectColumns + " WHERE id = @Id AND deleted_at IS NULL",
-            new { Id = id.ToString("D") }, cancellationToken: ct));
-        return row?.ToDomain();
+        try
+        {
+            var row = await c.QuerySingleOrDefaultAsync<GoalRow>(new CommandDefinition(
+                SelectColumns + " WHERE id = @Id AND deleted_at IS NULL",
+                new { Id = id.ToString("D") }, cancellationToken: ct));
+            return row?.ToDomain();
+        }
+        catch (DataException e)
+        {
+            // Tipo errado numa coluna: o Dapper embrulha; quem lê por id só precisa saber que a linha é inválida.
+            throw new FormatException($"Linha inválida em goals: {id}.", e);
+        }
     }
 
     public async Task<IReadOnlyList<Goal>> ListAsync(bool includeArchived, CancellationToken ct = default)
     {
         await using var c = db.Open();
-        var rows = await c.QueryAsync<GoalRow>(new CommandDefinition(
+        return await RowReader.ReadValidAsync<GoalRow, Goal>(c, new CommandDefinition(
             SelectColumns + """
              WHERE deleted_at IS NULL AND (@IncludeArchived OR archived_at IS NULL)
              ORDER BY created_at
-            """, new { IncludeArchived = includeArchived }, cancellationToken: ct));
-        return rows.Select(r => r.ToDomain()).ToList();
+            """, new { IncludeArchived = includeArchived }, cancellationToken: ct), "goals", r => r.ToDomain());
     }
 }

@@ -28,14 +28,13 @@ public sealed class CheckinRepository(SqliteConnectionFactory db) : ICheckinRepo
     public async Task<IReadOnlyList<Checkin>> ListAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken ct = default)
     {
         await using var c = db.Open();
-        var rows = await c.QueryAsync<Row>(new CommandDefinition("""
+        return await RowReader.ReadValidAsync<Row, Checkin>(c, new CommandDefinition("""
             SELECT id AS Id, goal_id AS GoalId, done_at AS DoneAt, amount AS Amount, note AS Note,
                    updated_at AS UpdatedAt, deleted_at AS DeletedAt
             FROM checkins
             WHERE deleted_at IS NULL AND done_at >= @From AND done_at < @To
             ORDER BY done_at
-            """, Range(fromUtc, toUtc), cancellationToken: ct));
-        return rows.Select(r => r.ToDomain()).ToList();
+            """, Range(fromUtc, toUtc), cancellationToken: ct), "checkins", r => r.ToDomain());
     }
 
     public async Task<int> SumAsync(Guid goalId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken ct = default)

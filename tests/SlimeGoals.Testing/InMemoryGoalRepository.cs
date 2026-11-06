@@ -12,6 +12,7 @@ public sealed class InMemoryGoalRepository(InMemoryCheckinRepository? checkins =
     InMemoryTimerRepository? timers = null) : IGoalRepository
 {
     private readonly Dictionary<Guid, Goal> _goals = new();
+    private readonly HashSet<Guid> _unreadable = [];
 
     public int Count => _goals.Count;
 
@@ -20,6 +21,9 @@ public sealed class InMemoryGoalRepository(InMemoryCheckinRepository? checkins =
 
     /// <summary>Quando definido, toda leitura lança esta exceção.</summary>
     public Exception? FailReadsWith { get; set; }
+
+    /// <summary>Simula linha inválida no banco: a meta some das listas, e a leitura por id lança <see cref="FormatException"/>.</summary>
+    public void MarkUnreadable(Guid id) => _unreadable.Add(id);
 
     public Task AddAsync(Goal goal, CancellationToken ct = default)
     {
@@ -46,11 +50,15 @@ public sealed class InMemoryGoalRepository(InMemoryCheckinRepository? checkins =
         return Task.CompletedTask;
     }
 
-    public Task<Goal?> GetAsync(Guid id, CancellationToken ct = default) =>
-        FailReadsWith is not null ? throw FailReadsWith : Task.FromResult(_goals.TryGetValue(id, out var g) && g.DeletedAt is null ? g : null);
+    public Task<Goal?> GetAsync(Guid id, CancellationToken ct = default)
+    {
+        if (_unreadable.Contains(id))
+            throw new FormatException($"Linha inválida: {id}.");
+        return FailReadsWith is not null ? throw FailReadsWith : Task.FromResult(_goals.TryGetValue(id, out var g) && g.DeletedAt is null ? g : null);
+    }
 
     public Task<IReadOnlyList<Goal>> ListAsync(bool includeArchived, CancellationToken ct = default) =>
         FailReadsWith is not null ? throw FailReadsWith : Task.FromResult<IReadOnlyList<Goal>>(_goals.Values
-            .Where(g => g.DeletedAt is null && (includeArchived || g.ArchivedAt is null))
+            .Where(g => g.DeletedAt is null && !_unreadable.Contains(g.Id) && (includeArchived || g.ArchivedAt is null))
             .OrderBy(g => g.CreatedAt).ToList());
 }
