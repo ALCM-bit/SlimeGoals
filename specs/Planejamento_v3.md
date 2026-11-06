@@ -30,7 +30,7 @@ Aplicação multiplataforma para cadastrar metas (hábitos diários e metas sema
 
 ## 3. Requisitos não funcionais
 
-- **Offline e local:** SQLite, sem servidor.
+- **Offline e local:** SQLite, sem servidor. A sincronização opcional está em `Sincronizacao_v1.md`; sem conta, nada muda.
 - **Separação de camadas:** nenhuma regra de negócio na UI, para compartilhar Core e UI entre Linux e Android.
 - **Testável:** Core sem dependência de Avalonia; relógio injetável (`TimeProvider`).
 - **Resposta independente da UI:** tratar a ação de um lembrete (Feito/Adiar/Ignorar) não pode exigir janela nem ViewModel; no Android o processo pode estar morto.
@@ -386,7 +386,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 | Três tipos de recorrência multiplicam casos de borda                                                     | Regra centralizada em `GoalPeriod`; testes por tipo antes de qualquer tela                                |
 | Semanas e dias parciais                                                                                  | Alvo não proporcionalizado; arquivamento automático ao fim                                                |
 | Dapper vs. EF Core                                                                                       | Dapper no MVP; trocar é barato por causa dos repositórios                                                 |
-| Login e sincronização Linux ↔ Android                                                                    | Fora do MVP (dados independentes por dispositivo); modelo já preparado (GUID, `updated_at`, `deleted_at`) |
+| Login e sincronização Linux ↔ Android                                                                    | Fora do MVP (dados independentes por dispositivo); próxima etapa em `Sincronizacao_v1.md` |
 
 ## 15. Decisões registradas e próximos passos
 
@@ -490,7 +490,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 7. Ícone do app: o slime do design `specs/design/Slime — mascote do SlimeGoals.html`, pose parada, sem sombra nem confete; substitui também o ícone provisório da bandeja; o "target" do Lucide continua como ícone de meta.
 8. Nome e ícone no GNOME: `.desktop` com `StartupWMClass=slimegoals` e `WM_CLASS` `slimegoals` no app (`X11PlatformOptions.WmClass`, via XWayland); cabeçalho das notificações e painel conferidos à mão depois da instalação.
 
-**Pendências:** sincronização entre dispositivos (fora do MVP). A versão mínima do Android ficou definida como Android 8.0 (API 26) na Fase 7c.
+**Pendências:** sincronização entre dispositivos (fora do MVP; especificada em `Sincronizacao_v1.md`). A versão mínima do Android ficou definida como Android 8.0 (API 26) na Fase 7c.
 
 **Próximos passos imediatos:**
 
