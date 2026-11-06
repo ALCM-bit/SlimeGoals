@@ -141,4 +141,111 @@ public class SyncOutboxTests : IDisposable
         await add.Should().ThrowAsync<GoalNotFoundException>();
         Count("sync_outbox").Should().Be(0);
     }
+
+    private void MarkKnown(Guid id, string kind, int seq) => _db.Anchor.Execute(
+        "INSERT INTO sync_records (record_id, kind, seq) VALUES (@Id, @Kind, @Seq)", new { Id = id.ToString("D"), Kind = kind, Seq = seq });
+
+    private static string Text(Guid id) => id.ToString("D");
+
+    [Fact]
+    public async Task Deleting_with_sync_off_touches_no_sync_table()
+    {
+        var goal = NewGoal();
+        await Goals.AddAsync(goal);
+        await Checkins.AddAsync(NewCheckin(goal));
+
+        await Goals.DeleteAsync(goal.Id);
+
+        Count("sync_outbox").Should().Be(0);
+        Count("sync_records").Should().Be(0);
+        Count("sync_tombstones").Should().Be(0);
+        Count("sync_pending").Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Deleting_goal_the_server_knows_queues_delete_and_tombstone()
+    {
+        EnableSync();
+        var goal = NewGoal();
+        await Goals.AddAsync(goal);
+        MarkKnown(goal.Id, "goal", 5);
+
+        await Goals.DeleteAsync(goal.Id);
+
+        var row = await _db.Anchor.QuerySingleAsync("SELECT kind, op, base_seq FROM sync_outbox WHERE record_id = @Id", new { Id = Text(goal.Id) });
+        ((string)row.kind).Should().Be("goal");
+        ((string)row.op).Should().Be("delete");
+        ((long)row.base_seq).Should().Be(5);
+        (await _db.Anchor.QueryAsync<string>("SELECT goal_id FROM sync_tombstones")).Should().Equal(Text(goal.Id));
+    }
+
+    [Fact]
+    public async Task Deleting_goal_never_sent_only_leaves_the_queue()
+    {
+        EnableSync();
+        var goal = NewGoal();
+        await Goals.AddAsync(goal);
+
+        await Goals.DeleteAsync(goal.Id);
+
+        Count("sync_outbox").Should().Be(0);
+        (await _db.Anchor.QueryAsync<string>("SELECT goal_id FROM sync_tombstones")).Should().Equal(Text(goal.Id));
+    }
+
+    [Fact]
+    public async Task Deleting_goal_handles_each_checkin()
+    {
+        EnableSync();
+        var goal = NewGoal();
+        await Goals.AddAsync(goal);
+        var known = NewCheckin(goal);
+        var unsent = NewCheckin(goal);
+        await Checkins.AddAsync(known);
+        await Checkins.AddAsync(unsent);
+        MarkKnown(known.Id, "checkin", 3);
+
+        await Goals.DeleteAsync(goal.Id);
+
+        var rows = (await _db.Anchor.QueryAsync("SELECT record_id, kind, op, base_seq FROM sync_outbox")).ToList();
+        rows.Should().ContainSingle();
+        ((string)rows[0].record_id).Should().Be(Text(known.Id));
+        ((string)rows[0].kind).Should().Be("checkin");
+        ((string)rows[0].op).Should().Be("delete");
+        ((long)rows[0].base_seq).Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Deleting_goal_purges_pending_checkins()
+    {
+        EnableSync();
+        var goal = NewGoal();
+        var other = NewGoal();
+        await Goals.AddAsync(goal);
+        await Goals.AddAsync(other);
+        foreach (var g in new[] { goal, other })
+            _db.Anchor.Execute("INSERT INTO sync_pending (record_id, goal_id, seq, payload) VALUES (@R, @G, 1, '{}')",
+                new { R = Text(Guid.CreateVersion7()), G = Text(g.Id) });
+
+        await Goals.DeleteAsync(goal.Id);
+
+        (await _db.Anchor.QueryAsync<string>("SELECT goal_id FROM sync_pending")).Should().Equal(Text(other.Id));
+    }
+
+    [Fact]
+    public async Task Deleting_missing_goal_changes_no_sync_table()
+    {
+        EnableSync();
+        var goal = NewGoal();
+        await Goals.AddAsync(goal);
+        var ghost = Guid.CreateVersion7();
+        _db.Anchor.Execute("INSERT INTO sync_pending (record_id, goal_id, seq, payload) VALUES (@R, @G, 1, '{}')",
+            new { R = Text(Guid.CreateVersion7()), G = Text(ghost) });
+
+        var delete = () => Goals.DeleteAsync(ghost);
+
+        await delete.Should().ThrowAsync<GoalNotFoundException>();
+        Count("sync_outbox").Should().Be(1);
+        Count("sync_tombstones").Should().Be(0);
+        Count("sync_pending").Should().Be(1);
+    }
 }
