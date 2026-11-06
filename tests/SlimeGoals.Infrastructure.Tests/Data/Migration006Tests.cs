@@ -31,4 +31,16 @@ public class Migration006Tests
         c.ExecuteScalar<long>("SELECT full_resync FROM sync_state").Should().Be(0);
         c.ExecuteScalar<long>("SELECT COUNT(*) FROM pragma_table_info('sync_outbox') WHERE name = 'record_key'").Should().Be(1);
     }
+
+    /// <summary>Cada exclusão recebida procura a chave também na fila: sem índice, varreria a fila inteira, que ao ligar tem tudo.</summary>
+    [Fact]
+    public void Outbox_is_searched_by_key_through_an_index()
+    {
+        using var db = new TestDatabase();
+
+        var plan = db.Anchor.Query("EXPLAIN QUERY PLAN SELECT record_id, kind FROM sync_outbox WHERE record_key = 'k'")
+            .Select(r => (string)r.detail).ToList();
+
+        plan.Should().ContainSingle().Which.Should().Contain("USING INDEX");
+    }
 }
