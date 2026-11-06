@@ -8,7 +8,7 @@ com os dados guardados localmente em SQLite.
 ![Tela Hoje no desktop, com o slime e as metas do dia](docs/images/hoje-desktop.png)
 
 > **Status:** em desenvolvimento. O app funciona no Linux, com pacote de instalação, e no Android, onde já dá para
-> gerar um APK assinado ([Instalar no Android](#instalar-no-android)). Falta o autor conferir o APK num celular de verdade. Veja o [roteiro](#roteiro).
+> gerar um APK assinado ([Instalar no Android](#instalar-no-android)). O autor já testou num celular de verdade a instalação, as notificações e os lembretes, inclusive depois de religar o aparelho. Veja o [roteiro](#roteiro).
 
 ## Funcionalidades do MVP
 
@@ -202,7 +202,7 @@ Para desinstalar, rode `./uninstall.sh` de dentro da pasta extraída. Ele pergun
 | 4 | Lembretes (planejador, agendador, notificação nativa, segundo plano) | ✅ |
 | 5 | Relatórios | ✅ |
 | 6 | Acabamento e empacotamento Linux | ✅ |
-| 7 | Android (7a interface ✅ · 7b lembretes ✅ · 7c distribuição ✅ implementado · ⏳ aparelho real) | ⏳ |
+| 7 | Android (7a interface ✅ · 7b lembretes ✅ · 7c distribuição ✅ implementado · ⏳ teste longo no aparelho) | ⏳ |
 | 8 | Mascote slime | ✅ |
 
 ## Licença
