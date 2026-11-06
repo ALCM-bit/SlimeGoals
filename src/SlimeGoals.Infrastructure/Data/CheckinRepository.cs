@@ -74,7 +74,7 @@ public sealed class CheckinRepository(SqliteConnectionFactory db) : ICheckinRepo
         new { From = SqlText.Instant(fromUtc), To = SqlText.Instant(toUtc) };
 
     /// <summary>Linha crua de checkins, tudo como TEXT nos formatos da spec §8.</summary>
-    private sealed class Row
+    internal sealed class Row
     {
         public required string Id { get; init; }
         public required string GoalId { get; init; }

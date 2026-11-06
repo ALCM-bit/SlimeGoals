@@ -9,7 +9,7 @@ namespace SlimeGoals.Infrastructure.Data;
 /// <summary>Adaptador SQLite da porta <see cref="IGoalRepository"/>. Uma conexão por operação.</summary>
 public sealed class GoalRepository(SqliteConnectionFactory db) : IGoalRepository
 {
-    private const string SelectColumns = """
+    internal const string SelectColumns = """
         SELECT id AS Id, title AS Title, recurrence AS Recurrence, target AS Target, measure AS Measure, unit AS Unit, icon AS Icon,
                color AS Color, reminder_every_min AS ReminderEveryMin, active_from AS ActiveFrom,
                active_until AS ActiveUntil, active_days AS ActiveDays, start_date AS StartDate,
