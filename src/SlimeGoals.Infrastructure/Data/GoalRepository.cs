@@ -57,16 +57,8 @@ public sealed class GoalRepository(SqliteConnectionFactory db) : IGoalRepository
     {
         await using var c = db.Open();
         await using var tx = await c.BeginTransactionAsync(ct);
-        var parameters = new { Id = SqlText.Id(id) };
         await SyncOutbox.EnqueueGoalDeletionAsync(c, tx, id, ct);
-        // Filhas antes da meta: as chaves estrangeiras estão ligadas e não há ON DELETE CASCADE.
-        await c.ExecuteAsync(new CommandDefinition("""
-            DELETE FROM active_timer WHERE goal_id = @Id;
-            DELETE FROM checkins WHERE goal_id = @Id;
-            DELETE FROM reminder_log WHERE goal_id = @Id;
-            """, parameters, tx, cancellationToken: ct));
-        var affected = await c.ExecuteAsync(new CommandDefinition(
-            "DELETE FROM goals WHERE id = @Id", parameters, tx, cancellationToken: ct));
+        var affected = await GoalDeletion.DeleteRowsAsync(c, tx, id, ct);
 
         if (affected == 0)
             throw new GoalNotFoundException(id);
