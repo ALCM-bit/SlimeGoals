@@ -84,6 +84,27 @@ public class FakeSyncServerTests
     }
 
     [Fact]
+    public async Task Purge_never_passes_the_highest_seq()
+    {
+        await _server.PushAsync([new("a", 0, null), new("b", 0, null)]);
+
+        _server.PurgeBefore(long.MaxValue);
+
+        _server.Records.Should().ContainSingle().Which.Should().Be(new RemoteRecord("b", 2, null));
+        (await _server.PullAsync(2, 10, full: false)).Records.Should().BeEmpty();
+        var behind = () => _server.PullAsync(1, 10, full: false);
+        await behind.Should().ThrowAsync<SyncResetRequiredException>();
+    }
+
+    [Fact]
+    public async Task Purge_of_an_empty_account_requires_no_reset()
+    {
+        _server.PurgeBefore(10);
+
+        (await _server.PullAsync(0, 10, full: false)).Records.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Server_without_purge_never_requires_reset()
     {
         await _server.PushAsync([new("a", 0, Blob)]);

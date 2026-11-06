@@ -30,6 +30,7 @@ internal sealed class SimulatedDevice : IDisposable
     private readonly DeviceTransport _transport;
     private readonly SyncEngine _engine;
     private readonly SyncStateRepository _state;
+    private readonly DataChangeNotifier _changes = new();
     private readonly GoalService _goals;
     private readonly CheckinService _checkins;
 
@@ -44,12 +45,11 @@ internal sealed class SimulatedDevice : IDisposable
         var goals = new GoalRepository(_db.Factory);
         var checkins = new CheckinRepository(_db.Factory);
         var timers = new TimerRepository(_db.Factory);
-        var changes = new DataChangeNotifier();
         var reminders = new ReminderService(goals, checkins, timers, new ReminderLogRepository(_db.Factory), Notifications,
             new PlainFormatter(), Time);
-        _goals = new GoalService(goals, checkins, timers, Time, changes, reminders);
-        _checkins = new CheckinService(goals, checkins, Time, changes);
-        _engine = new SyncEngine(_state, new SyncLocalStore(_db.Factory), _transport, new PlainSyncCrypto(), reminders, changes, Time);
+        _goals = new GoalService(goals, checkins, timers, Time, _changes, reminders);
+        _checkins = new CheckinService(goals, checkins, Time, _changes);
+        _engine = new SyncEngine(_state, new SyncLocalStore(_db.Factory), _transport, new PlainSyncCrypto(), reminders, _changes, Time);
         // EnableAsync mantém o id que já existe: assim cada aparelho tem o seu, escolhido pelo teste.
         _db.Anchor.Execute("UPDATE sync_state SET device_id = @Id", new { Id = id.ToString("D") });
     }
@@ -58,6 +58,9 @@ internal sealed class SimulatedDevice : IDisposable
     public Guid Id { get; }
     public FakeTimeProvider Time { get; }
     public FakeNotificationService Notifications { get; } = new();
+
+    /// <summary>Ciclos rodados pelo agendador de <see cref="NewScheduler"/>.</summary>
+    public int ScheduledCycles { get; private set; }
 
     /// <summary>Tamanho da página pedida ao servidor. Menor que o padrão, faz registros chegarem antes da meta.</summary>
     public int? PageSize
@@ -123,6 +126,13 @@ internal sealed class SimulatedDevice : IDisposable
             throw new InvalidOperationException($"A ação durante o envio falhou em {Name}: {failure}", failure);
         return result;
     }
+
+    /// <summary>O agendador de verdade, com o motor, os avisos de mudança e o relógio deste aparelho.</summary>
+    public SyncScheduler NewScheduler() => new(ct =>
+    {
+        ScheduledCycles++;
+        return _engine.RunCycleAsync(ct);
+    }, _changes, Time);
 
     /// <summary>Lembrete já mostrado e sem resposta, como o log guarda. Devolve o id da linha.</summary>
     public async Task<Guid> AddPendingReminder(Guid goalId)

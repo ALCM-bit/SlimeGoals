@@ -53,13 +53,16 @@ public sealed class FakeSyncServer : ISyncTransport
             _nextFailure = failure;
     }
 
-    /// <summary>Limpa as marcas de exclusão anteriores a <paramref name="seq"/>. Quem parou antes disso precisa refazer tudo.</summary>
+    /// <summary>
+    /// Limpa as marcas de exclusão anteriores a <paramref name="seq"/>, sem passar do maior <c>seq</c> da conta: o registro
+    /// mais novo sempre fica, e quem lê tudo alcança a limpeza (regra 5). Quem parou antes dela precisa refazer tudo.
+    /// </summary>
     public void PurgeBefore(long seq)
     {
         lock (_lock)
         {
-            _purgedBefore = seq;
-            foreach (var record in _records.Values.Where(r => r.Blob is null && r.Seq < seq).ToList())
+            _purgedBefore = Math.Min(seq, _lastSeq);
+            foreach (var record in _records.Values.Where(r => r.Blob is null && r.Seq < _purgedBefore).ToList())
                 _records.Remove(record.RecordKey);
         }
     }

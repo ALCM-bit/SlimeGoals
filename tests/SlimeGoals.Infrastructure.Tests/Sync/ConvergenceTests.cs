@@ -490,7 +490,7 @@ public sealed class ConvergenceTests : IDisposable
         await a.SyncAsync();
         Tick(Minute);
         await behind.EditGoal(kept.Id, "Edição local que espera envio");
-        _server.PurgeBefore(_server.Records.Max(r => r.Seq) + 1);
+        _server.PurgeBefore(_server.Records.Max(r => r.Seq));
         var before = _server.PullRequests.Count;
 
         await ConvergeAsync();
@@ -502,8 +502,8 @@ public sealed class ConvergenceTests : IDisposable
     }
 
     /// <summary>
-    /// Quem só enviou continua com <c>last_seq</c> 0 até baixar a própria meta, e <c>after</c> 0 nunca recebe 410.
-    /// A marca limpa não chegaria nunca, e a fila ficaria em conflito para sempre.
+    /// Quem só enviou continua com <c>last_seq</c> 0 até baixar a própria meta, e pede sem <c>full</c>. É o 410 que o leva a
+    /// ler tudo: a marca limpa não chegaria nunca, e a fila ficaria em conflito para sempre.
     /// </summary>
     [Theory]
     [InlineData("nada")]
@@ -520,7 +520,10 @@ public sealed class ConvergenceTests : IDisposable
         await b.DeleteGoal(goal.Id);
         await b.SyncAsync();
         await b.SyncAsync();
-        _server.PurgeBefore(_server.Records.Max(r => r.Seq) + 1);
+        await b.CreateGoal("Depois"); // a limpeza não passa do maior seq: sem outra escrita, a marca ficaria
+        await b.SyncAsync();
+        _server.PurgeBefore(_server.Records.Max(r => r.Seq));
+        _server.Records.Should().OnlyContain(r => r.Blob != null);
 
         if (localChange == "edição")
             await sender.EditGoal(goal.Id, "Edição local que espera envio");
@@ -528,7 +531,7 @@ public sealed class ConvergenceTests : IDisposable
             await sender.DeleteGoal(goal.Id);
 
         await ConvergeAsync();
-        sender.Snapshot().Lines.Should().BeEmpty();
+        sender.Snapshot().Goals.Should().ContainSingle().Which.Title.Should().Be("Depois");
         ServerShouldHoldNothingOf(goal.Id);
     }
 
@@ -546,11 +549,54 @@ public sealed class ConvergenceTests : IDisposable
         await a.SyncAsync();
         await a.CreateGoal("Depois");
         await a.SyncAsync();
-        _server.PurgeBefore(_server.Records.Max(r => r.Seq) + 1);
+        _server.PurgeBefore(_server.Records.Max(r => r.Seq));
 
         await ConvergeAsync();
         behind.Snapshot().Goals.Should().NotContain(g => g.Id == gone.Id);
         ServerShouldHoldNothingOf(gone.Id);
+    }
+
+    /// <summary>
+    /// A última escrita da conta foi uma exclusão, e a limpeza passou por ela. Se o aparelho terminasse abaixo da limpeza, todo
+    /// ciclo daria 410, leria tudo e avisaria mudança, e o agendador rodaria de novo em 5 s, para sempre, sempre com Done.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Purged_last_deletion_does_not_keep_resyncing(bool afterReset)
+    {
+        var a = await DeviceAsync();
+        var behind = afterReset ? await DeviceAsync() : null;
+        var kept = await a.CreateGoal("Fica");
+        var first = await a.CreateGoal("Excluída antes");
+        var last = await a.CreateGoal("Excluída por último");
+        await ConvergeAsync();
+
+        await a.DeleteGoal(first.Id);
+        await a.SyncAsync();
+        await a.DeleteGoal(last.Id);
+        await a.SyncAsync();
+        _server.PurgeBefore(long.MaxValue);
+        var top = _server.Records[^1].Seq;
+
+        var device = behind ?? await DeviceAsync();
+        var before = _server.PullRequests.Count;
+        using var scheduler = device.NewScheduler();
+        scheduler.Start();
+        var resynced = _server.PullRequests.Count;
+        _server.PullRequests.Skip(before).Should().Contain(p => p.Full && p.After == 0);
+
+        for (var i = 0; i < 10; i++)
+            device.Time.Advance(SyncScheduler.ChangeDelay);
+
+        device.ScheduledCycles.Should().Be(2, "o aviso da leitura completa pede um ciclo, e esse não muda nada");
+        device.Time.Advance(SyncScheduler.Period);
+        device.ScheduledCycles.Should().Be(3, "depois disso só resta o ciclo de 15 min");
+        _server.PullRequests.Skip(resynced).Should().OnlyContain(p => !p.Full && p.After == top, "nenhum outro 410");
+        device.LastSeq.Should().Be(top);
+        device.LastError.Should().BeNull();
+        device.Snapshot().Goals.Should().ContainSingle().Which.Id.Should().Be(kept.Id);
+        _server.Records.Where(r => r.Blob is null).Should().ContainSingle().Which.Seq.Should().Be(top, "só a marca mais nova sobrevive à limpeza");
     }
 
     private sealed class Coverage
@@ -633,8 +679,8 @@ public sealed class ConvergenceTests : IDisposable
 
         public string Title() => $"t{++NextTitle}";
 
-        /// <summary>Quem vence no fim é a maior data de todas as edições; empate, o maior id de aparelho (spec §3).</summary>
         /// <summary>
+        /// Quem vence no fim é a maior data de todas as edições; empate, o maior id de aparelho (spec §3).
         /// Guarda a linha inteira de quem escreveu: cada aparelho baixa de volta o que enviou, então coluna que não viaja
         /// fica igual e errada em todos, e comparar os aparelhos entre si não veria.
         /// </summary>
@@ -965,8 +1011,8 @@ public sealed class ConvergenceTests : IDisposable
         if (records.Count == 0)
             return Task.CompletedTask;
         run.Coverage.Purges++;
-        // A limpeza segue o tempo: nunca volta para trás.
-        var seq = Math.Max(run.PurgedBefore, records[run.Random.Next(records.Count)].Seq + 1);
+        // A limpeza segue o tempo, nunca volta para trás, e não passa do maior seq da conta.
+        var seq = Math.Max(run.PurgedBefore, Math.Min(records[run.Random.Next(records.Count)].Seq + 1, records[^1].Seq));
         run.PurgedBefore = seq;
         var crypto = new PlainSyncCrypto();
         var marks = records.Where(r => r.Blob is null && r.Seq < seq).Select(r => r.RecordKey).ToHashSet();

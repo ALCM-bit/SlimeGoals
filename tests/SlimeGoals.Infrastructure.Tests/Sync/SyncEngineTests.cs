@@ -161,8 +161,12 @@ public class SyncEngineTests : IDisposable
     /// <summary>Limpa até o fim do servidor: os registros vivos ficam todos abaixo da limpeza.</summary>
     private void PurgeUpToTheEnd() => _server.PurgeBefore(_server.Records.Max(r => r.Seq));
 
-    /// <summary>Limpa todas as marcas, sem deixar nenhuma para trás.</summary>
-    private void PurgePastTheEnd() => _server.PurgeBefore(_server.Records.Max(r => r.Seq) + 1);
+    /// <summary>A limpeza nunca passa do maior <c>seq</c>: uma escrita depois da marca é o que a deixa abaixo da limpeza, e ela sai.</summary>
+    private async Task PurgeMarksAsync()
+    {
+        await SendFromOtherAsync(NewGoal("Depois da exclusão"));
+        PurgeUpToTheEnd();
+    }
 
     private static FakeSyncServer.PullRequest Pull(long after, bool full) => new(after, full);
 
@@ -241,7 +245,7 @@ public class SyncEngineTests : IDisposable
         await Goals.AddAsync(goal);
         await Engine().RunCycleAsync(); // enviou; last_seq continua 0 até baixar a própria meta
         await DeleteFromOtherAsync(goal.Id);
-        PurgePastTheEnd();
+        await PurgeMarksAsync();
         var before = _server.PullRequests.Count;
 
         var result = await Engine().RunCycleAsync();
@@ -282,7 +286,7 @@ public class SyncEngineTests : IDisposable
     public async Task Device_without_records_reads_everything_past_the_purge()
     {
         await SendFromOtherAsync(NewGoal());
-        PurgePastTheEnd();
+        PurgeUpToTheEnd();
 
         var result = await Engine().RunCycleAsync();
 
@@ -298,7 +302,7 @@ public class SyncEngineTests : IDisposable
         await Engine().RunCycleAsync();
         await Goals.UpdateAsync(goal with { Title = "Edição na fila", UpdatedAt = T0.AddMinutes(1) });
         await DeleteFromOtherAsync(goal.Id);
-        PurgePastTheEnd();
+        await PurgeMarksAsync();
 
         var result = await Engine().RunCycleAsync();
 
@@ -667,7 +671,7 @@ public class SyncEngineTests : IDisposable
     {
         var (gone, kept) = await SyncTwoGoalsAsync();
         await DeleteFromOtherAsync(gone.Id);
-        _server.PurgeBefore(4);
+        await PurgeMarksAsync();
         _transport.Pulls.Clear();
         _notices = 0;
 
@@ -721,7 +725,7 @@ public class SyncEngineTests : IDisposable
         var clashing = NewGoal("Local", T0.AddHours(1));
         await Goals.AddAsync(clashing);
         await DeleteFromOtherAsync(gone.Id);
-        _server.PurgeBefore(4);
+        PurgeUpToTheEnd();
         _transport.BeforePush = call => call == 1 ? SendFromOtherAsync(clashing with { UpdatedAt = T0 }) : Task.CompletedTask;
         _transport.Pushes.Clear();
         var before = _server.PullRequests.Count;
@@ -729,7 +733,7 @@ public class SyncEngineTests : IDisposable
         var result = await Engine().RunCycleAsync();
 
         result.Should().Be(SyncCycleResult.Done);
-        _server.PullRequests.Skip(before).Should().Equal(Pull(2, false), Pull(0, true), Pull(2, true));
+        _server.PullRequests.Skip(before).Should().Equal(Pull(2, false), Pull(0, true), Pull(3, true));
     }
 
     [Fact]
@@ -794,7 +798,7 @@ public class SyncEngineTests : IDisposable
     {
         var (gone, _) = await SyncTwoGoalsAsync();
         await DeleteFromOtherAsync(gone.Id);
-        _server.PurgeBefore(4);
+        await PurgeMarksAsync();
         _notices = 0;
         var runs = 0;
         _gate.During = () =>
