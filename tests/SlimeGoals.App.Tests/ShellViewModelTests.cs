@@ -103,6 +103,24 @@ public class ShellViewModelBackTests
     }
 
     [Fact]
+    public void GoBack_walks_out_of_settings_licenses()
+    {
+        var shell = Create();
+        var settings = (SettingsPageViewModel)shell.Pages[3];
+        shell.CurrentPage = settings;
+        settings.OpenLicensesCommand.Execute(null);
+        settings.SelectedLicense = settings.Licenses[0];
+
+        shell.GoBack().Should().BeTrue();
+        settings.SelectedLicense.Should().BeNull();
+        shell.GoBack().Should().BeTrue();
+        settings.LicensesOpen.Should().BeFalse();
+        shell.GoBack().Should().BeTrue();
+        shell.CurrentPage.Should().BeOfType<TodayPageViewModel>();
+        shell.GoBack().Should().BeFalse();
+    }
+
+    [Fact]
     public void ShowQuit_follows_capabilities()
     {
         Create().ShowQuit.Should().BeTrue();

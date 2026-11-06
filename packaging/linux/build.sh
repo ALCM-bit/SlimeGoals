@@ -17,7 +17,8 @@ mkdir -p "$out"
 dotnet publish src/SlimeGoals.Desktop -c Release -r linux-x64 --self-contained -o "$out/app"
 
 cp "$here/install.sh" "$here/uninstall.sh" "$here/slimegoals.desktop.in" "$out/"
-cp -r "$here/icons" "$here/licenses" "$out/"
+cp -r "$here/icons" "$out/"
+cp -r src/SlimeGoals.App/Licenses "$out/licenses"
 cp LICENSE.md THIRD-PARTY-NOTICES.md "$out/"
 chmod +x "$out/install.sh" "$out/uninstall.sh"
 

@@ -8,6 +8,12 @@
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
 
+  <!-- Textos de licença embutidos: a tela "Sobre" os lê e o pacote do Linux os copia para licenses/. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Licenses\*.txt" LogicalName="SlimeGoals.Licenses.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\LICENSE.md" Link="Licenses\LICENSE.md" LogicalName="SlimeGoals.Licenses.LICENSE.md" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Avalonia" />
     <PackageReference Include="Avalonia.Themes.Fluent" />

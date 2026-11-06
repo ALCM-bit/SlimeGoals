@@ -53,12 +53,13 @@ public sealed partial class ShellViewModel : ObservableObject
     public bool ShowQuit => _capabilities.Quit;
 
     /// <summary>
-    /// Botão Voltar do sistema: fecha o editor de meta aberto; senão volta para Hoje.
+    /// Botão Voltar do sistema: a página atual trata primeiro (fecha o editor de meta ou recua
+    /// no texto/lista de licenças das Configurações); senão volta para Hoje.
     /// Devolve falso em Hoje, para o sistema tratar (segundo plano).
     /// </summary>
     public bool GoBack()
     {
-        if (CurrentPage is GoalsPageViewModel goals && goals.CloseEditorIfOpen())
+        if (CurrentPage.TryGoBack())
             return true;
         if (!ReferenceEquals(CurrentPage, Pages[0]))
         {

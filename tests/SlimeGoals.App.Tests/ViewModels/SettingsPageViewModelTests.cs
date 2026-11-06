@@ -29,6 +29,61 @@ public class SettingsPageViewModelTests
     }
 
     [Fact]
+    public void About_shows_version()
+    {
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()), appVersion: "0.7.0");
+
+        vm.VersionText.Should().Be("SlimeGoals 0.7.0");
+        vm.LicenseText.Should().Be("Licença: PolyForm Noncommercial 1.0.0");
+    }
+
+    [Fact]
+    public void About_default_version_has_no_build_metadata()
+    {
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()));
+
+        vm.VersionText.Should().StartWith("SlimeGoals ");
+        vm.VersionText.Should().NotContain("+");
+    }
+
+    [Fact]
+    public void Licenses_open_list_then_text()
+    {
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()));
+        (vm.IsMainOpen, vm.IsLicenseListOpen, vm.IsLicenseTextOpen).Should().Be((true, false, false));
+
+        vm.OpenLicensesCommand.Execute(null);
+        vm.LicensesOpen.Should().BeTrue();
+        (vm.IsMainOpen, vm.IsLicenseListOpen, vm.IsLicenseTextOpen).Should().Be((false, true, false));
+        vm.SelectedLicense = vm.Licenses[0];
+        vm.SelectedLicenseText.Should().StartWith("Required Notice:");
+        (vm.IsMainOpen, vm.IsLicenseListOpen, vm.IsLicenseTextOpen).Should().Be((false, false, true));
+        vm.CloseLicenseTextCommand.Execute(null);
+        vm.SelectedLicense.Should().BeNull();
+        vm.SelectedLicenseText.Should().BeNull();
+        vm.LicensesOpen.Should().BeTrue();
+        (vm.IsMainOpen, vm.IsLicenseListOpen, vm.IsLicenseTextOpen).Should().Be((false, true, false));
+        vm.CloseLicensesCommand.Execute(null);
+        vm.LicensesOpen.Should().BeFalse();
+        (vm.IsMainOpen, vm.IsLicenseListOpen, vm.IsLicenseTextOpen).Should().Be((true, false, false));
+    }
+
+    [Fact]
+    public void TryGoBack_closes_text_then_list()
+    {
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()));
+        vm.OpenLicensesCommand.Execute(null);
+        vm.SelectedLicense = vm.Licenses[0];
+
+        vm.TryGoBack().Should().BeTrue();
+        vm.SelectedLicense.Should().BeNull();
+        vm.LicensesOpen.Should().BeTrue();
+        vm.TryGoBack().Should().BeTrue();
+        vm.LicensesOpen.Should().BeFalse();
+        vm.TryGoBack().Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Settings_shows_permission_state()
     {
         var permissions = new FakePermissions(new ReminderPermissionStatus(false, true));
@@ -54,6 +109,32 @@ public class SettingsPageViewModelTests
         changes.NotifyChanged();
 
         (vm.NotificationsText, vm.ExactAlarmsText, vm.CanRequestNotifications).Should().Be(("Permitidas", "Permitidos", false));
+    }
+
+    [Fact]
+    public async Task Settings_shows_battery_state()
+    {
+        var permissions = new FakePermissions(new ReminderPermissionStatus(true, true, false));
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()), null, null, permissions);
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        (vm.BatteryText, vm.CanRequestBattery).Should().Be(("Otimizada", true));
+        vm.RequestBatteryCommand.Execute(null);
+        permissions.BatteryRequests.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Settings_rechecks_battery_on_data_change()
+    {
+        var permissions = new FakePermissions(new ReminderPermissionStatus(true, true, false));
+        var changes = new DataChangeNotifier();
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()), null, null, permissions, changes);
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        permissions.Status = new ReminderPermissionStatus(true, true, true);
+        changes.NotifyChanged();
+
+        (vm.BatteryText, vm.CanRequestBattery).Should().Be(("Sem restrição", false));
     }
 
     [Fact]
@@ -180,12 +261,15 @@ public class SettingsPageViewModelTests
         public ReminderPermissionStatus Status { get; set; } = status;
         public int NotificationRequests { get; private set; }
         public int ExactAlarmRequests { get; private set; }
+        public int BatteryRequests { get; private set; }
 
         public ReminderPermissionStatus Get() => Status;
 
         public void RequestNotifications() => NotificationRequests++;
 
         public void RequestExactAlarms() => ExactAlarmRequests++;
+
+        public void RequestBatteryUnrestricted() => BatteryRequests++;
     }
 
     private sealed class FakeAutostart : IAutostart

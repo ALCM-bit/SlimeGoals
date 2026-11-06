@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.Reflection;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SlimeGoals.App.About;
 using SlimeGoals.App.Hosting;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Services;
@@ -16,7 +18,7 @@ public sealed record SnoozeOptionViewModel(int Minutes, string Label);
 /// </summary>
 public sealed partial class SettingsPageViewModel(AppSettings settings, IAutostart? autostart = null,
     PlatformCapabilities? capabilities = null, IReminderPermissions? permissions = null,
-    DataChangeNotifier? changes = null) : PageViewModel
+    DataChangeNotifier? changes = null, string? appVersion = null) : PageViewModel
 {
     private readonly PlatformCapabilities _capabilities = capabilities ?? PlatformCapabilities.Desktop;
 
@@ -28,6 +30,86 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
     private SynchronizationContext? _ui;
 
     public override string Title => "Configurações";
+
+    /// <summary>Versão do app: a informada, ou a do assembly sem o sufixo depois de "+".</summary>
+    public string VersionText { get; } = "SlimeGoals " + (appVersion ?? DefaultVersion());
+
+    public string LicenseText => "Licença: PolyForm Noncommercial 1.0.0";
+
+    public IReadOnlyList<LicenseEntry> Licenses => LicenseCatalog.All;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLicenseListOpen), nameof(IsMainOpen))]
+    public partial bool LicensesOpen { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLicenseListOpen), nameof(IsLicenseTextOpen))]
+    public partial LicenseEntry? SelectedLicense { get; set; }
+
+    /// <summary>A lista de licenças está aberta e nenhum texto foi escolhido.</summary>
+    public bool IsLicenseListOpen => LicensesOpen && SelectedLicense is null;
+
+    public bool IsLicenseTextOpen => SelectedLicense is not null;
+
+    /// <summary>Página principal (seções + Sobre): nem a lista nem o texto de licença estão abertos.</summary>
+    public bool IsMainOpen => !LicensesOpen;
+
+    /// <summary>Texto do componente escolhido; lido uma vez, quando a escolha muda.</summary>
+    public string? SelectedLicenseText { get; private set; }
+
+    private static string DefaultVersion()
+    {
+        var info = typeof(SettingsPageViewModel).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "";
+        var plus = info.IndexOf('+');
+        return plus >= 0 ? info[..plus] : info;
+    }
+
+    private static string ReadLicense(LicenseEntry entry)
+    {
+        try
+        {
+            return LicenseTexts.Read(entry.File);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Trace.TraceError($"Falha ao ler a licença {entry.File}: {ex}");
+            return "Não foi possível abrir a licença.";
+        }
+    }
+
+    [RelayCommand]
+    private void OpenLicenses() => LicensesOpen = true;
+
+    [RelayCommand]
+    private void CloseLicenses()
+    {
+        SelectedLicense = null;
+        LicensesOpen = false;
+    }
+
+    [RelayCommand]
+    private void SelectLicense(LicenseEntry entry) => SelectedLicense = entry;
+
+    [RelayCommand]
+    private void CloseLicenseText() => SelectedLicense = null;
+
+    public override bool TryGoBack()
+    {
+        if (SelectedLicense is not null)
+            CloseLicenseText();
+        else if (LicensesOpen)
+            CloseLicenses();
+        else
+            return false;
+        return true;
+    }
+
+    partial void OnSelectedLicenseChanged(LicenseEntry? value)
+    {
+        SelectedLicenseText = value is null ? null : ReadLicense(value);
+        OnPropertyChanged(nameof(SelectedLicenseText));
+    }
 
     public override string IconKey => "NavSettings";
 
@@ -43,7 +125,7 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
     /// <summary>Nenhuma seção se aplica à plataforma: a tela mostra um aviso no lugar.</summary>
     public bool IsEmpty => !ShowGeneral && !ShowReminders && !ShowWindow;
 
-    /// <summary>Linhas "Notificações" e "Alarmes exatos" da seção Lembretes (só com a porta de permissões).</summary>
+    /// <summary>Linhas "Notificações", "Alarmes exatos" e "Bateria" da seção Lembretes (só com a porta de permissões).</summary>
     public bool ShowPermissions => permissions is not null && _capabilities.Reminders;
 
     public string EmptyMessage => "Nada para configurar por enquanto.";
@@ -56,13 +138,21 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
     [NotifyPropertyChangedFor(nameof(ExactAlarmsText), nameof(CanRequestExactAlarms))]
     public partial bool ExactAlarmsAllowed { get; set; } = true;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(BatteryText), nameof(CanRequestBattery))]
+    public partial bool BatteryUnrestricted { get; set; } = true;
+
     public string NotificationsText => NotificationsAllowed ? "Permitidas" : "Bloqueadas";
 
     public string ExactAlarmsText => ExactAlarmsAllowed ? "Permitidos" : "Bloqueados";
 
+    public string BatteryText => BatteryUnrestricted ? "Sem restrição" : "Otimizada";
+
     public bool CanRequestNotifications => !NotificationsAllowed;
 
     public bool CanRequestExactAlarms => !ExactAlarmsAllowed;
+
+    public bool CanRequestBattery => !BatteryUnrestricted;
 
     [RelayCommand]
     private void RequestNotifications() => permissions?.RequestNotifications();
@@ -70,12 +160,16 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
     [RelayCommand]
     private void RequestExactAlarms() => permissions?.RequestExactAlarms();
 
+    [RelayCommand]
+    private void RequestBattery() => permissions?.RequestBatteryUnrestricted();
+
     private void RefreshPermissions()
     {
         if (permissions is null)
             return;
         var status = permissions.Get();
-        (NotificationsAllowed, ExactAlarmsAllowed) = (status.Notifications, status.ExactAlarms);
+        (NotificationsAllowed, ExactAlarmsAllowed, BatteryUnrestricted) =
+            (status.Notifications, status.ExactAlarms, status.BatteryUnrestricted);
     }
 
     public bool CanAutostart => autostart is not null;

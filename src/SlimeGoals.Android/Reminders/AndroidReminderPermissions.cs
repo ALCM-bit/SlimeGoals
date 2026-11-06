@@ -2,6 +2,7 @@ using Android;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
+using Android.OS;
 using SlimeGoals.App.Hosting;
 using AProvider = Android.Provider;
 using AUri = Android.Net.Uri;
@@ -37,7 +38,10 @@ internal sealed class AndroidReminderPermissions(Context context) : IReminderPer
         var exactAlarms = !OperatingSystem.IsAndroidVersionAtLeast(31)
             || ((AlarmManager)context.GetSystemService(Context.AlarmService)!).CanScheduleExactAlarms();
 
-        return new ReminderPermissionStatus(notifications, exactAlarms);
+        var battery = ((PowerManager)context.GetSystemService(Context.PowerService)!)
+            .IsIgnoringBatteryOptimizations(context.PackageName);
+
+        return new ReminderPermissionStatus(notifications, exactAlarms, battery);
     }
 
     public void RequestNotifications()
@@ -72,5 +76,31 @@ internal sealed class AndroidReminderPermissions(Context context) : IReminderPer
         var intent = new Intent(AProvider.Settings.ActionRequestScheduleExactAlarm,
             AUri.Parse($"package:{activity.PackageName}"));
         activity.StartActivity(intent);
+    }
+
+    public void RequestBatteryUnrestricted()
+    {
+        if (CurrentActivity is not { } activity)
+            return;
+
+        // Primeiro o diálogo direto; sem tela que o resolva, a lista geral de otimização de bateria.
+        try
+        {
+            activity.StartActivity(new Intent(AProvider.Settings.ActionRequestIgnoreBatteryOptimizations,
+                AUri.Parse($"package:{activity.PackageName}")));
+            return;
+        }
+        catch (ActivityNotFoundException)
+        {
+        }
+
+        try
+        {
+            activity.StartActivity(new Intent(AProvider.Settings.ActionIgnoreBatteryOptimizationSettings));
+        }
+        catch (ActivityNotFoundException ex)
+        {
+            System.Diagnostics.Trace.TraceError($"Nenhuma tela de otimização de bateria no sistema: {ex}");
+        }
     }
 }

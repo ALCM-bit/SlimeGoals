@@ -12,4 +12,7 @@ public abstract class PageViewModel : ObservableObject
 
     /// <summary>Chamado pelo shell quando a página passa a ser exibida (ex.: recarregar dados).</summary>
     public virtual void Activate() { }
+
+    /// <summary>Voltar do sistema: fecha o que a página tem aberto por dentro. Falso se não havia nada a fechar.</summary>
+    public virtual bool TryGoBack() => false;
 }
