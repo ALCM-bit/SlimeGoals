@@ -52,9 +52,10 @@ public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider
                 ? all.Where(g => g.ArchivedAt is not null).OrderByDescending(g => g.ArchivedAt)
                 : all.Where(g => g.ArchivedAt is null);
 
+            var today = DateOnly.FromDateTime(time.GetLocalNow().DateTime);
             Goals.Clear();
             foreach (var goal in items)
-                Goals.Add(new GoalItemViewModel(goal, time.LocalTimeZone));
+                Goals.Add(new GoalItemViewModel(goal, time.LocalTimeZone, today));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

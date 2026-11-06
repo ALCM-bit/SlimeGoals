@@ -123,6 +123,35 @@ public class GoalsPageViewModelTests
     }
 
     [Fact]
+    public async Task Expired_goal_cannot_be_unarchived_and_says_why()
+    {
+        await Create("Expirada", end: Today);
+        _time.Advance(TimeSpan.FromDays(1));
+        await _service.ArchiveExpiredAsync();
+        _vm.ShowArchived = true;
+        await _vm.LoadCommand.ExecutionTask!;
+
+        var item = _vm.Goals.Single();
+
+        item.CanUnarchive.Should().BeFalse();
+        item.Status.Should().EndWith(" · período encerrado");
+    }
+
+    [Fact]
+    public async Task Archived_goal_ending_today_can_still_be_unarchived()
+    {
+        var goal = await Create("Termina hoje", end: Today);
+        await _service.ArchiveAsync(goal.Id);
+        _vm.ShowArchived = true;
+        await _vm.LoadCommand.ExecutionTask!;
+
+        var item = _vm.Goals.Single();
+
+        item.CanUnarchive.Should().BeTrue();
+        item.Status.Should().NotContain("período encerrado");
+    }
+
+    [Fact]
     public async Task Unarchive_error_from_service_shows_ErrorMessage()
     {
         var goal = await Create("Expirada", end: Today);
@@ -193,9 +222,9 @@ public class GoalsPageViewModelTests
         // 03/11 01:00 UTC = 02/11 22:00 em São Paulo: a data mostrada é a local.
         var at = new DateTimeOffset(2026, 11, 3, 1, 0, 0, TimeSpan.Zero);
 
-        new GoalItemViewModel(goal, zone).Summary.Should().Be("3 vezes por semana · a cada 2 h · 09:00–18:00 · Seg a sex");
-        new GoalItemViewModel(goal, zone).Status.Should().BeNull();
-        new GoalItemViewModel(goal with { ArchivedAt = at }, zone).Status.Should().Be("Arquivada em 02/11");
+        new GoalItemViewModel(goal, zone, Today).Summary.Should().Be("3 vezes por semana · a cada 2 h · 09:00–18:00 · Seg a sex");
+        new GoalItemViewModel(goal, zone, Today).Status.Should().BeNull();
+        new GoalItemViewModel(goal with { ArchivedAt = at }, zone, Today).Status.Should().Be("Arquivada em 02/11");
     }
 
     [Fact]
