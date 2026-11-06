@@ -461,6 +461,19 @@ public sealed class ConvergenceTests : IDisposable
         ServerShouldHoldNothingOf(gone.Id);
     }
 
+    /// <summary>Protege o próprio teste: falha da ação não pode passar por queda de rede, que o motor engole.</summary>
+    [Fact]
+    public async Task Failure_of_the_action_during_send_reaches_the_test()
+    {
+        var a = await DeviceAsync();
+        await a.CreateGoal("Ler");
+        a.DuringNextPush = () => throw new FormatException("Erro do teste.");
+
+        var act = () => a.SyncAsync();
+
+        (await act.Should().ThrowAsync<InvalidOperationException>()).WithInnerException<FormatException>();
+    }
+
     [Fact]
     public async Task Device_behind_the_purge_runs_full_resync()
     {
@@ -478,9 +491,10 @@ public sealed class ConvergenceTests : IDisposable
         Tick(Minute);
         await behind.EditGoal(kept.Id, "Edição local que espera envio");
         _server.PurgeBefore(_server.Records.Max(r => r.Seq) + 1);
+        var before = _server.PullRequests.Count;
 
         await ConvergeAsync();
-        _server.PullRequests.Should().Contain(p => p.Full && p.After == 0);
+        _server.PullRequests.Skip(before).Should().Contain(p => p.Full && p.After == 0);
         var goal = behind.Snapshot().Goals.Should().ContainSingle().Which;
         goal.Id.Should().Be(kept.Id);
         goal.Title.Should().Be("Edição local que espera envio");
@@ -562,11 +576,46 @@ public sealed class ConvergenceTests : IDisposable
         public HashSet<Guid> Created { get; } = [];
         public HashSet<Guid> Deleted { get; } = [];
         public Dictionary<Guid, Guid> Checkins { get; } = [];
-        public Dictionary<Guid, (DateTimeOffset At, Guid Device, string Title)> Winners { get; } = [];
+        public Dictionary<Guid, (DateTimeOffset At, Guid Device, string Row)> Winners { get; } = [];
         public List<SimulatedDevice> Late { get; } = [];
         public List<string> Log { get; } = [];
         public int NextTitle { get; set; }
         public long PurgedBefore { get; set; }
+        public bool Reentered { get; set; }
+
+        /// <summary>Quem excluiu a meta e ainda guarda a marca.</summary>
+        public Dictionary<Guid, HashSet<SimulatedDevice>> Deleters { get; } = [];
+
+        /// <summary>Metas com exclusão ainda não aceita quando quem excluiu saiu: a exclusão se perdeu com a fila.</summary>
+        public HashSet<Guid> LostDeletions { get; } = [];
+
+        /// <summary>Metas cuja marca o servidor já limpou.</summary>
+        public HashSet<Guid> PurgedMarks { get; } = [];
+
+        /// <summary>Únicas metas excluídas que podem voltar (spec §7): nenhum autor da exclusão guarda a marca, e ela se perdeu ou foi limpa.</summary>
+        public HashSet<Guid> MayReturn() => [.. LostDeletions.Concat(PurgedMarks).Where(id => Deleters[id].Count == 0)];
+
+        public void DeletedBy(SimulatedDevice device, Guid id)
+        {
+            Deleted.Add(id);
+            LostDeletions.Remove(id);
+            PurgedMarks.Remove(id);
+            if (!Deleters.TryGetValue(id, out var deleters))
+                Deleters[id] = deleters = [];
+            deleters.Add(device);
+        }
+
+        /// <summary>Sair apaga a fila e as marcas: o que este aparelho excluiu e o servidor ainda guarda vivo fica sem exclusão.</summary>
+        public void Leaving(SimulatedDevice device)
+        {
+            Reentered = true;
+            var live = LiveBlobs(server).Where(e => e.Kind == SyncRecordKind.Goal).Select(e => e.RecordId).ToHashSet();
+            foreach (var (id, deleters) in Deleters)
+            {
+                if (deleters.Remove(device) && live.Contains(id))
+                    LostDeletions.Add(id);
+            }
+        }
 
         public SimulatedDevice Pick() => devices[random.Next(devices.Count)];
 
@@ -585,10 +634,14 @@ public sealed class ConvergenceTests : IDisposable
         public string Title() => $"t{++NextTitle}";
 
         /// <summary>Quem vence no fim é a maior data de todas as edições; empate, o maior id de aparelho (spec §3).</summary>
+        /// <summary>
+        /// Guarda a linha inteira de quem escreveu: cada aparelho baixa de volta o que enviou, então coluna que não viaja
+        /// fica igual e errada em todos, e comparar os aparelhos entre si não veria.
+        /// </summary>
         public void Saw(Goal goal, SimulatedDevice device)
         {
             if (!Winners.TryGetValue(goal.Id, out var best) || SyncMerge.LocalWins(goal.UpdatedAt, device.Id, best.At, best.Device))
-                Winners[goal.Id] = (goal.UpdatedAt, device.Id, goal.Title);
+                Winners[goal.Id] = (goal.UpdatedAt, device.Id, device.Snapshot().Goals.Single(g => g.Id == goal.Id).Row);
         }
     }
 
@@ -608,7 +661,7 @@ public sealed class ConvergenceTests : IDisposable
         coverage.Races.Should().BePositive();
     }
 
-    /// <summary>A mesma propriedade, com limpeza de marcas e quem sai e volta. Sair apaga as marcas locais, então meta excluída pode voltar (spec §7).</summary>
+    /// <summary>A mesma propriedade, com limpeza de marcas e quem sai e volta. Só pode voltar a meta cujos autores da exclusão saíram com ela perdida ou limpa (spec §7).</summary>
     [Fact]
     public async Task Random_operations_with_purge_and_reentry_converge()
     {
@@ -734,10 +787,44 @@ public sealed class ConvergenceTests : IDisposable
         run.Log.Add($"{device.Name}: cria {goal.Id}");
     }
 
+    /// <summary>Cada edição muda o título e mais um campo sorteado, para coluna que não viaja aparecer como diferença.</summary>
     private static async Task EditAsync(Run run, SimulatedDevice device, Guid id)
     {
-        run.Saw(await device.EditGoal(id, run.Title()), device);
-        run.Log.Add($"{device.Name}: edita {id}");
+        if (run.Random.Next(10) == 0)
+        {
+            run.Saw(await device.ToggleArchive(id), device);
+            run.Log.Add($"{device.Name}: arquiva ou desarquiva {id}");
+            return;
+        }
+
+        var field = run.Random.Next(7);
+        var number = run.Random.Next(1, 28);
+        var colors = Enum.GetValues<GoalColor>();
+        run.Saw(await device.EditGoal(id, run.Title(), draft => field switch
+        {
+            0 when draft.Measure == Measure.Quantity => draft with { Target = number },
+            1 => draft with { Icon = $"icone{number}" },
+            2 => draft with { Color = colors[number % colors.Length] },
+            3 => draft with { ReminderEveryMinutes = 30 + number, ActiveFrom = new TimeOnly(7, number), ActiveUntil = new TimeOnly(21, number) },
+            4 => draft with { StartDate = new DateOnly(2026, 10, number), EndDate = new DateOnly(2027, 1, number) },
+            5 => draft with { Recurrence = number % 2 == 0 ? Recurrence.Daily : Recurrence.Weekly },
+            6 when draft.Measure == Measure.Quantity => draft with { Unit = $"u{number}" },
+            _ => draft,
+        }), device);
+        run.Log.Add($"{device.Name}: edita {id} (campo {field})");
+    }
+
+    /// <summary>A meta pode já ter saído ou estar arquivada; recusa ali é uso normal, qualquer outra falha derruba o teste.</summary>
+    private static async Task AllowingRefusalAsync(Run run, SimulatedDevice device, Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception e) when (e is GoalStateException or GoalValidationException or GoalNotFoundException)
+        {
+            run.Log.Add($"{device.Name}: recusado ({e.Message})");
+        }
     }
 
     /// <summary>Metade de ±1, que também vale em metas de conclusão.</summary>
@@ -750,7 +837,7 @@ public sealed class ConvergenceTests : IDisposable
     private static async Task AdjustAsync(Run run, SimulatedDevice device, Guid id, int amount)
     {
         var before = device.Snapshot().Checkins.Select(c => c.Id).ToHashSet();
-        await device.Adjust(id, amount);
+        await device.Adjust(id, amount, run.Random.Next(3) == 0 ? run.Title() : null);
         var added = device.Snapshot().Checkins.Single(c => !before.Contains(c.Id));
         run.Checkins[added.Id] = id;
         if (added.Period is not null)
@@ -788,7 +875,7 @@ public sealed class ConvergenceTests : IDisposable
     private static async Task DeleteAsync(Run run, SimulatedDevice device, Guid id)
     {
         await device.DeleteGoal(id);
-        run.Deleted.Add(id);
+        run.DeletedBy(device, id);
         run.Log.Add($"{device.Name}: exclui {id}");
     }
 
@@ -811,13 +898,16 @@ public sealed class ConvergenceTests : IDisposable
     {
         if (device.Pending == 0)
             await EditAsync(run, device, id);
-        device.DuringNextPush = () => DeleteAsync(run, device, id);
-        run.Coverage.InFlightDeletions++;
-        if (run.Random.Next(2) == 0)
+        var loseAck = run.Random.Next(2) == 0;
+        device.DuringNextPush = async () =>
         {
-            run.Server.LoseNextAck();
-            run.Coverage.LostAcks++;
-        }
+            if (device.Snapshot().Goals.All(g => g.Id != id))
+                return; // o que acabou de baixar já a tirou
+            await DeleteAsync(run, device, id);
+            run.Coverage.InFlightDeletions++;
+            if (loseAck)
+                LoseAck(run);
+        };
         await SyncAsync(run, device);
         device.DuringNextPush = null;
     }
@@ -830,8 +920,7 @@ public sealed class ConvergenceTests : IDisposable
         device.DuringNextPush = async () =>
         {
             run.Coverage.Races++;
-            if (other.Snapshot().Goals.Any(g => g.Id == id))
-                await EditAsync(run, other, id);
+            await AllowingRefusalAsync(run, other, () => EditAsync(run, other, id));
             await SyncAsync(run, other);
         };
         await SyncAsync(run, device);
@@ -842,12 +931,12 @@ public sealed class ConvergenceTests : IDisposable
     private static async Task EditDuringSendAsync(Run run, SimulatedDevice device, Guid id)
     {
         await EditAsync(run, device, id);
-        device.DuringNextPush = async () =>
+        device.DuringNextPush = () => AllowingRefusalAsync(run, device, async () =>
         {
             await EditAsync(run, device, id);
             if (run.Random.Next(2) == 0)
                 await AdjustAsync(run, device, id, 1);
-        };
+        });
         await SyncAsync(run, device);
         device.DuringNextPush = null;
     }
@@ -858,10 +947,12 @@ public sealed class ConvergenceTests : IDisposable
         run.Coverage.Reentries++;
         if (run.Random.Next(2) == 0)
             await SyncAsync(run, device);
+        run.Leaving(device);
         await device.DisableAsync();
         run.Log.Add($"{device.Name}: sai");
+        // Uma recusa aqui não pode deixar o aparelho de fora para sempre.
         if (run.PickGoal(device) is { } id)
-            await EditAsync(run, device, id);
+            await AllowingRefusalAsync(run, device, () => EditAsync(run, device, id));
         if (run.Random.Next(2) == 0)
             await CreateAsync(run, device);
         await device.EnableAsync();
@@ -877,6 +968,9 @@ public sealed class ConvergenceTests : IDisposable
         // A limpeza segue o tempo: nunca volta para trás.
         var seq = Math.Max(run.PurgedBefore, records[run.Random.Next(records.Count)].Seq + 1);
         run.PurgedBefore = seq;
+        var crypto = new PlainSyncCrypto();
+        var marks = records.Where(r => r.Blob is null && r.Seq < seq).Select(r => r.RecordKey).ToHashSet();
+        run.PurgedMarks.UnionWith(run.Deleted.Where(id => marks.Contains(crypto.RecordKey(id))));
         run.Server.PurgeBefore(seq);
         run.Log.Add($"limpa marcas abaixo de {seq}");
         return Task.CompletedTask;
@@ -888,11 +982,22 @@ public sealed class ConvergenceTests : IDisposable
         run.Log.Add($"{device.Name}: sincroniza, {result}");
     }
 
-    private static async Task LoseAckAsync(Run run, SimulatedDevice device)
+    /// <summary>Só vale com o envio no ar: pedido antes, o aceite perdido poderia sobrar para o envio de outro aparelho, ou para nenhum.</summary>
+    private static void LoseAck(Run run)
     {
         run.Server.LoseNextAck();
         run.Coverage.LostAcks++;
+    }
+
+    private static async Task LoseAckAsync(Run run, SimulatedDevice device)
+    {
+        device.DuringNextPush = () =>
+        {
+            LoseAck(run);
+            return Task.CompletedTask;
+        };
         await SyncAsync(run, device);
+        device.DuringNextPush = null;
     }
 
     private static async Task VerifyAsync(Run run, int seed)
@@ -903,23 +1008,26 @@ public sealed class ConvergenceTests : IDisposable
         run.Coverage.Superseded += snapshot.Checkins.Count(c => c.Superseded);
 
         var blobs = LiveBlobs(run.Server);
-        if (!run.WithResets)
-        {
-            snapshot.Goals.Select(g => g.Id).Intersect(run.Deleted).Should().BeEmpty("meta excluída não volta");
-            snapshot.Checkins.Select(c => c.GoalId).Intersect(run.Deleted).Should().BeEmpty("registro de meta excluída não volta");
-            blobs.Select(OwnerGoal).Intersect(run.Deleted).Should().BeEmpty("excluir apaga o conteúdo no servidor (RS05)");
+        var mayReturn = run.MayReturn();
+        var gone = run.Deleted.Except(mayReturn).ToHashSet();
+        snapshot.Goals.Select(g => g.Id).Intersect(gone).Should().BeEmpty("meta excluída não volta");
+        snapshot.Checkins.Select(c => c.GoalId).Intersect(gone).Should().BeEmpty("registro de meta excluída não volta");
 
-            var liveGoals = run.Created.Except(run.Deleted).ToList();
-            snapshot.Goals.Select(g => g.Id).Should().BeEquivalentTo(liveGoals, "nenhuma meta viva se perde");
-            var liveCheckins = run.Checkins.Where(c => !run.Deleted.Contains(c.Value)).Select(c => c.Key).ToList();
-            snapshot.Checkins.Select(c => c.Id).Should().BeEquivalentTo(liveCheckins, "nenhum registro de meta viva se perde");
-            foreach (var goal in snapshot.Goals)
-                goal.Title.Should().Be(run.Winners[goal.Id].Title, "a edição vencedora não se perde");
-        }
+        var live = run.Created.Except(run.Deleted).ToHashSet();
+        snapshot.Goals.Select(g => g.Id).Where(live.Contains).Should().BeEquivalentTo(live, "nenhuma meta viva se perde");
+        var liveCheckins = run.Checkins.Where(c => live.Contains(c.Value)).Select(c => c.Key).ToList();
+        snapshot.Checkins.Where(c => live.Contains(c.GoalId)).Select(c => c.Id).Should()
+            .BeEquivalentTo(liveCheckins, "nenhum registro de meta viva se perde");
+        foreach (var goal in snapshot.Goals.Where(g => live.Contains(g.Id)))
+            goal.Row.Should().Be(run.Winners[goal.Id].Row, "a edição vencedora chega inteira");
 
-        // Quem sai perde as marcas (spec §7): o registro de meta excluída pode sobrar no servidor, sem dono em nenhum aparelho.
+        // Questão em aberto, para decisão de quem escreve a spec: se todos os que sabem da exclusão saem antes de enviar o delete
+        // de um registro que chegou depois dela, o conteúdo dele sobra no servidor, sem dono. A §7 fala de metas que voltam, não
+        // dessa sobra, e a RS05 pede o contrário. O filtro não diz que isso está certo: só impede que a execução com saída falhe
+        // por isso. Sem saída, nenhuma sobra é tolerada.
         var goals = snapshot.Goals.Select(g => g.Id).ToHashSet();
-        var owned = run.WithResets ? blobs.Where(b => goals.Contains(OwnerGoal(b))).ToList() : blobs;
+        var owned = run.Reentered ? blobs.Where(b => goals.Contains(OwnerGoal(b))).ToList() : blobs;
+        owned.Select(OwnerGoal).Intersect(gone).Should().BeEmpty("excluir apaga o conteúdo no servidor (RS05)");
         owned.Select(b => b.RecordId).Should().BeEquivalentTo(
             goals.Concat(snapshot.Checkins.Select(c => c.Id)), "o servidor guarda só o que está vivo");
         blobs.Where(b => b.Kind == SyncRecordKind.Goal).Select(b => b.RecordId).Should().BeEquivalentTo(goals);

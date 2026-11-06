@@ -235,18 +235,59 @@ public class SyncEngineTests : IDisposable
     }
 
     [Fact]
-    public async Task Device_that_only_sent_drops_what_the_server_no_longer_has()
+    public async Task Device_that_only_sent_reconciles_only_after_the_reset()
     {
         var goal = NewGoal();
         await Goals.AddAsync(goal);
         await Engine().RunCycleAsync(); // enviou; last_seq continua 0 até baixar a própria meta
         await DeleteFromOtherAsync(goal.Id);
         PurgePastTheEnd();
+        var before = _server.PullRequests.Count;
 
         var result = await Engine().RunCycleAsync();
 
         result.Should().Be(SyncCycleResult.Done);
         (await Goals.GetAsync(goal.Id)).Should().BeNull();
+        _server.PullRequests.Skip(before).Should().Equal(Pull(0, full: false), Pull(0, full: true));
+    }
+
+    /// <summary>Resposta vazia sem aviso de limpeza não diz nada sobre os registros: quem decide apagar é o reset do servidor.</summary>
+    [Fact]
+    public async Task Device_that_only_sent_removes_nothing_from_an_empty_server()
+    {
+        var goals = new[] { NewGoal("Água"), NewGoal("Ler") };
+        var checkins = new CheckinRepository(_db.Factory);
+        foreach (var goal in goals)
+        {
+            await Goals.AddAsync(goal);
+            await checkins.AddAsync(new Checkin
+            {
+                Id = Guid.CreateVersion7(), GoalId = goal.Id, DoneAt = T0, Amount = 1, UpdatedAt = T0,
+            });
+        }
+        await Engine().RunCycleAsync();
+        var empty = new FakeSyncServer();
+
+        var result = await new SyncEngine(State, Store, empty, _crypto, _gate, _changes, _time).RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Done);
+        empty.PullRequests.Should().Equal(Pull(0, full: false));
+        (await Goals.ListAsync(includeArchived: true)).Should().HaveCount(2);
+        _db.Anchor.ExecuteScalar<int>("SELECT COUNT(*) FROM checkins").Should().Be(2);
+        (await Store.GetStatusAsync()).FullResync.Should().BeFalse();
+        _gate.Deleted.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Device_without_records_reads_everything_past_the_purge()
+    {
+        await SendFromOtherAsync(NewGoal());
+        PurgePastTheEnd();
+
+        var result = await Engine().RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Done);
+        _server.PullRequests.Should().Equal(Pull(0, full: true));
     }
 
     [Fact]
@@ -277,6 +318,7 @@ public class SyncEngineTests : IDisposable
         result.Should().Be(SyncCycleResult.Done);
         (await Goals.GetAsync(goal.Id)).Should().NotBeNull();
         (await Store.GetStatusAsync()).FullResync.Should().BeFalse();
+        _server.PullRequests.Should().Equal(Pull(0, full: true), Pull(0, full: false));
     }
 
     [Fact]

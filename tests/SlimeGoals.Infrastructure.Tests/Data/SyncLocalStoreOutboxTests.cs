@@ -226,15 +226,28 @@ public class SyncLocalStoreOutboxTests : IDisposable
     }
 
     [Fact]
+    public async Task Status_tells_when_the_device_has_records()
+    {
+        var goal = NewGoal();
+        await Goals.AddAsync(goal);
+        (await Store.GetStatusAsync()).HasRecords.Should().BeFalse("o que só está na fila o servidor ainda não conhece");
+
+        var item = (await Store.ReadOutboxAsync(1)).Single();
+        await Store.ConfirmPushAsync([new PushConfirmation(goal.Id, SyncRecordKind.Goal, false, "k1", 1, item.Revision)]);
+
+        (await Store.GetStatusAsync()).HasRecords.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Record_cycle_saves_date_and_error()
     {
         var at = new DateTimeOffset(2026, 11, 3, 10, 0, 0, TimeSpan.Zero);
 
         await Store.RecordCycleAsync(at, null);
-        (await Store.GetStatusAsync()).Should().Be(new SyncStatus(at, null, 0, false));
+        (await Store.GetStatusAsync()).Should().Be(new SyncStatus(at, null, 0, false, false));
 
         await Store.RecordCycleAsync(null, "falhou");
-        (await Store.GetStatusAsync()).Should().Be(new SyncStatus(at, "falhou", 0, false));
+        (await Store.GetStatusAsync()).Should().Be(new SyncStatus(at, "falhou", 0, false, false));
     }
 
     [Fact]

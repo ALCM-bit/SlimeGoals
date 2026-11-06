@@ -70,16 +70,27 @@ public class FakeSyncServerTests
     }
 
     [Fact]
-    public async Task Pull_behind_the_purge_requires_reset_except_from_zero()
+    public async Task Pull_behind_the_purge_requires_reset_even_from_zero()
     {
         await _server.PushAsync([new("a", 0, null), new("b", 0, Blob)]);
         _server.PurgeBefore(2);
 
-        var act = () => _server.PullAsync(1, 10, full: false);
-        var fromZero = await _server.PullAsync(0, 10, full: false);
+        var behind = () => _server.PullAsync(1, 10, full: false);
+        var fromZero = () => _server.PullAsync(0, 10, full: false);
 
-        await act.Should().ThrowAsync<SyncResetRequiredException>();
-        fromZero.Records.Select(r => r.RecordKey).Should().Equal("b");
+        await behind.Should().ThrowAsync<SyncResetRequiredException>();
+        await fromZero.Should().ThrowAsync<SyncResetRequiredException>();
+        (await _server.PullAsync(2, 10, full: false)).Records.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Server_without_purge_never_requires_reset()
+    {
+        await _server.PushAsync([new("a", 0, Blob)]);
+
+        var page = await _server.PullAsync(0, 10, full: false);
+
+        page.Records.Select(r => r.RecordKey).Should().Equal("a");
     }
 
     [Fact]

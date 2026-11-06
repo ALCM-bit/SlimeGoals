@@ -72,7 +72,7 @@ public sealed class FakeSyncServer : ISyncTransport
             _pullRequests.Add(new PullRequest(after, full));
             ThrowIfFailing();
             // Registros vivos ficam abaixo da limpeza: quem lê tudo passa por ela sem 410, senão nunca terminaria.
-            if (!full && after > 0 && after < _purgedBefore)
+            if (!full && after < _purgedBefore)
                 throw new SyncResetRequiredException();
 
             var newer = _records.Values.Where(r => r.Seq > after).OrderBy(r => r.Seq).ToList();

@@ -75,16 +75,12 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
     private async Task PullAsync(Guid deviceId, CancellationToken ct)
     {
         var after = (await state.GetAsync(ct).ConfigureAwait(false)).LastSeq;
-        var resuming = (await store.GetStatusAsync(ct).ConfigureAwait(false)).FullResync;
+        var status = await store.GetStatusAsync(ct).ConfigureAwait(false);
         // Registros vivos ficam abaixo da limpeza: quem lê tudo precisa passar por ela sem receber outro reset.
-        var full = after == 0 || resuming || _resetInCycle;
+        // Quem já tem registros e só enviou também está em 0, mas precisa do reset: só o servidor sabe se houve limpeza.
+        var full = (after == 0 && !status.HasRecords) || status.FullResync || _resetInCycle;
         if (after == 0)
-        {
             await RememberQueuedKeysAsync(ct).ConfigureAwait(false);
-            // Sem 410 em after = 0, quem só enviou até aqui nunca saberia das marcas limpas: o que o servidor não devolver sai no fim.
-            if (!resuming)
-                await store.BeginFullResyncAsync(ct).ConfigureAwait(false);
-        }
         while (true)
         {
             SyncPullPage page;

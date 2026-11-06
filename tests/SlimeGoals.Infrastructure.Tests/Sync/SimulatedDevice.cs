@@ -94,17 +94,35 @@ internal sealed class SimulatedDevice : IDisposable
     public Task<Goal> CreateGoal(string title, Measure measure = Measure.Quantity, int target = 10) =>
         _goals.CreateAsync(Draft(title, measure, target));
 
-    public async Task<Goal> EditGoal(Guid id, string title)
+    /// <summary>Parte do que a meta tem hoje: só muda o título e o que <paramref name="change"/> pedir.</summary>
+    public async Task<Goal> EditGoal(Guid id, string title, Func<GoalDraft, GoalDraft>? change = null)
     {
         var goal = await _goals.GetAsync(id) ?? throw new GoalNotFoundException(id);
-        return await _goals.UpdateAsync(id, Draft(title, goal.Measure, goal.Target));
+        var draft = new GoalDraft(title, goal.Recurrence, goal.Target, goal.Icon, goal.Color, goal.ReminderEveryMinutes,
+            goal.ActiveFrom, goal.ActiveUntil, goal.ActiveDays, goal.StartDate, goal.EndDate, goal.Measure, goal.Unit);
+        return await _goals.UpdateAsync(id, change is null ? draft : change(draft));
     }
 
-    public Task<int> Adjust(Guid goalId, int amount) => _checkins.AdjustAsync(goalId, amount);
+    /// <summary>Arquiva a meta ativa e desarquiva a arquivada. Devolve como ela ficou.</summary>
+    public async Task<Goal> ToggleArchive(Guid id)
+    {
+        var goal = await _goals.GetAsync(id) ?? throw new GoalNotFoundException(id);
+        await (goal.ArchivedAt is null ? _goals.ArchiveAsync(id) : _goals.UnarchiveAsync(id));
+        return await _goals.GetAsync(id) ?? throw new GoalNotFoundException(id);
+    }
+
+    public Task<int> Adjust(Guid goalId, int amount, string? note = null) => _checkins.AdjustAsync(goalId, amount, note);
 
     public Task DeleteGoal(Guid id) => _goals.DeleteAsync(id);
 
-    public Task<SyncCycleResult> SyncAsync() => _engine.RunCycleAsync();
+    /// <summary>O motor trata exceção como falha de rede: a ação do teste que falhou com o envio no ar tem de aparecer aqui.</summary>
+    public async Task<SyncCycleResult> SyncAsync()
+    {
+        var result = await _engine.RunCycleAsync();
+        if (_transport.TakeActionFailure() is { } failure)
+            throw new InvalidOperationException($"A ação durante o envio falhou em {Name}: {failure}", failure);
+        return result;
+    }
 
     /// <summary>Lembrete já mostrado e sem resposta, como o log guarda. Devolve o id da linha.</summary>
     public async Task<Guid> AddPendingReminder(Guid goalId)
@@ -149,8 +167,17 @@ internal sealed class SimulatedDevice : IDisposable
     /// <summary>Passa tudo ao servidor da conta, com o tamanho de página e a ação durante o envio pedidos pelo teste.</summary>
     private sealed class DeviceTransport(ISyncTransport server) : ISyncTransport
     {
+        private Exception? _actionFailure;
+
         public int? PageSize { get; set; }
         public Func<Task>? DuringNextPush { get; set; }
+
+        public Exception? TakeActionFailure()
+        {
+            var failure = _actionFailure;
+            _actionFailure = null;
+            return failure;
+        }
 
         public Task<SyncPullPage> PullAsync(long after, int limit, bool full, CancellationToken ct = default) =>
             server.PullAsync(after, PageSize ?? limit, full, ct);
@@ -160,7 +187,14 @@ internal sealed class SimulatedDevice : IDisposable
             if (DuringNextPush is { } action)
             {
                 DuringNextPush = null;
-                await action();
+                try
+                {
+                    await action();
+                }
+                catch (Exception e)
+                {
+                    _actionFailure = e;
+                }
             }
             return await server.PushAsync(items, ct);
         }
