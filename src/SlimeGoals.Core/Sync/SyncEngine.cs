@@ -78,6 +78,13 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
         var resuming = (await store.GetStatusAsync(ct).ConfigureAwait(false)).FullResync;
         // Registros vivos ficam abaixo da limpeza: quem lê tudo precisa passar por ela sem receber outro reset.
         var full = after == 0 || resuming || _resetInCycle;
+        if (after == 0)
+        {
+            await RememberQueuedKeysAsync(ct).ConfigureAwait(false);
+            // Sem 410 em after = 0, quem só enviou até aqui nunca saberia das marcas limpas: o que o servidor não devolver sai no fim.
+            if (!resuming)
+                await store.BeginFullResyncAsync(ct).ConfigureAwait(false);
+        }
         while (true)
         {
             SyncPullPage page;
@@ -112,6 +119,21 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
                 break;
         }
         await FinishFullResyncAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Ao ligar, a fila leva tudo com base 0, e o servidor pode já ter marca de exclusão de algum item. A marca só traz a
+    /// chave e passa uma vez: sem a chave guardada antes de baixar, o item ficaria em conflito para sempre.
+    /// </summary>
+    private async Task RememberQueuedKeysAsync(CancellationToken ct)
+    {
+        while (true)
+        {
+            var ids = await store.ReadUnkeyedAsync(PushBatch, ct).ConfigureAwait(false);
+            if (ids.Count == 0)
+                return;
+            await store.RememberKeysAsync(ids.Select(id => new OutboxKey(id, crypto.RecordKey(id))).ToList(), ct).ConfigureAwait(false);
+        }
     }
 
     /// <summary>Abre tudo antes de aplicar: uma versão desconhecida pausa sem deixar a página pela metade.</summary>

@@ -161,6 +161,9 @@ public class SyncEngineTests : IDisposable
     /// <summary>Limpa até o fim do servidor: os registros vivos ficam todos abaixo da limpeza.</summary>
     private void PurgeUpToTheEnd() => _server.PurgeBefore(_server.Records.Max(r => r.Seq));
 
+    /// <summary>Limpa todas as marcas, sem deixar nenhuma para trás.</summary>
+    private void PurgePastTheEnd() => _server.PurgeBefore(_server.Records.Max(r => r.Seq) + 1);
+
     private static FakeSyncServer.PullRequest Pull(long after, bool full) => new(after, full);
 
     private long SeqOf(Guid id) => _server.Records.Single(r => r.RecordKey == _crypto.RecordKey(id)).Seq;
@@ -229,6 +232,79 @@ public class SyncEngineTests : IDisposable
         _transport.Pushes.Select(p => p.Count).Should().Equal(SyncEngine.PushBatch, 1);
         (await State.GetAsync()).LastSeq.Should().Be(SyncEngine.PullLimit + 1);
         (await Store.GetStatusAsync()).Pending.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Device_that_only_sent_drops_what_the_server_no_longer_has()
+    {
+        var goal = NewGoal();
+        await Goals.AddAsync(goal);
+        await Engine().RunCycleAsync(); // enviou; last_seq continua 0 até baixar a própria meta
+        await DeleteFromOtherAsync(goal.Id);
+        PurgePastTheEnd();
+
+        var result = await Engine().RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Done);
+        (await Goals.GetAsync(goal.Id)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Queued_edit_of_device_that_only_sent_is_sent_again_with_base_zero()
+    {
+        var goal = NewGoal();
+        await Goals.AddAsync(goal);
+        await Engine().RunCycleAsync();
+        await Goals.UpdateAsync(goal with { Title = "Edição na fila", UpdatedAt = T0.AddMinutes(1) });
+        await DeleteFromOtherAsync(goal.Id);
+        PurgePastTheEnd();
+
+        var result = await Engine().RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Done);
+        (await Store.GetStatusAsync()).Pending.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Device_that_only_sent_keeps_what_the_server_returns()
+    {
+        var goal = NewGoal();
+        await Goals.AddAsync(goal);
+        await Engine().RunCycleAsync();
+
+        var result = await Engine().RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Done);
+        (await Goals.GetAsync(goal.Id)).Should().NotBeNull();
+        (await Store.GetStatusAsync()).FullResync.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Deletion_mark_finds_the_item_queued_on_enable()
+    {
+        var goal = NewGoal();
+        await SendFromOtherAsync(goal);
+        await DeleteFromOtherAsync(goal.Id);
+        await Goals.AddAsync(goal); // cópia que ficou aqui enquanto a sincronização estava desligada
+
+        var result = await Engine().RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Done);
+        (await Goals.GetAsync(goal.Id)).Should().BeNull();
+        (await Store.GetStatusAsync()).Pending.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Queue_larger_than_a_batch_has_all_keys_before_the_first_pull()
+    {
+        var goals = Enumerable.Range(0, SyncEngine.PushBatch + 1).Select(_ => NewGoal()).ToList();
+        foreach (var goal in goals)
+            await Goals.AddAsync(goal);
+        _transport.BeforePull = async _ => (await Store.ReadUnkeyedAsync(1)).Should().BeEmpty();
+
+        var result = await Engine().RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Done);
     }
 
     [Fact]

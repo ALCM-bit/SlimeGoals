@@ -3,6 +3,8 @@ namespace SlimeGoals.Core.Sync;
 public interface ISyncLocalStore
 {
     Task<IReadOnlyList<OutboxItem>> ReadOutboxAsync(int limit, CancellationToken ct = default);
+    /// <summary>Itens da fila cuja chave no servidor ainda não foi guardada, em ordem de fila.</summary>
+    Task<IReadOnlyList<Guid>> ReadUnkeyedAsync(int limit, CancellationToken ct = default);
     /// <summary>Chamar antes de cada envio: se o aceite se perder, a exclusão vinda de outro aparelho ainda acha o registro pela chave.</summary>
     Task RememberKeysAsync(IReadOnlyList<OutboxKey> keys, CancellationToken ct = default);
     Task ConfirmPushAsync(IReadOnlyList<PushConfirmation> confirmations, CancellationToken ct = default);

@@ -68,6 +68,20 @@ public class SyncLocalStoreOutboxTests : IDisposable
     }
 
     [Fact]
+    public async Task Reads_only_the_items_without_a_remembered_key_up_to_the_limit()
+    {
+        var keyed = NewGoal();
+        var first = NewGoal();
+        var second = NewGoal();
+        foreach (var goal in new[] { keyed, first, second })
+            await Goals.AddAsync(goal);
+        await Store.RememberKeysAsync([new OutboxKey(keyed.Id, "k1")]);
+
+        (await Store.ReadUnkeyedAsync(10)).Should().Equal(first.Id, second.Id);
+        (await Store.ReadUnkeyedAsync(1)).Should().Equal(first.Id);
+    }
+
+    [Fact]
     public async Task Remembering_keys_keeps_the_item_as_it_was()
     {
         var goal = NewGoal();

@@ -80,6 +80,15 @@ public sealed class SyncLocalStore(SqliteConnectionFactory db) : ISyncLocalStore
         return new OutboxItem(id, kind, false, row.BaseSeq, row.Revision, payload);
     }
 
+    public async Task<IReadOnlyList<Guid>> ReadUnkeyedAsync(int limit, CancellationToken ct = default)
+    {
+        await using var c = db.Open();
+        var ids = await c.QueryAsync<string>(new CommandDefinition(
+            "SELECT record_id FROM sync_outbox WHERE record_key IS NULL ORDER BY position LIMIT @Limit",
+            new { Limit = limit }, cancellationToken: ct));
+        return ids.Select(id => Guid.ParseExact(id, "D")).ToList();
+    }
+
     public async Task RememberKeysAsync(IReadOnlyList<OutboxKey> keys, CancellationToken ct = default)
     {
         await using var c = db.Open();
