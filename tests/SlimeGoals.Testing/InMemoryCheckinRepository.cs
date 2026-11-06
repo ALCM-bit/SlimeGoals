@@ -11,6 +11,9 @@ public sealed class InMemoryCheckinRepository : ICheckinRepository
     /// <summary>Todos os registros gravados, inclusive excluídos, na ordem de gravação.</summary>
     public IReadOnlyList<Checkin> All => _checkins;
 
+    /// <summary>Ids de registros que deixaram de contar (compensações substituídas).</summary>
+    public HashSet<Guid> Superseded { get; } = [];
+
     /// <summary>Quando definido, toda escrita lança esta exceção.</summary>
     public Exception? FailWritesWith { get; set; }
 
@@ -30,9 +33,14 @@ public sealed class InMemoryCheckinRepository : ICheckinRepository
     public Task<bool> HasAnyAsync(Guid goalId, CancellationToken ct = default) =>
         Task.FromResult(_checkins.Any(c => c.GoalId == goalId && c.DeletedAt is null));
 
+    public Task<IReadOnlyList<Guid>> CompensationIdsAsync(Guid goalId, DateOnly period, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(_checkins
+            .Where(c => c.GoalId == goalId && c.DeletedAt is null && c.Compensation?.Period == period)
+            .Select(c => c.Id).ToList());
+
     /// <summary>Apaga os registros da meta (a exclusão da meta).</summary>
     public void RemoveOf(Guid goalId) => _checkins.RemoveAll(c => c.GoalId == goalId);
 
     private IEnumerable<Checkin> Live(DateTimeOffset fromUtc, DateTimeOffset toUtc) =>
-        _checkins.Where(c => c.DeletedAt is null && c.DoneAt >= fromUtc && c.DoneAt < toUtc);
+        _checkins.Where(c => c.DeletedAt is null && !Superseded.Contains(c.Id) && c.DoneAt >= fromUtc && c.DoneAt < toUtc);
 }

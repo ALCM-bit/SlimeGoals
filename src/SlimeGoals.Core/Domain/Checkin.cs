@@ -13,4 +13,7 @@ public sealed record Checkin
     public string? Note { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }
     public DateTimeOffset? DeletedAt { get; init; }
+
+    /// <summary>Preenchido quando o registro compensa o total limitado do período; nulo é um registro normal.</summary>
+    public Compensation? Compensation { get; init; }
 }

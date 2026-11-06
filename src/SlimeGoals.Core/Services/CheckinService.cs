@@ -45,6 +45,10 @@ public sealed class CheckinService(IGoalRepository goals, ICheckinRepository che
             throw new GoalStateException(goalId, "Meta já concluída neste período.");
 
         var now = time.GetUtcNow();
+        var stored = total - raw;
+        Compensation? compensation = null;
+        if (stored != amount && GoalPeriod.EvaluationPeriod(goal, today) is { } range)
+            compensation = new Compensation(range.Start, await checkins.CompensationIdsAsync(goalId, range.Start, ct));
         await checkins.AddAsync(new Checkin
         {
             Id = Guid.CreateVersion7(now),
@@ -52,9 +56,10 @@ public sealed class CheckinService(IGoalRepository goals, ICheckinRepository che
             DoneAt = now,
             // Normalmente raw e o total limitado são iguais; só diferem após trocar a recorrência da meta,
             // e aí a tela já parte do total limitado.
-            Amount = total - raw,
+            Amount = stored,
             Note = note,
             UpdatedAt = now,
+            Compensation = compensation,
         }, ct);
         changes?.NotifyChanged();
         return total;

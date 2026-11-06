@@ -90,4 +90,64 @@ public class CheckinRepositoryTests : IDisposable
         (await Repo.HasAnyAsync(_goal.Id)).Should().BeTrue();
         (await Repo.HasAnyAsync(_other.Id)).Should().BeFalse();
     }
+
+    private static readonly DateOnly Monday = new(2026, 11, 2);
+
+    [Fact]
+    public async Task Sum_and_list_ignore_superseded()
+    {
+        var kept = At(_goal, T0, 2);
+        var gone = At(_goal, T0.AddHours(1), 5);
+        await Repo.AddAsync(kept);
+        await Repo.AddAsync(gone);
+        _db.Anchor.Execute("UPDATE checkins SET superseded = 1 WHERE id = @Id", new { Id = gone.Id.ToString("D") });
+
+        (await Repo.ListAsync(T0, T0.AddDays(1))).Should().Equal(kept);
+        (await Repo.SumAsync(_goal.Id, T0, T0.AddDays(1))).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task HasAny_counts_superseded()
+    {
+        var only = At(_goal, T0, 5);
+        await Repo.AddAsync(only);
+        _db.Anchor.Execute("UPDATE checkins SET superseded = 1");
+
+        (await Repo.HasAnyAsync(_goal.Id)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Compensation_round_trips()
+    {
+        var seen = new[] { Guid.CreateVersion7(), Guid.CreateVersion7() };
+        var compensated = At(_goal, T0, 5) with { Compensation = new Compensation(Monday, seen) };
+        var empty = At(_goal, T0.AddHours(1), 1) with { Compensation = new Compensation(Monday, []) };
+        var normal = At(_goal, T0.AddHours(2), 1);
+        foreach (var c in new[] { compensated, empty, normal })
+            await Repo.AddAsync(c);
+
+        var list = await Repo.ListAsync(T0, T0.AddDays(1));
+
+        list[0].Compensation!.Period.Should().Be(Monday);
+        list[0].Compensation!.Seen.Should().Equal(seen);
+        list[1].Compensation!.Seen.Should().BeEmpty();
+        list[2].Compensation.Should().BeNull();
+        _db.Anchor.ExecuteScalar<string>("SELECT compensation_period FROM checkins WHERE id = @Id", new { Id = compensated.Id.ToString("D") })
+            .Should().Be("2026-11-02");
+    }
+
+    [Fact]
+    public async Task CompensationIds_lists_only_that_goal_and_period()
+    {
+        var mine = At(_goal, T0, 5) with { Compensation = new Compensation(Monday, []) };
+        var superseded = At(_goal, T0.AddHours(1), 5) with { Compensation = new Compensation(Monday, []) };
+        var otherPeriod = At(_goal, T0.AddHours(2), 5) with { Compensation = new Compensation(Monday.AddDays(7), []) };
+        var otherGoal = At(_other, T0, 5) with { Compensation = new Compensation(Monday, []) };
+        var normal = At(_goal, T0.AddHours(3), 1);
+        foreach (var c in new[] { mine, superseded, otherPeriod, otherGoal, normal })
+            await Repo.AddAsync(c);
+        _db.Anchor.Execute("UPDATE checkins SET superseded = 1 WHERE id = @Id", new { Id = superseded.Id.ToString("D") });
+
+        (await Repo.CompensationIdsAsync(_goal.Id, Monday)).Should().BeEquivalentTo([mine.Id, superseded.Id]);
+    }
 }

@@ -142,4 +142,15 @@ public class SyncStateRepositoryTests : IDisposable
 
         Count("sync_outbox").Should().Be(0);
     }
+
+    [Fact]
+    public async Task Disable_clears_full_resync()
+    {
+        await Sync.EnableAsync();
+        _db.Anchor.Execute("UPDATE sync_state SET full_resync = 1");
+
+        await Sync.DisableAsync();
+
+        _db.Anchor.ExecuteScalar<long>("SELECT full_resync FROM sync_state").Should().Be(0);
+    }
 }
