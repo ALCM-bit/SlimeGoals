@@ -717,6 +717,26 @@ public class SyncApplyTests : IDisposable
         (await DayTotalAsync(goal.Id)).Should().Be(2);
     }
 
+    [Theory]
+    [InlineData("not json")]
+    [InlineData("[1]")]
+    [InlineData("{}")]
+    public async Task Corrupt_compensation_does_not_stop_the_recalculation(string seen)
+    {
+        var goal = NewGoal();
+        var corrupt = NewCheckin(goal.Id, amount: 5, doneAt: T0.AddMinutes(1), compensation: Compensates());
+        var older = NewCheckin(goal.Id, amount: 5, doneAt: T0.AddMinutes(2), compensation: Compensates());
+        var newer = NewCheckin(goal.Id, amount: 5, doneAt: T0.AddMinutes(3), compensation: Compensates());
+        await ApplyAsync(3, In(goal, 1), In(corrupt, 2), In(older, 3));
+        _db.Anchor.Execute("UPDATE checkins SET compensation_seen = @Seen WHERE id = @Id", new { Seen = seen, Id = corrupt.Id.ToString("D") });
+
+        await ApplyAsync(4, In(newer, 4));
+
+        LastSeq.Should().Be(4);
+        IsSuperseded(older.Id).Should().BeTrue();
+        IsSuperseded(newer.Id).Should().BeFalse();
+    }
+
     [Fact]
     public async Task Arrival_order_does_not_change_superseded()
     {

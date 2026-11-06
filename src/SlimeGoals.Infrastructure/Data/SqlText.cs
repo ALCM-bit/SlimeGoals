@@ -39,8 +39,16 @@ internal static class SqlText
     {
         if (string.IsNullOrEmpty(json))
             return [];
-        using var doc = JsonDocument.Parse(json);
-        return doc.RootElement.EnumerateArray().Select(e => Guid.ParseExact(e.GetString()!, "D")).ToList();
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.EnumerateArray().Select(e => Guid.ParseExact(e.GetString()!, "D")).ToList();
+        }
+        // FormatException é o que o RowReader reconhece como linha inválida.
+        catch (Exception e) when (e is JsonException or InvalidOperationException)
+        {
+            throw new FormatException($"Lista de ids inválida: {e.Message}", e);
+        }
     }
 
     public static string Id(Guid id) => id.ToString("D");

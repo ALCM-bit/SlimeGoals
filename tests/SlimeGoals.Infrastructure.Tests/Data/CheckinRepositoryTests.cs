@@ -40,6 +40,9 @@ public class CheckinRepositoryTests : IDisposable
     [InlineData("updated_at = 'agora'")]
     [InlineData("done_at = '2026-11-02T12:30:00 lixo'")]
     [InlineData("amount = 'muitos'")]
+    [InlineData("compensation_period = '2026-11-02', compensation_seen = 'not json'")]
+    [InlineData("compensation_period = '2026-11-02', compensation_seen = '[1]'")]
+    [InlineData("compensation_period = '2026-11-02', compensation_seen = '{}'")]
     public async Task List_skips_invalid_row_in_any_position_and_keeps_the_others(string assignment)
     {
         foreach (var position in Enumerable.Range(0, 3))
