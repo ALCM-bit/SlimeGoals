@@ -107,7 +107,7 @@ dotnet build src/SlimeGoals.Android -t:Install -f net10.0-android -p:AndroidSdkD
 ~/Android/Sdk/platform-tools/adb shell monkey -p dev.alcm.slimegoals 1
 ```
 
-Os dados ficam no armazenamento privado do app (`<FilesDir>/slimegoals.db`); desinstalar o app apaga tudo.
+Os dados ficam no armazenamento privado do app (`<FilesDir>/slimegoals.db`); desinstalar o app apaga tudo. O app não entra no backup do Android nem na transferência entre aparelhos: as metas ficam só neste celular.
 
 **Lembretes:** o app precisa de duas permissões, que o Android 16 traz negadas num app recém-instalado: notificações e alarmes exatos. O aviso na tela Hoje oferece "Permitir" para as duas (Configurações mostra o estado de cada uma). Sem alarmes exatos os lembretes seguem, mas podem atrasar alguns minutos.
 

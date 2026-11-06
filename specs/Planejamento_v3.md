@@ -502,7 +502,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 2. Layout adaptativo por largura, não por plataforma: abaixo de 720 px o `ShellView` usa `compact`; o mínimo de 900 px da janela do desktop continua.
 3. Navegação inferior com os quatro itens e ícones do Lucide (sun, list-checks, chart-column, sliders-horizontal); o item ativo usa `Selected` e `PrimarySoft`.
 4. Voltar: `ShellViewModel.GoBack()` fecha o editor, senão volta para Hoje, senão devolve falso (o sistema decide); no desktop ninguém o chama.
-5. Dados no Android em `<FilesDir>/slimegoals.db` (armazenamento privado), com migrações ao abrir; desinstalar apaga os dados.
+5. Dados no Android em `<FilesDir>/slimegoals.db` (armazenamento privado), com migrações ao abrir; desinstalar apaga os dados. Fora do backup do Android e da transferência entre aparelhos (`allowBackup=false` e `data_extraction_rules.xml`): trocar de celular não leva as metas.
 6. Lembretes na 7a: `NoopNotificationService` só para satisfazer o `ReminderService`; sem `ReminderHost` nem agendador; a 7b usa o `AlarmManager`.
 7. Identidade: `dev.alcm.slimegoals`, rótulo "SlimeGoals", API mínima 26, APK Debug, ícone do slime em `mipmap-*`, tema escuro com barras em `#0F0D15`, orientação livre sem recriar a Activity, `AdjustResize` para o teclado.
 8. O head Android fica fora de `SlimeGoals.slnx` e entra em `SlimeGoals.Android.slnx` (Core, Infrastructure, App e Android).
