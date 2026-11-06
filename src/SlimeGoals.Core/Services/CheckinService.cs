@@ -6,7 +6,8 @@ namespace SlimeGoals.Core.Services;
 
 /// <summary>
 /// Registra ajustes de progresso (spec §5.2): valores com sinal; o total do período nunca fica negativo
-/// e, na conclusão, nunca passa de 1.
+/// e, na conclusão, nunca passa de 1. O ajuste parte do total limitado e grava a diferença até o total real,
+/// então o total mostrado muda exatamente pelo valor pedido.
 /// </summary>
 public sealed class CheckinService(IGoalRepository goals, ICheckinRepository checkins, TimeProvider time,
     DataChangeNotifier? changes = null)
@@ -36,7 +37,8 @@ public sealed class CheckinService(IGoalRepository goals, ICheckinRepository che
         if (errors.Count > 0)
             throw new GoalValidationException(errors);
 
-        var total = await TotalAsync(goal, today, ct) + amount;
+        var raw = await TotalAsync(goal, today, ct);
+        var total = GoalTotals.Effective(goal, raw) + amount;
         if (total < 0)
             throw new GoalStateException(goalId, "Não dá para remover mais do que o registrado no período.");
         if (goal.Measure == Measure.Completion && total > 1)
@@ -48,7 +50,8 @@ public sealed class CheckinService(IGoalRepository goals, ICheckinRepository che
             Id = Guid.CreateVersion7(now),
             GoalId = goalId,
             DoneAt = now,
-            Amount = amount,
+            // Sem sincronização raw e o total limitado são iguais, e o valor gravado é `amount`.
+            Amount = total - raw,
             Note = note,
             UpdatedAt = now,
         }, ct);
@@ -60,7 +63,7 @@ public sealed class CheckinService(IGoalRepository goals, ICheckinRepository che
     public async Task<int> PeriodTotalAsync(Guid goalId, CancellationToken ct = default)
     {
         var goal = await goals.GetAsync(goalId, ct);
-        return goal is null ? 0 : await TotalAsync(goal, Today(), ct);
+        return goal is null ? 0 : GoalTotals.Effective(goal, await TotalAsync(goal, Today(), ct));
     }
 
     private async Task<int> TotalAsync(Goal goal, DateOnly today, CancellationToken ct)

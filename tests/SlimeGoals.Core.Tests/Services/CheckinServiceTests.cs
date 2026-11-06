@@ -29,6 +29,88 @@ public class CheckinServiceTests
             Unit = measure == Measure.Quantity ? "copos" : null,
         });
 
+    private async Task Seed(Goal goal, int amount) =>
+        await _checkins.AddAsync(new Checkin
+        {
+            Id = Guid.CreateVersion7(T0), GoalId = goal.Id, DoneAt = T0, Amount = amount, UpdatedAt = T0,
+        });
+
+    [Fact]
+    public async Task Unmark_with_total_2_goes_back_to_zero_in_one_step()
+    {
+        var goal = await Create(Measure.Completion, target: 1);
+        await Seed(goal, 1);
+        await Seed(goal, 1);
+
+        (await Service.AdjustAsync(goal.Id, -1)).Should().Be(0);
+
+        _checkins.All.Select(c => c.Amount).Should().Equal(1, 1, -2);
+    }
+
+    [Fact]
+    public async Task Mark_with_negative_total_reaches_one()
+    {
+        var goal = await Create(Measure.Completion, target: 1);
+        await Seed(goal, -1);
+
+        (await Service.AdjustAsync(goal.Id, 1)).Should().Be(1);
+
+        _checkins.All.Select(c => c.Amount).Should().Equal(-1, 2);
+    }
+
+    [Fact]
+    public async Task Quantity_with_negative_total_counts_from_zero()
+    {
+        var goal = await Create();
+        await Seed(goal, -3);
+
+        (await Service.AdjustAsync(goal.Id, 2)).Should().Be(2);
+
+        _checkins.All.Select(c => c.Amount).Should().Equal(-3, 5);
+    }
+
+    [Fact]
+    public async Task Removing_from_zero_limited_total_is_refused()
+    {
+        var goal = await Create();
+        await Seed(goal, -1);
+
+        var act = () => Service.AdjustAsync(goal.Id, -1);
+
+        await act.Should().ThrowAsync<GoalStateException>();
+    }
+
+    [Fact]
+    public async Task Marking_again_with_total_2_is_refused()
+    {
+        var goal = await Create(Measure.Completion, target: 1);
+        await Seed(goal, 2);
+
+        var act = () => Service.AdjustAsync(goal.Id, 1);
+
+        await act.Should().ThrowAsync<GoalStateException>();
+    }
+
+    [Fact]
+    public async Task Normal_total_records_the_amount_as_is()
+    {
+        var goal = await Create();
+        await Seed(goal, 3);
+
+        await Service.AdjustAsync(goal.Id, 2);
+
+        _checkins.All.Select(c => c.Amount).Should().Equal(3, 2);
+    }
+
+    [Fact]
+    public async Task Period_total_is_limited()
+    {
+        var goal = await Create();
+        await Seed(goal, -1);
+
+        (await Service.PeriodTotalAsync(goal.Id)).Should().Be(0);
+    }
+
     [Fact]
     public async Task Adjust_adds_and_returns_period_total()
     {
