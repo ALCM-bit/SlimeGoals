@@ -10,9 +10,12 @@ namespace SlimeGoals.Core.Tests.Services;
 public class GoalServiceMeasureTests
 {
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 11, 2, 12, 0, 0, TimeSpan.Zero));
-    private readonly InMemoryGoalRepository _goals = new();
+    private readonly InMemoryGoalRepository _goals;
     private readonly InMemoryCheckinRepository _checkins = new();
     private readonly InMemoryTimerRepository _timers = new();
+
+    public GoalServiceMeasureTests() => _goals = new InMemoryGoalRepository(_checkins, timers: _timers);
+
     private GoalService Service => new(_goals, _checkins, _timers, _time);
     private CheckinService Checkins => new(_goals, _checkins, _time);
 

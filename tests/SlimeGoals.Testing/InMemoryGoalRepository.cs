@@ -4,8 +4,12 @@ using SlimeGoals.Core.Domain;
 
 namespace SlimeGoals.Testing;
 
-/// <summary>Implementação em memória que respeita o contrato de <see cref="IGoalRepository"/>.</summary>
-public sealed class InMemoryGoalRepository : IGoalRepository
+/// <summary>
+/// Implementação em memória que respeita o contrato de <see cref="IGoalRepository"/>. Os repositórios recebidos
+/// são os que <see cref="DeleteAsync"/> limpa junto, como a transação do banco.
+/// </summary>
+public sealed class InMemoryGoalRepository(InMemoryCheckinRepository? checkins = null, InMemoryReminderLogRepository? log = null,
+    InMemoryTimerRepository? timers = null) : IGoalRepository
 {
     private readonly Dictionary<Guid, Goal> _goals = new();
 
@@ -29,6 +33,16 @@ public sealed class InMemoryGoalRepository : IGoalRepository
         if (FailWritesWith is not null) throw FailWritesWith;
         if (!_goals.ContainsKey(goal.Id)) throw new GoalNotFoundException(goal.Id);
         _goals[goal.Id] = goal;
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        if (FailWritesWith is not null) throw FailWritesWith;
+        if (!_goals.Remove(id)) throw new GoalNotFoundException(id);
+        checkins?.RemoveOf(id);
+        log?.RemoveOf(id);
+        timers?.RemoveOf(id);
         return Task.CompletedTask;
     }
 

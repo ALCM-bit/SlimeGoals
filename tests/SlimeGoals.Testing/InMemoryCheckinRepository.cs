@@ -30,6 +30,9 @@ public sealed class InMemoryCheckinRepository : ICheckinRepository
     public Task<bool> HasAnyAsync(Guid goalId, CancellationToken ct = default) =>
         Task.FromResult(_checkins.Any(c => c.GoalId == goalId && c.DeletedAt is null));
 
+    /// <summary>Apaga os registros da meta (a exclusão da meta).</summary>
+    public void RemoveOf(Guid goalId) => _checkins.RemoveAll(c => c.GoalId == goalId);
+
     private IEnumerable<Checkin> Live(DateTimeOffset fromUtc, DateTimeOffset toUtc) =>
         _checkins.Where(c => c.DeletedAt is null && c.DoneAt >= fromUtc && c.DoneAt < toUtc);
 }

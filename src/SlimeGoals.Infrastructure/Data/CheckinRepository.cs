@@ -1,4 +1,6 @@
 using Dapper;
+using Microsoft.Data.Sqlite;
+using SlimeGoals.Core;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Domain;
 
@@ -10,10 +12,17 @@ public sealed class CheckinRepository(SqliteConnectionFactory db) : ICheckinRepo
     public async Task AddAsync(Checkin checkin, CancellationToken ct = default)
     {
         await using var c = db.Open();
-        await c.ExecuteAsync(new CommandDefinition("""
-            INSERT INTO checkins (id, goal_id, done_at, amount, note, updated_at, deleted_at)
-            VALUES (@Id, @GoalId, @DoneAt, @Amount, @Note, @UpdatedAt, @DeletedAt)
-            """, Row.FromDomain(checkin), cancellationToken: ct));
+        try
+        {
+            await c.ExecuteAsync(new CommandDefinition("""
+                INSERT INTO checkins (id, goal_id, done_at, amount, note, updated_at, deleted_at)
+                VALUES (@Id, @GoalId, @DoneAt, @Amount, @Note, @UpdatedAt, @DeletedAt)
+                """, Row.FromDomain(checkin), cancellationToken: ct));
+        }
+        catch (SqliteException e) when (e.SqliteExtendedErrorCode == SqlText.ForeignKeyViolation)
+        {
+            throw new GoalNotFoundException(checkin.GoalId); // a meta foi excluída depois de quem registra lê-la
+        }
     }
 
     public async Task<IReadOnlyList<Checkin>> ListAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken ct = default)

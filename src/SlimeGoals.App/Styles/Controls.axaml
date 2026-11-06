@@ -143,6 +143,12 @@
 
   <!-- ===== Fase 2: componentes das telas de metas (tokens da spec §11) ===== -->
 
+  <!-- Aviso da confirmação de exclusão: quebra em duas linhas, dentro de painéis horizontais que dão largura infinita -->
+  <Style Selector="TextBlock.delete-warning">
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="MaxWidth" Value="240" />
+  </Style>
+
   <!-- Botões: primário (ação principal), fantasma (secundária), perigo (excluir) -->
   <Style Selector="Button.primary, Button.ghost, Button.danger, Button.danger-solid">
     <Setter Property="MinHeight" Value="44" />

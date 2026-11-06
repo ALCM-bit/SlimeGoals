@@ -1,4 +1,6 @@
 using Dapper;
+using Microsoft.Data.Sqlite;
+using SlimeGoals.Core;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Domain;
 
@@ -22,10 +24,17 @@ public sealed class TimerRepository(SqliteConnectionFactory db) : ITimerReposito
     public async Task<bool> TryStartAsync(ActiveTimer timer, CancellationToken ct = default)
     {
         await using var c = db.Open();
-        // INSERT OR IGNORE é atômico: dois processos iniciando juntos não criam dois cronômetros.
-        return await c.ExecuteAsync(new CommandDefinition(
-            "INSERT OR IGNORE INTO active_timer (id, goal_id, started_at, stopped_at) VALUES (1, @GoalId, @StartedAt, @StoppedAt)",
-            Params(timer), cancellationToken: ct)) == 1;
+        try
+        {
+            // INSERT OR IGNORE é atômico: dois processos iniciando juntos não criam dois cronômetros.
+            return await c.ExecuteAsync(new CommandDefinition(
+                "INSERT OR IGNORE INTO active_timer (id, goal_id, started_at, stopped_at) VALUES (1, @GoalId, @StartedAt, @StoppedAt)",
+                Params(timer), cancellationToken: ct)) == 1;
+        }
+        catch (SqliteException e) when (e.SqliteExtendedErrorCode == SqlText.ForeignKeyViolation)
+        {
+            throw new GoalNotFoundException(timer.GoalId); // a meta foi excluída depois de quem inicia lê-la
+        }
     }
 
     public async Task SaveAsync(ActiveTimer timer, CancellationToken ct = default)
