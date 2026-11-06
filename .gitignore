@@ -14,6 +14,14 @@ publish/
 # Android
 *.keystore
 *.jks
+*.p12
+*.pfx
+*.pem
+
+# Dados e ambiente locais: o repositório é público
+.env*
+*.db
+*.binlog
 
 # SO / editores
 .DS_Store

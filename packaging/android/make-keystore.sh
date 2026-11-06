@@ -21,12 +21,19 @@ if [ -z "${SLIMEGOALS_KEYSTORE_PASS:-}" ]; then
 fi
 
 dir="$(dirname "$keystore")"
-mkdir -p "$dir"
-chmod 700 "$dir"
+# Só restringe a pasta que ele mesmo criou: a do usuário pode ser qualquer uma, até a atual.
+if [ ! -d "$dir" ]; then
+  mkdir -p "$dir"
+  chmod 700 "$dir"
+fi
 
-"$JAVA_HOME/bin/keytool" -genkeypair -v -keystore "$keystore" -alias slimegoals \
-  -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=SlimeGoals" \
-  -storepass:env SLIMEGOALS_KEYSTORE_PASS -keypass:env SLIMEGOALS_KEYSTORE_PASS
+# A chave já nasce legível só pelo dono.
+(
+  umask 077
+  "$JAVA_HOME/bin/keytool" -genkeypair -v -keystore "$keystore" -alias slimegoals \
+    -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=SlimeGoals" \
+    -storepass:env SLIMEGOALS_KEYSTORE_PASS -keypass:env SLIMEGOALS_KEYSTORE_PASS
+)
 chmod 600 "$keystore"
 
 echo "Chave criada em $keystore"

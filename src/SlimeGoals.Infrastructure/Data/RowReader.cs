@@ -37,6 +37,6 @@ internal static class RowReader
     /// O que a conversão lança: os formatos e valores desconhecidos (<see cref="FormatException"/>), texto nulo
     /// (<see cref="ArgumentException"/>) e, pelo Dapper, tipo errado na coluna (<see cref="DataException"/>).
     /// </summary>
-    private static bool IsInvalidRow(Exception e) =>
+    public static bool IsInvalidRow(Exception e) =>
         e is FormatException or ArgumentException or DataException or InvalidCastException or OverflowException;
 }

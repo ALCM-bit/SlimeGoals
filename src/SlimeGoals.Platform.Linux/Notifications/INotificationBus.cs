@@ -7,6 +7,9 @@ public interface INotificationBus : IDisposable
     Task<uint> NotifyAsync(string summary, string body, IReadOnlyList<(string Key, string Label)> actions,
         CancellationToken ct = default);
 
+    /// <summary>O servidor interpreta marcação no corpo (capacidade <c>body-markup</c>).</summary>
+    Task<bool> SupportsBodyMarkupAsync(CancellationToken ct = default);
+
     /// <summary>Fecha a notificação (motivo 3 no sinal seguinte).</summary>
     Task CloseAsync(uint id, CancellationToken ct = default);
 

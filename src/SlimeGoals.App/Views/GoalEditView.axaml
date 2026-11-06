@@ -14,7 +14,7 @@
         </Border>
         <!-- No layout estreito, Excluir (e a confirmação) desce para a linha de baixo (estilo delete-actions) -->
         <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-          <StackPanel Classes="delete-actions" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <StackPanel Classes="delete-actions" Spacing="8" VerticalAlignment="Center">
             <Button Classes="danger" Content="Excluir" Command="{Binding DeleteCommand}"
                     IsVisible="{Binding !IsNew}" />
             <StackPanel Spacing="8" IsVisible="{Binding IsConfirmingDelete}">
@@ -189,7 +189,7 @@
             <TextBlock Classes="field-label" Text="Dias" />
             <ItemsControl ItemsSource="{Binding Days}">
               <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8" /></ItemsPanelTemplate>
+                <ItemsPanelTemplate><WrapPanel ItemSpacing="8" LineSpacing="8" /></ItemsPanelTemplate>
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:DayOption">

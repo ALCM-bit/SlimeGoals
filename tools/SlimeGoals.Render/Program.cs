@@ -12,9 +12,9 @@ using SlimeGoals.Render;
 using ScrollViewer = Avalonia.Controls.ScrollViewer;
 using Window = Avalonia.Controls.Window;
 
-if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot")))
+if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow")))
 {
-    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot]");
+    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow]");
     return 1;
 }
 
@@ -33,6 +33,11 @@ if (which is "phone" or "all")
     Render(true, "phone", 412, 915);
 if (which is "desktop" or "all")
     Render(false, "desktop", 1100, 720);
+if (which == "narrow")
+{
+    RenderNarrow(320);
+    RenderNarrow(360);
+}
 if (which == "mascot")
     RenderMascot();
 return 0;
@@ -70,6 +75,29 @@ void RenderMascot()
         frame.Save(stream);
 #pragma warning restore CS0618
     }
+    Console.WriteLine(path);
+    window.Close();
+}
+
+// Editor de uma meta existente, com a confirmação de exclusão aberta, em janela alta: o formulário cabe num quadro só.
+void RenderNarrow(int width)
+{
+    var shell = sample.CreateShell(true);
+    var window = new Window { Width = width, Height = 1700, Content = new ShellView { DataContext = shell } };
+    window.Show();
+    var goals = shell.Pages.OfType<GoalsPageViewModel>().Single();
+    shell.CurrentPage = goals;
+    Pump();
+    goals.EditCommand.Execute(goals.Goals[0]);
+    Pump();
+    goals.Editor!.DeleteCommand.Execute(null);
+    Pump();
+    var path = Path.Combine(outDir, $"goal-edit-delete-{width}.png");
+    var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para capturar.");
+    using var stream = File.Create(path);
+#pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
+    frame.Save(stream);
+#pragma warning restore CS0618
     Console.WriteLine(path);
     window.Close();
 }
