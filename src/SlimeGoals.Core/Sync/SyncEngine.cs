@@ -20,6 +20,7 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
     private const string UpdateAppMessage = "Atualize o app para continuar sincronizando.";
 
     private readonly SemaphoreSlim _running = new(1, 1);
+    private bool _resetInCycle; // só muda com _running na mão
 
     public async Task<SyncCycleResult> RunCycleAsync(CancellationToken ct = default)
     {
@@ -58,6 +59,7 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
         if (!current.Enabled || current.DeviceId is not { } deviceId)
             return SyncCycleResult.Disabled;
 
+        _resetInCycle = false;
         for (var attempt = 0; attempt < MaxAttempts; attempt++)
         {
             await PullAsync(deviceId, ct).ConfigureAwait(false);
@@ -73,25 +75,33 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
     private async Task PullAsync(Guid deviceId, CancellationToken ct)
     {
         var after = (await state.GetAsync(ct).ConfigureAwait(false)).LastSeq;
+        var resuming = (await store.GetStatusAsync(ct).ConfigureAwait(false)).FullResync;
+        // Registros vivos ficam abaixo da limpeza: quem lê tudo precisa passar por ela sem receber outro reset.
+        var full = after == 0 || resuming || _resetInCycle;
         while (true)
         {
             SyncPullPage page;
             try
             {
-                page = await transport.PullAsync(after, PullLimit, ct).ConfigureAwait(false);
+                page = await transport.PullAsync(after, PullLimit, full, ct).ConfigureAwait(false);
             }
-            // Vindo do zero não há o que refazer: tentar de novo não terminaria nunca.
-            catch (SyncResetRequiredException) when (after > 0)
+            // Um segundo reset segue adiante e vira Failed: repetir poderia não terminar nunca.
+            catch (SyncResetRequiredException) when (!_resetInCycle)
             {
+                _resetInCycle = true;
                 await store.BeginFullResyncAsync(ct).ConfigureAwait(false);
                 after = 0;
+                full = true;
                 continue;
             }
 
             if (page.Records.Count > 0)
             {
-                after = page.Records.Max(r => r.Seq);
-                await ApplyAsync(page, after, deviceId, ct).ConfigureAwait(false);
+                var lastSeq = page.Records.Max(r => r.Seq);
+                if (lastSeq <= after)
+                    throw new InvalidOperationException($"O servidor devolveu uma página que não avança: seq {lastSeq}, depois de {after}.");
+                await ApplyAsync(page, lastSeq, deviceId, ct).ConfigureAwait(false);
+                after = lastSeq;
             }
             else if (page.HasMore)
             {
@@ -110,8 +120,15 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
         var records = page.Records.Select(Open).ToList();
         using (changes.Defer())
         {
-            await gate.RunAsync(c => store.ApplyPageAsync(records, lastSeq, deviceId, c), ct).ConfigureAwait(false);
-            changes.NotifyChanged();
+            // O portão pode falhar depois do COMMIT, e aí as telas ainda precisam recarregar.
+            try
+            {
+                await gate.RunAsync(c => store.ApplyPageAsync(records, lastSeq, deviceId, c), ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                changes.NotifyChanged();
+            }
         }
     }
 
@@ -135,14 +152,20 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
         var removed = false;
         using (changes.Defer())
         {
-            await gate.RunAsync(async c =>
+            try
             {
-                var goals = await store.FinishFullResyncAsync(c).ConfigureAwait(false);
-                removed = goals.Count > 0;
-                return goals;
-            }, ct).ConfigureAwait(false);
-            if (removed)
-                changes.NotifyChanged();
+                await gate.RunAsync(async c =>
+                {
+                    var goals = await store.FinishFullResyncAsync(c).ConfigureAwait(false);
+                    removed = goals.Count > 0;
+                    return goals;
+                }, ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                if (removed)
+                    changes.NotifyChanged();
+            }
         }
     }
 
@@ -158,18 +181,22 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
             var keyed = items.Select(i => (Key: crypto.RecordKey(i.RecordId), Item: i)).ToList();
             await store.RememberKeysAsync(keyed.Select(k => new OutboxKey(k.Item.RecordId, k.Key)).ToList(), ct).ConfigureAwait(false);
             var batch = keyed.Select(k => new PushItem(k.Key, k.Item.BaseSeq, Seal(k.Item, deviceId))).ToList();
+            var sent = keyed.ToDictionary(k => k.Key, k => k.Item);
 
             var result = await transport.PushAsync(batch, ct).ConfigureAwait(false);
 
-            var sent = keyed.ToDictionary(k => k.Key, k => k.Item);
-            await store.ConfirmPushAsync(result.Accepted.Select(a =>
+            var confirmations = new List<PushConfirmation>();
+            foreach (var accepted in result.Accepted)
             {
-                var item = sent[a.RecordKey];
-                return new PushConfirmation(item.RecordId, item.Kind, item.IsDelete, a.RecordKey, a.Seq, item.Revision);
-            }).ToList(), ct).ConfigureAwait(false);
+                if (sent.TryGetValue(accepted.RecordKey, out var item))
+                    confirmations.Add(new PushConfirmation(item.RecordId, item.Kind, item.IsDelete, accepted.RecordKey, accepted.Seq, item.Revision));
+                else
+                    Trace.TraceWarning($"O servidor aceitou uma chave que não foi enviada: {accepted.RecordKey}.");
+            }
+            await store.ConfirmPushAsync(confirmations, ct).ConfigureAwait(false);
 
-            // Reler a fila só devolveria o item em conflito. Lote sem resposta também não anda: não insiste.
-            if (result.Conflicts.Count > 0 || result.Accepted.Count == 0)
+            // Reler a fila só devolveria o item em conflito. Lote sem nada confirmado também não anda: não insiste.
+            if (result.Conflicts.Count > 0 || confirmations.Count == 0)
                 return false;
         }
     }

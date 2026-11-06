@@ -11,7 +11,7 @@ public sealed class SyncLocalStore(SqliteConnectionFactory db) : ISyncLocalStore
 
     private sealed record QueueRow(long Position, string RecordId, string Kind, string Op, long BaseSeq, long Revision);
 
-    private sealed record StatusRow(string? LastSyncAt, string? LastError, long Pending);
+    private sealed record StatusRow(string? LastSyncAt, string? LastError, long Pending, long FullResync);
 
     public async Task<IReadOnlyList<OutboxItem>> ReadOutboxAsync(int limit, CancellationToken ct = default)
     {
@@ -168,9 +168,11 @@ public sealed class SyncLocalStore(SqliteConnectionFactory db) : ISyncLocalStore
     {
         await using var c = db.Open();
         var row = await c.QuerySingleAsync<StatusRow>(new CommandDefinition("""
-            SELECT last_sync_at AS LastSyncAt, last_error AS LastError, (SELECT COUNT(*) FROM sync_outbox) AS Pending
+            SELECT last_sync_at AS LastSyncAt, last_error AS LastError, (SELECT COUNT(*) FROM sync_outbox) AS Pending,
+                   full_resync AS FullResync
             FROM sync_state
             """, cancellationToken: ct));
-        return new SyncStatus(row.LastSyncAt is null ? null : SqlText.ParseInstant(row.LastSyncAt), row.LastError, (int)row.Pending);
+        return new SyncStatus(row.LastSyncAt is null ? null : SqlText.ParseInstant(row.LastSyncAt), row.LastError, (int)row.Pending,
+            row.FullResync == 1);
     }
 }

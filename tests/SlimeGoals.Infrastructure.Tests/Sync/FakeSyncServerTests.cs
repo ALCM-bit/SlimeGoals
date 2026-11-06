@@ -60,8 +60,8 @@ public class FakeSyncServerTests
     {
         await _server.PushAsync([new("a", 0, Blob), new("b", 0, Blob), new("c", 0, Blob)]);
 
-        var first = await _server.PullAsync(0, 2);
-        var second = await _server.PullAsync(2, 2);
+        var first = await _server.PullAsync(0, 2, full: false);
+        var second = await _server.PullAsync(2, 2, full: false);
 
         first.Records.Select(r => r.RecordKey).Should().Equal("a", "b");
         first.HasMore.Should().BeTrue();
@@ -75,11 +75,23 @@ public class FakeSyncServerTests
         await _server.PushAsync([new("a", 0, null), new("b", 0, Blob)]);
         _server.PurgeBefore(2);
 
-        var act = () => _server.PullAsync(1, 10);
-        var full = await _server.PullAsync(0, 10);
+        var act = () => _server.PullAsync(1, 10, full: false);
+        var fromZero = await _server.PullAsync(0, 10, full: false);
 
         await act.Should().ThrowAsync<SyncResetRequiredException>();
-        full.Records.Select(r => r.RecordKey).Should().Equal("b");
+        fromZero.Records.Select(r => r.RecordKey).Should().Equal("b");
+    }
+
+    [Fact]
+    public async Task Full_pull_never_requires_reset_and_is_recorded()
+    {
+        await _server.PushAsync([new("a", 0, Blob), new("b", 0, Blob), new("c", 0, Blob)]);
+        _server.PurgeBefore(3);
+
+        var page = await _server.PullAsync(1, 10, full: true);
+
+        page.Records.Select(r => r.RecordKey).Should().Equal("b", "c");
+        _server.PullRequests.Should().Equal(new FakeSyncServer.PullRequest(1, true));
     }
 
     [Fact]
@@ -102,7 +114,7 @@ public class FakeSyncServerTests
 
         await act.Should().ThrowAsync<TimeoutException>();
         _server.Records.Should().BeEmpty();
-        (await _server.PullAsync(0, 10)).Records.Should().BeEmpty();
+        (await _server.PullAsync(0, 10, full: false)).Records.Should().BeEmpty();
     }
 
     [Fact]

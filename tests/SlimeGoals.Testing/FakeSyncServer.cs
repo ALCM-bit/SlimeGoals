@@ -8,8 +8,12 @@ namespace SlimeGoals.Testing;
 /// </summary>
 public sealed class FakeSyncServer : ISyncTransport
 {
+    /// <summary>Um pedido de <c>pull</c> como chegou ao servidor.</summary>
+    public sealed record PullRequest(long After, bool Full);
+
     private readonly object _lock = new();
     private readonly Dictionary<string, RemoteRecord> _records = [];
+    private readonly List<PullRequest> _pullRequests = [];
     private long _lastSeq;
     private long _purgedBefore;
     private bool _loseNextAck;
@@ -22,6 +26,16 @@ public sealed class FakeSyncServer : ISyncTransport
         {
             lock (_lock)
                 return _records.Values.OrderBy(r => r.Seq).ToList();
+        }
+    }
+
+    /// <summary>Todos os pedidos de <c>pull</c> recebidos, em ordem, mesmo os que falharam.</summary>
+    public IReadOnlyList<PullRequest> PullRequests
+    {
+        get
+        {
+            lock (_lock)
+                return _pullRequests.ToList();
         }
     }
 
@@ -50,14 +64,15 @@ public sealed class FakeSyncServer : ISyncTransport
         }
     }
 
-    public Task<SyncPullPage> PullAsync(long after, int limit, CancellationToken ct = default)
+    public Task<SyncPullPage> PullAsync(long after, int limit, bool full, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         lock (_lock)
         {
+            _pullRequests.Add(new PullRequest(after, full));
             ThrowIfFailing();
-            // after 0 é a sincronização completa: pedir 410 aqui faria ela nunca terminar.
-            if (after > 0 && after < _purgedBefore)
+            // Registros vivos ficam abaixo da limpeza: quem lê tudo passa por ela sem 410, senão nunca terminaria.
+            if (!full && after > 0 && after < _purgedBefore)
                 throw new SyncResetRequiredException();
 
             var newer = _records.Values.Where(r => r.Seq > after).OrderBy(r => r.Seq).ToList();

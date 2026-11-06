@@ -29,10 +29,10 @@ public sealed record OutboxKey(Guid RecordId, string RecordKey);
 
 public sealed record PushConfirmation(Guid RecordId, SyncRecordKind Kind, bool IsDelete, string RecordKey, long Seq, long Revision);
 
-public sealed record SyncStatus(DateTimeOffset? LastSyncAt, string? LastError, int Pending);
+public sealed record SyncStatus(DateTimeOffset? LastSyncAt, string? LastError, int Pending, bool FullResync);
 
 /// <summary>O servidor respondeu 410: o histórico local não vale mais e é preciso sincronizar tudo de novo.</summary>
-public sealed class SyncResetRequiredException : Exception;
+public sealed class SyncResetRequiredException() : Exception("O servidor pediu para sincronizar tudo de novo.");
 
 /// <summary>Versão do formato desconhecida.</summary>
 public sealed class SyncFormatException(int version) : Exception($"Versão de formato de sincronização desconhecida: {version}.")

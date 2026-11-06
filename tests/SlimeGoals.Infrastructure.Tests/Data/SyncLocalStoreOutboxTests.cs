@@ -217,10 +217,20 @@ public class SyncLocalStoreOutboxTests : IDisposable
         var at = new DateTimeOffset(2026, 11, 3, 10, 0, 0, TimeSpan.Zero);
 
         await Store.RecordCycleAsync(at, null);
-        (await Store.GetStatusAsync()).Should().Be(new SyncStatus(at, null, 0));
+        (await Store.GetStatusAsync()).Should().Be(new SyncStatus(at, null, 0, false));
 
         await Store.RecordCycleAsync(null, "falhou");
-        (await Store.GetStatusAsync()).Should().Be(new SyncStatus(at, "falhou", 0));
+        (await Store.GetStatusAsync()).Should().Be(new SyncStatus(at, "falhou", 0, false));
+    }
+
+    [Fact]
+    public async Task Status_shows_a_full_resync_until_it_finishes()
+    {
+        await Store.BeginFullResyncAsync();
+        (await Store.GetStatusAsync()).FullResync.Should().BeTrue();
+
+        await Store.FinishFullResyncAsync();
+        (await Store.GetStatusAsync()).FullResync.Should().BeFalse();
     }
 
     [Fact]

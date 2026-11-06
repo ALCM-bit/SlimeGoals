@@ -51,13 +51,16 @@ public class SyncEngineTests : IDisposable
         public Func<int, Task>? BeforePull { get; set; }
         public Func<int, Task>? BeforePush { get; set; }
 
-        public async Task<SyncPullPage> PullAsync(long after, int limit, CancellationToken ct = default)
+        public async Task<SyncPullPage> PullAsync(long after, int limit, bool full, CancellationToken ct = default)
         {
             Calls.Add("pull");
             Pulls.Add(after);
+            // Um laço infinito no motor vira falha de teste, não um teste que nunca termina.
+            if (Pulls.Count > 50)
+                throw new InvalidOperationException("Laço: pulls demais.");
             if (BeforePull is { } before)
                 await before(Pulls.Count);
-            return await inner.PullAsync(after, limit, ct);
+            return await inner.PullAsync(after, limit, full, ct);
         }
 
         public async Task<PushResult> PushAsync(IReadOnlyList<PushItem> items, CancellationToken ct = default)
@@ -87,22 +90,49 @@ public class SyncEngineTests : IDisposable
         public ReminderText Format(Goal goal, int periodTotal) => new("T", "B", "Feito!");
     }
 
-    private sealed class EmptyPages : ISyncTransport
+    /// <summary>Servidor com defeito: responde sempre a mesma página.</summary>
+    private sealed class FixedPage(SyncPullPage page) : ISyncTransport
     {
-        public Task<SyncPullPage> PullAsync(long after, int limit, CancellationToken ct = default) =>
-            Task.FromResult(new SyncPullPage([], HasMore: true));
+        public int Pulls { get; private set; }
+
+        public Task<SyncPullPage> PullAsync(long after, int limit, bool full, CancellationToken ct = default)
+        {
+            if (++Pulls > 50)
+                throw new InvalidOperationException("Laço: pulls demais.");
+            return Task.FromResult(page);
+        }
 
         public Task<PushResult> PushAsync(IReadOnlyList<PushItem> items, CancellationToken ct = default) =>
             throw new NotSupportedException();
     }
 
-    private sealed class SilentPush : ISyncTransport
+    /// <summary>Servidor com defeito: nada a baixar, e o envio só responde o que foi combinado.</summary>
+    private sealed class FixedPush(params PushAccepted[] accepted) : ISyncTransport
     {
-        public Task<SyncPullPage> PullAsync(long after, int limit, CancellationToken ct = default) =>
+        public int Pushes { get; private set; }
+
+        public Task<SyncPullPage> PullAsync(long after, int limit, bool full, CancellationToken ct = default) =>
             Task.FromResult(new SyncPullPage([], HasMore: false));
 
-        public Task<PushResult> PushAsync(IReadOnlyList<PushItem> items, CancellationToken ct = default) =>
-            Task.FromResult(new PushResult([], []));
+        public Task<PushResult> PushAsync(IReadOnlyList<PushItem> items, CancellationToken ct = default)
+        {
+            if (++Pushes > 50)
+                throw new InvalidOperationException("Laço: envios demais.");
+            return Task.FromResult(new PushResult(accepted, []));
+        }
+    }
+
+    /// <summary>Servidor com defeito: aceita o lote e ainda devolve uma chave que ninguém enviou.</summary>
+    private sealed class UnknownAccepted(ISyncTransport inner) : ISyncTransport
+    {
+        public Task<SyncPullPage> PullAsync(long after, int limit, bool full, CancellationToken ct = default) =>
+            inner.PullAsync(after, limit, full, ct);
+
+        public async Task<PushResult> PushAsync(IReadOnlyList<PushItem> items, CancellationToken ct = default)
+        {
+            var result = await inner.PushAsync(items, ct);
+            return result with { Accepted = [new PushAccepted("desconhecida", 99), .. result.Accepted] };
+        }
     }
 
     private static Goal NewGoal(string title = "Água", DateTimeOffset? updatedAt = null) => new()
@@ -121,6 +151,17 @@ public class SyncEngineTests : IDisposable
         var result = await _server.PushAsync([new(_crypto.RecordKey(goal.Id), baseSeq, Sealed(goal, version))]);
         result.Conflicts.Should().BeEmpty();
     }
+
+    private async Task SendManyFromOtherAsync(int count)
+    {
+        for (var i = 0; i < count; i++)
+            await SendFromOtherAsync(NewGoal());
+    }
+
+    /// <summary>Limpa até o fim do servidor: os registros vivos ficam todos abaixo da limpeza.</summary>
+    private void PurgeUpToTheEnd() => _server.PurgeBefore(_server.Records.Max(r => r.Seq));
+
+    private static FakeSyncServer.PullRequest Pull(long after, bool full) => new(after, full);
 
     private long SeqOf(Guid id) => _server.Records.Single(r => r.RecordKey == _crypto.RecordKey(id)).Seq;
 
@@ -288,11 +329,38 @@ public class SyncEngineTests : IDisposable
     public async Task Batch_without_answer_stops_sending()
     {
         await Goals.AddAsync(NewGoal());
-        var engine = new SyncEngine(State, Store, new SilentPush(), _crypto, _gate, _changes, _time);
+        var engine = new SyncEngine(State, Store, new FixedPush(), _crypto, _gate, _changes, _time);
 
         var result = await engine.RunCycleAsync();
 
         result.Should().Be(SyncCycleResult.Incomplete);
+    }
+
+    [Fact]
+    public async Task Unknown_accepted_key_is_traced_and_the_others_are_confirmed()
+    {
+        using var trace = new TraceCapture();
+        await Goals.AddAsync(NewGoal());
+        var engine = new SyncEngine(State, Store, new UnknownAccepted(_transport), _crypto, _gate, _changes, _time);
+
+        var result = await engine.RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Done);
+        (await Store.GetStatusAsync()).Pending.Should().Be(0);
+        trace.Messages.Should().Contain(m => m.Contains("desconhecida"));
+    }
+
+    [Fact]
+    public async Task Batch_with_only_unknown_accepted_keys_stops_sending()
+    {
+        await Goals.AddAsync(NewGoal());
+        var transport = new FixedPush(new PushAccepted("desconhecida", 1));
+        var engine = new SyncEngine(State, Store, transport, _crypto, _gate, _changes, _time);
+
+        var result = await engine.RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Incomplete);
+        transport.Pushes.Should().Be(SyncEngine.MaxAttempts);
     }
 
     [Fact]
@@ -353,24 +421,55 @@ public class SyncEngineTests : IDisposable
     }
 
     [Fact]
-    public async Task Reset_from_zero_is_a_failure_and_does_not_loop()
+    public async Task Second_reset_in_a_cycle_is_a_failure()
     {
-        _server.FailNext(new SyncResetRequiredException());
+        await SyncTwoGoalsAsync();
+        _transport.Pulls.Clear();
+        _transport.BeforePull = _ => throw new SyncResetRequiredException();
 
         var result = await Engine().RunCycleAsync();
 
         result.Should().Be(SyncCycleResult.Failed);
-        _transport.Pulls.Should().ContainSingle();
+        _transport.Pulls.Should().Equal(2, 0);
+        (await Store.GetStatusAsync()).LastError.Should().Be(new SyncResetRequiredException().Message);
     }
 
     [Fact]
     public async Task Page_with_more_but_no_records_is_a_failure_and_does_not_loop()
     {
-        var engine = new SyncEngine(State, Store, new EmptyPages(), _crypto, _gate, _changes, _time);
+        var transport = new FixedPage(new SyncPullPage([], HasMore: true));
+        var engine = new SyncEngine(State, Store, transport, _crypto, _gate, _changes, _time);
 
         var result = await engine.RunCycleAsync();
 
         result.Should().Be(SyncCycleResult.Failed);
+        transport.Pulls.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Page_with_more_that_does_not_advance_is_a_failure_and_does_not_loop()
+    {
+        var transport = new FixedPage(new SyncPullPage([new RemoteRecord("k:x", 1, null)], HasMore: true));
+        var engine = new SyncEngine(State, Store, transport, _crypto, _gate, _changes, _time);
+
+        var result = await engine.RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Failed);
+        transport.Pulls.Should().Be(2);
+        (await State.GetAsync()).LastSeq.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Last_page_behind_last_seq_does_not_move_it_back()
+    {
+        _db.Anchor.Execute("UPDATE sync_state SET last_seq = 5");
+        var transport = new FixedPage(new SyncPullPage([new RemoteRecord("k:x", 3, null)], HasMore: false));
+        var engine = new SyncEngine(State, Store, transport, _crypto, _gate, _changes, _time);
+
+        var result = await engine.RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Failed);
+        (await State.GetAsync()).LastSeq.Should().Be(5);
     }
 
     [Fact]
@@ -466,13 +565,62 @@ public class SyncEngineTests : IDisposable
     }
 
     [Fact]
+    public async Task New_device_reads_everything_below_the_purge()
+    {
+        await SendManyFromOtherAsync(SyncEngine.PullLimit + 2);
+        PurgeUpToTheEnd();
+
+        var result = await Engine().RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Done);
+        _server.PullRequests.Should().Equal(Pull(0, true), Pull(SyncEngine.PullLimit, true));
+        (await State.GetAsync()).LastSeq.Should().Be(SyncEngine.PullLimit + 2);
+    }
+
+    [Fact]
+    public async Task Device_behind_the_purge_reads_everything_below_it()
+    {
+        var (gone, kept) = await SyncTwoGoalsAsync();
+        await DeleteFromOtherAsync(gone.Id);
+        await SendManyFromOtherAsync(SyncEngine.PullLimit + 1);
+        PurgeUpToTheEnd();
+        var before = _server.PullRequests.Count;
+
+        var result = await Engine().RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Done);
+        // A primeira página traz a meta mantida (seq 2) e 199 novas (seq 4 em diante).
+        _server.PullRequests.Skip(before).Should().Equal(Pull(2, false), Pull(0, true), Pull(SyncEngine.PullLimit + 2, true));
+        (await Goals.GetAsync(gone.Id)).Should().BeNull();
+        (await Goals.GetAsync(kept.Id)).Should().NotBeNull();
+        (await Store.GetStatusAsync()).FullResync.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Reset_keeps_reading_in_full_for_the_rest_of_the_cycle()
+    {
+        var (gone, _) = await SyncTwoGoalsAsync();
+        var clashing = NewGoal("Local", T0.AddHours(1));
+        await Goals.AddAsync(clashing);
+        await DeleteFromOtherAsync(gone.Id);
+        _server.PurgeBefore(4);
+        _transport.BeforePush = call => call == 1 ? SendFromOtherAsync(clashing with { UpdatedAt = T0 }) : Task.CompletedTask;
+        _transport.Pushes.Clear();
+        var before = _server.PullRequests.Count;
+
+        var result = await Engine().RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Done);
+        _server.PullRequests.Skip(before).Should().Equal(Pull(2, false), Pull(0, true), Pull(2, true));
+    }
+
+    [Fact]
     public async Task Interrupted_full_resync_finishes_next_cycle()
     {
         var (gone, kept) = await SyncTwoGoalsAsync();
         await DeleteFromOtherAsync(gone.Id);
-        for (var i = 0; i < SyncEngine.PullLimit + 1; i++)
-            await SendFromOtherAsync(NewGoal());
-        _server.PurgeBefore(4);
+        await SendManyFromOtherAsync(SyncEngine.PullLimit + 1);
+        PurgeUpToTheEnd();
         _transport.Pulls.Clear();
         _transport.BeforePull = call => call == 3 ? throw new HttpRequestException("sem rede") : Task.CompletedTask;
 
@@ -488,6 +636,7 @@ public class SyncEngineTests : IDisposable
         (await Engine().RunCycleAsync()).Should().Be(SyncCycleResult.Done);
 
         _transport.Pulls.Should().Equal(stoppedAt);
+        _server.PullRequests[^1].Should().Be(Pull(stoppedAt, true));
         (await Goals.GetAsync(gone.Id)).Should().BeNull();
         (await Goals.GetAsync(kept.Id)).Should().NotBeNull();
     }
@@ -508,6 +657,49 @@ public class SyncEngineTests : IDisposable
         await Engine().RunCycleAsync();
 
         _notices.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Failure_after_the_commit_still_raises_the_notice()
+    {
+        await SendFromOtherAsync(NewGoal());
+        _gate.During = () => throw new InvalidOperationException("retirada falhou");
+
+        var result = await Engine().RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Failed);
+        _notices.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Failure_after_the_full_resync_removal_still_raises_the_notice()
+    {
+        var (gone, _) = await SyncTwoGoalsAsync();
+        await DeleteFromOtherAsync(gone.Id);
+        _server.PurgeBefore(4);
+        _notices = 0;
+        var runs = 0;
+        _gate.During = () =>
+        {
+            if (++runs == 2)
+                throw new InvalidOperationException("retirada falhou");
+        };
+
+        var result = await Engine().RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Failed);
+        _notices.Should().Be(2, "uma pela página e uma pelo que saiu no fim");
+    }
+
+    [Fact]
+    public async Task Failure_without_records_raises_none()
+    {
+        _gate.During = () => throw new InvalidOperationException("portão falhou");
+
+        var result = await Engine().RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Failed);
+        _notices.Should().Be(0);
     }
 
     [Fact]
