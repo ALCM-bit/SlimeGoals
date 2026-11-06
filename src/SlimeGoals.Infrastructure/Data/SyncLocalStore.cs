@@ -119,12 +119,31 @@ public sealed class SyncLocalStore(SqliteConnectionFactory db) : ISyncLocalStore
         await tx.CommitAsync(ct);
     }
 
-    public Task<IReadOnlyList<Guid>> ApplyPageAsync(IReadOnlyList<IncomingRecord> records, long lastSeq, Guid deviceId, CancellationToken ct = default) =>
-        throw new NotImplementedException("Tarefa 6.");
+    public async Task<IReadOnlyList<Guid>> ApplyPageAsync(IReadOnlyList<IncomingRecord> records, long lastSeq, Guid deviceId, CancellationToken ct = default)
+    {
+        await using var c = db.Open();
+        await using var tx = await c.BeginTransactionAsync(ct);
+        var deleted = await SyncApply.ApplyPageAsync(c, tx, records, lastSeq, deviceId, ct);
+        await tx.CommitAsync(ct);
+        return deleted;
+    }
 
-    public Task BeginFullResyncAsync(CancellationToken ct = default) => throw new NotImplementedException("Tarefa 6.");
+    public async Task BeginFullResyncAsync(CancellationToken ct = default)
+    {
+        await using var c = db.Open();
+        await using var tx = await c.BeginTransactionAsync(ct);
+        await SyncApply.BeginFullResyncAsync(c, tx, ct);
+        await tx.CommitAsync(ct);
+    }
 
-    public Task<IReadOnlyList<Guid>> FinishFullResyncAsync(CancellationToken ct = default) => throw new NotImplementedException("Tarefa 6.");
+    public async Task<IReadOnlyList<Guid>> FinishFullResyncAsync(CancellationToken ct = default)
+    {
+        await using var c = db.Open();
+        await using var tx = await c.BeginTransactionAsync(ct);
+        var removed = await SyncApply.FinishFullResyncAsync(c, tx, ct);
+        await tx.CommitAsync(ct);
+        return removed;
+    }
 
     public async Task RecordCycleAsync(DateTimeOffset? syncedAt, string? error, CancellationToken ct = default)
     {
