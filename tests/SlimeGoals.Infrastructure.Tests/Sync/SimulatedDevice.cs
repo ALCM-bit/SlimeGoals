@@ -60,6 +60,9 @@ internal sealed class SimulatedDevice : IDisposable
     public FakeTimeProvider Time { get; }
     public FakeNotificationService Notifications { get; } = new();
 
+    /// <summary>O estado da sincronização deste aparelho, para quem liga e desliga por fora (o serviço de conta).</summary>
+    public ISyncStateStore State => _state;
+
     /// <summary>Ciclos rodados pelo agendador de <see cref="NewScheduler"/>.</summary>
     public int ScheduledCycles { get; private set; }
 
