@@ -112,15 +112,33 @@ public sealed class AccountStore(Db db)
             cancellationToken: cancellationToken));
     }
 
-    public async Task<Guid> CreateDeviceAsync(
-        Guid accountId, string name, byte[] tokenHash, DateTimeOffset now, CancellationToken cancellationToken)
+    /// <summary>
+    /// Cria o aparelho só se a conta ainda existe com a mesma auth_key que o login conferiu. A linha da conta
+    /// fica travada com FOR SHARE, que conflita com a troca de senha e a exclusão: ou o aparelho nasce antes
+    /// da revogação e é revogado, ou o insert já vê o hash novo. Nulo quando não pode criar.
+    /// </summary>
+    public async Task<Guid?> CreateDeviceAsync(
+        Guid accountId, byte[] verifiedAuthHash, string name, byte[] tokenHash, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var id = Guid.NewGuid();
         await using var connection = await db.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var currentHash = await connection.QuerySingleOrDefaultAsync<byte[]>(new CommandDefinition(
+            "SELECT auth_hash FROM accounts WHERE id = @accountId FOR SHARE",
+            new { accountId },
+            transaction,
+            cancellationToken: cancellationToken));
+        if (currentHash is null || !SecretHash.Equal(currentHash, verifiedAuthHash))
+        {
+            return null;
+        }
+
+        var id = Guid.NewGuid();
         await connection.ExecuteAsync(new CommandDefinition(
             "INSERT INTO devices (id, account_id, name, token_hash, last_seen_at) VALUES (@id, @accountId, @name, @tokenHash, @now)",
             new { id, accountId, name, tokenHash, now },
+            transaction,
             cancellationToken: cancellationToken));
+        await transaction.CommitAsync(cancellationToken);
         return id;
     }
 

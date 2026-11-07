@@ -192,8 +192,14 @@ public static class AccountEndpoints
         }
 
         var token = SecretHash.NewToken();
-        var deviceId = await store.CreateDeviceAsync(account.Id, deviceName, SecretHash.Of(token), time.GetUtcNow(), cancellationToken);
-        return Results.Json(new LoginResponse(token, deviceId, account.WrappedKeyPassword), SyncJsonContext.Default.LoginResponse);
+        var deviceId = await store.CreateDeviceAsync(account.Id, account.AuthHash, deviceName, SecretHash.Of(token), time.GetUtcNow(), cancellationToken);
+        if (deviceId is null)
+        {
+            // A conta mudou de senha ou sumiu entre a conferência e a criação.
+            return Error("unauthorized", StatusCodes.Status401Unauthorized);
+        }
+
+        return Results.Json(new LoginResponse(token, deviceId.Value, account.WrappedKeyPassword), SyncJsonContext.Default.LoginResponse);
     }
 
     private static async Task<IResult> LogoutAsync(
