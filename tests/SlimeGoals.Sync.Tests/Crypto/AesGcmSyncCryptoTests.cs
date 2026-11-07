@@ -109,9 +109,30 @@ public sealed class AesGcmSyncCryptoTests : IDisposable
     public void Unknown_envelope_version_throws_format_exception()
     {
         var recordKey = _crypto.RecordKey(RecordId);
-        var json = Encoding.UTF8.GetBytes($$"""
+        var blob = SealRaw(recordKey, $$"""
             {"version":2,"kind":"Tag","recordId":"{{RecordId}}","deviceId":"{{Guid.NewGuid()}}","payload":"{}","extra":true}
             """);
+
+        var act = () => _crypto.Open(recordKey, blob);
+
+        act.Should().Throw<SyncFormatException>().Which.Version.Should().Be(2);
+    }
+
+    /// <summary>Uma versão nova pode mudar a forma dos campos: a versão é lida antes do resto, e o aviso é "atualize o app".</summary>
+    [Fact]
+    public void Unknown_envelope_version_with_another_shape_throws_format_exception()
+    {
+        var recordKey = _crypto.RecordKey(RecordId);
+        var blob = SealRaw(recordKey, """{"version":2,"kind":7,"recordId":123,"payload":{"title":"x"}}""");
+
+        var act = () => _crypto.Open(recordKey, blob);
+
+        act.Should().Throw<SyncFormatException>().Which.Version.Should().Be(2);
+    }
+
+    private static byte[] SealRaw(string recordKey, string envelopeJson)
+    {
+        var json = Encoding.UTF8.GetBytes(envelopeJson);
         var encKey = new byte[32];
         HKDF.DeriveKey(HashAlgorithmName.SHA256, FixedDataKey, encKey, [], "slimegoals/v1/enc"u8);
         var blob = new byte[1 + 12 + json.Length + 16];
@@ -120,10 +141,7 @@ public sealed class AesGcmSyncCryptoTests : IDisposable
         using (var aes = new AesGcm(encKey, 16))
             aes.Encrypt(blob.AsSpan(1, 12), json, blob.AsSpan(13, json.Length), blob.AsSpan(13 + json.Length),
                 [.. "slimegoals/v1/record"u8, .. Encoding.UTF8.GetBytes(recordKey)]);
-
-        var act = () => _crypto.Open(recordKey, blob);
-
-        act.Should().Throw<SyncFormatException>().Which.Version.Should().Be(2);
+        return blob;
     }
 
     [Fact]

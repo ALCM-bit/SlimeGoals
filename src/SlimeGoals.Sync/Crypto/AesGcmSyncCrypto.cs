@@ -148,6 +148,10 @@ public sealed partial class AesGcmSyncCrypto : ISyncCrypto, IDisposable
     /// <summary>A versão vem antes do resto: um envelope de versão nova pode ter outra forma e ainda assim dá <see cref="SyncFormatException"/>.</summary>
     private static SyncEnvelope Read(byte[] plain)
     {
+        var declared = ReadVersion(plain) ?? throw new CryptographicException("O conteúdo do registro não tem versão.");
+        if (declared != SyncCodec.FormatVersion)
+            throw new SyncFormatException(declared);
+
         EnvelopeDto dto;
         try
         {
@@ -168,6 +172,32 @@ public sealed partial class AesGcmSyncCrypto : ISyncCrypto, IDisposable
         if (dto.RecordId is not { } recordId || dto.DeviceId is not { } deviceId || dto.Payload is not { } payload)
             throw new CryptographicException("O conteúdo do registro está incompleto.");
         return new SyncEnvelope(version, kind, recordId, deviceId, payload);
+    }
+
+    /// <summary>Só o campo <c>version</c> do objeto de fora, sem olhar a forma dos outros; nulo se faltar ou não for inteiro.</summary>
+    /// <exception cref="CryptographicException">O conteúdo não é um objeto JSON legível.</exception>
+    private static int? ReadVersion(ReadOnlySpan<byte> plain)
+    {
+        try
+        {
+            var reader = new Utf8JsonReader(plain);
+            if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+                throw new CryptographicException("O conteúdo do registro não é um objeto.");
+            while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+            {
+                var isVersion = reader.ValueTextEquals("version"u8);
+                reader.Read();
+                if (isVersion)
+                    return reader.TokenType == JsonTokenType.Number && reader.TryGetInt32(out var version) ? version : null;
+                reader.Skip();
+            }
+
+            return null;
+        }
+        catch (JsonException e)
+        {
+            throw new CryptographicException("O conteúdo do registro é ilegível.", e);
+        }
     }
 
     private static byte[] Aad(string recordKey)

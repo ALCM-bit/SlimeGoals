@@ -261,7 +261,7 @@ Acordos feitos ao implementar a criptografia e a conta (`src/SlimeGoals.Sync/Cry
 - Subchaves: `enc = HKDF(dados, "slimegoals/v1/enc")` e `rk = HKDF(dados, "slimegoals/v1/record-key")`.
 - `record_key = base64url(HMAC-SHA256(rk, id))`, sem preenchimento, com 43 caracteres. O id vai em 16 bytes na ordem de `Guid.TryWriteBytes` com `bigEndian: true` (a ordem do texto do GUID).
 - O dado autenticado é `"slimegoals/v1/record" ‖ record_key` em UTF-8: blob trocado de chave falha já no GCM. `Open` também confere `RecordKey(envelope.RecordId)`.
-- Byte de versão ou versão do envelope desconhecidos lançam `SyncFormatException`, que pausa o motor. Tag inválida lança `CryptographicException`.
+- Byte de versão ou versão do envelope desconhecidos lançam `SyncFormatException`, que pausa o motor. A versão do envelope é lida antes dos outros campos, então uma versão nova com outra forma também pausa, em vez de virar registro ilegível. Tag inválida lança `CryptographicException`.
 
 **Vetores fixos.** Conferidos fora do .NET (OpenSSL e Python). A 9.5 tem de obter os mesmos valores no Android.
 
