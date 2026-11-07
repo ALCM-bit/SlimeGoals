@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\SlimeGoals.Core\SlimeGoals.Core.csproj" />
+    <ProjectReference Include="..\SlimeGoals.Sync.Contracts\SlimeGoals.Sync.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

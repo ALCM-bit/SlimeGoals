@@ -1,0 +1,42 @@
+# Servidor de sincronização local. Uso: copie .env.example para .env, preencha e rode docker compose up -d --build --wait
+name: slimegoals
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: slimegoals
+      POSTGRES_DB: slimegoals
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U slimegoals -d slimegoals"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  server:
+    build:
+      context: .
+      dockerfile: src/SlimeGoals.Server/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Development liga o e-mail simulado: o token de confirmação sai no log.
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Postgres: Host=db;Port=5432;Database=slimegoals;Username=slimegoals;Password=${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env};GSS Encryption Mode=Disable
+      Server__PreloginSecret: ${SERVER_PRELOGIN_SECRET:?defina SERVER_PRELOGIN_SECRET no .env}
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:8080/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata:

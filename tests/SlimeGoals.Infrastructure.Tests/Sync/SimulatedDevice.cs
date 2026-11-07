@@ -34,7 +34,7 @@ internal sealed class SimulatedDevice : IDisposable
     private readonly GoalService _goals;
     private readonly CheckinService _checkins;
 
-    public SimulatedDevice(string name, Guid id, FakeSyncServer server, DateTimeOffset now)
+    public SimulatedDevice(string name, Guid id, ISyncTransport server, DateTimeOffset now)
     {
         Name = name;
         Id = id;

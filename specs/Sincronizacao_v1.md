@@ -43,6 +43,7 @@ As mesmas metas e registros aparecem em todos os aparelhos de uma pessoa, sem qu
 3. Lembretes podem tocar nos dois aparelhos até a sincronização seguinte.
 4. Entrar com dados em dois aparelhos une tudo, sem deduplicar.
 5. Entre compensações concorrentes, o progresso da mais antiga deixa de contar no total.
+6. Uma meta excluída pode voltar por um aparelho parado há mais de 180 dias, se quem excluiu saiu da conta: a marca de exclusão já foi limpa, e o aparelho antigo reenvia a meta como nova.
 
 **Data de uma edição de meta:** ao gravar, `updated_at` é o maior valor entre a hora atual e o `updated_at` que o aparelho já tem para a meta mais 1 ms. Assim, uma edição feita depois de ver outra sempre vence essa outra, mesmo com o relógio atrasado. Gravar em UTC resolve o fuso, não a hora errada do aparelho. A regra vale para toda gravação que muda `updated_at` da meta, com ou sem sincronização ligada.
 
@@ -100,25 +101,30 @@ ASP.NET Core em `src/SlimeGoals.Server`, com PostgreSQL. Docker Compose para rod
 
 ```
 accounts(id, email, email_confirmed_at, kdf_salt, kdf_params, auth_hash, recovery_hash,
-         wrapped_key_password, wrapped_key_recovery, next_seq, created_at)
+         wrapped_key_password, wrapped_key_recovery, next_seq, purge_point,
+         confirm_hash, confirm_expires_at, created_at)
 devices(id, account_id, name, token_hash, last_seen_at, revoked_at)
 records(account_id, record_key, seq, blob, deleted_at)   -- PK (account_id, record_key); índice (account_id, seq)
 ```
+
+Acréscimos da 9.3 ao esquema: `purge_point` (ponto da limpeza, começa em 0), `confirm_hash` e `confirm_expires_at` (confirmação do e-mail). `next_seq` começa em 1, então o maior `seq` da conta é `next_seq - 1`. Índices: `accounts(email)` único, `devices(token_hash)` único, `devices(account_id)`, `records(account_id, seq)` e `records(deleted_at)` parcial, só das marcas de exclusão.
 
 | Rota | Função |
 |---|---|
 | `POST /auth/prelogin` | Devolve sal e parâmetros do e-mail |
 | `POST /auth/register`, `/auth/confirm`, `/auth/login`, `/auth/logout` | Conta e sessão |
-| `POST /auth/recover`, `/auth/password` | Recuperar com o código, trocar senha |
+| `POST /auth/recover/begin`, `/auth/recover` | Recuperar com o código, em duas etapas: o `begin` confere o código e devolve `wrapped_key_recovery`, sem a qual o aparelho não abre a chave de dados; o `recover` confere o código de novo, define a nova senha e revoga todos os aparelhos |
+| `POST /auth/password` | Trocar senha: exige a `auth_key` atual no corpo |
 | `GET /devices`, `DELETE /devices/{id}` | Aparelhos da conta |
-| `DELETE /account` | Apaga conta e dados |
+| `DELETE /account` | Apaga conta e dados; exige a `auth_key` no corpo, além do token |
 | `GET /sync/pull?after=N&limit=M&full=1\|0` | Registros com `seq > N`, em ordem |
-| `POST /sync/push` | Lote de `{record_key, base_seq, blob ou delete}` |
+| `POST /sync/push` | Lote de `{record_key, base_seq, blob}` ou `{record_key, base_seq, delete: true}` |
+| `GET /health` | Responde `200` se o banco responde, `503` se não |
 
 **Respostas de que o motor depende** (`key` é a `record_key`):
 
 - `pull`: `{records: [{key, seq, blob}], has_more}`. `records` vem em ordem de `seq`, com no máximo `limit` itens. `blob` nulo é registro excluído. `has_more` diz se ainda há registros depois da página. O aparelho trata como falha uma página vazia com `has_more` verdadeiro e uma página cujo maior `seq` não passa de `after`.
-- `push`: `{accepted: [{key, seq}], conflicts: [key]}`. `seq` é o novo `seq` do registro. Todo item do lote aparece em uma das listas. Um lote sem nenhum item aceito faz o aparelho parar de enviar e baixar de novo.
+- `push`: o item leva `blob` ou `delete: true`, nunca os dois; um item sem nenhum dos dois recebe `400`, para um cliente com defeito não apagar um registro. A resposta é `{accepted: [{key, seq}], conflicts: [key]}`. `seq` é o novo `seq` do registro. Todo item do lote aparece em uma das listas. Um lote sem nenhum item aceito faz o aparelho parar de enviar e baixar de novo.
 
 **Regras:**
 
@@ -127,13 +133,83 @@ records(account_id, record_key, seq, blob, deleted_at)   -- PK (account_id, reco
 3. **Reenvio seguro.** Repetir um envio já aceito responde com conflito, resolvido no ciclo seguinte sem duplicar.
 4. **Exclusão.** Zera `blob`, grava `deleted_at` e aumenta o `seq`.
 5. **Marcas antigas.** Limpas depois de 180 dias. A limpeza remove só marcas de exclusão, então registros vivos mantêm `seq` antigos. O ponto da limpeza nunca passa do maior `seq` da conta. Marcas com `seq` igual ou acima do ponto ficam, mesmo depois dos 180 dias, então o registro mais novo da conta sempre sobrevive. Sem isso, quem lê tudo terminaria abaixo do ponto, e cada ciclo daria `410` e outra leitura completa. Com `full=0`, o servidor responde `410` quando `N` está abaixo do ponto da limpeza, inclusive `N = 0`, depois que uma limpeza aconteceu. Com `N` igual ao ponto ou acima dele, não responde `410`. Com `full=1`, nunca responde `410`. Sem o `full`, um aparelho que lê tudo receberia `410` na segunda página.
+   - **Fórmula da limpeza** (por conta, com a linha da conta travada, uma vez por dia): `candidato` = maior `seq` das marcas com `deleted_at` anterior ao corte, mais 1; `ponto` = `MAX(purge_point atual, MIN(candidato, next_seq - 1))`. Remove as marcas anteriores ao corte com `seq` abaixo do ponto. O ponto nunca recua.
+   - O `pull` lê o ponto e os registros numa transação `REPEATABLE READ` somente leitura, do mesmo instante. Com leituras separadas, uma limpeza entre as duas faria um aparelho perder marcas sem receber `410`.
    - O aparelho ignora marca de exclusão de chave desconhecida, mas `last_seq` avança com ela. É assim que um aparelho novo alcança o ponto da limpeza.
    - O aparelho usa `full=1` quando está em `N = 0` sem nenhuma linha em `sync_records`, durante a sincronização completa e depois de um `410` no mesmo ciclo. Nos demais casos usa `full=0`, inclusive em `N = 0`: uma resposta sem `410` nunca remove dados locais, então uma resposta vazia de servidor restaurado de backup não faz perder nada.
    - Depois do `410`, o aparelho zera `last_seq`, marca `sync_records.confirmed = 0` e baixa tudo. O que não voltou e não está na fila foi excluído há mais de 180 dias, e sai do aparelho sem voltar para a fila.
    - No máximo um `410` por ciclo. O segundo conta como falha.
 6. **Isolamento.** Toda consulta filtra pela conta da sessão, nunca por parâmetro do cliente.
-7. **Limites.** Taxa por IP e por conta nas rotas `/auth`; tamanho máximo de blob e de lote. Cotas por conta configuráveis, desligadas por padrão.
+7. **Limites.** Taxa por IP e por e-mail nas rotas `/auth`, e falhas de `auth_key` por conta em `DELETE /account` e `POST /auth/password`; tamanho máximo de blob e de lote. Cotas por conta configuráveis, desligadas por padrão. Os valores estão em "Decisões da fase 9.3".
 8. **Logs.** Nunca registram e-mail completo, token ou blob.
+
+### Decisões da fase 9.3
+
+Acordos feitos ao implementar o servidor. Onde diferem do texto acima, valem estes.
+
+**Token do aparelho.** 256 bits aleatórios, enviado em `Authorization: Bearer` e guardado como SHA-256 em `devices.token_hash`. Não expira: dura até sair, revogar, trocar a senha ou recuperar. `last_seen_at` é atualizado no máximo uma vez por hora.
+
+**Hash de `auth_key` e do código.** SHA-256, sem Argon2id no servidor, comparado com `CryptographicOperations.FixedTimeEquals`. O custo de testar senhas já está no Argon2id do aparelho, e a `auth_key` tem 256 bits. Um hash lento no servidor só abriria espaço para negação de serviço.
+
+**Cadastro não revela quem tem conta.** Todo cadastro com corpo válido recebe a mesma resposta `202`. E-mail de conta confirmada não muda nada nem recebe e-mail. E-mail de conta ainda não confirmada substitui a conta pendente, numa só instrução: sal, parâmetros, `auth_key`, código de recuperação, chaves cifradas, código de confirmação e vencimento novos, e outro e-mail de confirmação sai. O código anterior deixa de valer. A conta não confirmada some depois de 24 h.
+
+**Conta não confirmada é tratada como inexistente.** O `prelogin` devolve o sal falso e o `login` responde `401` mesmo com a chave certa. Sem isso, cadastrar com chave própria e tentar entrar revelaria se o e-mail estava livre. Por isso `email_not_confirmed` não é um código de erro.
+
+**Confirmação ligada a quem cadastrou.** `POST /auth/confirm` recebe `{"token", "auth_key"}`. Só confirma se o código for o mais recente, estiver no prazo e a `auth_key` for a do cadastro, comparada em tempo constante. Código desconhecido, vencido, substituído ou com `auth_key` de outro cadastro dão o mesmo `400 invalid_token`. Sem isso, quem cadastrasse o e-mail de outra pessoa com as próprias chaves faria a vítima confirmar, com o código que chegou primeiro, a conta do atacante. A vítima ficaria presa a um sal e a um código de recuperação que não são dela.
+
+**Limitação aceita do cadastro.** Quem conhece o e-mail de alguém pode cadastrá-lo de novo e invalidar o código pendente, mas não confirma nada sem a caixa de entrada. O limite por e-mail segura a repetição. A conta pendente vence em 24 h, e a limpeza roda uma vez por dia.
+
+**Obrigação para a 9.4: confirmar dentro do app.** O e-mail leva um código que a pessoa digita ou cola no app, não um link solto: a confirmação precisa da `auth_key`, que só o aparelho que cadastrou tem. O app guarda a `auth_key` derivada até a confirmação, ou deriva de novo pedindo a senha.
+
+**E-mail de confirmação.** `IEmailSender`, com `LogEmailSender`, que escreve o token no log, com o e-mail mascarado (`a***@exemplo.com`), e só existe em `Development`. É a exceção à regra 8 da §5, prevista na §10. Fora de `Development`, o servidor recusa iniciar sem um envio real e sem `Server:PreloginSecret`.
+
+**Obrigação para a 9.6: envio em segundo plano.** O envio real precisa rodar em segundo plano, para um e-mail novo e um já usado levarem o mesmo tempo para responder. Enviar na própria requisição revelaria quem tem conta pelo tempo da resposta.
+
+**Apagar a conta e trocar a senha pedem a `auth_key` no corpo**, além do token. Um token roubado lê os blobs cifrados, mas não apaga a cópia da nuvem nem troca a senha. As duas rotas têm limite de 10 falhas de `auth_key` por minuto por conta, para o token roubado não testar senhas sem o limite que o login tem.
+
+**Sal falso.** `HMAC-SHA-256(Server:PreloginSecret, e-mail)`, cortado em 16 bytes, com `Server:DefaultKdfParams` igual a `{"v":1,"m":65536,"t":3,"p":1}`.
+
+**E-mail normalizado.** `Trim()` e `ToLowerInvariant()` antes de qualquer uso, com índice único na coluna.
+
+**Cota.** Só `Sync:MaxRecordsPerAccount`, nula por padrão. Passar dela recusa o lote inteiro com `403 quota_exceeded`.
+
+**`limit` acima do máximo é reduzido, não recusado.** `has_more` continua correto, então o aparelho não percebe diferença.
+
+**Valores que a spec não fixa:**
+
+| Item | Valor |
+|---|---|
+| `limit` do `pull` | padrão 200, máximo 500 |
+| Lote do `push` | até 100 itens |
+| Blob | até 64 KiB |
+| Corpo | até 64 KiB nas rotas que não são `/sync/push`; até 10 MiB no `/sync/push`; acima disso, `413 too_large` |
+| `/auth` | 20 pedidos por minuto por IP e 10 por minuto por e-mail |
+| Falhas de `auth_key` | 10 por minuto por conta, em `DELETE /account` e `POST /auth/password` |
+| `record_key` | de 1 a 128 caracteres |
+| E-mail | até 254 caracteres |
+| `auth_key` e chave de recuperação | 32 bytes |
+| `kdf_salt` | de 16 a 64 bytes |
+| `kdf_params` | até 256 caracteres |
+| Chaves cifradas | até 256 bytes |
+| Token de confirmação | vale 24 h |
+| Marcas de exclusão | 180 dias |
+
+**Limites de taxa e proxy reverso (obrigação para a 9.6).** O limite por IP usa `RemoteIpAddress`. Atrás de um proxy reverso, todos os pedidos pareceriam vir do proxy; é preciso configurar `ForwardedHeaders` com os proxies conhecidos. Os contadores ficam na memória do processo: reiniciar o servidor os zera, e só há uma instância.
+
+**Respostas de erro.** Corpo `{"error":"<código>"}`, em minúsculas e sem detalhes internos.
+
+| Status | Código | Quando |
+|---|---|---|
+| 400 | `invalid_request` | Campo ausente, formato ou tamanho errado, `limit` ou `after` inválidos, lote acima do máximo |
+| 400 | `invalid_token` | Confirmação desconhecida, vencida, substituída por um novo cadastro ou com `auth_key` de outro cadastro |
+| 401 | `unauthorized` | Token ausente, desconhecido ou revogado; credencial errada; e-mail desconhecido ou não confirmado no login |
+| 403 | `quota_exceeded` | Cota da conta |
+| 404 | `not_found` | Aparelho que não existe nesta conta |
+| 410 | `reset_required` | Regra 5 |
+| 413 | `too_large` | Blob ou corpo acima do máximo |
+| 429 | `rate_limited` | Limite de taxa, com `Retry-After` |
+
+**Docker Compose.** `docker compose up -d --build --wait` sobe o PostgreSQL (`postgres:18-alpine`, sem porta publicada) e a API em `http://127.0.0.1:8080`, em modo `Development`, com o processo rodando como usuário `app`. O servidor aplica as migrações ao iniciar.
 
 ## 6. Criptografia e conta
 
@@ -204,7 +280,7 @@ O código do spike é descartável, como em `specs/spikes/`.
 | 9.5 | Interface, permissão de internet, Linux e Android sincronizando |
 | 9.6 | Publicação, depois de decidir grátis ou pago: domínio, TLS, backup, e-mail, política de privacidade, nova auditoria |
 
-Até a 9.6, a confirmação de e-mail é simulada: o link sai no log do servidor local.
+Até a 9.6, a confirmação de e-mail é simulada: o código sai no log do servidor local, e a pessoa o cola no app.
 
 ## 11. Decisões em aberto
 

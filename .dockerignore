@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+.git/
+.claude/
+.superpowers/
+.env*
+!.env.example
+docs/
+specs/
+tests/
+tools/
+packaging/
+artifacts/

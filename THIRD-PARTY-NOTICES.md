@@ -28,6 +28,8 @@ Os componentes abaixo mantêm suas próprias licenças.
 | xunit.v3.mtp-v2 | Apache-2.0 |
 | AwesomeAssertions | Apache-2.0 |
 | Microsoft.Extensions.TimeProvider.Testing | MIT |
+| Npgsql (servidor) | PostgreSQL License |
+| Testcontainers.PostgreSql (testes do servidor) | MIT |
 
 ## Distribuídos no pacote do Linux
 
@@ -73,6 +75,17 @@ O APK (`packaging/android/build.sh`) traz o runtime .NET para Android, as biblio
 | AndroidX, Kotlin e kotlinx.coroutines, Guava ListenableFuture, JSpecify, JetBrains Annotations (bibliotecas Java e Kotlin) | Apache-2.0 | `Apache-2.0.txt` |
 | Fonte Figtree (embutida em `SlimeGoals.App.dll`) | SIL OFL 1.1 | `OFL-1.1-Figtree.txt` |
 | Ícones do Lucide (embutidos em `SlimeGoals.App.dll`) | ISC e MIT (Feather) | `ISC-Lucide.txt` |
+
+## Imagem Docker do servidor
+
+O servidor de sincronização (`src/SlimeGoals.Server`) é montado numa imagem Docker, só para quem roda o servidor; ela não vai no app. A imagem traz o runtime ASP.NET Core e as bibliotecas gerenciadas do servidor.
+
+| Componente | Licença |
+|---|---|
+| Runtime .NET e ASP.NET Core (imagem `aspnet:10.0-alpine`, com o Alpine Linux e seus pacotes) | MIT; licenças variadas no Alpine |
+| Npgsql | PostgreSQL License |
+| Dapper | Apache-2.0 |
+| PostgreSQL (imagem `postgres:18-alpine` usada no Compose, não distribuída por este repositório) | PostgreSQL License |
 
 ## Onde ver os textos no app
 

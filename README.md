@@ -64,6 +64,8 @@ tests/                         testes do Core, Infrastructure, App e Platform.Li
 tools/SlimeGoals.Render/       grava PNGs das telas sem abrir o app
 packaging/linux/               pacote .tar.gz e instalador
 packaging/android/             APK assinado (build.sh) e criação da chave (make-keystore.sh)
+src/SlimeGoals.Server/         servidor de sincronização (ASP.NET Core + PostgreSQL), fora do app
+src/SlimeGoals.Sync/           motor de sincronização; SlimeGoals.Sync.Contracts: contratos do protocolo
 specs/                         especificação, protótipos, planos e conclusões de spikes
 ```
 
@@ -128,6 +130,30 @@ adb shell am kill dev.alcm.slimegoals
 ```
 
 Para conferir os layouts sem emulador, `dotnet run --project tools/SlimeGoals.Render -- /tmp/render [phone|desktop|all]` grava PNGs de cada página em 412×915 (celular) e 1100×720 (desktop).
+
+## Servidor de sincronização (desenvolvimento)
+
+O servidor da fase 9 (`src/SlimeGoals.Server`, ASP.NET Core + PostgreSQL) ainda não é usado pelo app; esta etapa só o deixa rodando e testado. Pré-requisito: Docker com o plugin Compose.
+
+```bash
+cp .env.example .env
+# preencha POSTGRES_PASSWORD e SERVER_PRELOGIN_SECRET (ex.: openssl rand -base64 32)
+docker compose up -d --build --wait
+curl -fsS http://127.0.0.1:8080/health
+```
+
+- A API responde em `http://127.0.0.1:8080`, publicada só no seu computador. O PostgreSQL não tem porta publicada.
+- O servidor sobe em `Development`, com o e-mail simulado: o código de confirmação do cadastro aparece no log (`docker compose logs server`), ao lado do e-mail mascarado (`a***@exemplo.com`), nunca do endereço completo. A confirmação pede também a `auth_key` de quem cadastrou.
+- O `.env` fica fora do repositório. Sem as duas variáveis, o `docker compose` recusa subir.
+- Os dados ficam no volume `slimegoals_pgdata`. `docker compose down` mantém o volume; `docker compose down -v` apaga o banco.
+- As rotas, os limites e os códigos de erro estão em [specs/Sincronizacao_v1.md](specs/Sincronizacao_v1.md), seção 5.
+
+**Os testes do servidor usam Docker.** Os testes de integração sobem um PostgreSQL de verdade com Testcontainers, então `dotnet test --solution SlimeGoals.slnx` agora precisa do Docker rodando. Se o Testcontainers falhar ao subir o contêiner auxiliar (ryuk), por exemplo por uma credencial antiga do Docker, baixe as imagens à mão e rode de novo:
+
+```bash
+docker pull postgres:18-alpine
+docker pull testcontainers/ryuk:0.14.0   # use a versão que o erro indicar
+```
 
 ## Instalar no Android
 

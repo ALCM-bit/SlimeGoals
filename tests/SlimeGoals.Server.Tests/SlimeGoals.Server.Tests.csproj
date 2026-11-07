@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <!-- xUnit1051: repassar TestContext.Current.CancellationToken; ruído em testes locais e rápidos -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3.mtp-v2" />
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SlimeGoals.Server\SlimeGoals.Server.csproj" />
+    <ProjectReference Include="..\..\src\SlimeGoals.Sync\SlimeGoals.Sync.csproj" />
+    <ProjectReference Include="..\..\src\SlimeGoals.Infrastructure\SlimeGoals.Infrastructure.csproj" />
+    <ProjectReference Include="..\SlimeGoals.Testing\SlimeGoals.Testing.csproj" />
+  </ItemGroup>
+
+  <!-- O aparelho simulado e o banco SQLite dele vêm dos testes da Infrastructure; só este projeto de teste os liga ao servidor. -->
+  <ItemGroup>
+    <Compile Include="..\SlimeGoals.Infrastructure.Tests\Sync\SimulatedDevice.cs" Link="Sync\SimulatedDevice.cs" />
+    <Compile Include="..\SlimeGoals.Infrastructure.Tests\TestDatabase.cs" Link="TestDatabase.cs" />
+  </ItemGroup>
+
+</Project>
