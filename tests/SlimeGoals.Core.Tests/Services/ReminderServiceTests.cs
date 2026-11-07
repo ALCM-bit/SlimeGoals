@@ -49,6 +49,42 @@ public class ReminderServiceTests
     private void At(int hour, int minute = 0) => _time.SetUtcNow(Today(hour, minute));
 
     [Fact]
+    public async Task Running_timer_blocks_reminders_of_its_goal()
+    {
+        var goal = await Add();
+        await _timers.SaveAsync(new ActiveTimer(goal.Id, Today(7)));
+        At(10);
+
+        (await Service.SyncAsync()).Should().BeNull();
+
+        _notifications.Shown.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Timer_stopped_on_another_day_does_not_block_reminders()
+    {
+        var goal = await Add();
+        await _timers.SaveAsync(new ActiveTimer(goal.Id, Today(9).AddDays(-3)) { StoppedAt = Today(9, 1).AddDays(-3) });
+        At(10);
+
+        await Service.SyncAsync();
+
+        _notifications.Shown.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Interval_counts_from_the_stop_of_a_timer_stopped_today()
+    {
+        var goal = await Add();
+        await _timers.SaveAsync(new ActiveTimer(goal.Id, Today(9)) { StoppedAt = Today(10) });
+        At(10, 1);
+
+        (await Service.SyncAsync()).Should().Be(Today(11));
+
+        _notifications.Shown.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Remote_deletion_withdraws_pending_notifications_of_deleted_goals()
     {
         var goal = await Add();

@@ -5,9 +5,9 @@ namespace SlimeGoals.Core.Services;
 
 /// <summary>Fatos de hoje (dia local) de uma meta, já levantados pelo ReminderService.</summary>
 /// <param name="PeriodMet">Soma do período de avaliação atual ≥ alvo.</param>
-/// <param name="HasTimer">Há cronômetro desta meta (rodando ou parado).</param>
+/// <param name="HasTimer">Há cronômetro rodando nesta meta. Parado não conta: pode ficar dias esperando registro.</param>
 /// <param name="LastFiredAt">Último disparo de hoje.</param>
-/// <param name="LastCheckinAt">Último registro de hoje.</param>
+/// <param name="LastCheckinAt">Último registro de hoje, ou parada do cronômetro hoje, o que vier depois.</param>
 /// <param name="SnoozedAt">RespondedAt do último disparo de hoje, se a resposta foi Adiar.</param>
 /// <param name="IntervalStartAt">Instante de hoje a partir do qual o intervalo conta: criação da meta ou retomada
 /// dos lembretes (evita notificar na hora e rajada de atrasados).</param>

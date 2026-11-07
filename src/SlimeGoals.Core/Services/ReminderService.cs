@@ -200,7 +200,7 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
             .GroupBy(c => (c.GoalId, Day: DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(c.DoneAt, zone).DateTime)))
             .ToDictionary(g => g.Key, g => g.Sum(c => c.Amount));
 
-        return new Snapshot(active, zone, today, todayStart, tomorrowStart, byGoalAndDay, weekCheckins, fires, timer?.GoalId,
+        return new Snapshot(active, zone, today, todayStart, tomorrowStart, byGoalAndDay, weekCheckins, fires, timer,
             pauseState, snooze);
     }
 
@@ -208,7 +208,7 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
     private sealed class Snapshot(IReadOnlyList<Goal> goals, TimeZoneInfo zone, DateOnly today,
         DateTimeOffset todayStart, DateTimeOffset tomorrowStart,
         Dictionary<(Guid GoalId, DateOnly Day), int> sums, IReadOnlyList<Checkin> weekCheckins,
-        List<ReminderLogEntry> fires, Guid? timerGoalId, PauseState pauseState, int snoozeMinutes)
+        List<ReminderLogEntry> fires, ActiveTimer? timer, PauseState pauseState, int snoozeMinutes)
     {
         public bool Paused => pauseState.IsPaused;
         public int SnoozeMinutes => snoozeMinutes;
@@ -231,12 +231,15 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
             var lastCheckin = weekCheckins
                 .Where(c => c.GoalId == goal.Id && c.DoneAt >= todayStart && c.DoneAt < tomorrowStart)
                 .Select(c => (DateTimeOffset?)c.DoneAt).Max();
+            // Parar conta como atividade: sem isso o lembrete sairia enquanto a pessoa confere o tempo.
+            var stoppedToday = timer?.GoalId == goal.Id && timer.StoppedAt is { } stopped
+                               && stopped >= todayStart && stopped < tomorrowStart ? timer.StoppedAt : null;
             var snoozedAt = last is { Response: ReminderResponse.Snooze } ? last.RespondedAt : null;
             var intervalStart = new[] { goal.CreatedAt, pauseState.ResumedAt }
                 .Where(t => t is { } v && v >= todayStart && v < tomorrowStart)
                 .Max();
-            return new ReminderState(PeriodTotal(goal) >= goal.Target, timerGoalId == goal.Id,
-                last?.FiredAt, lastCheckin, snoozedAt, intervalStart);
+            return new ReminderState(PeriodTotal(goal) >= goal.Target, timer is { StoppedAt: null } && timer.GoalId == goal.Id,
+                last?.FiredAt, new[] { lastCheckin, stoppedToday }.Max(), snoozedAt, intervalStart);
         }
     }
 }

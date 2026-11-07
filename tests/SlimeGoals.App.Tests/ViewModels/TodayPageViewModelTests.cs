@@ -341,6 +341,33 @@ public class TodayPageViewModelTests
     }
 
     [Fact]
+    public async Task Timer_stopped_today_keeps_the_plain_message()
+    {
+        await Create("Estudar", Measure.Duration, 60);
+        var page = await Loaded();
+        await page.StartTimerCommand.ExecuteAsync(Card(page, "Estudar"));
+        _time.Advance(TimeSpan.FromMinutes(10));
+        await page.StopTimerCommand.ExecuteAsync(Card(page, "Estudar"));
+
+        Card(page, "Estudar").StoppedText.Should().Be("Cronômetro parado. Confira o tempo antes de registrar.");
+    }
+
+    [Fact]
+    public async Task Timer_stopped_on_another_day_shows_when_it_stopped()
+    {
+        await Create("Estudar", Measure.Duration, 60);
+        var first = await Loaded();
+        await first.StartTimerCommand.ExecuteAsync(Card(first, "Estudar"));
+        _time.Advance(TimeSpan.FromMinutes(10));
+        await first.StopTimerCommand.ExecuteAsync(Card(first, "Estudar"));
+        _time.Advance(TimeSpan.FromDays(3));
+
+        var reopened = await Loaded();
+
+        Card(reopened, "Estudar").StoppedText.Should().Be("Cronômetro parado em 04/11, 12:10. Confira o tempo antes de registrar.");
+    }
+
+    [Fact]
     public async Task Other_duration_goals_cannot_start_while_timer_exists()
     {
         await Create("Estudar", Measure.Duration, 60);

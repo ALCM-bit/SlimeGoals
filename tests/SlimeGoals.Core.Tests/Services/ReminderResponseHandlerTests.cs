@@ -73,6 +73,20 @@ public class ReminderResponseHandlerTests
     }
 
     [Fact]
+    public async Task Primary_on_duration_with_its_own_stopped_timer_returns_open_app_and_keeps_pending()
+    {
+        var goal = await Create(Measure.Duration, "Estudar");
+        await Timers.StartAsync(goal.Id);
+        await Timers.StopAsync();
+        var entry = await Fire(goal);
+
+        (await Handler.HandleAsync(entry.Id, ReminderAction.Primary)).Should().Be(ReminderOutcome.OpenApp);
+
+        (await _log.GetAsync(entry.Id))!.Response.Should().BeNull();
+        (await Timers.GetAsync())!.StoppedAt.Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task Primary_on_duration_with_other_timer_returns_open_app_and_keeps_pending()
     {
         var other = await Create(Measure.Duration, "Outra");

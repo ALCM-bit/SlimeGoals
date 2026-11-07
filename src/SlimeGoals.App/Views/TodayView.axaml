@@ -220,7 +220,7 @@
                   <!-- Cronômetro parado: conferir e registrar -->
                   <Border Classes="inline-panel" IsVisible="{Binding IsTimerStopped}">
                     <StackPanel Spacing="10">
-                      <TextBlock Text="Cronômetro parado. Confira o tempo antes de registrar." Foreground="{DynamicResource Muted}" />
+                      <TextBlock Text="{Binding StoppedText}" TextWrapping="Wrap" Foreground="{DynamicResource Muted}" />
                       <StackPanel Orientation="Horizontal" Spacing="10">
                         <NumericUpDown Value="{Binding StoppedMinutesInput}" Minimum="0" Maximum="1440" Increment="1"
                                        FormatString="0" Width="130" AutomationProperties.Name="Minutos cronometrados" />
