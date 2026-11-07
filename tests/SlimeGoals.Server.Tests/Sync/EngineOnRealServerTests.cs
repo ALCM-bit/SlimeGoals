@@ -239,24 +239,35 @@ public sealed class EngineOnRealServerTests(PostgresFixture postgres) : IAsyncLi
         ShouldBeEqual();
     }
 
+    /// <summary>Quem só enviou continua com <c>last_seq</c> 0 até baixar a própria meta; o servidor vazio não pode levar o que ele tem.</summary>
     [Fact]
     public async Task Empty_account_removes_nothing_from_a_device_that_only_sent()
     {
-        var a = (await DeviceAsync()).Sim;
-        var goal = await a.CreateGoal("Ler");
-        await a.Adjust(goal.Id, 2);
-        await SettleAsync();
-        var before = a.Snapshot().Lines;
+        var device = await DeviceAsync();
+        var goal = await device.Sim.CreateGoal("Ler");
+        await device.Sim.Adjust(goal.Id, 2);
+        (await device.Sim.SyncAsync()).Should().Be(SyncCycleResult.Done);
+        device.Sim.LastSeq.Should().Be(0, "só enviou: ainda não baixou a própria meta");
+        device.Sim.Pending.Should().Be(0);
+        var before = device.Sim.Snapshot().Lines;
+        before.Should().NotBeEmpty();
 
         await using (var connection = await OpenAsync())
         {
-            await connection.ExecuteAsync("DELETE FROM records");
+            (await connection.ExecuteAsync("DELETE FROM records")).Should().BeGreaterThan(0);
         }
 
-        await SettleAsync();
+        device.Calls.Calls.Clear();
+        (await device.Sim.SyncAsync()).Should().Be(SyncCycleResult.Done);
 
-        a.Snapshot().Lines.Should().Equal(before);
-        a.Pending.Should().Be(0);
+        // O ciclo leu de verdade a conta vazia, desde o início e sem pedir o reset.
+        var pulls = device.Calls.Calls.Where(c => c.Uri.AbsolutePath == "/sync/pull").ToList();
+        pulls.Should().ContainSingle();
+        pulls[0].Uri.Query.Should().Contain("after=0").And.Contain("full=0");
+        pulls[0].Status.Should().Be(HttpStatusCode.OK);
+        device.Sim.Snapshot().Lines.Should().Equal(before);
+        device.Sim.FullResync.Should().BeFalse();
+        device.Sim.Pending.Should().Be(0);
     }
 
     [Fact]
