@@ -28,6 +28,13 @@ public static class AccountEndpoints
         auth.MapPost("/confirm", ConfirmAsync);
         auth.MapPost("/login", LoginAsync);
         auth.MapPost("/logout", LogoutAsync).RequireAuthorization();
+        auth.MapPost("/password", ChangePasswordAsync).RequireAuthorization();
+        auth.MapPost("/recover/begin", RecoverBeginAsync);
+        auth.MapPost("/recover", RecoverAsync);
+
+        routes.MapGet("/devices", ListDevicesAsync).RequireAuthorization();
+        routes.MapDelete("/devices/{id:guid}", RevokeDeviceAsync).RequireAuthorization();
+        routes.MapDelete("/account", DeleteAccountAsync).RequireAuthorization();
     }
 
     /// <summary>Remove espaços e usa minúsculas; nulo se vazio, grande demais ou sem arroba (decisão 15).</summary>
@@ -133,13 +140,16 @@ public static class AccountEndpoints
     }
 
     private static bool IsValid(RegisterRequest body) =>
-        body.KdfSalt is { Length: >= 16 and <= 64 }
-        && !string.IsNullOrWhiteSpace(body.KdfParams) && body.KdfParams.Length <= MaxKdfParamsLength
-        && !HasControl(body.KdfParams)
-        && body.AuthKey is { Length: KeyBytes }
+        IsValidKeyMaterial(body.KdfSalt, body.KdfParams, body.AuthKey, body.WrappedKeyPassword)
         && body.RecoveryKey is { Length: KeyBytes }
-        && body.WrappedKeyPassword is { Length: > 0 and <= MaxWrappedKeyBytes }
         && body.WrappedKeyRecovery is { Length: > 0 and <= MaxWrappedKeyBytes };
+
+    private static bool IsValidKeyMaterial(byte[]? kdfSalt, string? kdfParams, byte[]? authKey, byte[]? wrappedKeyPassword) =>
+        kdfSalt is { Length: >= 16 and <= 64 }
+        && !string.IsNullOrWhiteSpace(kdfParams) && kdfParams.Length <= MaxKdfParamsLength
+        && !HasControl(kdfParams)
+        && authKey is { Length: KeyBytes }
+        && wrappedKeyPassword is { Length: > 0 and <= MaxWrappedKeyBytes };
 
     private static async Task<IResult> ConfirmAsync(
         HttpRequest request, AccountStore store, TimeProvider time, CancellationToken cancellationToken)
@@ -190,6 +200,134 @@ public static class AccountEndpoints
         System.Security.Claims.ClaimsPrincipal user, AccountStore store, TimeProvider time, CancellationToken cancellationToken)
     {
         await store.RevokeDeviceAsync(user.AccountId(), user.DeviceId(), time.GetUtcNow(), cancellationToken);
+        return Results.NoContent();
+    }
+
+    private static IResult Unauthorized() => Error("unauthorized", StatusCodes.Status401Unauthorized);
+
+    private static async Task<IResult> ChangePasswordAsync(
+        HttpRequest request,
+        System.Security.Claims.ClaimsPrincipal user,
+        AccountStore store,
+        TimeProvider time,
+        CancellationToken cancellationToken)
+    {
+        var body = await ReadBodyAsync(request, SyncJsonContext.Default.ChangePasswordRequest, cancellationToken);
+        if (body?.CurrentAuthKey is not { Length: KeyBytes }
+            || !IsValidKeyMaterial(body.KdfSalt, body.KdfParams, body.AuthKey, body.WrappedKeyPassword))
+        {
+            return InvalidRequest();
+        }
+
+        var accountId = user.AccountId();
+        var currentHash = await store.FindAuthHashAsync(accountId, cancellationToken);
+        if (currentHash is null || !SecretHash.Equal(SecretHash.Of(body.CurrentAuthKey), currentHash))
+        {
+            return Unauthorized();
+        }
+
+        var changed = await store.SetPasswordAsync(
+            accountId,
+            currentHash,
+            new NewPassword(SecretHash.Of(body.AuthKey!), body.KdfSalt!, body.KdfParams!, body.WrappedKeyPassword!),
+            user.DeviceId(),
+            time.GetUtcNow(),
+            cancellationToken);
+        return changed ? Results.NoContent() : Unauthorized();
+    }
+
+    /// <summary>Acha a conta confirmada do e-mail e confere o código; e-mail desconhecido, conta não confirmada e código errado dão o mesmo resultado.</summary>
+    private static async Task<RecoveryAccount?> CheckRecoveryCodeAsync(
+        AccountStore store, string email, byte[] recoveryKey, CancellationToken cancellationToken)
+    {
+        var account = await store.FindForRecoveryAsync(email, cancellationToken);
+        var hash = SecretHash.Of(recoveryKey);
+        if (account is null)
+        {
+            _ = SecretHash.Equal(hash, DummyHash);
+            return null;
+        }
+
+        return SecretHash.Equal(hash, account.RecoveryHash) ? account : null;
+    }
+
+    private static async Task<IResult> RecoverBeginAsync(
+        HttpRequest request, AccountStore store, CancellationToken cancellationToken)
+    {
+        var body = await ReadBodyAsync(request, SyncJsonContext.Default.RecoverBeginRequest, cancellationToken);
+        var email = NormalizeEmail(body?.Email);
+        if (email is null || body?.RecoveryKey is not { Length: KeyBytes })
+        {
+            return InvalidRequest();
+        }
+
+        var account = await CheckRecoveryCodeAsync(store, email, body.RecoveryKey, cancellationToken);
+        return account is null
+            ? Unauthorized()
+            : Results.Json(new RecoverBeginResponse(account.WrappedKeyRecovery), SyncJsonContext.Default.RecoverBeginResponse);
+    }
+
+    private static async Task<IResult> RecoverAsync(
+        HttpRequest request, AccountStore store, TimeProvider time, CancellationToken cancellationToken)
+    {
+        var body = await ReadBodyAsync(request, SyncJsonContext.Default.RecoverRequest, cancellationToken);
+        var email = NormalizeEmail(body?.Email);
+        if (email is null || body?.RecoveryKey is not { Length: KeyBytes }
+            || !IsValidKeyMaterial(body.KdfSalt, body.KdfParams, body.AuthKey, body.WrappedKeyPassword))
+        {
+            return InvalidRequest();
+        }
+
+        // Confere o código aqui mesmo: nunca confia em que o begin tenha rodado antes.
+        var account = await CheckRecoveryCodeAsync(store, email, body.RecoveryKey, cancellationToken);
+        if (account is null)
+        {
+            return Unauthorized();
+        }
+
+        await store.SetPasswordAsync(
+            account.Id,
+            null,
+            new NewPassword(SecretHash.Of(body.AuthKey!), body.KdfSalt!, body.KdfParams!, body.WrappedKeyPassword!),
+            null,
+            time.GetUtcNow(),
+            cancellationToken);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> ListDevicesAsync(
+        System.Security.Claims.ClaimsPrincipal user, AccountStore store, CancellationToken cancellationToken)
+    {
+        var currentId = user.DeviceId();
+        var devices = await store.ListDevicesAsync(user.AccountId(), cancellationToken);
+        var dtos = devices.Select(d => new DeviceDto(d.Id, d.Name, d.LastSeenAt, d.Id == currentId)).ToArray();
+        return Results.Json(dtos, SyncJsonContext.Default.DeviceDtoArray);
+    }
+
+    private static async Task<IResult> RevokeDeviceAsync(
+        Guid id, System.Security.Claims.ClaimsPrincipal user, AccountStore store, TimeProvider time, CancellationToken cancellationToken)
+    {
+        var found = await store.RevokeOwnedDeviceAsync(user.AccountId(), id, time.GetUtcNow(), cancellationToken);
+        return found ? Results.NoContent() : Error("not_found", StatusCodes.Status404NotFound);
+    }
+
+    private static async Task<IResult> DeleteAccountAsync(
+        HttpRequest request, System.Security.Claims.ClaimsPrincipal user, AccountStore store, CancellationToken cancellationToken)
+    {
+        var body = await ReadBodyAsync(request, SyncJsonContext.Default.DeleteAccountRequest, cancellationToken);
+        if (body?.AuthKey is not { Length: KeyBytes })
+        {
+            return InvalidRequest();
+        }
+
+        var accountId = user.AccountId();
+        var currentHash = await store.FindAuthHashAsync(accountId, cancellationToken);
+        if (currentHash is null || !SecretHash.Equal(SecretHash.Of(body.AuthKey), currentHash))
+        {
+            return Unauthorized();
+        }
+
+        await store.DeleteAccountAsync(accountId, cancellationToken);
         return Results.NoContent();
     }
 }

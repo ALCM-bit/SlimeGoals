@@ -23,3 +23,30 @@ public sealed record LoginResponse(string Token, Guid DeviceId, byte[] WrappedKe
 
 /// <summary>Corpo de todo erro: <c>{"error":"codigo"}</c>.</summary>
 public sealed record ErrorResponse(string Error);
+
+/// <summary>Troca de senha: prova a senha atual e envia o novo material de chave, já cifrado.</summary>
+public sealed record ChangePasswordRequest(
+    byte[]? CurrentAuthKey,
+    byte[]? AuthKey,
+    byte[]? KdfSalt,
+    string? KdfParams,
+    byte[]? WrappedKeyPassword);
+
+/// <summary>Primeira etapa da recuperação: confere o código e pede a chave cifrada por ele.</summary>
+public sealed record RecoverBeginRequest(string? Email, byte[]? RecoveryKey);
+
+public sealed record RecoverBeginResponse(byte[] WrappedKeyRecovery);
+
+/// <summary>Segunda etapa da recuperação: confere o código de novo e define a nova senha.</summary>
+public sealed record RecoverRequest(
+    string? Email,
+    byte[]? RecoveryKey,
+    byte[]? AuthKey,
+    byte[]? KdfSalt,
+    string? KdfParams,
+    byte[]? WrappedKeyPassword);
+
+public sealed record DeviceDto(Guid Id, string Name, DateTimeOffset LastSeenAt, bool IsCurrent);
+
+/// <summary>Apagar a conta exige a auth_key, além do token do aparelho.</summary>
+public sealed record DeleteAccountRequest(byte[]? AuthKey);

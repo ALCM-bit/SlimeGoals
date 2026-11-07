@@ -21,6 +21,14 @@ public sealed record LoginAccount(Guid Id, byte[] AuthHash, byte[] WrappedKeyPas
 
 public sealed record DeviceIdentity(Guid AccountId, Guid DeviceId);
 
+public sealed record RecoveryAccount(Guid Id, byte[] RecoveryHash, byte[] WrappedKeyRecovery);
+
+public sealed record NewPassword(byte[] AuthHash, byte[] KdfSalt, string KdfParams, byte[] WrappedKeyPassword);
+
+public sealed record DeviceInfo(Guid Id, string Name, DateTimeOffset LastSeenAt);
+
+internal sealed record DeviceListRow(Guid Id, string Name, DateTime LastSeenAt);
+
 internal sealed record DeviceRow(Guid AccountId, Guid DeviceId, DateTime LastSeenAt);
 
 /// <summary>Consultas de conta e aparelho. Todo e-mail chega aqui já normalizado (decisão 15).</summary>
@@ -123,6 +131,98 @@ public sealed class AccountStore(Db db)
         await connection.ExecuteAsync(new CommandDefinition(
             "UPDATE devices SET revoked_at = @now WHERE id = @deviceId AND account_id = @accountId AND revoked_at IS NULL",
             new { now, deviceId, accountId },
+            cancellationToken: cancellationToken));
+    }
+
+    /// <summary>Hash da auth_key da conta da sessão.</summary>
+    public async Task<byte[]?> FindAuthHashAsync(Guid accountId, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        return await connection.QuerySingleOrDefaultAsync<byte[]>(new CommandDefinition(
+            "SELECT auth_hash FROM accounts WHERE id = @accountId",
+            new { accountId },
+            cancellationToken: cancellationToken));
+    }
+
+    /// <summary>Conta confirmada de um e-mail, com o necessário para a recuperação.</summary>
+    public async Task<RecoveryAccount?> FindForRecoveryAsync(string email, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        return await connection.QuerySingleOrDefaultAsync<RecoveryAccount>(new CommandDefinition(
+            """
+            SELECT id AS Id, recovery_hash AS RecoveryHash, wrapped_key_recovery AS WrappedKeyRecovery
+              FROM accounts WHERE email = @email AND email_confirmed_at IS NOT NULL
+            """,
+            new { email },
+            cancellationToken: cancellationToken));
+    }
+
+    /// <summary>
+    /// Troca o material de senha e revoga aparelhos na mesma transação: os outros aparelhos da conta
+    /// (<paramref name="keepDeviceId"/> fica) ou todos, se nulo. Só vale se a auth_key atual ainda for a esperada (nula na recuperação, que já conferiu o código).
+    /// </summary>
+    public async Task<bool> SetPasswordAsync(
+        Guid accountId, byte[]? expectedAuthHash, NewPassword password, Guid? keepDeviceId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var rows = await connection.ExecuteAsync(new CommandDefinition(
+            """
+            UPDATE accounts
+               SET auth_hash = @AuthHash, kdf_salt = @KdfSalt, kdf_params = @KdfParams, wrapped_key_password = @WrappedKeyPassword
+             WHERE id = @accountId AND (@expectedAuthHash::bytea IS NULL OR auth_hash = @expectedAuthHash::bytea)
+            """,
+            new { password.AuthHash, password.KdfSalt, password.KdfParams, password.WrappedKeyPassword, accountId, expectedAuthHash },
+            transaction,
+            cancellationToken: cancellationToken));
+        if (rows != 1)
+        {
+            return false;
+        }
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            """
+            UPDATE devices SET revoked_at = @now
+             WHERE account_id = @accountId AND revoked_at IS NULL AND (@keepDeviceId::uuid IS NULL OR id <> @keepDeviceId::uuid)
+            """,
+            new { now, accountId, keepDeviceId },
+            transaction,
+            cancellationToken: cancellationToken));
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<DeviceInfo>> ListDevicesAsync(Guid accountId, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        var rows = await connection.QueryAsync<DeviceListRow>(new CommandDefinition(
+            "SELECT id AS Id, name AS Name, last_seen_at AS LastSeenAt FROM devices WHERE account_id = @accountId AND revoked_at IS NULL ORDER BY last_seen_at DESC, id",
+            new { accountId },
+            cancellationToken: cancellationToken));
+        return [.. rows.Select(r => new DeviceInfo(r.Id, r.Name, new DateTimeOffset(DateTime.SpecifyKind(r.LastSeenAt, DateTimeKind.Utc))))];
+    }
+
+    /// <summary>Revoga um aparelho da conta; falso se ele não existe nesta conta. Já revogado conta como sucesso, sem mudar nada.</summary>
+    public async Task<bool> RevokeOwnedDeviceAsync(Guid accountId, Guid deviceId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        return await connection.ExecuteScalarAsync<bool>(new CommandDefinition(
+            """
+            WITH target AS (SELECT id FROM devices WHERE id = @deviceId AND account_id = @accountId),
+                 revoked AS (UPDATE devices SET revoked_at = @now WHERE id IN (SELECT id FROM target) AND revoked_at IS NULL)
+            SELECT EXISTS (SELECT 1 FROM target)
+            """,
+            new { now, deviceId, accountId },
+            cancellationToken: cancellationToken));
+    }
+
+    /// <summary>Apaga a conta; aparelhos e registros saem em cascata.</summary>
+    public async Task DeleteAccountAsync(Guid accountId, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        await connection.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM accounts WHERE id = @accountId",
+            new { accountId },
             cancellationToken: cancellationToken));
     }
 

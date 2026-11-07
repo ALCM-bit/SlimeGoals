@@ -11,4 +11,10 @@ namespace SlimeGoals.Sync.Contracts;
 [JsonSerializable(typeof(LoginRequest))]
 [JsonSerializable(typeof(LoginResponse))]
 [JsonSerializable(typeof(ErrorResponse))]
+[JsonSerializable(typeof(ChangePasswordRequest))]
+[JsonSerializable(typeof(RecoverBeginRequest))]
+[JsonSerializable(typeof(RecoverBeginResponse))]
+[JsonSerializable(typeof(RecoverRequest))]
+[JsonSerializable(typeof(DeviceDto[]))]
+[JsonSerializable(typeof(DeleteAccountRequest))]
 public sealed partial class SyncJsonContext : JsonSerializerContext;
