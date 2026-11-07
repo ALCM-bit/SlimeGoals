@@ -151,11 +151,15 @@ Acordos feitos ao implementar o servidor. Onde diferem do texto acima, valem est
 
 **Hash de `auth_key` e do código.** SHA-256, sem Argon2id no servidor, comparado com `CryptographicOperations.FixedTimeEquals`. O custo de testar senhas já está no Argon2id do aparelho, e a `auth_key` tem 256 bits. Um hash lento no servidor só abriria espaço para negação de serviço.
 
-**Cadastro não revela quem tem conta.** E-mail já usado recebe a mesma resposta `202`, sem alterar nada. A conta não confirmada some depois de 24 h, para ninguém reservar o e-mail de outra pessoa.
+**Cadastro não revela quem tem conta.** Todo cadastro com corpo válido recebe a mesma resposta `202`. E-mail de conta confirmada não muda nada nem recebe e-mail. E-mail de conta ainda não confirmada substitui a conta pendente, numa só instrução: sal, parâmetros, `auth_key`, código de recuperação, chaves cifradas, código de confirmação e vencimento novos, e outro e-mail de confirmação sai. O código anterior deixa de valer. A conta não confirmada some depois de 24 h.
 
 **Conta não confirmada é tratada como inexistente.** O `prelogin` devolve o sal falso e o `login` responde `401` mesmo com a chave certa. Sem isso, cadastrar com chave própria e tentar entrar revelaria se o e-mail estava livre. Por isso `email_not_confirmed` não é um código de erro.
 
-**Limitação aceita do cadastro.** O e-mail pode ficar reservado por até cerca de 48 h: o token vale 24 h e a limpeza roda uma vez por dia. O token de confirmação não está ligado a quem cadastrou, então quem cadastrar primeiro segura o e-mail da vítima até a conta vencer. Não há como o dono do e-mail liberar antes.
+**Confirmação ligada a quem cadastrou.** `POST /auth/confirm` recebe `{"token", "auth_key"}`. Só confirma se o código for o mais recente, estiver no prazo e a `auth_key` for a do cadastro, comparada em tempo constante. Código desconhecido, vencido, substituído ou com `auth_key` de outro cadastro dão o mesmo `400 invalid_token`. Sem isso, quem cadastrasse o e-mail de outra pessoa com as próprias chaves faria a vítima confirmar, com o código que chegou primeiro, a conta do atacante. A vítima ficaria presa a um sal e a um código de recuperação que não são dela.
+
+**Limitação aceita do cadastro.** Quem conhece o e-mail de alguém pode cadastrá-lo de novo e invalidar o código pendente, mas não confirma nada sem a caixa de entrada. O limite por e-mail segura a repetição. A conta pendente vence em 24 h, e a limpeza roda uma vez por dia.
+
+**Obrigação para a 9.4: confirmar dentro do app.** O e-mail leva um código que a pessoa digita ou cola no app, não um link solto: a confirmação precisa da `auth_key`, que só o aparelho que cadastrou tem. O app guarda a `auth_key` derivada até a confirmação, ou deriva de novo pedindo a senha.
 
 **E-mail de confirmação.** `IEmailSender`, com `LogEmailSender`, que escreve o token no log e só existe em `Development`. É a exceção à regra 8 da §5, prevista na §10. Fora de `Development`, o servidor recusa iniciar sem um envio real e sem `Server:PreloginSecret`.
 
@@ -197,7 +201,7 @@ Acordos feitos ao implementar o servidor. Onde diferem do texto acima, valem est
 | Status | Código | Quando |
 |---|---|---|
 | 400 | `invalid_request` | Campo ausente, formato ou tamanho errado, `limit` ou `after` inválidos, lote acima do máximo |
-| 400 | `invalid_token` | Confirmação desconhecida ou vencida |
+| 400 | `invalid_token` | Confirmação desconhecida, vencida, substituída por um novo cadastro ou com `auth_key` de outro cadastro |
 | 401 | `unauthorized` | Token ausente, desconhecido ou revogado; credencial errada; e-mail desconhecido ou não confirmado no login |
 | 403 | `quota_exceeded` | Cota da conta |
 | 404 | `not_found` | Aparelho que não existe nesta conta |
@@ -276,7 +280,7 @@ O código do spike é descartável, como em `specs/spikes/`.
 | 9.5 | Interface, permissão de internet, Linux e Android sincronizando |
 | 9.6 | Publicação, depois de decidir grátis ou pago: domínio, TLS, backup, e-mail, política de privacidade, nova auditoria |
 
-Até a 9.6, a confirmação de e-mail é simulada: o link sai no log do servidor local.
+Até a 9.6, a confirmação de e-mail é simulada: o código sai no log do servidor local, e a pessoa o cola no app.
 
 ## 11. Decisões em aberto
 

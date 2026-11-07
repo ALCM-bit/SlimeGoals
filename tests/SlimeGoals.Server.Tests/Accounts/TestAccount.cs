@@ -50,7 +50,7 @@ public sealed class TestAccount
         var register = await anonymous.PostAsJsonAsync("/auth/register", request, SyncJsonContext.Default.RegisterRequest);
         register.EnsureSuccessStatusCode();
         var confirm = await anonymous.PostAsJsonAsync(
-            "/auth/confirm", new ConfirmRequest(factory.Email.LastToken), SyncJsonContext.Default.ConfirmRequest);
+            "/auth/confirm", new ConfirmRequest(factory.Email.LastToken, request.AuthKey), SyncJsonContext.Default.ConfirmRequest);
         confirm.EnsureSuccessStatusCode();
 
         var account = new TestAccount(factory, email, request.AuthKey!, request.RecoveryKey!);

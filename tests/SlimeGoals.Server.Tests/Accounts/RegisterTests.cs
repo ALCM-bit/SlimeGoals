@@ -15,6 +15,12 @@ public sealed class RegisterTests(PostgresFixture postgres)
     private static Task<HttpResponseMessage> RegisterAsync(HttpClient client, RegisterRequest request) =>
         client.PostAsJsonAsync("/auth/register", request, SyncJsonContext.Default.RegisterRequest);
 
+    private static Task<HttpResponseMessage> ConfirmAsync(HttpClient client, string token, byte[]? authKey) =>
+        client.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(token, authKey), SyncJsonContext.Default.ConfirmRequest);
+
+    private static Task<HttpResponseMessage> LoginAsync(HttpClient client, string email, byte[]? authKey) =>
+        client.PostAsJsonAsync("/auth/login", new LoginRequest(email, authKey, "pc"), SyncJsonContext.Default.LoginRequest);
+
     private static Task<HttpResponseMessage> PreloginAsync(HttpClient client, string email) =>
         client.PostAsJsonAsync("/auth/prelogin", new PreloginRequest(email), SyncJsonContext.Default.PreloginRequest);
 
@@ -25,7 +31,7 @@ public sealed class RegisterTests(PostgresFixture postgres)
         using var client = factory.CreateClient();
         var request = TestAccount.NewRegisterRequest("ana@exemplo.com");
         (await RegisterAsync(client, request)).StatusCode.Should().Be(HttpStatusCode.Accepted);
-        await client.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(factory.Email.LastToken), SyncJsonContext.Default.ConfirmRequest);
+        await ConfirmAsync(client, factory.Email.LastToken, request.AuthKey);
 
         var response = await PreloginAsync(client, "ana@exemplo.com");
 
@@ -61,7 +67,7 @@ public sealed class RegisterTests(PostgresFixture postgres)
         await RegisterAsync(client, request);
 
         var pending = await (await PreloginAsync(client, "ana@exemplo.com")).Content.ReadFromJsonAsync(SyncJsonContext.Default.PreloginResponse);
-        await client.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(factory.Email.LastToken), SyncJsonContext.Default.ConfirmRequest);
+        await ConfirmAsync(client, factory.Email.LastToken, request.AuthKey);
         var confirmed = await (await PreloginAsync(client, "ana@exemplo.com")).Content.ReadFromJsonAsync(SyncJsonContext.Default.PreloginResponse);
 
         pending!.KdfSalt.Should().Equal(expected!.KdfSalt);
@@ -158,21 +164,102 @@ public sealed class RegisterTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Register_with_used_email_answers_202_and_changes_nothing()
+    public async Task Register_of_a_pending_email_replaces_the_pending_account_and_sends_a_new_email()
     {
         await using var factory = new ServerFactory(postgres);
         using var client = factory.CreateClient();
         await RegisterAsync(client, TestAccount.NewRegisterRequest("ana@exemplo.com"));
         var before = await ReadAccountAsync(factory, "ana@exemplo.com");
+        var second = TestAccount.NewRegisterRequest("ana@exemplo.com");
 
-        var response = await RegisterAsync(client, TestAccount.NewRegisterRequest("ana@exemplo.com"));
+        var response = await RegisterAsync(client, second);
 
         response.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        factory.Email.Count.Should().Be(1);
+        factory.Email.Count.Should().Be(2);
+        factory.Email.LastEmail.Should().Be("ana@exemplo.com");
         var after = await ReadAccountAsync(factory, "ana@exemplo.com");
-        ((byte[])after.kdf_salt).Should().Equal((byte[])before.kdf_salt);
-        ((byte[])after.auth_hash).Should().Equal((byte[])before.auth_hash);
+        ((byte[])after.kdf_salt).Should().Equal(second.KdfSalt);
+        ((byte[])after.auth_hash).Should().NotEqual((byte[])before.auth_hash);
+        ((byte[])after.confirm_hash).Should().NotEqual((byte[])before.confirm_hash);
+        ((object?)after.email_confirmed_at).Should().BeNull();
         (await CountAccountsAsync(factory)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Attacker_registering_first_cannot_take_over_the_victims_email()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var client = factory.CreateClient();
+        var attacker = TestAccount.NewRegisterRequest("vitima@exemplo.com");
+        var victim = TestAccount.NewRegisterRequest("vitima@exemplo.com");
+
+        await RegisterAsync(client, attacker);
+        var attackerToken = factory.Email.LastToken;
+        (await RegisterAsync(client, victim)).StatusCode.Should().Be(HttpStatusCode.Accepted);
+        var victimToken = factory.Email.LastToken;
+
+        victimToken.Should().NotBe(attackerToken);
+        (await ConfirmAsync(client, attackerToken, attacker.AuthKey)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ConfirmAsync(client, victimToken, victim.AuthKey)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await LoginAsync(client, "vitima@exemplo.com", victim.AuthKey)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await LoginAsync(client, "vitima@exemplo.com", attacker.AuthKey)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        var prelogin = await (await PreloginAsync(client, "vitima@exemplo.com")).Content.ReadFromJsonAsync(SyncJsonContext.Default.PreloginResponse);
+        prelogin!.KdfSalt.Should().Equal(victim.KdfSalt);
+    }
+
+    [Fact]
+    public async Task Confirm_with_the_right_token_but_another_auth_key_answers_invalid_token()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var client = factory.CreateClient();
+        var request = TestAccount.NewRegisterRequest("ana@exemplo.com");
+        await RegisterAsync(client, request);
+        var token = factory.Email.LastToken;
+
+        var wrong = await ConfirmAsync(client, token, System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+
+        wrong.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await wrong.Content.ReadFromJsonAsync(SyncJsonContext.Default.ErrorResponse))!.Error.Should().Be("invalid_token");
+        var row = await ReadAccountAsync(factory, "ana@exemplo.com");
+        ((object?)row.email_confirmed_at).Should().BeNull();
+        (await LoginAsync(client, "ana@exemplo.com", request.AuthKey)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await ConfirmAsync(client, token, request.AuthKey)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task Old_token_stops_working_after_a_new_register_even_with_its_own_auth_key()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var client = factory.CreateClient();
+        var first = TestAccount.NewRegisterRequest("ana@exemplo.com");
+        await RegisterAsync(client, first);
+        var oldToken = factory.Email.LastToken;
+        var second = TestAccount.NewRegisterRequest("ana@exemplo.com");
+        await RegisterAsync(client, second);
+
+        var withOldKey = await ConfirmAsync(client, oldToken, first.AuthKey);
+        var withNewKey = await ConfirmAsync(client, oldToken, second.AuthKey);
+
+        withOldKey.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await withOldKey.Content.ReadFromJsonAsync(SyncJsonContext.Default.ErrorResponse))!.Error.Should().Be("invalid_token");
+        withNewKey.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        ((object?)(await ReadAccountAsync(factory, "ana@exemplo.com")).email_confirmed_at).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Confirm_without_a_valid_auth_key_answers_invalid_request()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var client = factory.CreateClient();
+        await RegisterAsync(client, TestAccount.NewRegisterRequest("ana@exemplo.com"));
+        var token = factory.Email.LastToken;
+
+        foreach (var key in new[] { null, new byte[5] })
+        {
+            var response = await ConfirmAsync(client, token, key);
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await response.Content.ReadFromJsonAsync(SyncJsonContext.Default.ErrorResponse))!.Error.Should().Be("invalid_request");
+        }
     }
 
     [Fact]
@@ -190,20 +277,29 @@ public sealed class RegisterTests(PostgresFixture postgres)
         factory.Email.Count.Should().Be(sent);
         var after = await ReadAccountAsync(factory, account.Email);
         ((byte[])after.auth_hash).Should().Equal((byte[])before.auth_hash);
+        ((byte[])after.kdf_salt).Should().Equal((byte[])before.kdf_salt);
+        ((object?)after.confirm_hash).Should().BeNull();
+        (await LoginAsync(client, account.Email, account.AuthKey)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
-    public async Task Simultaneous_registers_of_the_same_email_create_one_account()
+    public async Task Simultaneous_registers_of_the_same_email_leave_one_whole_pending_account()
     {
         await using var factory = new ServerFactory(postgres);
         using var client = factory.CreateClient();
+        var requests = Enumerable.Range(0, 8).Select(_ => TestAccount.NewRegisterRequest("ana@exemplo.com")).ToArray();
 
-        var responses = await Task.WhenAll(Enumerable.Range(0, 8)
-            .Select(_ => RegisterAsync(client, TestAccount.NewRegisterRequest("ana@exemplo.com"))));
+        var responses = await Task.WhenAll(requests.Select(r => RegisterAsync(client, r)));
 
         responses.Should().OnlyContain(r => r.StatusCode == HttpStatusCode.Accepted);
         (await CountAccountsAsync(factory)).Should().Be(1);
-        factory.Email.Count.Should().Be(1);
+        factory.Email.Count.Should().Be(8);
+
+        // A linha final é inteira de um só cadastro: o sal e a auth_key são do mesmo pedido.
+        var row = await ReadAccountAsync(factory, "ana@exemplo.com");
+        var winner = requests.Single(r => ((byte[])row.kdf_salt).SequenceEqual(r.KdfSalt!));
+        ((byte[])row.auth_hash).Should().Equal(SlimeGoals.Server.Accounts.SecretHash.Of(winner.AuthKey!));
+        ((byte[])row.recovery_hash).Should().Equal(SlimeGoals.Server.Accounts.SecretHash.Of(winner.RecoveryKey!));
     }
 
     [Fact]
@@ -213,7 +309,7 @@ public sealed class RegisterTests(PostgresFixture postgres)
         using var client = factory.CreateClient();
         var request = TestAccount.NewRegisterRequest("ana@exemplo.com");
         await RegisterAsync(client, request);
-        await client.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(factory.Email.LastToken), SyncJsonContext.Default.ConfirmRequest);
+        await ConfirmAsync(client, factory.Email.LastToken, request.AuthKey);
 
         var prelogin = await PreloginAsync(client, "  Ana@Exemplo.COM ");
         var login = await client.PostAsJsonAsync(
@@ -231,12 +327,13 @@ public sealed class RegisterTests(PostgresFixture postgres)
     {
         await using var factory = new ServerFactory(postgres);
         using var client = factory.CreateClient();
-        await RegisterAsync(client, TestAccount.NewRegisterRequest("ana@exemplo.com"));
+        var request = TestAccount.NewRegisterRequest("ana@exemplo.com");
+        await RegisterAsync(client, request);
         var token = factory.Email.LastToken;
 
-        var unknown = await client.PostAsJsonAsync("/auth/confirm", new ConfirmRequest("nada"), SyncJsonContext.Default.ConfirmRequest);
+        var unknown = await ConfirmAsync(client, "nada", request.AuthKey);
         factory.Time.Advance(TimeSpan.FromHours(24) + TimeSpan.FromSeconds(1));
-        var expired = await client.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(token), SyncJsonContext.Default.ConfirmRequest);
+        var expired = await ConfirmAsync(client, token, request.AuthKey);
 
         unknown.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await unknown.Content.ReadFromJsonAsync(SyncJsonContext.Default.ErrorResponse))!.Error.Should().Be("invalid_token");
@@ -253,8 +350,8 @@ public sealed class RegisterTests(PostgresFixture postgres)
         await RegisterAsync(client, request);
         var token = factory.Email.LastToken;
 
-        var first = await client.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(token), SyncJsonContext.Default.ConfirmRequest);
-        var second = await client.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(token), SyncJsonContext.Default.ConfirmRequest);
+        var first = await ConfirmAsync(client, token, request.AuthKey);
+        var second = await ConfirmAsync(client, token, request.AuthKey);
         var login = await client.PostAsJsonAsync(
             "/auth/login", new LoginRequest("ana@exemplo.com", request.AuthKey, "pc"), SyncJsonContext.Default.LoginRequest);
 

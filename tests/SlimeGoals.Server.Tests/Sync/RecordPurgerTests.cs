@@ -134,7 +134,7 @@ public sealed class RecordPurgerTests(PostgresFixture postgres)
         var late = await PurgerOf(factory).RunAsync(CancellationToken.None);
         var again = await client.PostAsJsonAsync("/auth/register", request, SyncJsonContext.Default.RegisterRequest);
         again.EnsureSuccessStatusCode();
-        await client.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(factory.Email.LastToken), SyncJsonContext.Default.ConfirmRequest);
+        await client.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(factory.Email.LastToken, request.AuthKey), SyncJsonContext.Default.ConfirmRequest);
 
         early.Accounts.Should().Be(0);
         late.Accounts.Should().Be(1);

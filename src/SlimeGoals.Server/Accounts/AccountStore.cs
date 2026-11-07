@@ -29,6 +29,8 @@ public sealed record DeviceInfo(Guid Id, string Name, DateTimeOffset LastSeenAt)
 
 internal sealed record DeviceListRow(Guid Id, string Name, DateTime LastSeenAt);
 
+internal sealed record PendingAccount(Guid Id, byte[] AuthHash);
+
 internal sealed record DeviceRow(Guid AccountId, Guid DeviceId, DateTime LastSeenAt);
 
 /// <summary>Consultas de conta e aparelho. Todo e-mail chega aqui já normalizado (decisão 15).</summary>
@@ -45,8 +47,13 @@ public sealed class AccountStore(Db db)
             cancellationToken: cancellationToken));
     }
 
-    /// <summary>Cria a conta; devolve falso se o e-mail já existe (inclusive numa corrida).</summary>
-    public async Task<bool> TryCreateAsync(NewAccount account, CancellationToken cancellationToken)
+    /// <summary>
+    /// Cria a conta ou substitui, numa só instrução, a conta ainda não confirmada do e-mail: material de chave,
+    /// código e vencimento novos, e o código antigo deixa de valer. Conta confirmada fica intacta e devolve falso.
+    /// O <c>ON CONFLICT ... DO UPDATE</c> trava a linha, então dois cadastros simultâneos nunca criam duas linhas
+    /// nem deixam uma linha meio trocada.
+    /// </summary>
+    public async Task<bool> TryCreateOrReplacePendingAsync(NewAccount account, CancellationToken cancellationToken)
     {
         await using var connection = await db.OpenAsync(cancellationToken);
         var rows = await connection.ExecuteAsync(new CommandDefinition(
@@ -55,7 +62,12 @@ public sealed class AccountStore(Db db)
                                   wrapped_key_password, wrapped_key_recovery, confirm_hash, confirm_expires_at, created_at)
             VALUES (@id, @Email, @KdfSalt, @KdfParams, @AuthHash, @RecoveryHash,
                     @WrappedKeyPassword, @WrappedKeyRecovery, @ConfirmHash, @ConfirmExpiresAt, @CreatedAt)
-            ON CONFLICT (email) DO NOTHING
+            ON CONFLICT (email) DO UPDATE
+               SET kdf_salt = EXCLUDED.kdf_salt, kdf_params = EXCLUDED.kdf_params, auth_hash = EXCLUDED.auth_hash,
+                   recovery_hash = EXCLUDED.recovery_hash, wrapped_key_password = EXCLUDED.wrapped_key_password,
+                   wrapped_key_recovery = EXCLUDED.wrapped_key_recovery, confirm_hash = EXCLUDED.confirm_hash,
+                   confirm_expires_at = EXCLUDED.confirm_expires_at, created_at = EXCLUDED.created_at
+             WHERE accounts.email_confirmed_at IS NULL
             """,
             new
             {
@@ -85,19 +97,35 @@ public sealed class AccountStore(Db db)
             cancellationToken: cancellationToken));
     }
 
-    /// <summary>Confirma a conta com o token; o código vale uma vez e até o vencimento.</summary>
-    public async Task<bool> ConfirmAsync(byte[] tokenHash, DateTimeOffset now, CancellationToken cancellationToken)
+    /// <summary>
+    /// Confirma a conta com o token e a auth_key de quem cadastrou; o código vale uma vez e até o vencimento.
+    /// A linha fica travada entre a conferência e a confirmação, para um cadastro simultâneo não trocar a chave no meio.
+    /// </summary>
+    public async Task<bool> ConfirmAsync(byte[] tokenHash, byte[] authHash, DateTimeOffset now, CancellationToken cancellationToken)
     {
         await using var connection = await db.OpenAsync(cancellationToken);
-        var rows = await connection.ExecuteAsync(new CommandDefinition(
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var pending = await connection.QuerySingleOrDefaultAsync<PendingAccount>(new CommandDefinition(
             """
-            UPDATE accounts
-               SET email_confirmed_at = @now, confirm_hash = NULL, confirm_expires_at = NULL
+            SELECT id AS Id, auth_hash AS AuthHash FROM accounts
              WHERE confirm_hash = @tokenHash AND confirm_expires_at >= @now AND email_confirmed_at IS NULL
+               FOR UPDATE
             """,
             new { tokenHash, now },
+            transaction,
             cancellationToken: cancellationToken));
-        return rows == 1;
+        if (pending is null || !SecretHash.Equal(pending.AuthHash, authHash))
+        {
+            return false;
+        }
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE accounts SET email_confirmed_at = @now, confirm_hash = NULL, confirm_expires_at = NULL WHERE id = @id",
+            new { now, id = pending.Id },
+            transaction,
+            cancellationToken: cancellationToken));
+        await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     public async Task<LoginAccount?> FindForLoginAsync(string email, CancellationToken cancellationToken)

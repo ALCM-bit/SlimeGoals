@@ -122,7 +122,7 @@ public static class AccountEndpoints
         var now = time.GetUtcNow();
         var token = SecretHash.NewToken();
         var tokenHash = SecretHash.Of(token);
-        var created = await store.TryCreateAsync(
+        var sendEmail = await store.TryCreateOrReplacePendingAsync(
             new NewAccount(
                 email,
                 body.KdfSalt!,
@@ -136,8 +136,9 @@ public static class AccountEndpoints
                 now),
             cancellationToken);
 
-        // Mesma resposta para e-mail novo e já usado (decisão 6); só a conta nova manda e-mail.
-        if (created)
+        // Mesma resposta para e-mail novo, pendente e confirmado (decisão 6). A conta nova ou substituída manda
+        // e-mail; a confirmada fica como está e não manda nada.
+        if (sendEmail)
         {
             try
             {
@@ -170,12 +171,13 @@ public static class AccountEndpoints
         HttpRequest request, AccountStore store, TimeProvider time, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.ConfirmRequest, cancellationToken);
-        if (string.IsNullOrWhiteSpace(body?.Token) || body.Token.Length > 256)
+        if (string.IsNullOrWhiteSpace(body?.Token) || body.Token.Length > 256 || body.AuthKey is not { Length: KeyBytes })
         {
             return InvalidRequest();
         }
 
-        var confirmed = await store.ConfirmAsync(SecretHash.Of(body.Token), time.GetUtcNow(), cancellationToken);
+        // Código desconhecido, vencido ou de outra auth_key dão a mesma resposta: o código só confirma a conta de quem cadastrou.
+        var confirmed = await store.ConfirmAsync(SecretHash.Of(body.Token), SecretHash.Of(body.AuthKey), time.GetUtcNow(), cancellationToken);
         return confirmed ? Results.NoContent() : Error("invalid_token", StatusCodes.Status400BadRequest);
     }
 

@@ -15,7 +15,8 @@ public sealed record RegisterRequest(
     byte[]? WrappedKeyPassword,
     byte[]? WrappedKeyRecovery);
 
-public sealed record ConfirmRequest(string? Token);
+/// <summary>Confirmação do e-mail: o código do e-mail mais a auth_key de quem cadastrou.</summary>
+public sealed record ConfirmRequest(string? Token, byte[]? AuthKey);
 
 public sealed record LoginRequest(string? Email, byte[]? AuthKey, string? DeviceName);
 
