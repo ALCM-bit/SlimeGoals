@@ -12,13 +12,17 @@ public sealed class PendingRegistration : IDisposable
     private readonly byte[] _wrapKey;
     private bool _disposed;
 
-    internal PendingRegistration(string email, string recoveryCode, byte[] authKey, byte[] wrapKey)
+    internal PendingRegistration(Uri server, string email, string recoveryCode, byte[] authKey, byte[] wrapKey)
     {
+        Server = server;
         Email = email;
         RecoveryCode = recoveryCode;
         _authKey = authKey;
         _wrapKey = wrapKey;
     }
+
+    /// <summary>Servidor em que o cadastro foi feito; só um serviço do mesmo servidor o confirma.</summary>
+    public Uri Server { get; }
 
     /// <summary>E-mail já normalizado.</summary>
     public string Email { get; }
