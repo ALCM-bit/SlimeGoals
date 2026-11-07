@@ -13,6 +13,19 @@ public abstract class SyncContractTests
     /// <summary>Um transporte de uma conta nova, sem registros.</summary>
     protected abstract Task<ISyncTransport> NewAccountAsync();
 
+    /// <summary>Limpa as marcas de exclusão com <c>seq</c> abaixo de <paramref name="seq"/>, como a limpeza de 180 dias faria.</summary>
+    protected abstract Task PurgeBeforeAsync(ISyncTransport account, long seq);
+
+    /// <summary>Registros a, b, c e d vivos; a é excluído (seq 5), e e nasce depois (seq 6). A limpeza até 6 leva a marca de a.</summary>
+    private async Task<ISyncTransport> AccountWithOldMarkAsync()
+    {
+        var account = await NewAccountAsync();
+        await account.PushAsync([New("a"), New("b"), New("c")]);
+        await account.PushAsync([new PushItem("a", 1, null)]);
+        await account.PushAsync([New("e")]);
+        return account;
+    }
+
     private static PushItem New(string key) => new(key, 0, Blob);
 
     private static Task<SyncPullPage> PullAllAsync(ISyncTransport account) => account.PullAsync(0, 100, false);
@@ -224,5 +237,75 @@ public abstract class SyncContractTests
         var records = (await PullAllAsync(account)).Records;
         records.Select(r => r.Seq).Should().Equal(2, 3);
         records[0].Blob.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Purge_answers_reset_below_the_point_only_without_full()
+    {
+        var account = await AccountWithOldMarkAsync();
+        await PurgeBeforeAsync(account, 6);
+
+        var reset = () => account.PullAsync(3, 100, false);
+        await reset.Should().ThrowAsync<SyncResetRequiredException>();
+        var full = await account.PullAsync(3, 100, true);
+        var atPoint = await account.PullAsync(6, 100, false);
+
+        full.Records.Select(r => r.RecordKey).Should().Equal("e");
+        atPoint.Records.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Purge_answers_reset_at_zero_after_a_purge()
+    {
+        var account = await AccountWithOldMarkAsync();
+        await PurgeBeforeAsync(account, 6);
+
+        var reset = () => account.PullAsync(0, 100, false);
+
+        await reset.Should().ThrowAsync<SyncResetRequiredException>();
+        (await account.PullAsync(0, 100, true)).Records.Select(r => r.RecordKey).Should().Equal("b", "c", "e");
+    }
+
+    [Fact]
+    public async Task Account_without_purge_never_answers_reset()
+    {
+        var account = await AccountWithOldMarkAsync();
+
+        var page = await account.PullAsync(0, 100, false);
+
+        page.Records.Should().HaveCount(4);
+    }
+
+    [Fact]
+    public async Task Purge_keeps_live_records_and_the_newest_record()
+    {
+        var account = await NewAccountAsync();
+        await account.PushAsync([New("a"), New("b")]);
+        await account.PushAsync([new PushItem("b", 2, null)]);
+
+        await PurgeBeforeAsync(account, 100);
+
+        var records = (await account.PullAsync(0, 100, true)).Records;
+        records.Select(r => r.RecordKey).Should().Equal("a", "b");
+        records[^1].Blob.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Full_read_reaches_the_purge_point()
+    {
+        var account = await AccountWithOldMarkAsync();
+        await PurgeBeforeAsync(account, 100);
+
+        var after = 0L;
+        SyncPullPage page;
+        do
+        {
+            page = await account.PullAsync(after, 2, true);
+            after = page.Records[^1].Seq;
+        }
+        while (page.HasMore);
+
+        var next = await account.PullAsync(after, 100, false);
+        next.Records.Should().BeEmpty();
     }
 }

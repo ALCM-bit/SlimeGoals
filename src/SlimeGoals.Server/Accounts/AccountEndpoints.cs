@@ -52,6 +52,8 @@ public static class AccountEndpoints
     private static IResult Error(string code, int status) =>
         Results.Json(new ErrorResponse(code), SyncJsonContext.Default.ErrorResponse, statusCode: status);
 
+    internal static IResult ResetRequired() => Error("reset_required", StatusCodes.Status410Gone);
+
     internal static IResult InvalidRequest() => Error("invalid_request", StatusCodes.Status400BadRequest);
 
     internal static async Task<T?> ReadBodyAsync<T>(HttpRequest request, JsonTypeInfo<T> typeInfo, CancellationToken cancellationToken)

@@ -21,6 +21,8 @@ builder.Services.AddSingleton<Db>();
 builder.Services.AddSingleton<ServerMigrator>();
 builder.Services.AddSingleton<AccountStore>();
 builder.Services.AddSingleton<RecordStore>();
+builder.Services.AddSingleton<RecordPurger>();
+builder.Services.AddHostedService<MaintenanceService>();
 builder.Services.TryAddSingleton<IEmailSender, LogEmailSender>();
 builder.Services.AddSingleton<IValidateOptions<ServerOptions>, EmailSenderValidator>();
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, SyncJsonContext.Default));

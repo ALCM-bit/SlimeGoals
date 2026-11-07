@@ -8,10 +8,35 @@ namespace SlimeGoals.Server.Sync;
 /// <summary>Registros cifrados de uma conta. A conta vem sempre da sessão, nunca do cliente (regra 6).</summary>
 public sealed class RecordStore(Db db, TimeProvider time)
 {
-    /// <summary>Página de registros com <c>seq</c> acima de <paramref name="after"/>, em ordem.</summary>
+    /// <summary>Ponto de teste, chamado entre a leitura do ponto da limpeza e a dos registros.</summary>
+    internal Func<Task>? AfterPointRead { get; set; }
+
+    /// <summary>
+    /// Página de registros com <c>seq</c> acima de <paramref name="after"/>, em ordem. Ponto da limpeza e registros saem da mesma
+    /// foto do banco (decisão 9): com leituras separadas, uma limpeza entre as duas faria o aparelho perder marcas sem receber 410.
+    /// </summary>
+    /// <exception cref="ResetRequiredException"><paramref name="after"/> está abaixo do ponto e o pedido não é <paramref name="full"/>.</exception>
     public async Task<PullResponse> PullAsync(Guid account, long after, int limit, bool full, CancellationToken cancellationToken)
     {
         await using var connection = await db.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken);
+        await connection.ExecuteAsync(new CommandDefinition("SET TRANSACTION READ ONLY", transaction: transaction, cancellationToken: cancellationToken));
+        var purgePoint = await connection.ExecuteScalarAsync<long?>(new CommandDefinition(
+            "SELECT purge_point FROM accounts WHERE id = @account",
+            new { account },
+            transaction,
+            cancellationToken: cancellationToken)) ?? 0;
+        if (AfterPointRead is { } hook)
+        {
+            await hook();
+        }
+
+        // Registros vivos ficam abaixo do ponto: quem lê tudo passa por ele sem 410, senão nunca terminaria.
+        if (!full && after < purgePoint)
+        {
+            throw new ResetRequiredException();
+        }
+
         var rows = (await connection.QueryAsync<RecordDto>(new CommandDefinition(
             """
             SELECT record_key AS Key, seq AS Seq, blob AS Blob
@@ -21,6 +46,7 @@ public sealed class RecordStore(Db db, TimeProvider time)
             LIMIT @take
             """,
             new { account, after, take = limit + 1 },
+            transaction,
             cancellationToken: cancellationToken))).ToList();
         return new PullResponse(rows.Take(limit).ToArray(), rows.Count > limit);
     }
@@ -105,3 +131,6 @@ public sealed class RecordStore(Db db, TimeProvider time)
         return new PushResponse(accepted.ToArray(), conflicts.ToArray());
     }
 }
+
+/// <summary>O aparelho parou antes do ponto da limpeza e precisa ler tudo de novo (<c>410</c>).</summary>
+public sealed class ResetRequiredException : Exception;

@@ -35,8 +35,15 @@ public static class SyncEndpoints
         }
 
         // Acima do máximo reduz em vez de recusar: has_more continua certo, e o aparelho nem percebe (decisão 12).
-        var page = await store.PullAsync(user.AccountId(), after, (int)Math.Min(limit, sync.MaxLimit), full, cancellationToken);
-        return Results.Json(page, SyncJsonContext.Default.PullResponse);
+        try
+        {
+            var page = await store.PullAsync(user.AccountId(), after, (int)Math.Min(limit, sync.MaxLimit), full, cancellationToken);
+            return Results.Json(page, SyncJsonContext.Default.PullResponse);
+        }
+        catch (ResetRequiredException)
+        {
+            return AccountEndpoints.ResetRequired();
+        }
     }
 
     private static async Task<IResult> PushAsync(
