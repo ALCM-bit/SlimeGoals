@@ -452,7 +452,7 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
         using (var before = await first.SecretAsync())
             oldToken = before.RootElement.GetProperty("token").GetString()!;
 
-        await first.Service.ReauthenticateAsync(NewPassword);
+        await first.Service.ReauthenticateAsync(NewPassword, "notebook");
 
         (await first.State.GetAsync()).Should().Be(stateBefore with { LastSeq = 7 }).And.Match<SyncState>(s => s.Enabled);
         first.Db.Anchor.ExecuteScalar<int>("SELECT COUNT(*) FROM sync_outbox").Should().Be(1);
@@ -469,6 +469,20 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
         var envelope = Envelope();
         var result = await transport.PushAsync([new PushItem(session.Crypto.RecordKey(envelope.RecordId), 0, session.Crypto.Seal(envelope))]);
         result.Accepted.Should().ContainSingle();
+        (await first.Service.ListDevicesAsync()).Should().ContainSingle(d => d.IsCurrent).Which.Name.Should().Be("notebook");
+    }
+
+    [Fact]
+    public async Task Reauthenticate_refuses_an_invalid_device_name_before_any_request()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var device = new Device(factory);
+        await RegisterAndConfirmAsync(factory, device, NewEmail());
+        var sent = device.Handler.Sent.Count;
+
+        await FluentActions.Awaiting(() => device.Service.ReauthenticateAsync(Password, " ")).Should().ThrowAsync<ArgumentException>();
+
+        device.Handler.Sent.Should().HaveCount(sent);
     }
 
     [Fact]
@@ -480,7 +494,7 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
         var secretBefore = await device.Vault.GetAsync(SessionName);
         var stateBefore = await device.State.GetAsync();
 
-        (await FailureOf(() => device.Service.ReauthenticateAsync("senha-errada-123"))).Kind.Should().Be(AccountErrorKind.Unauthorized);
+        (await FailureOf(() => device.Service.ReauthenticateAsync("senha-errada-123", "notebook"))).Kind.Should().Be(AccountErrorKind.Unauthorized);
 
         (await device.Vault.GetAsync(SessionName)).Should().Equal(secretBefore);
         (await device.State.GetAsync()).Should().Be(stateBefore);
@@ -492,7 +506,7 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
         await using var factory = new ServerFactory(postgres);
         using var device = new Device(factory);
 
-        await FluentActions.Awaiting(() => device.Service.ReauthenticateAsync(Password))
+        await FluentActions.Awaiting(() => device.Service.ReauthenticateAsync(Password, "notebook"))
             .Should().ThrowAsync<InvalidOperationException>().WithMessage("Entre na conta antes.");
 
         device.Handler.Sent.Should().BeEmpty();
@@ -507,7 +521,7 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
         var secretBefore = await device.Vault.GetAsync(SessionName);
         device.Vault.FailWritesWith = new SecretVaultUnavailableException("desbloqueio recusado");
 
-        await FluentActions.Awaiting(() => device.Service.ReauthenticateAsync(Password))
+        await FluentActions.Awaiting(() => device.Service.ReauthenticateAsync(Password, "notebook"))
             .Should().ThrowAsync<SecretVaultUnavailableException>();
 
         device.Vault.FailWritesWith = null;

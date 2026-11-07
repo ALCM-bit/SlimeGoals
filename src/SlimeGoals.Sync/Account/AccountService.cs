@@ -16,7 +16,6 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
     private const int MaxEmailLength = 254;
     private const int MaxDeviceNameLength = 100;
     private const int SaltSize = 16;
-    private const string ReauthDeviceName = "Este aparelho";
 
     /// <summary>Cadastra a conta e devolve as chaves para a confirmação; nada vai ao cofre antes de confirmar (decisão 2).</summary>
     /// <exception cref="ArgumentException">E-mail ou senha inválidos.</exception>
@@ -96,9 +95,10 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
     /// Se algo falhar depois do <c>login</c>, o token novo é revogado e o segredo antigo continua como estava.
     /// </summary>
     /// <exception cref="InvalidOperationException">Sem sessão legível no cofre ou com a sincronização desligada.</exception>
-    public async Task ReauthenticateAsync(string password, CancellationToken ct = default)
+    public async Task ReauthenticateAsync(string password, string deviceName, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(password);
+        deviceName = RequireDeviceName(deviceName);
         string email;
         using (var session = await RequireSessionAsync(ct))
             email = session.Email!;
@@ -106,7 +106,7 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
             throw new InvalidOperationException("Entre na conta antes.");
 
         using var keys = await DeriveForAccountAsync(email, password, ct);
-        await EnterAsync(email, keys.AuthKey, keys.WrapKey, ReauthDeviceName, enableSync: false, ct);
+        await EnterAsync(email, keys.AuthKey, keys.WrapKey, deviceName, enableSync: false, ct);
     }
 
     /// <summary>
