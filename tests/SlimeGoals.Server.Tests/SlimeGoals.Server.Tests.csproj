@@ -28,7 +28,14 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\SlimeGoals.Server\SlimeGoals.Server.csproj" />
     <ProjectReference Include="..\..\src\SlimeGoals.Sync\SlimeGoals.Sync.csproj" />
+    <ProjectReference Include="..\..\src\SlimeGoals.Infrastructure\SlimeGoals.Infrastructure.csproj" />
     <ProjectReference Include="..\SlimeGoals.Testing\SlimeGoals.Testing.csproj" />
+  </ItemGroup>
+
+  <!-- O aparelho simulado e o banco SQLite dele vêm dos testes da Infrastructure; só este projeto de teste os liga ao servidor. -->
+  <ItemGroup>
+    <Compile Include="..\SlimeGoals.Infrastructure.Tests\Sync\SimulatedDevice.cs" Link="Sync\SimulatedDevice.cs" />
+    <Compile Include="..\SlimeGoals.Infrastructure.Tests\TestDatabase.cs" Link="TestDatabase.cs" />
   </ItemGroup>
 
 </Project>
