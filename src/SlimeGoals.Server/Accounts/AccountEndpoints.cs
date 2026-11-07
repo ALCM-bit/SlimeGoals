@@ -47,14 +47,14 @@ public static class AccountEndpoints
             : normalized;
     }
 
-    private static bool HasControl(string text) => text.Any(char.IsControl);
+    internal static bool HasControl(string text) => text.Any(char.IsControl);
 
     private static IResult Error(string code, int status) =>
         Results.Json(new ErrorResponse(code), SyncJsonContext.Default.ErrorResponse, statusCode: status);
 
-    private static IResult InvalidRequest() => Error("invalid_request", StatusCodes.Status400BadRequest);
+    internal static IResult InvalidRequest() => Error("invalid_request", StatusCodes.Status400BadRequest);
 
-    private static async Task<T?> ReadBodyAsync<T>(HttpRequest request, JsonTypeInfo<T> typeInfo, CancellationToken cancellationToken)
+    internal static async Task<T?> ReadBodyAsync<T>(HttpRequest request, JsonTypeInfo<T> typeInfo, CancellationToken cancellationToken)
         where T : class
     {
         try
@@ -209,7 +209,7 @@ public static class AccountEndpoints
         return Results.NoContent();
     }
 
-    private static IResult Unauthorized() => Error("unauthorized", StatusCodes.Status401Unauthorized);
+    internal static IResult Unauthorized() => Error("unauthorized", StatusCodes.Status401Unauthorized);
 
     private static async Task<IResult> ChangePasswordAsync(
         HttpRequest request,
