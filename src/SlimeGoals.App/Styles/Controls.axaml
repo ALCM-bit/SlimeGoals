@@ -584,11 +584,8 @@
     <Setter Property="MaxWidth" Value="640" />
     <Setter Property="HorizontalAlignment" Value="Left" />
   </Style>
-  <!-- Conta (fase 9.5a): seção e formulários na largura toda da lista (o texto curto de um estado não a encolhe),
+  <!-- Conta (fase 9.5a): seção e formulários na largura da lista (FillWidthStackPanel, até o MaxWidth de settings-list),
        erro em vermelho e o código de recuperação em destaque -->
-  <Style Selector="Border.account-card, StackPanel.account-form">
-    <Setter Property="Width" Value="640" />
-  </Style>
   <Style Selector="StackPanel.account-form">
     <Setter Property="Margin" Value="0,0,0,14" />
   </Style>
@@ -709,8 +706,5 @@
   <Style Selector=".compact StackPanel.settings-list">
     <Setter Property="MaxWidth" Value="Infinity" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />
-  </Style>
-  <Style Selector=".compact Border.account-card, .compact StackPanel.account-form">
-    <Setter Property="Width" Value="NaN" />
   </Style>
 </Styles>

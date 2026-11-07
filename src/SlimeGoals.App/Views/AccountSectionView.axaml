@@ -1,12 +1,14 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:acc="using:SlimeGoals.App.Account"
+             xmlns:views="using:SlimeGoals.App.Views"
              x:Class="SlimeGoals.App.Views.AccountSectionView"
              x:DataType="acc:AccountViewModel">
   <!-- Seção "Conta e sincronização" na página principal de Configurações (fase 9.5a, decisão 16).
        Um bloco por estado da conta; as ações abrem as subpáginas de AccountView. -->
   <Border Classes="card account-card">
-    <StackPanel Spacing="12">
+    <!-- Na largura toda da lista: o texto curto de um estado não a encolhe -->
+    <views:FillWidthStackPanel Spacing="12">
       <TextBlock Classes="section-title" Text="Conta e sincronização" />
 
       <!-- Sem conta -->
@@ -81,6 +83,6 @@
       <ProgressBar Classes="busy" IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
       <TextBlock Classes="form-error" Text="{Binding Error}"
                  IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-    </StackPanel>
+    </views:FillWidthStackPanel>
   </Border>
 </UserControl>

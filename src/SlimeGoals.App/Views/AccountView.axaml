@@ -1,12 +1,14 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:acc="using:SlimeGoals.App.Account"
+             xmlns:views="using:SlimeGoals.App.Views"
              x:Class="SlimeGoals.App.Views.AccountView"
              x:DataType="acc:AccountViewModel">
   <!-- Subpáginas da conta (fase 9.5a): abrem no lugar da lista de Licenças, com o título e o Voltar no cabeçalho de
        SettingsView. Um painel por página; senhas sem revelar; nada de cancelar durante a operação (decisão 13). -->
   <ScrollViewer x:Name="Scroller" Classes="page">
-    <StackPanel Classes="settings-list account-form" Spacing="18">
+    <!-- Na largura toda da coluna, até o MaxWidth da lista -->
+    <views:FillWidthStackPanel Classes="settings-list account-form" Spacing="18">
 
       <!-- Criar conta -->
       <StackPanel Spacing="18" IsVisible="{Binding IsRegisterOpen}">
@@ -216,6 +218,6 @@
       <ProgressBar Classes="busy" IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
       <TextBlock Classes="form-error" Text="{Binding Error}"
                  IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-    </StackPanel>
+    </views:FillWidthStackPanel>
   </ScrollViewer>
 </UserControl>

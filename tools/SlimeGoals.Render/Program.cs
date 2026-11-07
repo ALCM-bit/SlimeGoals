@@ -46,6 +46,7 @@ if (which == "account")
 {
     RenderAccount(320, 1400);
     RenderAccount(360, 1400);
+    RenderAccount(900, 800);
     RenderAccount(1100, 800);
 }
 return 0;
