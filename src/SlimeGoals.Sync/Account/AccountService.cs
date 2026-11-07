@@ -99,14 +99,15 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
     {
         ArgumentNullException.ThrowIfNull(password);
         deviceName = RequireDeviceName(deviceName);
-        string email;
-        using (var session = await RequireSessionAsync(ct))
-            email = session.Email!;
+        using var session = await RequireSessionAsync(ct);
         if (!(await state.GetAsync(ct)).Enabled)
             throw new InvalidOperationException("Entre na conta antes.");
+        // A senha derivada só vale para o servidor da sessão: um endereço diferente nunca recebe nada.
+        if (!Uri.TryCreate(session.Server, UriKind.Absolute, out var sessionServer) || sessionServer != server)
+            throw new InvalidOperationException("Esta sessão é de outro servidor.");
 
-        using var keys = await DeriveForAccountAsync(email, password, ct);
-        await EnterAsync(email, keys.AuthKey, keys.WrapKey, deviceName, enableSync: false, ct);
+        using var keys = await DeriveForAccountAsync(session.Email!, password, ct);
+        await EnterAsync(session.Email!, keys.AuthKey, keys.WrapKey, deviceName, enableSync: false, ct, session.DataKey);
     }
 
     /// <summary>
@@ -232,7 +233,8 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
     /// <c>login</c> falhar, o token emitido é revogado, o cofre fica vazio e nada liga. Sem <paramref name="enableSync"/>
     /// (entrar de novo), o segredo antigo só é trocado quando a gravação dá certo e o estado local não é tocado.
     /// </summary>
-    private async Task EnterAsync(string email, byte[] authKey, byte[] wrapKey, string deviceName, bool enableSync, CancellationToken ct)
+    private async Task EnterAsync(string email, byte[] authKey, byte[] wrapKey, string deviceName, bool enableSync, CancellationToken ct,
+        byte[]? expectedDataKey = null)
     {
         var login = await api.LoginAsync(email, authKey, deviceName, ct);
         var stored = false;
@@ -247,6 +249,9 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
                 DataKey = KeyWrap.Unwrap(login.WrappedKeyPassword, wrapKey, WrapPurpose.Password),
             })
             {
+                // Entrar de novo só vale para a mesma conta: outra chave de dados é outra conta com o mesmo e-mail.
+                if (expectedDataKey is not null && !CryptographicOperations.FixedTimeEquals(secret.DataKey, expectedDataKey))
+                    throw new InvalidOperationException("A conta no servidor não é mais a mesma. Saia e entre de novo.");
                 var bytes = secret.ToBytes();
                 try
                 {

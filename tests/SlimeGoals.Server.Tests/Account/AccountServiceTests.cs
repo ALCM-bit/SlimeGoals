@@ -533,6 +533,48 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Reauthenticate_with_a_service_for_another_server_is_refused_before_any_request()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var device = new Device(factory);
+        await RegisterAndConfirmAsync(factory, device, NewEmail());
+        var secretBefore = await device.Vault.GetAsync(SessionName);
+        var rogue = new Recorder();
+        var service = new AccountService(new HttpAccountApi(factory.CreateDefaultClient(rogue)), device.Vault, device.State, new Uri("http://outro.exemplo/"));
+
+        await FluentActions.Awaiting(() => service.ReauthenticateAsync(Password, "notebook"))
+            .Should().ThrowAsync<InvalidOperationException>().WithMessage("Esta sessão é de outro servidor.");
+
+        rogue.Sent.Should().BeEmpty();
+        (await device.Vault.GetAsync(SessionName)).Should().Equal(secretBefore);
+    }
+
+    [Fact]
+    public async Task Reauthenticate_against_a_different_account_with_the_same_email_revokes_the_new_token()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var first = new Device(factory);
+        using var second = new Device(factory);
+        using var third = new Device(factory);
+        var email = NewEmail();
+        await RegisterAndConfirmAsync(factory, first, email);
+        await second.Service.LoginAsync(email, Password, "celular");
+        await second.Service.DeleteAccountAsync(Password);
+        await RegisterAndConfirmAsync(factory, third, email);
+        var secretBefore = await first.Vault.GetAsync(SessionName);
+        var stateBefore = await first.State.GetAsync();
+
+        await FluentActions.Awaiting(() => first.Service.ReauthenticateAsync(Password, "notebook"))
+            .Should().ThrowAsync<InvalidOperationException>().WithMessage("A conta no servidor não é mais a mesma. Saia e entre de novo.");
+
+        (await first.Vault.GetAsync(SessionName)).Should().Equal(secretBefore);
+        (await first.State.GetAsync()).Should().Be(stateBefore);
+        var raw = new HttpAccountApi(factory.CreateClient());
+        (await FailureOf(() => raw.ListDevicesAsync(first.Handler.LoginTokens.Last()))).Kind.Should().Be(AccountErrorKind.Unauthorized);
+        (await third.Service.ListDevicesAsync()).Should().ContainSingle();
+    }
+
+    [Fact]
     public async Task Confirm_with_pending_from_other_server_is_refused()
     {
         await using var factory = new ServerFactory(postgres);
