@@ -219,9 +219,16 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
 
     /// <summary>A cripto e o provedor de token para o motor, ou nulo se não há sessão no cofre. Quem recebe descarta.</summary>
     /// <exception cref="InvalidDataException">O segredo do cofre está ilegível.</exception>
-    public async Task<SyncSession?> OpenSessionAsync(CancellationToken ct = default)
+    public Task<SyncSession?> OpenSessionAsync(CancellationToken ct = default) => OpenSessionAsync(vault, ct);
+
+    /// <summary>
+    /// Abre a sessão direto do cofre, sem cliente HTTP: quem ainda não sabe se há conta (o coordenador, ao iniciar) não
+    /// cria nada de rede antes de saber (RS02).
+    /// </summary>
+    /// <exception cref="InvalidDataException">O segredo do cofre está ilegível.</exception>
+    internal static async Task<SyncSession?> OpenSessionAsync(ISecretVault vault, CancellationToken ct)
     {
-        using var session = await ReadSessionAsync(ct);
+        using var session = await ReadSessionAsync(vault, ct);
         if (session is null)
             return null;
         return new SyncSession(new Uri(session.Server!), session.Email!, session.DeviceId!.Value, session.Token!,
@@ -299,7 +306,9 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
             throw new SecretVaultUnavailableException("O cofre de segredos do sistema não está disponível.");
     }
 
-    private async Task<SessionSecret?> ReadSessionAsync(CancellationToken ct)
+    private Task<SessionSecret?> ReadSessionAsync(CancellationToken ct) => ReadSessionAsync(vault, ct);
+
+    private static async Task<SessionSecret?> ReadSessionAsync(ISecretVault vault, CancellationToken ct)
     {
         var bytes = await vault.GetAsync(SessionSecret.Name, ct);
         if (bytes is null)
