@@ -5,4 +5,8 @@
     <ProjectReference Include="..\SlimeGoals.Sync.Contracts\SlimeGoals.Sync.Contracts.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Konscious.Security.Cryptography.Argon2" />
+  </ItemGroup>
+
 </Project>
