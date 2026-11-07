@@ -33,10 +33,14 @@ public sealed class AuthRateLimits(TimeProvider time, IOptions<ServerOptions> op
         return retry;
     }
 
-    /// <summary>Quanto esperar se a conta já errou a <c>auth_key</c> demais; nulo se pode tentar.</summary>
-    public TimeSpan? AccountBlocked(Guid account)
+    /// <summary>
+    /// Reserva uma tentativa de <c>auth_key</c> da conta antes de comparar a chave; devolve quanto esperar se o limite já foi usado.
+    /// A reserva é atômica, então pedidos paralelos não passam todos pela checagem. Quem acerta a chave devolve com
+    /// <see cref="RefundKeyAttempt"/>; quem erra deixa a reserva gasta.
+    /// </summary>
+    public TimeSpan? ReserveKeyAttempt(Guid account)
     {
-        var retry = _accountFailures.Blocked(account.ToString("N"), options.Value.Limits.AuthKeyFailuresPerAccountPerMinute);
+        var retry = _accountFailures.Hit(account.ToString("N"), options.Value.Limits.AuthKeyFailuresPerAccountPerMinute);
         if (retry is not null)
         {
             logger.LogWarning("Limite de falhas de chave atingido para a conta {Account}.", account);
@@ -45,7 +49,7 @@ public sealed class AuthRateLimits(TimeProvider time, IOptions<ServerOptions> op
         return retry;
     }
 
-    public void RecordKeyFailure(Guid account) => _accountFailures.Add(account.ToString("N"));
+    public void RefundKeyAttempt(Guid account) => _accountFailures.Remove(account.ToString("N"));
 
     /// <summary>Máscara para log: primeira letra, três asteriscos e o domínio (<c>a***@exemplo.com</c>).</summary>
     public static string MaskEmail(string email)
@@ -75,21 +79,16 @@ public sealed class AuthRateLimits(TimeProvider time, IOptions<ServerOptions> op
             }
         }
 
-        public TimeSpan? Blocked(string key, int limit)
-        {
-            lock (_gate)
-            {
-                var now = Current(key, out var entry);
-                return entry.Count >= limit ? Remaining(entry.Start, now) : null;
-            }
-        }
-
-        public void Add(string key)
+        /// <summary>Devolve uma contagem da janela atual (a chave certa não deve gastar a tentativa).</summary>
+        public void Remove(string key)
         {
             lock (_gate)
             {
                 Current(key, out var entry);
-                _entries[key] = (entry.Start, entry.Count + 1);
+                if (entry.Count > 0)
+                {
+                    _entries[key] = (entry.Start, entry.Count - 1);
+                }
             }
         }
 

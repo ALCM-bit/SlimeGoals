@@ -130,6 +130,23 @@ public sealed class RateLimitTests(PostgresFixture postgres)
         (await LoginAsync(factory.CreateClient(), account.Email, newKey)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    [Theory]
+    [InlineData("delete")]
+    [InlineData("password")]
+    public async Task Concurrent_wrong_keys_never_get_past_the_account_limit(string route)
+    {
+        await using var factory = new ServerFactory(postgres, new Dictionary<string, string?> { ["Limits:AuthKeyFailuresPerAccountPerMinute"] = "3" });
+        var account = await TestAccount.CreateAsync(factory);
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Task.Run(() => route == "delete"
+            ? DeleteAsync(account.Client, RandomNumberGenerator.GetBytes(32))
+            : account.Client.PostAsJsonAsync(
+                "/auth/password", PasswordTests.NewPassword(RandomNumberGenerator.GetBytes(32)), SyncJsonContext.Default.ChangePasswordRequest))));
+
+        responses.Count(r => r.StatusCode == HttpStatusCode.Unauthorized).Should().BeLessThanOrEqualTo(3);
+        responses.Count(r => r.StatusCode == HttpStatusCode.TooManyRequests).Should().Be(17);
+    }
+
     private static Task<HttpResponseMessage> DeleteAsync(HttpClient client, byte[] authKey) =>
         client.SendAsync(new HttpRequestMessage(HttpMethod.Delete, "/account")
         {

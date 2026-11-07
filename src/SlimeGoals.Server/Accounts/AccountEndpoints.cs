@@ -248,8 +248,8 @@ public static class AccountEndpoints
 
         var accountId = user.AccountId();
 
-        // Antes de comparar: um token roubado não pode testar senhas sem o limite que o login tem.
-        if (limits.AccountBlocked(accountId) is { } retry)
+        // Reserva a tentativa antes de comparar, atomicamente: um token roubado não pode testar senhas sem o limite que o login tem.
+        if (limits.ReserveKeyAttempt(accountId) is { } retry)
         {
             return new RateLimitedResult(retry);
         }
@@ -257,9 +257,10 @@ public static class AccountEndpoints
         var currentHash = await store.FindAuthHashAsync(accountId, cancellationToken);
         if (currentHash is null || !SecretHash.Equal(SecretHash.Of(body.CurrentAuthKey), currentHash))
         {
-            limits.RecordKeyFailure(accountId);
             return Unauthorized();
         }
+
+        limits.RefundKeyAttempt(accountId);
 
         var changed = await store.SetPasswordAsync(
             accountId,
@@ -370,7 +371,7 @@ public static class AccountEndpoints
         }
 
         var accountId = user.AccountId();
-        if (limits.AccountBlocked(accountId) is { } retry)
+        if (limits.ReserveKeyAttempt(accountId) is { } retry)
         {
             return new RateLimitedResult(retry);
         }
@@ -378,9 +379,10 @@ public static class AccountEndpoints
         var currentHash = await store.FindAuthHashAsync(accountId, cancellationToken);
         if (currentHash is null || !SecretHash.Equal(SecretHash.Of(body.AuthKey), currentHash))
         {
-            limits.RecordKeyFailure(accountId);
             return Unauthorized();
         }
+
+        limits.RefundKeyAttempt(accountId);
 
         await store.DeleteAccountAsync(accountId, cancellationToken);
         return Results.NoContent();
