@@ -1,8 +1,12 @@
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
+using SlimeGoals.Server.Accounts;
 
 namespace SlimeGoals.Server.Tests;
 
@@ -39,6 +43,11 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
 
     public FakeTimeProvider Time { get; } = new(new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero));
 
+    /// <summary>Rota protegida só dos testes: 200 com token válido, 401 sem ele.</summary>
+    public const string ProtectedTestRoute = "/test/protected";
+
+    public FakeEmailSender Email { get; } = new();
+
     public string ConnectionString => _settings["ConnectionStrings:Postgres"]!;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -49,6 +58,41 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
             builder.UseSetting(key, value);
         }
 
-        builder.ConfigureServices(services => services.Replace(ServiceDescriptor.Singleton<TimeProvider>(Time)));
+        builder.ConfigureServices(services =>
+        {
+            services.Replace(ServiceDescriptor.Singleton<TimeProvider>(Time));
+            if (_environment == "Development")
+            {
+                services.Replace(ServiceDescriptor.Singleton<IEmailSender>(Email));
+            }
+
+            services.AddTransient<IStartupFilter, ProtectedRouteFilter>();
+        });
     }
+}
+
+/// <summary>Registra a rota protegida de teste antes do pipeline do servidor.</summary>
+internal sealed class ProtectedRouteFilter : IStartupFilter
+{
+    public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+    {
+        app.Use(async (context, continuation) =>
+        {
+            if (context.Request.Path != ServerFactory.ProtectedTestRoute)
+            {
+                await continuation(context);
+                return;
+            }
+
+            var result = await context.AuthenticateAsync();
+            if (!result.Succeeded)
+            {
+                await context.ChallengeAsync();
+                return;
+            }
+
+            context.Response.StatusCode = StatusCodes.Status200OK;
+        });
+        next(app);
+    };
 }

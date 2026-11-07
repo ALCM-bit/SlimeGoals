@@ -1,8 +1,12 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using SlimeGoals.Server;
+using SlimeGoals.Server.Accounts;
+using SlimeGoals.Server.Auth;
 using SlimeGoals.Server.Data;
+using SlimeGoals.Sync.Contracts;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +18,13 @@ builder.Services.AddSingleton(sp =>
         ?? throw new InvalidOperationException("ConnectionStrings:Postgres não configurada.")));
 builder.Services.AddSingleton<Db>();
 builder.Services.AddSingleton<ServerMigrator>();
+builder.Services.AddSingleton<AccountStore>();
+builder.Services.TryAddSingleton<IEmailSender, LogEmailSender>();
+builder.Services.AddSingleton<IValidateOptions<ServerOptions>, EmailSenderValidator>();
+builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, SyncJsonContext.Default));
+builder.Services.AddAuthentication(DeviceTokenHandler.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, DeviceTokenHandler>(DeviceTokenHandler.SchemeName, null);
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
@@ -21,6 +32,10 @@ if (app.Services.GetRequiredService<IOptions<ServerOptions>>().Value.Server.Migr
 {
     await app.Services.GetRequiredService<ServerMigrator>().RunAsync(CancellationToken.None);
 }
+
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapAccountEndpoints();
 
 app.MapGet("/health", async (Db db, CancellationToken cancellationToken) =>
 {

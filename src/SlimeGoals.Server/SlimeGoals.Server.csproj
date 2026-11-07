@@ -9,4 +9,8 @@
     <PackageReference Include="Dapper" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\SlimeGoals.Sync.Contracts\SlimeGoals.Sync.Contracts.csproj" />
+  </ItemGroup>
+
 </Project>
