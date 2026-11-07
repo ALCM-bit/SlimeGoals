@@ -22,7 +22,7 @@ public class Migration005Tests
             """, new { Now });
         c.Execute("INSERT INTO checkins (id, goal_id, done_at, note, updated_at) VALUES ('c1', 'g1', @Now, 'nota', @Now)", new { Now });
 
-        MigrationRunner.Migrate(c).Should().Be(5);
+        MigrationRunner.Migrate(c).Should().Be(6);
 
         c.Query<string>("SELECT title FROM goals WHERE id = 'g1'").Should().Equal("Ler");
         c.Query<string>("SELECT note FROM checkins WHERE id = 'c1'").Should().Equal("nota");

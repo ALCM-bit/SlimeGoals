@@ -2,6 +2,7 @@ using Microsoft.Extensions.Time.Testing;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
+using SlimeGoals.Core.Sync;
 using SlimeGoals.Testing;
 using static SlimeGoals.Core.Tests.Support.Goals;
 
@@ -46,6 +47,79 @@ public class ReminderServiceTests
     }
 
     private void At(int hour, int minute = 0) => _time.SetUtcNow(Today(hour, minute));
+
+    [Fact]
+    public async Task Remote_deletion_withdraws_pending_notifications_of_deleted_goals()
+    {
+        var goal = await Add();
+        var entry = new ReminderLogEntry(Guid.NewGuid(), goal.Id, Today(7));
+        await _log.AddAsync(entry);
+
+        await ((IRemoteDeletionGate)Service).RunAsync(async ct =>
+        {
+            await _goals.DeleteAsync(goal.Id, ct);
+            return [goal.Id];
+        });
+
+        _notifications.Withdrawn.Should().Equal(entry.Id);
+    }
+
+    [Fact]
+    public async Task Remote_deletion_keeps_notifications_of_other_goals()
+    {
+        var gone = await Add("Apagada");
+        var kept = await Add("Mantida");
+        await _log.AddAsync(new ReminderLogEntry(Guid.NewGuid(), kept.Id, Today(7)));
+
+        await ((IRemoteDeletionGate)Service).RunAsync(async ct =>
+        {
+            await _goals.DeleteAsync(gone.Id, ct);
+            return [gone.Id];
+        });
+
+        _notifications.Withdrawn.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Remote_deletion_failure_withdraws_nothing()
+    {
+        var goal = await Add();
+        await _log.AddAsync(new ReminderLogEntry(Guid.NewGuid(), goal.Id, Today(7)));
+
+        var act = () => ((IRemoteDeletionGate)Service).RunAsync(
+            _ => throw new InvalidOperationException("banco recusou"));
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        _notifications.Withdrawn.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Remote_deletion_waits_for_a_firing_in_progress()
+    {
+        var goal = await Add();
+        At(9);
+        _notifications.ShowStarted = new TaskCompletionSource();
+        _notifications.ShowGate = new TaskCompletionSource();
+        var service = Service;
+        var sync = service.SyncAsync();
+        await _notifications.ShowStarted.Task;
+
+        var applied = false;
+        var run = ((IRemoteDeletionGate)service).RunAsync(async ct =>
+        {
+            applied = true;
+            await _goals.DeleteAsync(goal.Id, ct);
+            return [goal.Id];
+        });
+        await Task.Delay(50);
+        applied.Should().BeFalse();
+
+        _notifications.ShowGate.SetResult();
+        await Task.WhenAll(sync, run);
+
+        applied.Should().BeTrue();
+        _notifications.Visible.Should().BeEmpty();
+    }
 
     [Fact]
     public async Task Sync_with_pending_reminder_of_unreadable_goal_ignores_it_and_serves_the_others()

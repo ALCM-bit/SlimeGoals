@@ -9,7 +9,7 @@ namespace SlimeGoals.Infrastructure.Data;
 /// <summary>Adaptador SQLite da porta <see cref="IGoalRepository"/>. Uma conexão por operação.</summary>
 public sealed class GoalRepository(SqliteConnectionFactory db) : IGoalRepository
 {
-    private const string SelectColumns = """
+    internal const string SelectColumns = """
         SELECT id AS Id, title AS Title, recurrence AS Recurrence, target AS Target, measure AS Measure, unit AS Unit, icon AS Icon,
                color AS Color, reminder_every_min AS ReminderEveryMin, active_from AS ActiveFrom,
                active_until AS ActiveUntil, active_days AS ActiveDays, start_date AS StartDate,
@@ -57,16 +57,8 @@ public sealed class GoalRepository(SqliteConnectionFactory db) : IGoalRepository
     {
         await using var c = db.Open();
         await using var tx = await c.BeginTransactionAsync(ct);
-        var parameters = new { Id = SqlText.Id(id) };
         await SyncOutbox.EnqueueGoalDeletionAsync(c, tx, id, ct);
-        // Filhas antes da meta: as chaves estrangeiras estão ligadas e não há ON DELETE CASCADE.
-        await c.ExecuteAsync(new CommandDefinition("""
-            DELETE FROM active_timer WHERE goal_id = @Id;
-            DELETE FROM checkins WHERE goal_id = @Id;
-            DELETE FROM reminder_log WHERE goal_id = @Id;
-            """, parameters, tx, cancellationToken: ct));
-        var affected = await c.ExecuteAsync(new CommandDefinition(
-            "DELETE FROM goals WHERE id = @Id", parameters, tx, cancellationToken: ct));
+        var affected = await GoalDeletion.DeleteRowsAsync(c, tx, id, ct);
 
         if (affected == 0)
             throw new GoalNotFoundException(id);

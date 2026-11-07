@@ -37,7 +37,7 @@ public class Migration004Tests
         InsertLog(c, "l-kept", "kept");
         c.Execute("INSERT INTO active_timer (id, goal_id, started_at) VALUES (1, 'gone', @Now)", new { Now });
 
-        MigrationRunner.Migrate(c).Should().Be(5);
+        MigrationRunner.Migrate(c).Should().Be(6);
 
         c.Query<string>("SELECT id FROM goals").Should().Equal("kept");
         c.Query<string>("SELECT id FROM checkins").Should().Equal("c-kept");
@@ -111,7 +111,7 @@ public class Migration004Tests
 
             var factory = new SqliteConnectionFactory($"Data Source={path}");
             using (var c = factory.Open())
-                MigrationRunner.Migrate(c).Should().Be(5);
+                MigrationRunner.Migrate(c).Should().Be(6);
 
             SqliteConnection.ClearAllPools();
             var file = File.ReadAllBytes(path);

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Domain;
+using SlimeGoals.Core.Sync;
 
 namespace SlimeGoals.Core.Services;
 
@@ -13,7 +14,7 @@ public sealed record UpcomingReminder(Goal Goal, DateTimeOffset At);
 /// </summary>
 public sealed class ReminderService(IGoalRepository goals, ICheckinRepository checkins, ITimerRepository timers,
     IReminderLogRepository log, INotificationService notifications, IReminderFormatter formatter, TimeProvider time,
-    ReminderPause? pause = null, AppSettings? settings = null)
+    ReminderPause? pause = null, AppSettings? settings = null) : IRemoteDeletionGate
 {
     // Disparo e exclusão não se cruzam: um disparo em andamento já gravou o log, mas ainda não mostrou a notificação.
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -45,6 +46,27 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
             var pending = (await log.ListPendingAsync(ct).ConfigureAwait(false)).Where(e => e.GoalId == goalId).ToList();
             await goals.DeleteAsync(goalId, ct).ConfigureAwait(false);
             foreach (var entry in pending)
+                await WithdrawAsync(entry.Id, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Aplica exclusões vindas do servidor sob o mesmo portão, na mesma ordem de <see cref="DeleteGoalAsync"/>:
+    /// os pendentes são lidos antes (o log some com a meta) e só saem da central depois que <paramref name="apply"/>
+    /// terminou. Se ele falhar, nada é retirado.
+    /// </summary>
+    public async Task RunAsync(Func<CancellationToken, Task<IReadOnlyList<Guid>>> apply, CancellationToken ct = default)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var pending = await log.ListPendingAsync(ct).ConfigureAwait(false);
+            var deleted = (await apply(ct).ConfigureAwait(false)).ToHashSet();
+            foreach (var entry in pending.Where(e => deleted.Contains(e.GoalId)))
                 await WithdrawAsync(entry.Id, ct).ConfigureAwait(false);
         }
         finally

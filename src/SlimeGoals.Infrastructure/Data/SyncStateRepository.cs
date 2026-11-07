@@ -47,7 +47,7 @@ public sealed class SyncStateRepository(SqliteConnectionFactory db) : ISyncState
             DELETE FROM sync_records;
             DELETE FROM sync_tombstones;
             DELETE FROM sync_pending;
-            UPDATE sync_state SET enabled = 0, last_seq = 0, last_sync_at = NULL, last_error = NULL;
+            UPDATE sync_state SET enabled = 0, last_seq = 0, last_sync_at = NULL, last_error = NULL, full_resync = 0;
             """, transaction: tx, cancellationToken: ct));
         await tx.CommitAsync(ct);
     }

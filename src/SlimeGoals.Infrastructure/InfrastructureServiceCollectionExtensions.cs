@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using SlimeGoals.Core.Abstractions;
+using SlimeGoals.Core.Sync;
 using SlimeGoals.Infrastructure.Data;
 
 namespace SlimeGoals.Infrastructure;
@@ -23,6 +24,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<IReminderLogRepository, ReminderLogRepository>();
         services.AddSingleton<ISettingsRepository, SettingsRepository>();
         services.AddSingleton<ISyncStateStore, SyncStateRepository>();
+        services.AddSingleton<ISyncLocalStore, SyncLocalStore>();
         return services;
     }
 }

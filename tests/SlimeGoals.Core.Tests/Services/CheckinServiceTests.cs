@@ -221,4 +221,33 @@ public class CheckinServiceTests
         _time.SetUtcNow(new DateTimeOffset(2026, 11, 9, 3, 0, 0, TimeSpan.Zero)); // segunda 09/11 00:00 local
         (await Service.PeriodTotalAsync(goal.Id)).Should().Be(0);
     }
+
+    [Fact]
+    public async Task Compensated_adjust_marks_period_and_seen()
+    {
+        var goal = await Create();
+        await Seed(goal, -3);
+
+        (await Service.AdjustAsync(goal.Id, 2)).Should().Be(2);
+
+        var first = _checkins.All[^1];
+        first.Amount.Should().Be(5);
+        first.Compensation!.Period.Should().Be(new DateOnly(2026, 11, 2));
+        first.Compensation.Seen.Should().BeEmpty();
+
+        await Seed(goal, -5); // outro aparelho zera de novo o total real
+        await Service.AdjustAsync(goal.Id, 1);
+
+        _checkins.All[^1].Compensation!.Seen.Should().Equal(first.Id);
+    }
+
+    [Fact]
+    public async Task Normal_adjust_has_no_compensation()
+    {
+        var goal = await Create();
+
+        await Service.AdjustAsync(goal.Id, 3);
+
+        _checkins.All.Single().Compensation.Should().BeNull();
+    }
 }

@@ -6,7 +6,7 @@ namespace SlimeGoals.Infrastructure.Tests.Data;
 
 public class MigrationRunnerTests
 {
-    private const int Latest = 5;
+    private const int Latest = 6;
 
     private const string GoalColumns =
         "id, title, recurrence, target, icon, color, reminder_every_min, active_from, active_until, active_days, created_at, updated_at";
@@ -220,7 +220,7 @@ public class MigrationRunnerConcurrencyTests
                     return MigrationRunner.Migrate(c);
                 }));
 
-                (await Task.WhenAll(runs)).Should().AllBeEquivalentTo(5);
+                (await Task.WhenAll(runs)).Should().AllBeEquivalentTo(6);
             }
             finally
             {
