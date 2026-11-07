@@ -51,7 +51,10 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
     }
 
     /// <summary>Confirma o e-mail e entra com as chaves do cadastro, sem um segundo Argon2id.</summary>
-    /// <remarks>Se a confirmação falhar, o mesmo <paramref name="pending"/> serve para tentar de novo.</remarks>
+    /// <remarks>
+    /// Se a confirmação ou a entrada falhar, o mesmo <paramref name="pending"/> serve para tentar de novo. O código é de
+    /// uso único: depois que o servidor o aceita, a nova tentativa não o manda outra vez e só refaz a entrada.
+    /// </remarks>
     public async Task ConfirmAsync(PendingRegistration pending, string code, string deviceName, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(pending);
@@ -61,7 +64,12 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
         await EnsureSignedOutAsync(ct);
         await EnsureVaultAsync(ct);
 
-        await api.ConfirmAsync(code.Trim(), pending.AuthKey, ct);
+        if (!pending.Confirmed)
+        {
+            await api.ConfirmAsync(code.Trim(), pending.AuthKey, ct);
+            pending.Confirmed = true;
+        }
+
         await EnterAsync(pending.Email, pending.AuthKey, pending.WrapKey, deviceName, ct);
     }
 

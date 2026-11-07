@@ -267,6 +267,27 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Confirm_can_be_retried_after_a_failed_entry()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var device = new Device(factory);
+        using var pending = await device.Service.RegisterAsync(NewEmail(), Password);
+        var code = factory.Email.LastToken;
+        device.Vault.FailWritesWith = new SecretVaultUnavailableException("desbloqueio recusado");
+        await FluentActions.Awaiting(() => device.Service.ConfirmAsync(pending, code, "pc"))
+            .Should().ThrowAsync<SecretVaultUnavailableException>();
+
+        // O código já foi consumido no servidor: a nova tentativa só refaz a entrada.
+        device.Vault.FailWritesWith = null;
+        await device.Service.ConfirmAsync(pending, code, "pc");
+
+        device.Vault.Names.Should().Equal(SessionName);
+        (await device.State.GetAsync()).Enabled.Should().BeTrue();
+        device.Handler.Sent.Count(s => s.Path == "/auth/confirm").Should().Be(1);
+        (await device.Service.ListDevicesAsync()).Should().ContainSingle().Which.IsCurrent.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Login_while_enabled_is_refused()
     {
         await using var factory = new ServerFactory(postgres);

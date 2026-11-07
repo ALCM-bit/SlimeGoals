@@ -26,6 +26,12 @@ public sealed class PendingRegistration : IDisposable
     /// <summary>Código de recuperação para mostrar à pessoa, como <c>XXXX-XXXX-…-XX</c>.</summary>
     public string RecoveryCode { get; }
 
+    /// <summary>
+    /// O servidor já aceitou o código (ele é de uso único). Uma nova tentativa depois de falha na entrada pula a
+    /// confirmação e só refaz a entrada.
+    /// </summary>
+    internal bool Confirmed { get; set; }
+
     internal byte[] AuthKey
     {
         get
