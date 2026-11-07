@@ -1,9 +1,9 @@
 using System.Diagnostics;
 
-namespace SlimeGoals.Infrastructure.Tests;
+namespace SlimeGoals.Testing;
 
 /// <summary>Guarda o que passa pelo <see cref="Trace"/> enquanto existir. O Trace é global: confira por conteúdo.</summary>
-internal sealed class TraceCapture : TraceListener
+public sealed class TraceCapture : TraceListener
 {
     private readonly List<string> _messages = [];
 

@@ -519,7 +519,23 @@ public class SyncEngineTests : IDisposable
         var status = await Store.GetStatusAsync();
         status.LastError.Should().Be("Sem conexão com o servidor.");
         status.LastSyncAt.Should().BeNull();
-        trace.Messages.Should().Contain(m => m.Contains("sem rede"));
+        trace.Messages.Should().Contain(m => m.Contains("Falha na sincronização: HttpRequestException"));
+    }
+
+    [Fact]
+    public async Task Failure_trace_has_only_the_type_and_the_status()
+    {
+        using var trace = new TraceCapture();
+        _server.FailNext(new HttpRequestException("corpo-cru-do-servidor", new IOException("interna-secreta"),
+            System.Net.HttpStatusCode.ServiceUnavailable));
+
+        var result = await Engine().RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Failed);
+        (await Store.GetStatusAsync()).LastError.Should().Be("O servidor está com problemas. O app tenta de novo sozinho.");
+        trace.Messages.Should().Contain(m => m.Contains("Falha na sincronização: HttpRequestException (HTTP 503)"));
+        trace.Messages.Should().NotContain(m => m.Contains("corpo-cru-do-servidor") || m.Contains("interna-secreta")
+            || m.Contains(" at "));
     }
 
     [Fact]

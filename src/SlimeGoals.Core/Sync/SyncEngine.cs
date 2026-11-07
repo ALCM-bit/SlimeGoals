@@ -49,7 +49,7 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
         }
         catch (Exception e)
         {
-            Trace.TraceError($"Falha na sincronização: {e}");
+            Trace.TraceError($"Falha na sincronização: {SyncErrorText.ForTrace(e)}");
             await RecordErrorAsync(SyncErrorText.For(e)).ConfigureAwait(false);
             return SyncCycleResult.Failed;
         }

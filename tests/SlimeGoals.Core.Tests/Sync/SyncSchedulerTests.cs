@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Time.Testing;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Core.Sync;
+using SlimeGoals.Testing;
 
 namespace SlimeGoals.Core.Tests.Sync;
 
@@ -148,6 +149,28 @@ public class SyncSchedulerTests
         scheduler.Start();
         _time.Advance(TimeSpan.FromSeconds(30));
         _runs.Should().Be(2);
+    }
+
+    [Fact]
+    public void Failing_cycle_traces_only_the_exception_type()
+    {
+        using var trace = new TraceCapture();
+        _override = _ => throw new InvalidOperationException("detalhe-secreto-do-ciclo", new IOException("interna-secreta"));
+        using var scheduler = Create();
+        scheduler.Start();
+        trace.Messages.Should().Contain(m => m.Contains("Ciclo de sincronização falhou: InvalidOperationException"));
+        trace.Messages.Should().NotContain(m => m.Contains("detalhe-secreto-do-ciclo") || m.Contains("interna-secreta"));
+    }
+
+    [Fact]
+    public void Failing_cycle_traces_the_http_status()
+    {
+        using var trace = new TraceCapture();
+        _override = _ => throw new HttpRequestException("corpo-cru-agendador", null, System.Net.HttpStatusCode.BadGateway);
+        using var scheduler = Create();
+        scheduler.Start();
+        trace.Messages.Should().Contain(m => m.Contains("Ciclo de sincronização falhou: HttpRequestException (HTTP 502)"));
+        trace.Messages.Should().NotContain(m => m.Contains("corpo-cru-agendador"));
     }
 
     [Fact]

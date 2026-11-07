@@ -19,6 +19,14 @@ public static class SyncErrorText
         _ => "Erro inesperado na sincronização.",
     };
 
+    /// <summary>
+    /// Detalhe de uma falha para o <c>Trace</c>: só o tipo da exceção e, num <see cref="HttpRequestException"/>, o status
+    /// HTTP. Nem a mensagem, nem a pilha, nem as exceções internas, que podem trazer o corpo cru da resposta.
+    /// </summary>
+    public static string ForTrace(Exception e) => e is HttpRequestException { StatusCode: { } status }
+        ? $"{e.GetType().Name} (HTTP {(int)status})"
+        : e.GetType().Name;
+
     private static string ForStatus(HttpStatusCode status) => (int)status switch
     {
         >= 500 => "O servidor está com problemas. O app tenta de novo sozinho.",

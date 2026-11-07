@@ -5,6 +5,7 @@ using SlimeGoals.Core;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Sync;
 using SlimeGoals.Infrastructure.Data;
+using SlimeGoals.Testing;
 
 namespace SlimeGoals.Infrastructure.Tests.Data;
 

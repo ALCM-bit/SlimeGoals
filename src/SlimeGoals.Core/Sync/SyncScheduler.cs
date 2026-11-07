@@ -140,7 +140,7 @@ public sealed class SyncScheduler : IDisposable
             }
             catch (Exception e)
             {
-                Trace.TraceError($"Ciclo de sincronização falhou: {e}");
+                Trace.TraceError($"Ciclo de sincronização falhou: {SyncErrorText.ForTrace(e)}");
                 result = SyncCycleResult.Failed;
             }
 

@@ -1,6 +1,7 @@
 using Dapper;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Infrastructure.Data;
+using SlimeGoals.Testing;
 
 namespace SlimeGoals.Infrastructure.Tests.Data;
 
