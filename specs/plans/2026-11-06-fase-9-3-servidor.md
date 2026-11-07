@@ -40,7 +40,7 @@ Depois disso, `dotnet test --solution SlimeGoals.slnx` passa a exigir também o 
 10. **Limpeza por conta, com a linha da conta travada.** `candidato = maior seq das marcas com deleted_at anterior ao corte + 1`; `ponto = MAX(purge_point atual, MIN(candidato, next_seq - 1))`. Remove marcas anteriores ao corte com `seq` abaixo do ponto. Roda uma vez por dia em `MaintenanceService`.
 11. **Cota:** só `Sync:MaxRecordsPerAccount`, nula por padrão. Passar dela recusa o lote inteiro com `403 quota_exceeded`.
 12. **`limit` acima do máximo é reduzido, não recusado.** `has_more` continua correto, então o aparelho não percebe diferença.
-13. **Valores que a spec não fixa:** `limit` padrão 200 e máximo 500; lote máximo 100 itens; blob máximo 64 KiB; corpo máximo 10 MiB; `/auth` com 20 pedidos por minuto por IP e 10 por minuto por e-mail; `record_key` de 1 a 128 caracteres; e-mail até 254; `auth_key` e chave de recuperação com 32 bytes; `kdf_salt` de 16 a 64 bytes; `kdf_params` até 256 caracteres; chaves cifradas até 256 bytes; token de confirmação vale 24 h.
+13. **Valores que a spec não fixa:** `limit` padrão 200 e máximo 500; lote máximo 100 itens; blob máximo 64 KiB; corpo máximo 10 MiB; `/auth` com 20 pedidos por minuto por IP e 10 por minuto por e-mail; 10 falhas de `auth_key` por minuto por conta; `record_key` de 1 a 128 caracteres; e-mail até 254; `auth_key` e chave de recuperação com 32 bytes; `kdf_salt` de 16 a 64 bytes; `kdf_params` até 256 caracteres; chaves cifradas até 256 bytes; token de confirmação vale 24 h.
 14. **Sal falso:** `HMAC-SHA-256(Server:PreloginSecret, e-mail)`, cortado em 16 bytes, com `Server:DefaultKdfParams` igual a `{"v":1,"m":65536,"t":3,"p":1}`.
 15. **E-mail normalizado:** `Trim()` e `ToLowerInvariant()` antes de qualquer uso, com índice único na coluna.
 
@@ -241,11 +241,12 @@ Corpo `{"error":"<código>"}`, sempre em minúsculas, sem detalhes internos.
   - `Login_answers_429_past_the_email_limit_from_any_ip`, com `Limits:AuthPerIpPerMinute` alto.
   - `Limit_resets_after_a_minute`.
   - `Sync_routes_have_no_auth_rate_limit`.
+  - `Wrong_auth_key_answers_429_past_the_account_limit`: em `DELETE /account` e `POST /auth/password`, com o limite por IP alto; depois do limite, até a chave certa recebe `429`, e o teste confirma que a conta segue intacta.
   - `Blob_above_64_KiB_answers_413_and_saves_nothing`, `Batch_above_100_items_answers_400`, `Body_above_10_MiB_answers_413`.
   - `Quota_is_off_by_default`, `Batch_past_the_quota_answers_403_and_saves_nothing`, `Edit_at_the_quota_is_accepted`: editar um registro existente não aumenta a conta.
   - `Logs_never_contain_email_token_or_blob`: `ILoggerProvider` de teste em nível `Trace`, percorrendo cadastro, entrada, envio, leitura e erros; nenhuma linha contém o e-mail, o token, a `auth_key` em base64 ou o blob em base64. A fábrica usa aqui o `FakeEmailSender`, não o `LogEmailSender`.
 - [ ] **Step 2: Rodar e ver falhar.**
-- [ ] **Step 3: Implementar.** Limite por IP com `AddRateLimiter` em janela fixa, no grupo `/auth`. Limite por e-mail com `PartitionedRateLimiter`, chamado no início de login, prelogin, cadastro e recuperação, com a chave vinda do SHA-256 do e-mail normalizado. Corpo máximo em `/sync/push` por `IHttpMaxRequestBodySizeFeature`. Registrar e-mail só por máscara (`a***@exemplo.com`), quando for preciso.
+- [ ] **Step 3: Implementar.** Limite por IP com `AddRateLimiter` em janela fixa, no grupo `/auth`. Limite por e-mail com `PartitionedRateLimiter`, chamado no início de login, prelogin, cadastro e recuperação, com a chave vinda do SHA-256 do e-mail normalizado. Limite por conta de falhas na `auth_key` (10 por minuto, `Limits:AuthKeyFailuresPerAccountPerMinute`), consultado antes de comparar a chave em `DELETE /account` e `POST /auth/password`: sem ele, quem tem um token roubado testaria senhas sem o limite do login. Corpo máximo em `/sync/push` por `IHttpMaxRequestBodySizeFeature`, e 64 KiB nas rotas de `/auth`; corpo acima do máximo responde `413 too_large`, inclusive onde hoje `BadHttpRequestException` vira `400`. Registrar e-mail só por máscara (`a***@exemplo.com`), quando for preciso.
 - [ ] **Step 4: Rodar:** os testes passam.
 - [ ] **Step 5: Commit** `feat(server): aplica limites de taxa, tamanho e cota`
 
