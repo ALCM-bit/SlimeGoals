@@ -11,6 +11,7 @@ public static class SyncErrorText
     public static string For(Exception e) => e switch
     {
         SyncUnauthorizedException => "A sessão deste aparelho foi encerrada. Entre de novo.",
+        HttpRequestException { HttpRequestError: HttpRequestError.InvalidResponse } => "O servidor respondeu de um jeito inesperado.",
         HttpRequestException { StatusCode: null } => "Sem conexão com o servidor.",
         HttpRequestException { StatusCode: { } status } => ForStatus(status),
         TimeoutException or OperationCanceledException => "O servidor demorou para responder.",

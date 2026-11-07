@@ -15,6 +15,7 @@ public sealed class SyncErrorTextTests
         { new HttpRequestException(null, null, HttpStatusCode.Forbidden), "A conta chegou ao limite de registros do servidor." },
         { new HttpRequestException(null, null, HttpStatusCode.TooManyRequests), "Muitos pedidos ao servidor. O app tenta de novo daqui a pouco." },
         { new HttpRequestException(null, null, HttpStatusCode.BadRequest), "O servidor recusou a sincronização (código 400)." },
+        { new HttpRequestException(HttpRequestError.InvalidResponse, "ilegível", null, HttpStatusCode.OK), "O servidor respondeu de um jeito inesperado." },
         { new TimeoutException("segredo"), "O servidor demorou para responder." },
         { new TaskCanceledException("segredo"), "O servidor demorou para responder." },
         { new OperationCanceledException(), "O servidor demorou para responder." },

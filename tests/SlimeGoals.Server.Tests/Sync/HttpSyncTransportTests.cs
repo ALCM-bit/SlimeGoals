@@ -2,9 +2,8 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using SlimeGoals.Core.Sync;
-using SlimeGoals.Sync;
-
 using SlimeGoals.Server.Tests.Accounts;
+using SlimeGoals.Sync;
 
 namespace SlimeGoals.Server.Tests.Sync;
 
