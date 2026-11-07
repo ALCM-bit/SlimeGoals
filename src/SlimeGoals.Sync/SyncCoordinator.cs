@@ -62,14 +62,14 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
         {
             ArgumentNullException.ThrowIfNull(pending);
             await WithAccountAsync(pending.Server, a => a.ConfirmAsync(pending, code, deviceName, ct)).ConfigureAwait(false);
-            await OpenAsync(ct).ConfigureAwait(false);
+            await OpenAfterServerAsync().ConfigureAwait(false);
         }, ct);
 
     public Task LoginAsync(Uri server, string email, string password, string deviceName, CancellationToken ct = default) =>
         RunOpAsync(async () =>
         {
             await WithAccountAsync(RequireServer(server), a => a.LoginAsync(email, password, deviceName, ct)).ConfigureAwait(false);
-            await OpenAsync(ct).ConfigureAwait(false);
+            await OpenAfterServerAsync().ConfigureAwait(false);
         }, ct);
 
     public Task<string> RecoverAsync(Uri server, string email, string recoveryCode, string newPassword, string deviceName,
@@ -77,7 +77,7 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
         {
             var code = await WithAccountAsync(RequireServer(server),
                 a => a.RecoverAsync(email, recoveryCode, newPassword, deviceName, ct)).ConfigureAwait(false);
-            await OpenAsync(ct).ConfigureAwait(false);
+            await OpenAfterServerAsync().ConfigureAwait(false);
             return code;
         }, ct);
 
@@ -97,7 +97,7 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
         }
 
         await WithAccountAsync(server, a => a.ReauthenticateAsync(password, deviceName, ct)).ConfigureAwait(false);
-        await OpenAsync(ct).ConfigureAwait(false);
+        await OpenAfterServerAsync().ConfigureAwait(false);
     }, ct);
 
     public Task RetryVaultAsync(CancellationToken ct = default) => RunOpAsync(async () =>
@@ -293,6 +293,12 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
         }
     }
 
+    /// <summary>
+    /// Depois que o servidor aceitou, a conta já está ligada no cofre e no estado: o cancelamento de quem chamou não
+    /// pode mais deixar a foto desencontrada (e uma nova tentativa criaria outro aparelho).
+    /// </summary>
+    private Task OpenAfterServerAsync() => OpenAsync(CancellationToken.None);
+
     private void StartRun(SyncSession session)
     {
         HttpClient? http = null;
@@ -344,7 +350,11 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
     private void AfterCycle(EngineRun run, Task<SyncCycleResult> cycle)
     {
         if (cycle.IsCompletedSuccessfully && cycle.Result == SyncCycleResult.Unauthorized)
+        {
+            // Sem esperar o portão: até a reação chegar, nenhum ciclo novo sai com o token morto.
+            run.Scheduler.Stop();
             _ = ExpireAsync(run);
+        }
         else
             RaiseStatusChanged();
     }
@@ -389,13 +399,26 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
             cycle = run.Cycle;
         }
 
-        run.Scheduler.Stop();
-        await WaitQuietlyAsync(cycle).ConfigureAwait(false);
-        run.Scheduler.Dispose();
-        run.Session.Dispose();
-        run.Http.Dispose();
-        if (_run == run)
-            _run = null;
+        try
+        {
+            run.Scheduler.Stop();
+            await WaitQuietlyAsync(cycle).ConfigureAwait(false);
+            run.Scheduler.Dispose();
+        }
+        finally
+        {
+            // Mesmo se o agendador falhar ao parar, a chave é zerada e o cliente some.
+            try
+            {
+                run.Session.Dispose();
+            }
+            finally
+            {
+                run.Http.Dispose();
+                if (_run == run)
+                    _run = null;
+            }
+        }
     }
 
     private static async Task WaitQuietlyAsync(Task? cycle)
@@ -440,7 +463,7 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
             }
             catch (Exception e)
             {
-                Trace.TraceError($"Falha num assinante do status da conta: {e}");
+                Trace.TraceError($"Falha num assinante do status da conta: {e.GetType().Name}");
             }
         }
     }

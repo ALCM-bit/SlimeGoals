@@ -302,6 +302,23 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
     }
 
     [Fact]
+    public async Task Cancel_after_the_server_accepted_still_opens_the_session()
+    {
+        await CreateAccountAsync();
+        var a = NewDevice();
+        using var cancel = new CancellationTokenSource();
+        a.RecordingState.AfterEnable = cancel.Cancel; // o servidor já aceitou, o cofre e o estado já estão ligados
+
+        await a.Account.LoginAsync(Server, _email, Password, "pc", cancel.Token);
+
+        cancel.IsCancellationRequested.Should().BeTrue();
+        (await a.Account.GetStatusAsync()).State.Should().Be(AccountState.SignedIn, "a foto acompanha o que ficou ligado");
+        (await a.State.GetAsync()).Enabled.Should().BeTrue();
+        (await a.Account.FlushAsync()).Should().Be(0);
+        (await a.Account.ListDevicesAsync()).Should().ContainSingle();
+    }
+
+    [Fact]
     public async Task Account_operations_run_off_the_caller_thread()
     {
         await CreateAccountAsync();
@@ -398,7 +415,8 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
         {
             _factory = factory;
             Time = new FakeTimeProvider(T0);
-            State = new RecordingState(new SyncStateRepository(_db.Factory), Net);
+            RecordingState = new RecordingState(new SyncStateRepository(_db.Factory), Net);
+            State = RecordingState;
             _store = new SyncLocalStore(_db.Factory);
             var goals = new GoalRepository(_db.Factory);
             var checkins = new CheckinRepository(_db.Factory);
@@ -414,6 +432,7 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
         public InMemorySecretVault Vault { get; } = new();
         public Network Net { get; } = new();
         public ISyncStateStore State { get; }
+        public RecordingState RecordingState { get; }
         public GoalService Goals { get; }
         public CheckinService Checkins { get; }
         public SyncCoordinator Account { get; private set; }
@@ -512,7 +531,14 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
     {
         public Task<SyncState> GetAsync(CancellationToken ct = default) => inner.GetAsync(ct);
 
-        public Task EnableAsync(CancellationToken ct = default) => inner.EnableAsync(ct);
+        /// <summary>Roda depois de ligar, já com a conta aceita pelo servidor.</summary>
+        public Action? AfterEnable { get; set; }
+
+        public async Task EnableAsync(CancellationToken ct = default)
+        {
+            await inner.EnableAsync(ct);
+            AfterEnable?.Invoke();
+        }
 
         public async Task DisableAsync(CancellationToken ct = default)
         {
