@@ -1,3 +1,4 @@
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using SlimeGoals.App.Goals;
 using SlimeGoals.Core.Domain;
@@ -76,6 +77,22 @@ public sealed partial class TodayGoalViewModel : ObservableObject
     public bool IsTimerRunning => _timer is { StoppedAt: null };
     public bool IsTimerStopped => _timer is { StoppedAt: not null };
     public bool HasNoTimer => _timer is null;
+
+    /// <summary>Aviso do cronômetro parado; o de outro dia diz quando parou, para não parecer de agora.</summary>
+    public string StoppedText
+    {
+        get
+        {
+            const string check = "Confira o tempo antes de registrar.";
+            if (_timer?.StoppedAt is not { } at)
+                return "";
+            var stopped = TimeZoneInfo.ConvertTime(at, _time.LocalTimeZone);
+            return stopped.Date == _time.GetLocalNow().Date
+                ? $"Cronômetro parado. {check}"
+                : $"Cronômetro parado em {stopped.ToString("dd/MM, HH:mm", CultureInfo.InvariantCulture)}. {check}";
+        }
+    }
+
     [ObservableProperty] public partial string Elapsed { get; set; }
     [ObservableProperty] public partial decimal? StoppedMinutesInput { get; set; }
     [ObservableProperty] public partial bool CanStartTimer { get; set; }
