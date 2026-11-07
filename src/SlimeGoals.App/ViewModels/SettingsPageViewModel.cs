@@ -251,6 +251,9 @@ public sealed partial class SettingsPageViewModel : PageViewModel
             Account!.LoadCommand.Execute(null);
     }
 
+    /// <summary>Ao sair de Configurações, senhas e o código de recuperação digitados saem da memória da tela.</summary>
+    public override void Deactivate() => Account?.ClearSecretInputs();
+
     [RelayCommand]
     private async Task LoadAsync()
     {

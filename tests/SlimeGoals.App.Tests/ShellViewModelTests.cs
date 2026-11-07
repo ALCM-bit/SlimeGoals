@@ -149,7 +149,9 @@ public class ShellViewModelActivationTests
     {
         public override string Title => title;
         public int Activations { get; private set; }
+        public int Deactivations { get; private set; }
         public override void Activate() => Activations++;
+        public override void Deactivate() => Deactivations++;
     }
 
     private readonly CountingPage _a = new("A");
@@ -182,6 +184,18 @@ public class ShellViewModelActivationTests
         shell.CurrentPage = null!;
 
         _a.Activations.Should().Be(1);
+        _a.Deactivations.Should().Be(0);
+    }
+
+    [Fact]
+    public void Navigating_deactivates_the_page_left()
+    {
+        var shell = new ShellViewModel([_a, _b]);
+        shell.NavigateCommand.Execute(_b);
+
+        (_a.Deactivations, _b.Deactivations).Should().Be((1, 0));
+        shell.GoBack();
+        (_a.Deactivations, _b.Deactivations).Should().Be((1, 1));
     }
 }
 

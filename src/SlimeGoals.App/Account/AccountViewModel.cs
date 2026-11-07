@@ -37,7 +37,8 @@ public sealed record DeviceItemViewModel(Guid Id, string Name, bool IsCurrent)
 /// <summary>
 /// Seção "Conta e sincronização" de Configurações e suas subpáginas (fase 9.5a). Toda chamada à conta passa por
 /// <see cref="RunAsync"/>: liga <see cref="IsBusy"/>, troca a exceção pelo texto de <see cref="AccountMessages"/> e
-/// devolve o controle. Senhas e o código de recuperação digitado saem dos campos a cada envio e ao sair da subpágina.
+/// devolve o controle. Senhas e o código de recuperação digitado saem dos campos a cada envio, ao sair da subpágina e ao
+/// sair de Configurações.
 /// </summary>
 public sealed partial class AccountViewModel : ObservableObject
 {
@@ -497,7 +498,9 @@ public sealed partial class AccountViewModel : ObservableObject
         ShownRecoveryCode = code;
     }
 
-    private void ClearSecretInputs() =>
+    /// <summary>Esvazia os campos de senha e o código de recuperação digitado (a cada envio, ao trocar de subpágina e ao
+    /// sair de Configurações).</summary>
+    public void ClearSecretInputs() =>
         (CurrentPassword, Password, PasswordConfirmation, RecoveryCodeInput) = ("", "", "", "");
 
     partial void OnPageChanged(AccountPage oldValue, AccountPage newValue)

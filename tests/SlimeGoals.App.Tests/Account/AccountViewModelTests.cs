@@ -527,6 +527,30 @@ public class AccountViewModelTests
         vm.TryGoBack().Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(AccountPage.Recover)]
+    [InlineData(AccountPage.ChangePassword)]
+    public async Task Leaving_settings_clears_typed_secrets(AccountPage page)
+    {
+        var account = await LoadedAsync();
+        var settings = new SettingsPageViewModel(new AppSettings(_repo),
+            capabilities: PlatformCapabilities.Desktop with { Sync = true }, account: account);
+        var today = ShellViewModelTests.Today();
+        var shell = new ShellViewModel(new PageViewModel[] { today, settings });
+        shell.CurrentPage = settings;
+        Open(account, page);
+        (account.CurrentPassword, account.Password, account.PasswordConfirmation, account.RecoveryCodeInput) =
+            ("senha atual", "senha nova", "senha nova", "CODIGO-DIGITADO");
+        account.Email = "ana@exemplo.com";
+
+        shell.CurrentPage = today;
+
+        (account.CurrentPassword, account.Password, account.PasswordConfirmation, account.RecoveryCodeInput)
+            .Should().Be(("", "", "", ""));
+        account.Email.Should().Be("ana@exemplo.com");
+        _account.Calls.Should().BeEmpty();
+    }
+
     private static void Open(AccountViewModel vm, AccountPage page)
     {
         switch (page)
