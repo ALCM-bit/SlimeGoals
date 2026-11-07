@@ -11,6 +11,8 @@ namespace SlimeGoals.Sync.Crypto;
 /// Cifra dos registros (Sincronizacao_v1 §6): <c>versão 1 (1) ‖ nonce (12) ‖ cifra ‖ tag (16)</c>, com AES-256-GCM.
 /// A cifra guarda o <see cref="SyncEnvelope"/> em JSON; o dado autenticado é <c>"slimegoals/v1/record" ‖ record_key</c>.
 /// As subchaves <c>enc</c> e <c>rk</c> vêm da chave de dados por HKDF e são zeradas em <see cref="Dispose"/>.
+/// Todo uso das subchaves e o <see cref="Dispose"/> passam pelo mesmo lock: um <c>Dispose</c> concorrente nunca zera a
+/// chave no meio de um <c>Seal</c>, então nada sai cifrado com zeros. Depois dele, tudo lança <see cref="ObjectDisposedException"/>.
 /// </summary>
 public sealed partial class AesGcmSyncCrypto : ISyncCrypto, IDisposable
 {
@@ -24,6 +26,7 @@ public sealed partial class AesGcmSyncCrypto : ISyncCrypto, IDisposable
 
     private readonly byte[] _encKey;
     private readonly byte[] _recordKeyKey;
+    private readonly Lock _lock = new();
     private bool _disposed;
 
     public AesGcmSyncCrypto(ReadOnlySpan<byte> dataKey)
@@ -40,7 +43,16 @@ public sealed partial class AesGcmSyncCrypto : ISyncCrypto, IDisposable
     /// <summary><c>base64url(HMAC-SHA256(rk, id))</c> sem preenchimento (43 caracteres); o id em 16 bytes, big-endian.</summary>
     public string RecordKey(Guid recordId)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        lock (_lock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return RecordKeyCore(recordId);
+        }
+    }
+
+    /// <summary>Só com o lock tomado e depois de conferir o descarte.</summary>
+    private string RecordKeyCore(Guid recordId)
+    {
         Span<byte> id = stackalloc byte[16];
         recordId.TryWriteBytes(id, bigEndian: true, out _);
         Span<byte> mac = stackalloc byte[HMACSHA256.HashSizeInBytes];
@@ -67,9 +79,14 @@ public sealed partial class AesGcmSyncCrypto : ISyncCrypto, IDisposable
             blob[0] = BlobVersion;
             var nonce = blob.AsSpan(1, NonceSize);
             RandomNumberGenerator.Fill(nonce);
-            using var aes = new AesGcm(_encKey, TagSize);
-            aes.Encrypt(nonce, plain, blob.AsSpan(HeaderSize, plain.Length), blob.AsSpan(HeaderSize + plain.Length),
-                Aad(RecordKey(envelope.RecordId)));
+            lock (_lock)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                using var aes = new AesGcm(_encKey, TagSize);
+                aes.Encrypt(nonce, plain, blob.AsSpan(HeaderSize, plain.Length), blob.AsSpan(HeaderSize + plain.Length),
+                    Aad(RecordKeyCore(envelope.RecordId)));
+            }
+
             return blob;
         }
         finally
@@ -96,15 +113,19 @@ public sealed partial class AesGcmSyncCrypto : ISyncCrypto, IDisposable
         var plain = new byte[cipherLength];
         try
         {
-            using (var aes = new AesGcm(_encKey, TagSize))
-                aes.Decrypt(blob.AsSpan(1, NonceSize), blob.AsSpan(HeaderSize, cipherLength), blob.AsSpan(HeaderSize + cipherLength),
-                    plain, Aad(recordKey));
+            lock (_lock)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                using (var aes = new AesGcm(_encKey, TagSize))
+                    aes.Decrypt(blob.AsSpan(1, NonceSize), blob.AsSpan(HeaderSize, cipherLength), blob.AsSpan(HeaderSize + cipherLength),
+                        plain, Aad(recordKey));
 
-            var envelope = Read(plain);
-            // O GCM já amarra o blob à chave; conferir o id dentro do conteúdo fecha a §6.
-            if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(RecordKey(envelope.RecordId)), Encoding.UTF8.GetBytes(recordKey)))
-                throw new CryptographicException("O blob não pertence a esta chave.");
-            return envelope;
+                var envelope = Read(plain);
+                // O GCM já amarra o blob à chave; conferir o id dentro do conteúdo fecha a §6.
+                if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(RecordKeyCore(envelope.RecordId)), Encoding.UTF8.GetBytes(recordKey)))
+                    throw new CryptographicException("O blob não pertence a esta chave.");
+                return envelope;
+            }
         }
         finally
         {
@@ -114,11 +135,14 @@ public sealed partial class AesGcmSyncCrypto : ISyncCrypto, IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
-            return;
-        _disposed = true;
-        CryptographicOperations.ZeroMemory(_encKey);
-        CryptographicOperations.ZeroMemory(_recordKeyKey);
+        lock (_lock)
+        {
+            if (_disposed)
+                return;
+            _disposed = true;
+            CryptographicOperations.ZeroMemory(_encKey);
+            CryptographicOperations.ZeroMemory(_recordKeyKey);
+        }
     }
 
     /// <summary>A versão vem antes do resto: um envelope de versão nova pode ter outra forma e ainda assim dá <see cref="SyncFormatException"/>.</summary>

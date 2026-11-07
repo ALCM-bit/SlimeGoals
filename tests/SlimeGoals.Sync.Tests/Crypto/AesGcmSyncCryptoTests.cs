@@ -155,6 +155,56 @@ public sealed class AesGcmSyncCryptoTests : IDisposable
         var act = () => crypto.RecordKey(RecordId);
 
         act.Should().Throw<ObjectDisposedException>();
+        FluentActions.Invoking(() => crypto.Seal(Envelope())).Should().Throw<ObjectDisposedException>();
+        FluentActions.Invoking(() => crypto.Open(_crypto.RecordKey(RecordId), _crypto.Seal(Envelope())))
+            .Should().Throw<ObjectDisposedException>();
+    }
+
+    /// <summary>
+    /// <c>Dispose</c> em outra thread no meio de <c>Seal</c>: ou lança <see cref="ObjectDisposedException"/>, ou o blob
+    /// abre com a chave de verdade. Nunca sai um blob cifrado com a chave zerada (RS04).
+    /// </summary>
+    [Fact]
+    public void Dispose_racing_seal_never_seals_with_a_zeroed_key()
+    {
+        var envelope = Envelope() with { Payload = new string('x', 64 * 1024) };
+        var recordKey = _crypto.RecordKey(RecordId);
+        var bad = 0;
+        for (var i = 0; i < 2000 && bad == 0; i++)
+        {
+            var crypto = new AesGcmSyncCrypto(FixedDataKey);
+            using var start = new Barrier(2);
+            byte[]? blob = null;
+            var sealer = new Thread(() =>
+            {
+                start.SignalAndWait();
+                try
+                {
+                    blob = crypto.Seal(envelope);
+                }
+                catch (ObjectDisposedException)
+                {
+                }
+            });
+            sealer.Start();
+            start.SignalAndWait();
+            Thread.SpinWait(i * 37 % 40000);
+            crypto.Dispose();
+            sealer.Join();
+
+            if (blob is null)
+                continue;
+            try
+            {
+                _crypto.Open(recordKey, blob);
+            }
+            catch (CryptographicException)
+            {
+                bad++;
+            }
+        }
+
+        bad.Should().Be(0, "nenhum blob pode sair cifrado com a chave zerada");
     }
 
     private static bool Contains(byte[] haystack, byte[] needle) => haystack.AsSpan().IndexOf(needle) >= 0;
