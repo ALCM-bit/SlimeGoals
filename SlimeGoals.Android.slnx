@@ -4,5 +4,7 @@
     <Project Path="src/SlimeGoals.App/SlimeGoals.App.csproj" />
     <Project Path="src/SlimeGoals.Core/SlimeGoals.Core.csproj" />
     <Project Path="src/SlimeGoals.Infrastructure/SlimeGoals.Infrastructure.csproj" />
+    <Project Path="src/SlimeGoals.Sync/SlimeGoals.Sync.csproj" />
+    <Project Path="src/SlimeGoals.Sync.Contracts/SlimeGoals.Sync.Contracts.csproj" />
   </Folder>
 </Solution>

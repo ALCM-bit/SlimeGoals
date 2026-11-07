@@ -3,6 +3,7 @@ using System.Reflection;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SlimeGoals.App.About;
+using SlimeGoals.App.Account;
 using SlimeGoals.App.Hosting;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Services;
@@ -16,11 +17,13 @@ public sealed record SnoozeOptionViewModel(int Minutes, string Label);
 /// Tela Configurações (spec RF08): cada mudança grava na hora; se a gravação falhar, o valor volta ao anterior
 /// e a tela mostra o erro. Carregar não grava nada.
 /// </summary>
-public sealed partial class SettingsPageViewModel(AppSettings settings, IAutostart? autostart = null,
-    PlatformCapabilities? capabilities = null, IReminderPermissions? permissions = null,
-    DataChangeNotifier? changes = null, string? appVersion = null) : PageViewModel
+public sealed partial class SettingsPageViewModel : PageViewModel
 {
-    private readonly PlatformCapabilities _capabilities = capabilities ?? PlatformCapabilities.Desktop;
+    private readonly AppSettings _settings;
+    private readonly IAutostart? _autostart;
+    private readonly PlatformCapabilities _capabilities;
+    private readonly IReminderPermissions? _permissions;
+    private readonly DataChangeNotifier? _changes;
 
     private const string SaveError = "Não foi possível salvar a configuração.";
     private const string AutostartError = "Não foi possível alterar o início com o sistema.";
@@ -32,7 +35,33 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
     public override string Title => "Configurações";
 
     /// <summary>Versão do app: a informada, ou a do assembly sem o sufixo depois de "+".</summary>
-    public string VersionText { get; } = "SlimeGoals " + (appVersion ?? DefaultVersion());
+    /// <param name="account">Seção "Conta e sincronização"; só aparece com <see cref="PlatformCapabilities.Sync"/>.</param>
+    public SettingsPageViewModel(AppSettings settings, IAutostart? autostart = null,
+        PlatformCapabilities? capabilities = null, IReminderPermissions? permissions = null,
+        DataChangeNotifier? changes = null, string? appVersion = null, AccountViewModel? account = null)
+    {
+        _settings = settings;
+        _autostart = autostart;
+        _capabilities = capabilities ?? PlatformCapabilities.Desktop;
+        _permissions = permissions;
+        _changes = changes;
+        VersionText = "SlimeGoals " + (appVersion ?? DefaultVersion());
+        Account = account;
+        if (account is not null)
+            account.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(AccountViewModel.Page))
+                    OnPropertyChanged(nameof(IsMainOpen));
+            };
+    }
+
+    public string VersionText { get; }
+
+    /// <summary>A conta, quando o head a registra; a tela só a mostra com <see cref="ShowAccount"/>.</summary>
+    public AccountViewModel? Account { get; }
+
+    /// <summary>Seção "Conta e sincronização" (fase 9.5a): só no build de desenvolvimento do desktop.</summary>
+    public bool ShowAccount => Account is not null && _capabilities.Sync;
 
     public string LicenseText => "Licença: PolyForm Noncommercial 1.0.0";
 
@@ -51,8 +80,8 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
 
     public bool IsLicenseTextOpen => SelectedLicense is not null;
 
-    /// <summary>Página principal (seções + Sobre): nem a lista nem o texto de licença estão abertos.</summary>
-    public bool IsMainOpen => !LicensesOpen;
+    /// <summary>Página principal (seções + Sobre): nenhuma licença nem subpágina da conta aberta.</summary>
+    public bool IsMainOpen => !LicensesOpen && (Account?.Page ?? AccountPage.None) == AccountPage.None;
 
     /// <summary>Texto do componente escolhido; lido uma vez, quando a escolha muda.</summary>
     public string? SelectedLicenseText { get; private set; }
@@ -96,6 +125,8 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
 
     public override bool TryGoBack()
     {
+        if (Account?.TryGoBack() == true)
+            return true;
         if (SelectedLicense is not null)
             CloseLicenseText();
         else if (LicensesOpen)
@@ -123,10 +154,10 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
     public bool ShowWindow => _capabilities.WindowClose;
 
     /// <summary>Nenhuma seção se aplica à plataforma: a tela mostra um aviso no lugar.</summary>
-    public bool IsEmpty => !ShowGeneral && !ShowReminders && !ShowWindow;
+    public bool IsEmpty => !ShowAccount && !ShowGeneral && !ShowReminders && !ShowWindow;
 
     /// <summary>Linhas "Notificações", "Alarmes exatos" e "Bateria" da seção Lembretes (só com a porta de permissões).</summary>
-    public bool ShowPermissions => permissions is not null && _capabilities.Reminders;
+    public bool ShowPermissions => _permissions is not null && _capabilities.Reminders;
 
     public string EmptyMessage => "Nada para configurar por enquanto.";
 
@@ -155,26 +186,26 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
     public bool CanRequestBattery => !BatteryUnrestricted;
 
     [RelayCommand]
-    private void RequestNotifications() => permissions?.RequestNotifications();
+    private void RequestNotifications() => _permissions?.RequestNotifications();
 
     [RelayCommand]
-    private void RequestExactAlarms() => permissions?.RequestExactAlarms();
+    private void RequestExactAlarms() => _permissions?.RequestExactAlarms();
 
     [RelayCommand]
-    private void RequestBattery() => permissions?.RequestBatteryUnrestricted();
+    private void RequestBattery() => _permissions?.RequestBatteryUnrestricted();
 
     private void RefreshPermissions()
     {
-        if (permissions is null)
+        if (_permissions is null)
             return;
-        var status = permissions.Get();
+        var status = _permissions.Get();
         (NotificationsAllowed, ExactAlarmsAllowed, BatteryUnrestricted) =
             (status.Notifications, status.ExactAlarms, status.BatteryUnrestricted);
     }
 
-    public bool CanAutostart => autostart is not null;
+    public bool CanAutostart => _autostart is not null;
 
-    public string? AutostartUnavailableText => autostart is null ? "Indisponível neste sistema." : null;
+    public string? AutostartUnavailableText => _autostart is null ? "Indisponível neste sistema." : null;
 
     public IReadOnlyList<SnoozeOptionViewModel> SnoozeOptions { get; } =
         [.. AppSettings.SnoozeOptions.Select(m => new SnoozeOptionViewModel(m, m == 60 ? "1 h" : $"{m} min"))];
@@ -207,17 +238,22 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
     /// <summary>Última gravação disparada por uma mudança na tela (para quem precisa esperar o fim dela).</summary>
     public Task LastSave { get; private set; } = Task.CompletedTask;
 
-    public override void Activate() => LoadCommand.Execute(null);
+    public override void Activate()
+    {
+        LoadCommand.Execute(null);
+        if (ShowAccount)
+            Account!.LoadCommand.Execute(null);
+    }
 
     [RelayCommand]
     private async Task LoadAsync()
     {
         _ui ??= SynchronizationContext.Current;
-        if (!_subscribed && changes is not null)
+        if (!_subscribed && _changes is not null)
         {
             // O aviso pode chegar de qualquer thread (ex.: o app volta das configurações do sistema).
             _subscribed = true;
-            changes.Changed += (_, _) =>
+            _changes.Changed += (_, _) =>
             {
                 if (_ui is null)
                     RefreshPermissions();
@@ -229,9 +265,9 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
         ErrorMessage = null;
         try
         {
-            var snooze = await settings.GetSnoozeMinutesAsync();
-            var close = await settings.GetCloseActionAsync();
-            var enabled = autostart?.IsEnabled() ?? false;
+            var snooze = await _settings.GetSnoozeMinutesAsync();
+            var close = await _settings.GetCloseActionAsync();
+            var enabled = _autostart?.IsEnabled() ?? false;
             _loading = true;
             try
             {
@@ -253,15 +289,15 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
 
     partial void OnStartWithSystemChanged(bool oldValue, bool newValue)
     {
-        if (_loading || autostart is null)
+        if (_loading || _autostart is null)
             return;
         ErrorMessage = null;
         try
         {
             if (newValue)
-                autostart.Enable();
+                _autostart.Enable();
             else
-                autostart.Disable();
+                _autostart.Disable();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -275,7 +311,7 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
     {
         if (_loading || newValue is null)
             return;
-        LastSave = SaveAsync(() => settings.SetSnoozeMinutesAsync(newValue.Minutes), () => SelectedSnooze = oldValue);
+        LastSave = SaveAsync(() => _settings.SetSnoozeMinutesAsync(newValue.Minutes), () => SelectedSnooze = oldValue);
     }
 
     partial void OnCloseHidesChanged(bool oldValue, bool newValue)
@@ -283,7 +319,7 @@ public sealed partial class SettingsPageViewModel(AppSettings settings, IAutosta
         if (_loading)
             return;
         LastSave = SaveAsync(
-            () => settings.SetCloseActionAsync(newValue ? CloseAction.Hide : CloseAction.Quit),
+            () => _settings.SetCloseActionAsync(newValue ? CloseAction.Hide : CloseAction.Quit),
             () => CloseHides = oldValue);
     }
 
