@@ -17,7 +17,7 @@ internal sealed class AndroidNotificationService(Context context) : INotificatio
     public const string ChannelId = "lembretes";
     public const string ExtraLogId = "logId";
     public const string ExtraAction = "action";
-    public const string TimerConflictText = "Outro cronômetro está rodando. Toque para abrir o app.";
+    public const string TimerConflictText = "Há um cronômetro aberto. Toque para abrir o app.";
 
     private const int NotificationId = 1;
     private static readonly Color Accent = Color.ParseColor("#9B7BEA");

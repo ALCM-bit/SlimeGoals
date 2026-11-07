@@ -72,7 +72,7 @@ public sealed class ReminderResponseHandler(
             var goal = await goals.GetAsync(entry.GoalId, ct) ?? throw new GoalNotFoundException(entry.GoalId);
             if (goal.Measure == Measure.Duration)
             {
-                if (await HasOtherActiveTimerAsync(entry.GoalId, ct))
+                if (await NeedsAppForTimerAsync(entry.GoalId, ct))
                     return ReminderOutcome.OpenApp; // o log continua pendente
                 await timers.StartAsync(entry.GoalId, ct);
             }
@@ -88,11 +88,16 @@ public sealed class ReminderResponseHandler(
         return await RespondAsync(entry.Id, response, ct);
     }
 
-    /// <summary>Cronômetro de outra meta ainda viva; o de meta arquivada ou removida é órfão e não conta.</summary>
-    private async Task<bool> HasOtherActiveTimerAsync(Guid goalId, CancellationToken ct)
+    /// <summary>
+    /// Só a pessoa decide: cronômetro parado desta meta espera registro, e o de outra meta viva está em uso.
+    /// O de meta arquivada ou removida é órfão e não conta.
+    /// </summary>
+    private async Task<bool> NeedsAppForTimerAsync(Guid goalId, CancellationToken ct)
     {
-        if (await timers.GetAsync(ct) is not { } timer || timer.GoalId == goalId)
+        if (await timers.GetAsync(ct) is not { } timer)
             return false;
+        if (timer.GoalId == goalId)
+            return timer.StoppedAt is not null;
         return await goals.GetAsync(timer.GoalId, ct) is { ArchivedAt: null };
     }
 
