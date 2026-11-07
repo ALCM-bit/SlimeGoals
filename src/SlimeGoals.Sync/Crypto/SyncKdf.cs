@@ -12,6 +12,8 @@ internal static class SyncKdf
     public static ReadOnlySpan<byte> WrapInfo => "slimegoals/v1/wrap"u8;
     public static ReadOnlySpan<byte> RecoveryAuthInfo => "slimegoals/v1/recovery-auth"u8;
     public static ReadOnlySpan<byte> RecoveryWrapInfo => "slimegoals/v1/recovery-wrap"u8;
+    public static ReadOnlySpan<byte> EncInfo => "slimegoals/v1/enc"u8;
+    public static ReadOnlySpan<byte> RecordKeyInfo => "slimegoals/v1/record-key"u8;
 
     /// <summary>HKDF-SHA256 de <paramref name="ikm"/> com o <paramref name="info"/> dado, sem sal.</summary>
     public static byte[] Derive(ReadOnlySpan<byte> ikm, ReadOnlySpan<byte> info)

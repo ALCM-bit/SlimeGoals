@@ -2,6 +2,7 @@ using SlimeGoals.Core;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Sync;
 using SlimeGoals.Core.Validation;
+using SlimeGoals.Sync.Crypto;
 using SlimeGoals.Testing;
 
 namespace SlimeGoals.Infrastructure.Tests.Sync;
@@ -109,6 +110,38 @@ public sealed class ConvergenceTests : IDisposable
 
         await ConvergeAsync();
         a.Snapshot().Goals.Should().ContainSingle().Which.Title.Should().Be("Mais nova");
+    }
+
+    /// <summary>A cripto de verdade, com a mesma chave de dados nos dois: o servidor só vê blobs cifrados e chaves HMAC.</summary>
+    [Fact]
+    public async Task Devices_converge_with_real_crypto()
+    {
+        var dataKey = AesGcmSyncCrypto.NewDataKey();
+        using var cryptoA = new AesGcmSyncCrypto(dataKey);
+        using var cryptoB = new AesGcmSyncCrypto(dataKey);
+        var devices = new List<SimulatedDevice>
+        {
+            new("aparelho A", DeviceId(1), _server, T0, cryptoA),
+            new("aparelho B", DeviceId(2), _server, T0, cryptoB),
+        };
+        _devices.AddRange(devices);
+        foreach (var device in devices)
+            await device.EnableAsync();
+        var (a, b) = (devices[0], devices[1]);
+
+        var goal = await a.CreateGoal("Beber água");
+        await a.Adjust(goal.Id, 3);
+        await SettleAsync(_server, devices);
+        await b.EditGoal(goal.Id, "Beber mais água");
+        await b.Adjust(goal.Id, 2);
+        await SettleAsync(_server, devices);
+
+        ShouldBeEqual(devices);
+        a.Snapshot().Goals.Should().ContainSingle().Which.Title.Should().Be("Beber mais água");
+        (await a.ShownTotal(goal.Id)).Should().Be(5);
+        _server.Records.Should().NotBeEmpty().And.OnlyContain(r => r.RecordKey.Length == 43);
+        var clear = System.Text.Encoding.UTF8.GetBytes("água");
+        _server.Records.Select(r => r.Blob!).Where(blob => blob.AsSpan().IndexOf(clear) >= 0).Should().BeEmpty("o servidor não vê o título");
     }
 
     [Fact]

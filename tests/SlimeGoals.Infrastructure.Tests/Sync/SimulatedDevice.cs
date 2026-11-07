@@ -34,7 +34,8 @@ internal sealed class SimulatedDevice : IDisposable
     private readonly GoalService _goals;
     private readonly CheckinService _checkins;
 
-    public SimulatedDevice(string name, Guid id, ISyncTransport server, DateTimeOffset now)
+    /// <param name="crypto">Cripto do motor; sem ela, <see cref="PlainSyncCrypto"/>.</param>
+    public SimulatedDevice(string name, Guid id, ISyncTransport server, DateTimeOffset now, ISyncCrypto? crypto = null)
     {
         Name = name;
         Id = id;
@@ -49,7 +50,7 @@ internal sealed class SimulatedDevice : IDisposable
             new PlainFormatter(), Time);
         _goals = new GoalService(goals, checkins, timers, Time, _changes, reminders);
         _checkins = new CheckinService(goals, checkins, Time, _changes);
-        _engine = new SyncEngine(_state, new SyncLocalStore(_db.Factory), _transport, new PlainSyncCrypto(), reminders, _changes, Time);
+        _engine = new SyncEngine(_state, new SyncLocalStore(_db.Factory), _transport, crypto ?? new PlainSyncCrypto(), reminders, _changes, Time);
         // EnableAsync mantém o id que já existe: assim cada aparelho tem o seu, escolhido pelo teste.
         _db.Anchor.Execute("UPDATE sync_state SET device_id = @Id", new { Id = id.ToString("D") });
     }

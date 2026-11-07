@@ -26,6 +26,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\SlimeGoals.Infrastructure\SlimeGoals.Infrastructure.csproj" />
     <ProjectReference Include="..\SlimeGoals.Testing\SlimeGoals.Testing.csproj" />
+    <ProjectReference Include="..\..\src\SlimeGoals.Sync\SlimeGoals.Sync.csproj" />
   </ItemGroup>
 
 </Project>
