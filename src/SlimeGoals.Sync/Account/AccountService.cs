@@ -138,7 +138,18 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
     /// </summary>
     public async Task SignOutAsync(CancellationToken ct = default)
     {
-        using (var session = await ReadSessionAsync(ct))
+        SessionSecret? session;
+        try
+        {
+            session = await ReadSessionAsync(ct);
+        }
+        catch (InvalidDataException)
+        {
+            // Segredo ilegível: sem token para o logout, mas a limpeza local segue, senão a conta fica presa.
+            session = null;
+        }
+
+        using (session)
         {
             if (session is not null)
                 await TryLogoutAsync(session.Token!);

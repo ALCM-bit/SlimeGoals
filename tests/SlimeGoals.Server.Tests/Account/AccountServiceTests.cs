@@ -392,6 +392,26 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Sign_out_with_an_unreadable_session_still_clears_and_allows_login()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var device = new Device(factory);
+        var email = NewEmail();
+        await RegisterAndConfirmAsync(factory, device, email);
+        await device.Vault.SetAsync(SessionName, "isto não é json"u8.ToArray());
+        var sent = device.Handler.Sent.Count;
+
+        await device.Service.SignOutAsync();
+
+        device.Handler.Sent.Should().HaveCount(sent);
+        device.Vault.Names.Should().BeEmpty();
+        (await device.State.GetAsync()).Enabled.Should().BeFalse();
+        await device.Service.LoginAsync(email, Password, "pc");
+        (await device.State.GetAsync()).Enabled.Should().BeTrue();
+        (await device.Service.OpenSessionAsync()).Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task Delete_account_removes_the_cloud_and_keeps_local_data()
     {
         await using var factory = new ServerFactory(postgres);
