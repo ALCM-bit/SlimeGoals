@@ -276,7 +276,7 @@ Acordos feitos ao implementar a criptografia e a conta (`src/SlimeGoals.Sync/Cry
 Os testes estão em `tests/SlimeGoals.Sync.Tests/Crypto` (`PasswordKeysTests`, `RecoveryCodeTests`, `AesGcmSyncCryptoTests`).
 
 **O que vai ao cofre.** Um único segredo, `sync-session`, com um JSON de `server`, `email`, `device_id` (o do servidor), `token` e `data_key` (base64). Um item só é gravado e apagado de uma vez.
-- No Secret Service, o item fica na coleção `default`, com os atributos `application=slimegoals` e `name=sync-session`. Sem a coleção, ela é criada ao gravar.
+- No Secret Service, o item fica na coleção `default`, com os atributos `application=slimegoals` e `name=sync-session` (e, desde a 9.5a, `profile`). Sem a coleção, ela é criada ao gravar.
 - Coleção travada chama `Unlock` e espera o `Prompt`. Recusa ou ausência do serviço lançam `SecretVaultUnavailableException`.
 - Segredo ilegível faz `OpenSessionAsync` lançar `InvalidDataException`; `SignOutAsync` trata como sessão ausente e limpa, para a conta não ficar presa.
 
@@ -290,7 +290,7 @@ Os testes estão em `tests/SlimeGoals.Sync.Tests/Crypto` (`PasswordKeysTests`, `
 
 Se o passo 2, 3 ou 4 falhar, o segredo é apagado se chegou a ser gravado, o aparelho faz `logout` do token emitido, ignorando a falha dele, e relança o erro original. Entrar com a sincronização já ligada é recusado ("Saia da conta antes de entrar em outra."): é preciso sair antes.
 
-**Trocar a senha** mantém este aparelho e revoga os outros. A chave de dados não muda, e o cofre deste aparelho também não. Os revogados recebem `401` no ciclo, saem e entram com a senha nova; como `DisableAsync` zera o estado, eles baixam tudo de novo e terminam iguais, sem duplicatas (provado em `EncryptedSyncEndToEndTests`).
+**Trocar a senha** mantém este aparelho e revoga os outros. A chave de dados não muda, e o cofre deste aparelho também não. Os revogados recebem `401` no ciclo. Desde a 9.5a, eles não saem: entram de novo só com a senha e mantêm a fila (ver "Aparelho revogado não perde a fila" em "Decisões da fase 9.5a"). Sair e entrar, que zera o estado e baixa tudo de novo sem duplicatas (provado em `EncryptedSyncEndToEndTests`), perderia as edições offline ainda na fila.
 
 **Sair (`SignOutAsync`).**
 1. tenta `POST /auth/logout`;
@@ -318,6 +318,35 @@ Falha de rede ou da API no passo 1 não impede os outros dois. Cofre indisponív
 - **Cancelamento depois do servidor:** cancelar depois que o servidor já aceitou (conta apagada, recuperação feita) ainda pode interromper a limpeza ou a entrada local. A tela não oferece cancelar nesses passos, ou refaz a limpeza.
 - **Endereço do servidor configurável e TLS:** o `AccountService` aceita qualquer `Uri` e não exige HTTPS. Fora do desenvolvimento, só HTTPS.
 - **Teste manual do chaveiro do GNOME:** destravar pelo diálogo de verdade e recusar o pedido. Os testes automáticos só cobrem o `Prompt` recusado (daemon isolado) e o aceito (Secret Service falso).
+
+### Decisões da fase 9.5a
+
+Acordos feitos ao ligar a conta e a sincronização no Linux (`SyncCoordinator`, `AccountViewModel`, `AccountView` e a composição do head). Onde diferem do texto acima, valem estes.
+
+**Build de desenvolvimento.** A seção "Conta e sincronização" e tudo o que ela usa só entram no head Linux com a constante `SYNC_DEV`, definida em Debug ou com `-p:SyncDev=true`. O Release (`packaging/linux/build.sh`) não registra cofre, coordenador nem tela, e continua sem rede. O Android compila o `SlimeGoals.Sync`, mas não registra nada dele até a 9.5b.
+
+**Endereço do servidor.** Fica em `settings` (`sync_server`), com padrão `http://127.0.0.1:8080`, e só pode ser editado com a conta desligada; com a conta ligada, vale o servidor gravado na sessão do cofre. Aceita só URL absoluta `http` ou `https`, sem credenciais embutidas (`usuario:senha@`), consulta nem fragmento. O `http` é tolerado porque a seção só existe no build de desenvolvimento; a 9.6 exige `https`.
+
+**Aparelho revogado não perde a fila.** O `401` no ciclo vira `SyncUnauthorizedException`, o motor devolve `SyncCycleResult.Unauthorized` e grava "A sessão deste aparelho foi encerrada. Entre de novo." em `last_error`. O coordenador para o motor, descarta a sessão e passa a `SessionExpired`, sem tocar na fila, em `last_seq` nem em `sync_state.enabled`.
+- `ReauthenticateAsync(senha, nome do aparelho)` (o nome, como ao entrar, para o servidor não ver um aparelho genérico) usa o e-mail e o servidor da sessão do cofre, entra, abre a chave de dados e regrava o segredo com o token e o aparelho novos, sem `EnableAsync`. O motor volta e envia a fila; a chave de dados não muda com a troca de senha, então a fila continua válida.
+- A reentrada recusa uma sessão de outro servidor, antes de qualquer pedido, e uma conta trocada (chave de dados diferente), revogando o token recém-emitido. Nos dois casos, o segredo antigo fica como estava.
+- "Sair" continua disponível nesse estado, com o aviso de que a fila se perde.
+
+**Estados da conta.** `SignedOut`, `SignedIn`, `SessionExpired`, `VaultLocked` (o cofre não abriu ao iniciar; "Tentar de novo" abre o diálogo do chaveiro) e `SessionUnreadable` (segredo ilegível, ou sincronização ligada sem segredo: só "Sair" funciona). Com a sincronização desligada, o início não toca no cofre, para não abrir o diálogo do chaveiro a cada abertura de quem não tem conta.
+
+**Uma operação de conta por vez.** Todas as operações do coordenador passam por um único portão e rodam fora da thread da interface; a segunda espera a primeira, e a tela desabilita os botões enquanto trabalha. Isso cumpre a obrigação "dois `login` juntos deixam um aparelho órfão".
+
+**Sair em dois passos.** `FlushAsync` roda um ciclo e devolve quantos itens ficaram na fila. Com zero, a tela sai direto; senão, mostra o aviso com "Esperar" e "Sair mesmo assim". Fora de `SignedIn`, o ciclo não roda e o aviso aparece sempre que houver pendências.
+
+**Revogar o próprio aparelho.** A lista mostra "Este aparelho" no lugar do botão, e `RevokeDeviceAsync` com o id atual lança "Para desconectar este aparelho, use Sair.".
+
+**Perfil do cofre por banco.** O segredo ganha o atributo `profile`, o hash curto do caminho do banco (o mesmo da instância única, sem o caminho em claro), e a procura usa `application`, `name` e `profile`. Assim, dois apps de teste com `XDG_DATA_HOME` diferentes no mesmo login não dividem o `sync-session`.
+
+**Textos para a pessoa.** Vêm só das tabelas fixas de `SyncErrorText` e `AccountMessages`; o detalhe técnico vai ao Trace, sem segredos. A `Message` de uma exceção só aparece quando a exceção foi lançada pelo próprio app, sem o sufixo " (Parameter '…')"; as do framework e do servidor viram "Algo deu errado. Tente de novo.".
+
+**Segredos na tela.** Os campos de senha e o código de recuperação digitado são limpos depois de cada envio, com sucesso ou falha, e ao fechar a subpágina. A página do código de recuperação só fecha (Voltar ou Continuar) depois de marcar "Guardei o código", porque o servidor já trocou o código.
+
+**Cliente HTTP do head.** Um por servidor, com 30 s de prazo e sem seguir redirecionamento, para um `3xx` não levar o token a outro host.
 
 ## 7. Interface e Android
 
