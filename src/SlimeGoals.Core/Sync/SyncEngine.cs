@@ -4,7 +4,7 @@ using SlimeGoals.Core.Services;
 
 namespace SlimeGoals.Core.Sync;
 
-public enum SyncCycleResult { Done, Disabled, Skipped, Paused, Failed, Incomplete }
+public enum SyncCycleResult { Done, Disabled, Skipped, Paused, Failed, Incomplete, Unauthorized }
 
 /// <summary>
 /// Roda o ciclo de sincronização (spec de sincronização §4): baixa, aplica e envia a fila, um ciclo por vez.
@@ -41,10 +41,16 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
             await RecordErrorAsync(UpdateAppMessage).ConfigureAwait(false);
             return SyncCycleResult.Paused;
         }
+        catch (SyncUnauthorizedException e)
+        {
+            Trace.TraceWarning($"Sincronização recusada pelo servidor (401): {e.Message}");
+            await RecordErrorAsync(SyncErrorText.For(e)).ConfigureAwait(false);
+            return SyncCycleResult.Unauthorized;
+        }
         catch (Exception e)
         {
             Trace.TraceError($"Falha na sincronização: {e}");
-            await RecordErrorAsync(e.Message).ConfigureAwait(false);
+            await RecordErrorAsync(SyncErrorText.For(e)).ConfigureAwait(false);
             return SyncCycleResult.Failed;
         }
         finally
@@ -102,13 +108,13 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
             {
                 var lastSeq = page.Records.Max(r => r.Seq);
                 if (lastSeq <= after)
-                    throw new InvalidOperationException($"O servidor devolveu uma página que não avança: seq {lastSeq}, depois de {after}.");
+                    throw new SyncProtocolException($"O servidor devolveu uma página que não avança: seq {lastSeq}, depois de {after}.");
                 await ApplyAsync(page, lastSeq, deviceId, ct).ConfigureAwait(false);
                 after = lastSeq;
             }
             else if (page.HasMore)
             {
-                throw new InvalidOperationException("O servidor anunciou mais registros numa página vazia.");
+                throw new SyncProtocolException("O servidor anunciou mais registros numa página vazia.");
             }
 
             if (!page.HasMore)

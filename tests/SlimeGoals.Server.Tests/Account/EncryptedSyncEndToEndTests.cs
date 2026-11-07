@@ -138,7 +138,7 @@ public sealed class EncryptedSyncEndToEndTests(PostgresFixture postgres) : IAsyn
         b.Sim.Time.Advance(TimeSpan.FromMinutes(1));
         await b.Sim.Adjust(reading.Id, 4);
         b.Handler.Calls.Clear();
-        (await b.Sim.SyncAsync()).Should().Be(SyncCycleResult.Failed);
+        (await b.Sim.SyncAsync()).Should().Be(SyncCycleResult.Unauthorized);
         b.Handler.Calls.Should().Contain(c => c.Path.StartsWith("/sync/", StringComparison.Ordinal)
             && c.Status == HttpStatusCode.Unauthorized);
 
@@ -184,7 +184,7 @@ public sealed class EncryptedSyncEndToEndTests(PostgresFixture postgres) : IAsyn
 
         c.Sim.Snapshot().Lines.Should().Equal(expected);
         c.Sim.LastError.Should().BeNull();
-        (await a.Sim.SyncAsync()).Should().Be(SyncCycleResult.Failed, "a recuperação revoga os outros aparelhos");
+        (await a.Sim.SyncAsync()).Should().Be(SyncCycleResult.Unauthorized, "a recuperação revoga os outros aparelhos");
     }
 
     private Phone NewPhone()

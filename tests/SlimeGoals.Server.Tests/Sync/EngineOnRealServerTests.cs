@@ -271,7 +271,7 @@ public sealed class EngineOnRealServerTests(PostgresFixture postgres) : IAsyncLi
     }
 
     [Fact]
-    public async Task Revoked_device_fails_the_cycle_and_keeps_its_queue()
+    public async Task Revoked_device_gets_Unauthorized_and_keeps_its_queue()
     {
         var a = await DeviceAsync();
         var b = await DeviceAsync();
@@ -285,9 +285,9 @@ public sealed class EngineOnRealServerTests(PostgresFixture postgres) : IAsyncLi
         var queue = b.Sim.Queue;
         queue.Should().NotBeEmpty();
 
-        (await b.Sim.SyncAsync()).Should().Be(SyncCycleResult.Failed);
+        (await b.Sim.SyncAsync()).Should().Be(SyncCycleResult.Unauthorized);
 
-        b.Sim.LastError.Should().NotBeNullOrEmpty();
+        b.Sim.LastError.Should().Be("A sessão deste aparelho foi encerrada. Entre de novo.");
         b.Sim.Queue.Should().Be(queue);
         b.Sim.Pending.Should().BeGreaterThan(0);
     }

@@ -34,6 +34,12 @@ public sealed record SyncStatus(DateTimeOffset? LastSyncAt, string? LastError, i
 /// <summary>O servidor respondeu 410: o histórico local não vale mais e é preciso sincronizar tudo de novo.</summary>
 public sealed class SyncResetRequiredException() : Exception("O servidor pediu para sincronizar tudo de novo.");
 
+/// <summary>O servidor respondeu 401: o token deste aparelho foi recusado (aparelho removido ou senha trocada).</summary>
+public sealed class SyncUnauthorizedException() : Exception("O servidor recusou o token deste aparelho.");
+
+/// <summary>O servidor respondeu de um jeito que o motor não consegue seguir (página que não avança, página vazia com <c>has_more</c>).</summary>
+public sealed class SyncProtocolException(string message) : InvalidOperationException(message);
+
 /// <summary>Versão do formato desconhecida.</summary>
 public sealed class SyncFormatException(int version) : Exception($"Versão de formato de sincronização desconhecida: {version}.")
 {

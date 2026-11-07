@@ -517,9 +517,32 @@ public class SyncEngineTests : IDisposable
 
         result.Should().Be(SyncCycleResult.Failed);
         var status = await Store.GetStatusAsync();
-        status.LastError.Should().Be("sem rede");
+        status.LastError.Should().Be("Sem conexão com o servidor.");
         status.LastSyncAt.Should().BeNull();
         trace.Messages.Should().Contain(m => m.Contains("sem rede"));
+    }
+
+    [Fact]
+    public async Task Network_failure_records_friendly_text_not_raw_message()
+    {
+        _server.FailNext(new HttpRequestException("Connection refused"));
+
+        await Engine().RunCycleAsync();
+
+        var error = (await Store.GetStatusAsync()).LastError;
+        error.Should().Be("Sem conexão com o servidor.");
+        error.Should().NotContain("refused");
+    }
+
+    [Fact]
+    public async Task Unauthorized_transport_returns_Unauthorized_and_records_text()
+    {
+        _server.FailNext(new SyncUnauthorizedException());
+
+        var result = await Engine().RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Unauthorized);
+        (await Store.GetStatusAsync()).LastError.Should().Be("A sessão deste aparelho foi encerrada. Entre de novo.");
     }
 
     [Fact]
@@ -553,7 +576,7 @@ public class SyncEngineTests : IDisposable
 
         result.Should().Be(SyncCycleResult.Failed);
         _transport.Pulls.Should().Equal(2, 0);
-        (await Store.GetStatusAsync()).LastError.Should().Be(new SyncResetRequiredException().Message);
+        (await Store.GetStatusAsync()).LastError.Should().Be("Erro inesperado na sincronização.");
     }
 
     [Fact]

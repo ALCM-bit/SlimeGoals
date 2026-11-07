@@ -10,7 +10,7 @@ using SlimeGoals.Sync.Contracts;
 namespace SlimeGoals.Sync;
 
 /// <summary>
-/// Fala com o servidor de sincronização. <c>410</c> vira <see cref="SyncResetRequiredException"/>; qualquer outra falha,
+/// Fala com o servidor de sincronização. <c>410</c> vira <see cref="SyncResetRequiredException"/> e <c>401</c> em <see cref="SyncUnauthorizedException"/>; qualquer outra falha,
 /// inclusive uma resposta que não dá para ler, vira <see cref="HttpRequestException"/> com <c>StatusCode</c>.
 /// </summary>
 /// <param name="http">Cliente com <c>BaseAddress</c> do servidor.</param>
@@ -21,7 +21,7 @@ public sealed class HttpSyncTransport(HttpClient http, Func<CancellationToken, V
     {
         var uri = string.Create(CultureInfo.InvariantCulture, $"sync/pull?after={after}&limit={limit}&full={(full ? 1 : 0)}");
         using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-        var page = await SendAsync(request, SyncJsonContext.Default.PullResponse, IsComplete, ct);
+        var page = await SendAsync(request, SyncJsonContext.Default.PullResponse, IsComplete, ct).ConfigureAwait(false);
         return new SyncPullPage(page.Records.Select(r => new RemoteRecord(r.Key, r.Seq, r.Blob)).ToList(), page.HasMore);
     }
 
@@ -32,7 +32,7 @@ public sealed class HttpSyncTransport(HttpClient http, Func<CancellationToken, V
         {
             Content = JsonContent.Create(new PushRequest(dtos), SyncJsonContext.Default.PushRequest),
         };
-        var result = await SendAsync(request, SyncJsonContext.Default.PushResponse, IsComplete, ct);
+        var result = await SendAsync(request, SyncJsonContext.Default.PushResponse, IsComplete, ct).ConfigureAwait(false);
         return new PushResult(result.Accepted.Select(a => new PushAccepted(a.Key, a.Seq)).ToList(), result.Conflicts);
     }
 
@@ -48,22 +48,27 @@ public sealed class HttpSyncTransport(HttpClient http, Func<CancellationToken, V
         HttpRequestMessage request, JsonTypeInfo<T> typeInfo, Func<T, bool> isComplete, CancellationToken ct)
         where T : class
     {
-        if (await token(ct) is { } value)
+        if (await token(ct).ConfigureAwait(false) is { } value)
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", value);
         }
 
-        using var response = await http.SendAsync(request, ct);
+        using var response = await http.SendAsync(request, ct).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.Gone)
         {
             throw new SyncResetRequiredException();
         }
 
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            throw new SyncUnauthorizedException();
+        }
+
         response.EnsureSuccessStatusCode();
         try
         {
-            await using var stream = await response.Content.ReadAsStreamAsync(ct);
-            var body = await JsonSerializer.DeserializeAsync(stream, typeInfo, ct);
+            await using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            var body = await JsonSerializer.DeserializeAsync(stream, typeInfo, ct).ConfigureAwait(false);
             return body is not null && isComplete(body) ? body : throw Unreadable(response.StatusCode, null);
         }
         catch (JsonException e)
