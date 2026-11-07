@@ -167,8 +167,8 @@ No build de desenvolvimento do Linux (Debug, ou qualquer build com `-p:SyncDev=t
 # 1. suba o servidor (veja a seção anterior para o .env)
 docker compose up -d --build --wait
 
-# 2. rode o app em Debug, com dados de teste
-XDG_DATA_HOME=/tmp/sg-a dotnet run --project src/SlimeGoals.Desktop
+# 2. rode o app em Debug, com dados e configuração de teste
+XDG_DATA_HOME=/tmp/sg-a/data XDG_CONFIG_HOME=/tmp/sg-a/config dotnet run --project src/SlimeGoals.Desktop
 ```
 
 - O servidor padrão é `http://127.0.0.1:8080`, o do `compose.yaml`. O endereço só pode ser trocado com a conta desligada.
@@ -179,11 +179,11 @@ XDG_DATA_HOME=/tmp/sg-a dotnet run --project src/SlimeGoals.Desktop
   ```
 
 - A sessão fica no chaveiro do sistema (Secret Service, por exemplo o gnome-keyring), separada por banco de dados. Sem chaveiro, a sincronização não liga.
-- **Dois aparelhos no mesmo computador:** rode duas cópias, cada uma com o seu `XDG_DATA_HOME`, e entre com a mesma conta nas duas. Cada banco tem a sua instância e o seu segredo no chaveiro.
+- **Dois aparelhos no mesmo computador:** rode duas cópias, cada uma com o seu `XDG_DATA_HOME` e o seu `XDG_CONFIG_HOME`, e entre com a mesma conta nas duas. Cada banco tem a sua instância e o seu segredo no chaveiro. O `XDG_CONFIG_HOME` próprio evita que ligar "Iniciar com o sistema" numa cópia de teste grave a entrada de autostart de verdade.
 
   ```bash
-  XDG_DATA_HOME=/tmp/sg-a dotnet run --project src/SlimeGoals.Desktop
-  XDG_DATA_HOME=/tmp/sg-b dotnet run --project src/SlimeGoals.Desktop   # em outro terminal
+  XDG_DATA_HOME=/tmp/sg-a/data XDG_CONFIG_HOME=/tmp/sg-a/config dotnet run --project src/SlimeGoals.Desktop
+  XDG_DATA_HOME=/tmp/sg-b/data XDG_CONFIG_HOME=/tmp/sg-b/config dotnet run --project src/SlimeGoals.Desktop   # em outro terminal
   ```
 
   Com o app aberto, uma edição feita num chega ao outro em até uns 20 s.

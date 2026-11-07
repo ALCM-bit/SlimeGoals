@@ -342,6 +342,25 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
         (await a.Account.GetStatusAsync()).State.Should().Be(AccountState.SignedIn);
     }
 
+    [Fact]
+    public async Task Dispose_does_not_wait_for_an_operation_stuck_on_the_network()
+    {
+        // Fechar o app com uma entrada presa (rede lenta, diálogo do chaveiro aberto) não pode segurar o encerramento.
+        await CreateAccountAsync();
+        var a = NewDevice();
+        var hold = a.Net.HoldNextRequest("/auth/prelogin");
+        var login = a.Account.LoginAsync(Server, _email, Password, "pc");
+        await hold.Held.Task.WaitAsync(WaitLimit);
+
+        var dispose = a.Account.DisposeAsync().AsTask();
+        var finished = await Task.WhenAny(dispose, Task.Delay(TimeSpan.FromSeconds(10)));
+
+        hold.Release.TrySetResult();
+        await Outcome(login);
+        finished.Should().BeSameAs(dispose, "o descarte tem prazo próprio e não espera a operação presa");
+        await dispose;
+    }
+
     private Device NewDevice()
     {
         var device = new Device(_factory);
@@ -477,6 +496,17 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
 
         public PullHold HoldNextPull() => _hold = new PullHold();
 
+        private RequestHold? _requestHold;
+
+        /// <summary>Segura o próximo pedido para <paramref name="path"/> até o teste soltar, sem olhar o cancelamento.</summary>
+        public RequestHold HoldNextRequest(string path) => _requestHold = new RequestHold(path);
+
+        public RequestHold? TakeRequestHold(string path)
+        {
+            var hold = _requestHold;
+            return hold?.Path == path ? Interlocked.CompareExchange(ref _requestHold, null, hold) : null;
+        }
+
         public PullHold? TakeHold() => Interlocked.Exchange(ref _hold, null);
     }
 
@@ -491,6 +521,14 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
         public TaskCompletionSource Finish { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
+    /// <summary>Um pedido preso: <see cref="Held"/> quando chega; só segue quando o teste completa <see cref="Release"/>.</summary>
+    private sealed class RequestHold(string path)
+    {
+        public string Path { get; } = path;
+        public TaskCompletionSource Held { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
     private sealed class NetworkHandler(Network net) : DelegatingHandler
     {
         private int _disposed;
@@ -500,6 +538,11 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
             net.Calls.Enqueue($"{request.Method} {request.RequestUri!.PathAndQuery}");
             if (net.Down)
                 throw new HttpRequestException("Servidor fora do ar (simulado).");
+            if (net.TakeRequestHold(request.RequestUri.AbsolutePath) is { } requestHold)
+            {
+                requestHold.Held.TrySetResult();
+                await requestHold.Release.Task;
+            }
             if (request.RequestUri.AbsolutePath == "/sync/pull" && net.TakeHold() is { } hold)
             {
                 hold.Held.TrySetResult();

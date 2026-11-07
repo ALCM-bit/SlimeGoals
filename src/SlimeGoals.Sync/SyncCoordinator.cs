@@ -26,6 +26,7 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
 {
     private const string SignInFirst = "Entre na conta antes.";
     private const int FlushAttempts = 3;
+    private static readonly TimeSpan DisposeTimeout = TimeSpan.FromSeconds(2);
 
     private readonly SemaphoreSlim _ops = new(1, 1);
     private volatile Snapshot _snapshot = new(AccountState.SignedOut, null, null);
@@ -52,7 +53,25 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
             await StopRunAsync(run).ConfigureAwait(false);
     }, CancellationToken.None);
 
-    public ValueTask DisposeAsync() => new(StopAsync());
+    /// <summary>
+    /// Para como <see cref="StopAsync"/>, mas com prazo: uma operação de conta presa (rede lenta, diálogo do chaveiro
+    /// aberto) não segura o encerramento do app. Passado o prazo, a parada fica na fila do portão e roda quando a
+    /// operação terminar; o cliente HTTP da operação é descartado por ela mesma.
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        var stop = StopAsync();
+        try
+        {
+            await stop.WaitAsync(DisposeTimeout).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            Trace.TraceWarning($"A sincronização não parou em {DisposeTimeout.TotalSeconds} s; o descarte segue sem esperar.");
+            _ = stop.ContinueWith(t => Trace.TraceError($"Falha ao parar a sincronização: {t.Exception!.InnerException?.GetType().Name}"),
+                CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+        }
+    }
 
     public Task<PendingRegistration> RegisterAsync(Uri server, string email, string password, CancellationToken ct = default) =>
         RunOpAsync(() => WithAccountAsync(RequireServer(server), a => a.RegisterAsync(email, password, ct)), ct);
