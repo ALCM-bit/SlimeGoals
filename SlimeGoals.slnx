@@ -15,6 +15,7 @@
     <Project Path="tests/SlimeGoals.Infrastructure.Tests/SlimeGoals.Infrastructure.Tests.csproj" />
     <Project Path="tests/SlimeGoals.Platform.Linux.Tests/SlimeGoals.Platform.Linux.Tests.csproj" />
     <Project Path="tests/SlimeGoals.Server.Tests/SlimeGoals.Server.Tests.csproj" />
+    <Project Path="tests/SlimeGoals.Sync.Tests/SlimeGoals.Sync.Tests.csproj" />
     <Project Path="tests/SlimeGoals.Testing/SlimeGoals.Testing.csproj" />
   </Folder>
 </Solution>

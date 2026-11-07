@@ -234,6 +234,91 @@ Acordos feitos ao implementar o servidor. Onde diferem do texto acima, valem est
 
 **O que o servidor ainda sabe:** e-mail, IP, quantos aparelhos existem, quantos registros e de que tamanho, e quando cada mudança aconteceu. O ritmo de mudanças pode sugerir hábitos. **Senha fraca:** quem roubar o banco pode testar senhas contra a chave cifrada; o Argon2id encarece isso, mas não impede.
 
+### Decisões da fase 9.4
+
+Acordos feitos ao implementar a criptografia e a conta (`src/SlimeGoals.Sync/Crypto` e `src/SlimeGoals.Sync/Account`). Onde diferem do texto acima, valem estes. A 9.4 não tem telas: o app ainda não referencia `SlimeGoals.Sync`.
+
+**Cadastro pendente só na memória.** `RegisterAsync` devolve um `PendingRegistration` com a `auth_key` e a `wrap_key`, e `ConfirmAsync` entra com elas, sem um segundo Argon2id. É assim que a 9.4 cumpre a obrigação de confirmar dentro do app. Fechar o app antes de confirmar significa cadastrar de novo: o servidor substitui a conta pendente e manda outro código. Derivar de novo pela senha não funciona, porque o `prelogin` esconde a conta não confirmada e devolve o sal falso. O código é de uso único: se a entrada falhar depois que o servidor o aceitou (cofre recusado, rede caída no `login`), o mesmo `PendingRegistration` repete `ConfirmAsync` sem mandar o código de novo e só refaz a entrada.
+
+**`kdf_params` do servidor têm piso e teto.** O cliente aceita só `v` igual a 1, `m` de 65536 a 262144 KiB, `t` de 3 a 10 e `p` de 1 a 4. Sal com menos de 16 bytes também é recusado. Fora disso, `KdfParamsException` antes de derivar, e nada é enviado depois do `prelogin`.
+- O piso impede que um servidor malicioso peça parâmetros fracos, que deixariam a `auth_key` barata de testar contra senhas.
+- O teto impede que ele peça 4 GiB de memória ao celular.
+
+**Senha.** Normalizada em NFKC antes de virar UTF-8, então um "ç" composto ou decomposto dá a mesma chave. Tem de 10 a 1024 caracteres, contados depois da normalização. Senha nova (cadastro, troca, recuperação) passa por `PasswordKeys.Validate` antes de qualquer pedido; a do `login` não, porque já existe.
+
+**Derivação.**
+- `mestre = Argon2id(senha, kdf_salt, m, t, p)`, com 32 bytes. Padrão `{"v":1,"m":65536,"t":3,"p":1}`.
+- `auth_key = HKDF-SHA256(mestre, info "slimegoals/v1/auth")` e `wrap_key = HKDF-SHA256(mestre, info "slimegoals/v1/wrap")`, ambas com 32 bytes e sem sal no HKDF.
+- O sal do cadastro tem 16 bytes aleatórios.
+
+**Código de recuperação.** 128 bits aleatórios em Base32 de Crockford: 26 caracteres em grupos de 4 separados por hífen, o último com 2.
+- A leitura ignora caixa, espaços e hífens, e troca `O` por `0` e `I`/`L` por `1`. Tamanho, alfabeto ou bits finais errados lançam `FormatException`.
+- `recovery_key = HKDF(código, "slimegoals/v1/recovery-auth")` e `recovery_wrap = HKDF(código, "slimegoals/v1/recovery-wrap")`, sem Argon2id, porque o código já tem 128 bits.
+
+**Embrulho da chave de dados.** `versão 1 (1 byte) ‖ nonce (12) ‖ cifra (32) ‖ tag (16)`, 61 bytes, em AES-256-GCM com a `wrap_key` ou a `recovery_wrap`. O dado autenticado é `"slimegoals/v1/wrap-password"` ou `"slimegoals/v1/wrap-recovery"`, o que impede usar um embrulho no lugar do outro.
+
+**Blob do registro.** `versão 1 (1 byte) ‖ nonce (12) ‖ cifra ‖ tag (16)`, com o `SyncEnvelope` em JSON dentro da cifra.
+- Subchaves: `enc = HKDF(dados, "slimegoals/v1/enc")` e `rk = HKDF(dados, "slimegoals/v1/record-key")`.
+- `record_key = base64url(HMAC-SHA256(rk, id))`, sem preenchimento, com 43 caracteres. O id vai em 16 bytes na ordem de `Guid.TryWriteBytes` com `bigEndian: true` (a ordem do texto do GUID).
+- O dado autenticado é `"slimegoals/v1/record" ‖ record_key` em UTF-8: blob trocado de chave falha já no GCM. `Open` também confere `RecordKey(envelope.RecordId)`.
+- Byte de versão ou versão do envelope desconhecidos lançam `SyncFormatException`, que pausa o motor. A versão do envelope é lida antes dos outros campos, então uma versão nova com outra forma também pausa, em vez de virar registro ilegível. Tag inválida lança `CryptographicException`.
+
+**Vetores fixos.** Conferidos fora do .NET (OpenSSL e Python). A 9.5 tem de obter os mesmos valores no Android.
+
+| Entrada | Saída |
+|---|---|
+| Senha `correct horse battery`, sal `000102…0f` (16 bytes), parâmetros padrão | `auth_key` `ba53acc24ffa9ba24189d1f5b7946535d1ee123feaef82cc6d9b5cfbb2f172bc` |
+| A mesma | `wrap_key` `67c2cecefb41882ac98e816bab7619c23f0dc2d30a089743bb33c67ed79bc552` |
+| Código com os bytes `000102…0f`, mostrado como `000G-40R4-0M30-E209-185G-R38E-1W` | `recovery_key` `944be12c002a09efb7f8b498f2063f4b674d48a0d24e0bb8d4d814e625dd2159` |
+| O mesmo | `recovery_wrap` `c7da2cd9178e6498001e21d80eead4bdd5ea7273c354e309ad2bd7fe4e1e3eef` |
+| Chave de dados `000102…1f` (32 bytes), id `00112233-4455-6677-8899-aabbccddeeff` | `record_key` `QDTsiTp-QhBeJKBWIU_Iu_FbuyRZgQnQWvn4-NzxRxY` |
+
+Os testes estão em `tests/SlimeGoals.Sync.Tests/Crypto` (`PasswordKeysTests`, `RecoveryCodeTests`, `AesGcmSyncCryptoTests`).
+
+**O que vai ao cofre.** Um único segredo, `sync-session`, com um JSON de `server`, `email`, `device_id` (o do servidor), `token` e `data_key` (base64). Um item só é gravado e apagado de uma vez.
+- No Secret Service, o item fica na coleção `default`, com os atributos `application=slimegoals` e `name=sync-session`. Sem a coleção, ela é criada ao gravar.
+- Coleção travada chama `Unlock` e espera o `Prompt`. Recusa ou ausência do serviço lançam `SecretVaultUnavailableException`.
+- Segredo ilegível faz `OpenSessionAsync` lançar `InvalidDataException`; `SignOutAsync` trata como sessão ausente e limpa, para a conta não ficar presa.
+
+**Cofre antes da rede.** `RegisterAsync`, `ConfirmAsync`, `LoginAsync` e `RecoverAsync` conferem `IsAvailableAsync` antes do primeiro pedido. Sem cofre, a sincronização não liga, e nada é gravado em arquivo.
+
+**Ordem de entrada.**
+1. `login`;
+2. abrir a chave de dados;
+3. gravar no cofre;
+4. `EnableAsync`.
+
+Se o passo 2, 3 ou 4 falhar, o segredo é apagado se chegou a ser gravado, o aparelho faz `logout` do token emitido, ignorando a falha dele, e relança o erro original. Entrar com a sincronização já ligada é recusado ("Saia da conta antes de entrar em outra."): é preciso sair antes.
+
+**Trocar a senha** mantém este aparelho e revoga os outros. A chave de dados não muda, e o cofre deste aparelho também não. Os revogados recebem `401` no ciclo, saem e entram com a senha nova; como `DisableAsync` zera o estado, eles baixam tudo de novo e terminam iguais, sem duplicatas (provado em `EncryptedSyncEndToEndTests`).
+
+**Sair (`SignOutAsync`).**
+1. tenta `POST /auth/logout`;
+2. apaga o segredo do cofre;
+3. chama `DisableAsync`.
+
+Falha de rede ou da API no passo 1 não impede os outros dois. Cofre indisponível ao ler a sessão lança `SecretVaultUnavailableException` sem mudar nada: a sincronização continua ligada até a pessoa destravar o chaveiro e tentar de novo.
+
+**Apagar a conta** pede a senha: `prelogin`, derivação da `auth_key` e `DELETE /account`. Depois, a mesma limpeza local de sair, sem `logout`, e metas e registros ficam no aparelho (RS06). Senha errada não muda nada local.
+
+**Erros da API.** `AccountApiException` com `Kind`: `Unauthorized`, `InvalidToken`, `InvalidRequest`, `RateLimited` (com `RetryAfter`), `TooLarge`, `NotFound` ou `Unavailable` (rede, 5xx e resposta ilegível). Os textos para a pessoa ficam na 9.5.
+
+**`device_id` local e do servidor seguem separados.** `sync_state.device_id` continua sendo o do envelope (9.2). O do servidor fica no cofre, para `IsCurrent` e para revogar.
+
+**Privacidade provada.** `EncryptedSyncEndToEndTests` varre todas as colunas de texto e binárias de `accounts`, `devices` e `records`, achadas pelo `information_schema`. Procura título, unidade, nota, senha e código de recuperação em UTF-8, UTF-16, base64 e na forma escapada do JSON (`á`), além de um pedaço só ASCII de cada valor, porque o JSON do registro escapa o acento. Com a cripto trocada por texto puro, o teste falha.
+
+**Obrigações para a 9.5.**
+- **Cofre do Android**, sobre o Keystore, com o mesmo segredo `sync-session`.
+- **Vetores no Android:** os da tabela acima, no emulador e no aparelho, com o Konscious no arm64.
+- **Sair com envio da fila e aviso** (§7): tentar enviar antes de `SignOutAsync`, avisar do que se perde e deixar a pessoa escolher.
+- **`DisableAsync` com o ciclo cancelado:** cancelar e esperar o ciclo do motor antes de desligar, e descartar a `SyncSession` (o provedor de token passa a devolver nulo).
+- **Serializar as operações de conta:** o serviço não impede duas ao mesmo tempo. Dois `login` juntos deixam um aparelho órfão no servidor.
+- **Revogar o próprio aparelho:** `RevokeDeviceAsync` aceita o aparelho atual, e a sincronização fica ligada com um token morto. A tela esconde essa opção ou a troca por sair.
+- **Mapear para textos** `AccountApiException`, `KdfParamsException`, `SecretVaultUnavailableException`, a `FormatException` do código de recuperação e a `ArgumentException` de e-mail, senha e nome do aparelho.
+- **Cancelamento depois do servidor:** cancelar depois que o servidor já aceitou (conta apagada, recuperação feita) ainda pode interromper a limpeza ou a entrada local. A tela não oferece cancelar nesses passos, ou refaz a limpeza.
+- **Endereço do servidor configurável e TLS:** o `AccountService` aceita qualquer `Uri` e não exige HTTPS. Fora do desenvolvimento, só HTTPS.
+- **Teste manual do chaveiro do GNOME:** destravar pelo diálogo de verdade e recusar o pedido. Os testes automáticos só cobrem o `Prompt` recusado (daemon isolado) e o aceito (Secret Service falso).
+
 ## 7. Interface e Android
 
 - Configurações ganha a seção **Conta e sincronização**, visível por `PlatformCapabilities`.

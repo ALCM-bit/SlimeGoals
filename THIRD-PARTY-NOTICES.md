@@ -30,6 +30,7 @@ Os componentes abaixo mantêm suas próprias licenças.
 | Microsoft.Extensions.TimeProvider.Testing | MIT |
 | Npgsql (servidor) | PostgreSQL License |
 | Testcontainers.PostgreSql (testes do servidor) | MIT |
+| [Konscious.Security.Cryptography.Argon2](https://github.com/kmaragon/Konscious.Security.Cryptography) (Argon2id da sincronização) e a dependência dele, Konscious.Security.Cryptography.Blake2 | MIT |
 
 ## Distribuídos no pacote do Linux
 

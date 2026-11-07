@@ -155,6 +155,10 @@ docker pull postgres:18-alpine
 docker pull testcontainers/ryuk:0.14.0   # use a versão que o erro indicar
 ```
 
+**Criptografia e conta (fase 9.4).** `src/SlimeGoals.Sync` já cifra cada registro antes de ele sair do aparelho e tem o serviço de conta: cadastro com confirmação dentro do app, entrada, troca de senha, recuperação pelo código, sair e apagar a conta. A senha, a chave de dados e o conteúdo nunca vão ao servidor. No Linux, a sessão fica no chaveiro do sistema (Secret Service); sem chaveiro, a sincronização não liga. O app ainda não usa nada disso: as telas chegam na 9.5. As decisões e os vetores de teste estão em [specs/Sincronizacao_v1.md](specs/Sincronizacao_v1.md), seção 6.
+
+**Os testes do chaveiro precisam do `dbus-daemon` e do `gnome-keyring-daemon`.** Eles sobem um barramento e um chaveiro isolados, num diretório temporário, sem tocar no seu chaveiro. Sem esses programas, os testes são ignorados, não reprovados.
+
 ## Instalar no Android
 
 O APK é assinado com uma chave sua, que fica fora do repositório. Ele traz as arquiteturas arm64 (celulares) e x64 (emulador) e exige Android 8.0 ou mais novo (API 26). Pré-requisitos: os de [Rodar no Android](#rodar-no-android-desenvolvimento).
