@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using Dapper;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using SlimeGoals.Sync.Contracts;
 
@@ -23,6 +25,7 @@ public sealed class RegisterTests(PostgresFixture postgres)
         using var client = factory.CreateClient();
         var request = TestAccount.NewRegisterRequest("ana@exemplo.com");
         (await RegisterAsync(client, request)).StatusCode.Should().Be(HttpStatusCode.Accepted);
+        await client.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(factory.Email.LastToken), SyncJsonContext.Default.ConfirmRequest);
 
         var response = await PreloginAsync(client, "ana@exemplo.com");
 
@@ -46,6 +49,98 @@ public sealed class RegisterTests(PostgresFixture postgres)
         first.KdfSalt.Should().Equal(second!.KdfSalt);
         first.KdfSalt.Should().NotEqual(other!.KdfSalt);
         first.KdfParams.Should().Be(DefaultParams);
+    }
+
+    [Fact]
+    public async Task Prelogin_of_unconfirmed_account_returns_the_fake_salt()
+    {
+        await using var factory = new ServerFactory(postgres, new Dictionary<string, string?> { ["Server:PreloginSecret"] = "segredo" });
+        using var client = factory.CreateClient();
+        var request = TestAccount.NewRegisterRequest("ana@exemplo.com");
+        var expected = await (await PreloginAsync(client, "ana@exemplo.com")).Content.ReadFromJsonAsync(SyncJsonContext.Default.PreloginResponse);
+        await RegisterAsync(client, request);
+
+        var pending = await (await PreloginAsync(client, "ana@exemplo.com")).Content.ReadFromJsonAsync(SyncJsonContext.Default.PreloginResponse);
+        await client.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(factory.Email.LastToken), SyncJsonContext.Default.ConfirmRequest);
+        var confirmed = await (await PreloginAsync(client, "ana@exemplo.com")).Content.ReadFromJsonAsync(SyncJsonContext.Default.PreloginResponse);
+
+        pending!.KdfSalt.Should().Equal(expected!.KdfSalt);
+        pending.KdfParams.Should().Be(expected.KdfParams);
+        confirmed!.KdfSalt.Should().Equal(request.KdfSalt);
+    }
+
+    [Theory]
+    [InlineData("a\u0000@b.com")]
+    [InlineData("a\r\nBcc: x@y.com@b.com")]
+    [InlineData("a b@b.com")]
+    public async Task Prelogin_and_register_with_control_characters_in_email_answer_invalid_request(string email)
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var client = factory.CreateClient();
+
+        var prelogin = await PreloginAsync(client, email);
+        var register = await RegisterAsync(client, TestAccount.NewRegisterRequest(email));
+
+        foreach (var response in new[] { prelogin, register })
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await response.Content.ReadFromJsonAsync(SyncJsonContext.Default.ErrorResponse))!.Error.Should().Be("invalid_request");
+        }
+
+        factory.Email.Count.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData("{\"v\":1}\u0000")]
+    [InlineData("{\"v\":1}\r\n")]
+    public async Task Register_with_control_characters_in_kdf_params_answers_invalid_request(string kdfParams)
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var client = factory.CreateClient();
+
+        var response = await RegisterAsync(client, TestAccount.NewRegisterRequest("ana@exemplo.com") with { KdfParams = kdfParams });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadFromJsonAsync(SyncJsonContext.Default.ErrorResponse))!.Error.Should().Be("invalid_request");
+    }
+
+    [Fact]
+    public async Task Failed_email_send_removes_the_account_so_the_email_can_register_again()
+    {
+        await using var factory = new ServerFactory(postgres);
+        var sender = new ThrowingSender { Fail = true };
+        await using var failing = factory.WithWebHostBuilder(builder => builder.ConfigureServices(
+            services => services.AddSingleton<SlimeGoals.Server.Accounts.IEmailSender>(sender)));
+        using var client = failing.CreateClient();
+
+        var first = await RegisterAsync(client, TestAccount.NewRegisterRequest("ana@exemplo.com"));
+        var afterFailure = await CountAccountsAsync(factory);
+        sender.Fail = false;
+        var second = await RegisterAsync(client, TestAccount.NewRegisterRequest("ana@exemplo.com"));
+
+        first.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        afterFailure.Should().Be(0);
+        second.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        sender.Sent.Should().Be(1);
+        (await CountAccountsAsync(factory)).Should().Be(1);
+    }
+
+    private sealed class ThrowingSender : SlimeGoals.Server.Accounts.IEmailSender
+    {
+        public bool Fail { get; set; }
+
+        public int Sent { get; private set; }
+
+        public Task SendConfirmationAsync(string email, string token, CancellationToken cancellationToken)
+        {
+            if (Fail)
+            {
+                throw new InvalidOperationException("falha simulada");
+            }
+
+            Sent++;
+            return Task.CompletedTask;
+        }
     }
 
     [Fact]

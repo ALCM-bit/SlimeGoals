@@ -35,9 +35,12 @@ public static class AccountEndpoints
     {
         var normalized = email?.Trim().ToLowerInvariant();
         return string.IsNullOrEmpty(normalized) || normalized.Length > MaxEmailLength || !normalized.Contains('@')
+            || normalized.Any(c => char.IsControl(c) || char.IsWhiteSpace(c))
             ? null
             : normalized;
     }
+
+    private static bool HasControl(string text) => text.Any(char.IsControl);
 
     private static IResult Error(string code, int status) =>
         Results.Json(new ErrorResponse(code), SyncJsonContext.Default.ErrorResponse, statusCode: status);
@@ -96,6 +99,7 @@ public static class AccountEndpoints
 
         var now = time.GetUtcNow();
         var token = SecretHash.NewToken();
+        var tokenHash = SecretHash.Of(token);
         var created = await store.TryCreateAsync(
             new NewAccount(
                 email,
@@ -105,7 +109,7 @@ public static class AccountEndpoints
                 SecretHash.Of(body.RecoveryKey!),
                 body.WrappedKeyPassword!,
                 body.WrappedKeyRecovery!,
-                SecretHash.Of(token),
+                tokenHash,
                 now.AddHours(options.Value.Retention.UnconfirmedAccountHours),
                 now),
             cancellationToken);
@@ -113,7 +117,16 @@ public static class AccountEndpoints
         // Mesma resposta para e-mail novo e já usado (decisão 6); só a conta nova manda e-mail.
         if (created)
         {
-            await emailSender.SendConfirmationAsync(email, token, cancellationToken);
+            try
+            {
+                // Sem o token do pedido: desconectar o cliente não pode deixar conta sem e-mail.
+                await emailSender.SendConfirmationAsync(email, token, CancellationToken.None);
+            }
+            catch
+            {
+                await store.DeleteUnconfirmedAsync(tokenHash, CancellationToken.None);
+                throw;
+            }
         }
 
         return Results.Accepted();
@@ -122,6 +135,7 @@ public static class AccountEndpoints
     private static bool IsValid(RegisterRequest body) =>
         body.KdfSalt is { Length: >= 16 and <= 64 }
         && !string.IsNullOrWhiteSpace(body.KdfParams) && body.KdfParams.Length <= MaxKdfParamsLength
+        && !HasControl(body.KdfParams)
         && body.AuthKey is { Length: KeyBytes }
         && body.RecoveryKey is { Length: KeyBytes }
         && body.WrappedKeyPassword is { Length: > 0 and <= MaxWrappedKeyBytes }
@@ -147,7 +161,7 @@ public static class AccountEndpoints
         var email = NormalizeEmail(body?.Email);
         var deviceName = body?.DeviceName?.Trim();
         if (email is null || body?.AuthKey is not { Length: KeyBytes }
-            || string.IsNullOrEmpty(deviceName) || deviceName.Length > MaxDeviceNameLength)
+            || string.IsNullOrEmpty(deviceName) || deviceName.Length > MaxDeviceNameLength || HasControl(deviceName))
         {
             return InvalidRequest();
         }
@@ -165,11 +179,6 @@ public static class AccountEndpoints
         if (!SecretHash.Equal(hash, account.AuthHash))
         {
             return Error("unauthorized", StatusCodes.Status401Unauthorized);
-        }
-
-        if (!account.Confirmed)
-        {
-            return Error("email_not_confirmed", StatusCodes.Status403Forbidden);
         }
 
         var token = SecretHash.NewToken();

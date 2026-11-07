@@ -15,7 +15,7 @@ public sealed class LoginTests(PostgresFixture postgres)
         client.PostAsJsonAsync("/auth/login", new LoginRequest(email, authKey, "pc"), SyncJsonContext.Default.LoginRequest);
 
     [Fact]
-    public async Task Login_before_confirming_answers_403()
+    public async Task Login_before_confirming_answers_401()
     {
         await using var factory = new ServerFactory(postgres);
         using var client = factory.CreateClient();
@@ -24,8 +24,27 @@ public sealed class LoginTests(PostgresFixture postgres)
 
         var response = await LoginAsync(client, "ana@exemplo.com", request.AuthKey!);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await response.Content.ReadFromJsonAsync(SyncJsonContext.Default.ErrorResponse))!.Error.Should().Be("email_not_confirmed");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await response.Content.ReadFromJsonAsync(SyncJsonContext.Default.ErrorResponse))!.Error.Should().Be("unauthorized");
+        var unknown = await LoginAsync(client, "ninguem@exemplo.com", request.AuthKey!);
+        (await unknown.Content.ReadAsStringAsync()).Should().Be(await response.Content.ReadAsStringAsync());
+    }
+
+    [Theory]
+    [InlineData("a\u0000@b.com", "pc")]
+    [InlineData("a\r\n@b.com", "pc")]
+    [InlineData("ana@exemplo.com", "pc\u0000")]
+    [InlineData("ana@exemplo.com", "pc\r\nX: y")]
+    public async Task Login_with_control_characters_answers_invalid_request(string email, string device)
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/auth/login", new LoginRequest(email, RandomNumberGenerator.GetBytes(32), device), SyncJsonContext.Default.LoginRequest);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadFromJsonAsync(SyncJsonContext.Default.ErrorResponse))!.Error.Should().Be("invalid_request");
     }
 
     [Fact]

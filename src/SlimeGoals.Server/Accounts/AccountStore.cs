@@ -17,7 +17,7 @@ public sealed record NewAccount(
     DateTimeOffset ConfirmExpiresAt,
     DateTimeOffset CreatedAt);
 
-public sealed record LoginAccount(Guid Id, byte[] AuthHash, bool Confirmed, byte[] WrappedKeyPassword);
+public sealed record LoginAccount(Guid Id, byte[] AuthHash, byte[] WrappedKeyPassword);
 
 public sealed record DeviceIdentity(Guid AccountId, Guid DeviceId);
 
@@ -32,7 +32,7 @@ public sealed class AccountStore(Db db)
     {
         await using var connection = await db.OpenAsync(cancellationToken);
         return await connection.QuerySingleOrDefaultAsync<AccountKdf>(new CommandDefinition(
-            "SELECT kdf_salt AS KdfSalt, kdf_params AS KdfParams FROM accounts WHERE email = @email",
+            "SELECT kdf_salt AS KdfSalt, kdf_params AS KdfParams FROM accounts WHERE email = @email AND email_confirmed_at IS NOT NULL",
             new { email },
             cancellationToken: cancellationToken));
     }
@@ -67,6 +67,16 @@ public sealed class AccountStore(Db db)
         return rows == 1;
     }
 
+    /// <summary>Desfaz um cadastro cujo e-mail não saiu, achando a linha pelo hash da confirmação.</summary>
+    public async Task DeleteUnconfirmedAsync(byte[] confirmHash, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        await connection.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM accounts WHERE confirm_hash = @confirmHash AND email_confirmed_at IS NULL",
+            new { confirmHash },
+            cancellationToken: cancellationToken));
+    }
+
     /// <summary>Confirma a conta com o token; o código vale uma vez e até o vencimento.</summary>
     public async Task<bool> ConfirmAsync(byte[] tokenHash, DateTimeOffset now, CancellationToken cancellationToken)
     {
@@ -87,9 +97,8 @@ public sealed class AccountStore(Db db)
         await using var connection = await db.OpenAsync(cancellationToken);
         return await connection.QuerySingleOrDefaultAsync<LoginAccount>(new CommandDefinition(
             """
-            SELECT id AS Id, auth_hash AS AuthHash, (email_confirmed_at IS NOT NULL) AS Confirmed,
-                   wrapped_key_password AS WrappedKeyPassword
-              FROM accounts WHERE email = @email
+            SELECT id AS Id, auth_hash AS AuthHash, wrapped_key_password AS WrappedKeyPassword
+              FROM accounts WHERE email = @email AND email_confirmed_at IS NOT NULL
             """,
             new { email },
             cancellationToken: cancellationToken));
