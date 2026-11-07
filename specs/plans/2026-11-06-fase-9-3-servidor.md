@@ -33,7 +33,7 @@ Depois disso, `dotnet test --solution SlimeGoals.slnx` passa a exigir também o 
 3. **`accounts` ganha colunas (acréscimo à spec):** `purge_point bigint NOT NULL DEFAULT 0`, `confirm_hash bytea`, `confirm_expires_at timestamptz`. `next_seq` começa em 1, e o maior `seq` da conta é `next_seq - 1`.
 4. **Exclusão é explícita no envio (ajuste à spec).** O item leva `delete: true` e `blob` nulo. Um cliente com defeito que omita o blob recebe `400` em vez de apagar um registro.
 5. **Recuperar tem duas etapas (ajuste à spec).** `POST /auth/recover/begin` confere o código e devolve `wrapped_key_recovery`, sem a qual o aparelho não abre a chave de dados. `POST /auth/recover` define a nova senha e revoga todos os aparelhos. O código de recuperação continua o mesmo.
-6. **Cadastro não revela quem tem conta.** E-mail já usado recebe a mesma resposta `202`, sem alterar nada. Conta não confirmada some depois de 24 h, para ninguém reservar o e-mail de outra pessoa.
+6. **Cadastro não revela quem tem conta.** E-mail já usado recebe a mesma resposta `202`, sem alterar nada. Conta não confirmada some depois de 24 h, para ninguém reservar o e-mail de outra pessoa. Até confirmar, a conta é tratada como inexistente: `prelogin` devolve o sal falso, e `login` responde `401` mesmo com a chave certa. Sem isso, cadastrar com chave própria e tentar entrar revelaria se o e-mail estava livre.
 7. **Apagar a conta pede a `auth_key` no corpo, além do token.** Um token roubado lê os blobs cifrados, mas não apaga a cópia da nuvem.
 8. **E-mail simulado:** `IEmailSender` com `LogEmailSender`, que só existe em `Development`. É a exceção à regra 8 da §5, prevista na §10. Fora de `Development`, o servidor recusa iniciar sem um envio real.
 9. **Leitura do `pull` numa transação `REPEATABLE READ`, somente leitura.** Ponto da limpeza e registros vêm do mesmo instante. Com leituras separadas, uma limpeza entre as duas faria um aparelho perder marcas sem receber `410`.
@@ -52,8 +52,7 @@ Corpo `{"error":"<código>"}`, sempre em minúsculas, sem detalhes internos.
 |---|---|---|
 | 400 | `invalid_request` | Campo ausente, formato ou tamanho errado, `limit` ou `after` inválidos, lote acima do máximo |
 | 400 | `invalid_token` | Confirmação desconhecida ou vencida |
-| 401 | `unauthorized` | Token ausente, desconhecido ou revogado; credencial errada; e-mail desconhecido no login |
-| 403 | `email_not_confirmed` | Login com credencial certa antes de confirmar |
+| 401 | `unauthorized` | Token ausente, desconhecido ou revogado; credencial errada; e-mail desconhecido ou não confirmado no login |
 | 403 | `quota_exceeded` | Cota da conta |
 | 404 | `not_found` | Aparelho que não existe nesta conta |
 | 410 | `reset_required` | Regra 5 da §5 |
@@ -122,7 +121,7 @@ Corpo `{"error":"<código>"}`, sempre em minúsculas, sem detalhes internos.
   - `Register_with_used_email_answers_202_and_changes_nothing`: `kdf_salt` e `auth_hash` ficam iguais; nenhum e-mail novo.
   - `Email_is_normalized`: entrar com `"  Ana@Exemplo.COM "` acha a conta de `ana@exemplo.com`.
   - `Confirm_with_unknown_or_expired_token_answers_400`: avança `Time` em 24 h e 1 s.
-  - `Login_before_confirming_answers_403`, `Login_with_wrong_key_answers_401`, `Login_with_unknown_email_answers_401`: corpo igual ao da chave errada.
+  - `Login_before_confirming_answers_401`, `Login_with_wrong_key_answers_401`, `Login_with_unknown_email_answers_401`: corpo igual ao da chave errada.
   - `Login_creates_a_device_and_returns_the_wrapped_key`: em `devices`, `token_hash` difere do token e é SHA-256 dele.
   - `Stored_account_has_no_plain_secret`: `auth_hash` difere de `auth_key`; `recovery_hash` difere de `recovery_key`.
   - `Logout_revokes_only_this_device`: dois aparelhos; o primeiro sai e recebe `401`; o segundo segue com `200` em `GET /devices` (rota da Tarefa 3, então aqui usa uma rota de teste protegida registrada pela fábrica).
