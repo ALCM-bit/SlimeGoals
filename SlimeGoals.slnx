@@ -6,6 +6,7 @@
     <Project Path="src/SlimeGoals.Infrastructure/SlimeGoals.Infrastructure.csproj" />
     <Project Path="src/SlimeGoals.Platform.Linux/SlimeGoals.Platform.Linux.csproj" />
     <Project Path="src/SlimeGoals.Server/SlimeGoals.Server.csproj" />
+    <Project Path="src/SlimeGoals.Sync/SlimeGoals.Sync.csproj" />
     <Project Path="src/SlimeGoals.Sync.Contracts/SlimeGoals.Sync.Contracts.csproj" />
   </Folder>
   <Folder Name="/tests/">
