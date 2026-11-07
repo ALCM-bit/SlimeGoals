@@ -1,0 +1,221 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:acc="using:SlimeGoals.App.Account"
+             x:Class="SlimeGoals.App.Views.AccountView"
+             x:DataType="acc:AccountViewModel">
+  <!-- Subpáginas da conta (fase 9.5a): abrem no lugar da lista de Licenças, com o título e o Voltar no cabeçalho de
+       SettingsView. Um painel por página; senhas sem revelar; nada de cancelar durante a operação (decisão 13). -->
+  <ScrollViewer x:Name="Scroller" Classes="page">
+    <StackPanel Classes="settings-list account-form" Spacing="18">
+
+      <!-- Criar conta -->
+      <StackPanel Spacing="18" IsVisible="{Binding IsRegisterOpen}">
+        <TextBlock Text="{x:Static acc:AccountViewModel.IntroText}" Foreground="{DynamicResource Muted}"
+                   TextWrapping="Wrap" />
+        <StackPanel Spacing="18" IsEnabled="{Binding IsIdle}">
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Servidor" />
+            <TextBox Text="{Binding ServerText}" IsEnabled="{Binding IsServerEditable}" AutomationProperties.Name="Servidor" />
+          </StackPanel>
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="E-mail" />
+            <TextBox Text="{Binding Email}" AutomationProperties.Name="E-mail" />
+          </StackPanel>
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Senha" />
+            <TextBox Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Senha" />
+          </StackPanel>
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Confirmar senha" />
+            <TextBox Text="{Binding PasswordConfirmation}" PasswordChar="•" RevealPassword="False"
+                     AutomationProperties.Name="Confirmar senha" />
+          </StackPanel>
+        </StackPanel>
+        <Button Classes="primary" HorizontalAlignment="Left" Content="Criar conta" Command="{Binding SubmitRegisterCommand}" />
+      </StackPanel>
+
+      <!-- Código de recuperação (do cadastro e da recuperação): só existe nestas duas páginas -->
+      <StackPanel Spacing="14"
+                  IsVisible="{Binding ShownRecoveryCode, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+        <TextBlock Classes="section-title" Text="{x:Static acc:AccountViewModel.RecoveryCodeTitle}" TextWrapping="Wrap" />
+        <TextBlock Text="{x:Static acc:AccountViewModel.RecoveryCodeText}" TextWrapping="Wrap" />
+        <Border Classes="recovery-code">
+          <SelectableTextBlock Text="{Binding ShownRecoveryCode}" FontFamily="monospace" FontSize="18"
+                               TextWrapping="Wrap" AutomationProperties.Name="Código de recuperação" />
+        </Border>
+        <Button Classes="ghost" HorizontalAlignment="Left" Content="{x:Static acc:AccountViewModel.CopyLabel}"
+                Click="OnCopyRecoveryCode" />
+        <CheckBox MinHeight="44" Content="{x:Static acc:AccountViewModel.RecoveryCodeSavedLabel}"
+                  IsChecked="{Binding RecoveryCodeSaved}" IsEnabled="{Binding IsIdle}" />
+        <Button Classes="primary" HorizontalAlignment="Left" Content="{x:Static acc:AccountViewModel.ContinueLabel}"
+                Command="{Binding ContinueCommand}" />
+      </StackPanel>
+
+      <!-- Confirmar e-mail -->
+      <StackPanel Spacing="18" IsVisible="{Binding IsConfirmOpen}">
+        <TextBlock Text="{Binding ConfirmText}" TextWrapping="Wrap" />
+        <StackPanel Spacing="18" IsEnabled="{Binding IsIdle}">
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Código" />
+            <TextBox Text="{Binding ConfirmationCode}" AutomationProperties.Name="Código" />
+          </StackPanel>
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Nome do aparelho" />
+            <TextBox Text="{Binding DeviceName}" AutomationProperties.Name="Nome do aparelho" />
+          </StackPanel>
+        </StackPanel>
+        <Button Classes="primary" HorizontalAlignment="Left" Content="Confirmar" Command="{Binding SubmitConfirmCommand}" />
+      </StackPanel>
+
+      <!-- Entrar -->
+      <StackPanel Spacing="18" IsVisible="{Binding IsLoginOpen}">
+        <TextBlock Text="{x:Static acc:AccountViewModel.IntroText}" Foreground="{DynamicResource Muted}"
+                   TextWrapping="Wrap" />
+        <StackPanel Spacing="18" IsEnabled="{Binding IsIdle}">
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Servidor" />
+            <TextBox Text="{Binding ServerText}" IsEnabled="{Binding IsServerEditable}" AutomationProperties.Name="Servidor" />
+          </StackPanel>
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="E-mail" />
+            <TextBox Text="{Binding Email}" AutomationProperties.Name="E-mail" />
+          </StackPanel>
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Senha" />
+            <TextBox Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Senha" />
+          </StackPanel>
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Nome do aparelho" />
+            <TextBox Text="{Binding DeviceName}" AutomationProperties.Name="Nome do aparelho" />
+          </StackPanel>
+        </StackPanel>
+        <Button Classes="primary" HorizontalAlignment="Left" Content="Entrar" Command="{Binding SubmitLoginCommand}" />
+      </StackPanel>
+
+      <!-- Recuperar conta: o código digitado também fica mascarado -->
+      <StackPanel Spacing="18" IsVisible="{Binding IsRecoverOpen}">
+        <StackPanel Spacing="18" IsEnabled="{Binding IsIdle}">
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Servidor" />
+            <TextBox Text="{Binding ServerText}" IsEnabled="{Binding IsServerEditable}" AutomationProperties.Name="Servidor" />
+          </StackPanel>
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="E-mail" />
+            <TextBox Text="{Binding Email}" AutomationProperties.Name="E-mail" />
+          </StackPanel>
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Código de recuperação" />
+            <TextBox Text="{Binding RecoveryCodeInput}" PasswordChar="•" RevealPassword="False"
+                     AutomationProperties.Name="Código de recuperação" />
+          </StackPanel>
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Nova senha" />
+            <TextBox Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Nova senha" />
+          </StackPanel>
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Confirmar nova senha" />
+            <TextBox Text="{Binding PasswordConfirmation}" PasswordChar="•" RevealPassword="False"
+                     AutomationProperties.Name="Confirmar nova senha" />
+          </StackPanel>
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Nome do aparelho" />
+            <TextBox Text="{Binding DeviceName}" AutomationProperties.Name="Nome do aparelho" />
+          </StackPanel>
+        </StackPanel>
+        <Button Classes="primary" HorizontalAlignment="Left" Content="Recuperar conta" Command="{Binding SubmitRecoverCommand}" />
+      </StackPanel>
+
+      <!-- Entrar de novo (sessão encerrada): a fila continua -->
+      <StackPanel Spacing="18" IsVisible="{Binding IsReauthenticateOpen}">
+        <TextBlock Text="{x:Static acc:AccountViewModel.SessionExpiredText}" TextWrapping="Wrap" />
+        <StackPanel Spacing="18" IsEnabled="{Binding IsIdle}">
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Senha" />
+            <TextBox Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Senha" />
+          </StackPanel>
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Nome do aparelho" />
+            <TextBox Text="{Binding DeviceName}" AutomationProperties.Name="Nome do aparelho" />
+          </StackPanel>
+        </StackPanel>
+        <Button Classes="primary" HorizontalAlignment="Left" Content="{x:Static acc:AccountViewModel.ReauthenticateLabel}"
+                Command="{Binding SubmitReauthenticateCommand}" />
+      </StackPanel>
+
+      <!-- Trocar senha -->
+      <StackPanel Spacing="18" IsVisible="{Binding IsChangePasswordOpen}">
+        <StackPanel Spacing="18" IsEnabled="{Binding IsIdle}">
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Senha atual" />
+            <TextBox Text="{Binding CurrentPassword}" PasswordChar="•" RevealPassword="False"
+                     AutomationProperties.Name="Senha atual" />
+          </StackPanel>
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Nova senha" />
+            <TextBox Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Nova senha" />
+          </StackPanel>
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Confirmar nova senha" />
+            <TextBox Text="{Binding PasswordConfirmation}" PasswordChar="•" RevealPassword="False"
+                     AutomationProperties.Name="Confirmar nova senha" />
+          </StackPanel>
+        </StackPanel>
+        <Button Classes="primary" HorizontalAlignment="Left" Content="Trocar senha"
+                Command="{Binding SubmitChangePasswordCommand}" />
+      </StackPanel>
+
+      <!-- Aparelhos: o atual não tem o botão de remover (decisão 12) -->
+      <ItemsControl ItemsSource="{Binding Devices}" IsVisible="{Binding IsDevicesOpen}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Spacing="8" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="acc:DeviceItemViewModel">
+            <Border Classes="card">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" MinHeight="44">
+                <TextBlock Text="{Binding Name}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding CurrentLabel}" Foreground="{DynamicResource Muted}"
+                           VerticalAlignment="Center" IsVisible="{Binding IsCurrent}" />
+                <Button Grid.Column="1" Classes="danger" Content="Remover" IsVisible="{Binding CanRevoke}"
+                        Command="{Binding $parent[ItemsControl].((acc:AccountViewModel)DataContext).RevokeDeviceCommand}"
+                        CommandParameter="{Binding}" AutomationProperties.Name="{Binding Name, StringFormat='Remover {0}'}" />
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- Sair com pendências (decisão 11) -->
+      <StackPanel Spacing="18" IsVisible="{Binding IsSignOutOpen}">
+        <Border Classes="warning-band">
+          <TextBlock Text="{Binding SignOutWarningText}" TextWrapping="Wrap" />
+        </Border>
+        <WrapPanel ItemSpacing="8" LineSpacing="8">
+          <Button Classes="ghost" Content="{x:Static acc:AccountViewModel.WaitLabel}" Command="{Binding CloseCommand}" />
+          <Button Classes="danger-solid" Content="{x:Static acc:AccountViewModel.SignOutAnywayLabel}"
+                  Command="{Binding SubmitSignOutCommand}" />
+        </WrapPanel>
+      </StackPanel>
+
+      <!-- Apagar conta -->
+      <StackPanel Spacing="18" IsVisible="{Binding IsDeleteAccountOpen}">
+        <Border Classes="warning-band">
+          <TextBlock Text="{x:Static acc:AccountViewModel.DeleteAccountText}" TextWrapping="Wrap" />
+        </Border>
+        <StackPanel Classes="field" IsEnabled="{Binding IsIdle}">
+          <TextBlock Classes="field-label" Text="Senha" />
+          <TextBox Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Senha" />
+        </StackPanel>
+        <Button Classes="danger-solid" HorizontalAlignment="Left" Content="{x:Static acc:AccountViewModel.DeleteAccountLabel}"
+                Command="{Binding SubmitDeleteAccountCommand}" />
+      </StackPanel>
+
+      <!-- Ocupado e erro, abaixo do formulário -->
+      <ProgressBar Classes="busy" IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+      <TextBlock Classes="form-error" Text="{Binding Error}"
+                 IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -51,7 +51,10 @@ public sealed partial class SettingsPageViewModel : PageViewModel
             account.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(AccountViewModel.Page))
+                {
                     OnPropertyChanged(nameof(IsMainOpen));
+                    OnPropertyChanged(nameof(IsAccountPageOpen));
+                }
             };
     }
 
@@ -82,6 +85,9 @@ public sealed partial class SettingsPageViewModel : PageViewModel
 
     /// <summary>Página principal (seções + Sobre): nenhuma licença nem subpágina da conta aberta.</summary>
     public bool IsMainOpen => !LicensesOpen && (Account?.Page ?? AccountPage.None) == AccountPage.None;
+
+    /// <summary>Uma subpágina da conta está aberta (no lugar onde a lista de licenças abre).</summary>
+    public bool IsAccountPageOpen => Account is { IsMainOpen: false };
 
     /// <summary>Texto do componente escolhido; lido uma vez, quando a escolha muda.</summary>
     public string? SelectedLicenseText { get; private set; }

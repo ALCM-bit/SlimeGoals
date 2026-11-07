@@ -87,7 +87,7 @@ public sealed partial class AccountViewModel : ObservableObject
     }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsMainOpen), nameof(ConfirmText))]
+    [NotifyPropertyChangedFor(nameof(IsMainOpen), nameof(ConfirmText), nameof(PageTitle))]
     [NotifyCanExecuteChangedFor(nameof(CloseCommand))]
     public partial AccountPage Page { get; private set; }
 
@@ -139,6 +139,22 @@ public sealed partial class AccountViewModel : ObservableObject
     public bool IsIdle => !IsBusy;
 
     public bool IsMainOpen => Page == AccountPage.None;
+
+    /// <summary>Título da subpágina no cabeçalho de Configurações; nulo na seção principal.</summary>
+    public string? PageTitle => Page switch
+    {
+        AccountPage.Register => "Criar conta",
+        AccountPage.Login => "Entrar",
+        AccountPage.Recover => "Recuperar conta",
+        AccountPage.RecoveryCode or AccountPage.RecoveredCode => "Código de recuperação",
+        AccountPage.Confirm => "Confirmar e-mail",
+        AccountPage.Reauthenticate => "Entrar de novo",
+        AccountPage.ChangePassword => "Trocar senha",
+        AccountPage.Devices => "Aparelhos",
+        AccountPage.SignOut => "Sair da conta",
+        AccountPage.DeleteAccount => "Apagar conta",
+        _ => null,
+    };
 
     public bool IsSignedOut => Status.State == AccountState.SignedOut;
     public bool IsSignedIn => Status.State == AccountState.SignedIn;

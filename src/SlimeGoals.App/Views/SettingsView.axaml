@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:SlimeGoals.App.ViewModels"
              xmlns:about="using:SlimeGoals.App.About"
+             xmlns:views="using:SlimeGoals.App.Views"
              x:Class="SlimeGoals.App.Views.SettingsView"
              x:DataType="vm:SettingsPageViewModel">
   <DockPanel Classes="page">
@@ -10,10 +11,15 @@
               HorizontalAlignment="Left" IsVisible="{Binding IsLicenseListOpen}" />
       <Button Classes="ghost back" Content="← Licenças" Command="{Binding CloseLicenseTextCommand}"
               HorizontalAlignment="Left" IsVisible="{Binding IsLicenseTextOpen}" />
+      <!-- Subpágina da conta: o Voltar fica parado enquanto ocupado e até guardar o código de recuperação -->
+      <Button Classes="ghost back" Content="← Configurações" Command="{Binding Account.CloseCommand, FallbackValue={x:Null}}"
+              HorizontalAlignment="Left" IsVisible="{Binding IsAccountPageOpen}" />
       <TextBlock Classes="page-title" Text="{Binding Title}" IsVisible="{Binding IsMainOpen}" />
       <TextBlock Classes="page-title" Text="Licenças" IsVisible="{Binding IsLicenseListOpen}" />
       <TextBlock Classes="page-title" Text="{Binding SelectedLicense.Component}" TextWrapping="Wrap"
                  IsVisible="{Binding IsLicenseTextOpen}" />
+      <TextBlock Classes="page-title" Text="{Binding Account.PageTitle, FallbackValue={x:Null}}" TextWrapping="Wrap"
+                 IsVisible="{Binding IsAccountPageOpen}" />
     </StackPanel>
 
     <Border DockPanel.Dock="Top" Classes="warning-band" Margin="0,0,0,12"
@@ -24,6 +30,10 @@
     <Panel>
       <ScrollViewer Classes="page" IsVisible="{Binding IsMainOpen}">
         <StackPanel Classes="settings-list" Spacing="16" Margin="0,0,0,14">
+          <Panel IsVisible="{Binding ShowAccount}">
+            <views:AccountSectionView DataContext="{Binding Account}" />
+          </Panel>
+
           <Border Classes="card" IsVisible="{Binding ShowGeneral}">
             <StackPanel Spacing="12">
               <TextBlock Classes="section-title" Text="Geral" />
@@ -107,6 +117,11 @@
           </Border>
         </StackPanel>
       </ScrollViewer>
+
+      <!-- Subpáginas da conta -->
+      <Panel IsVisible="{Binding IsAccountPageOpen}">
+        <views:AccountView DataContext="{Binding Account}" />
+      </Panel>
 
       <!-- Lista de licenças -->
       <ScrollViewer Classes="page" IsVisible="{Binding IsLicenseListOpen}">

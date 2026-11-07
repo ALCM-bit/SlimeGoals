@@ -5,9 +5,10 @@
     <ProjectReference Include="..\SlimeGoals.Sync.Contracts\SlimeGoals.Sync.Contracts.csproj" />
   </ItemGroup>
 
-  <!-- O falso da conta nos testes do App devolve um cadastro pendente, cujo construtor é interno. -->
+  <!-- O falso da conta nos testes do App e na Render devolve um cadastro pendente, cujo construtor é interno. -->
   <ItemGroup>
     <InternalsVisibleTo Include="SlimeGoals.App.Tests" />
+    <InternalsVisibleTo Include="SlimeGoals.Render" />
   </ItemGroup>
 
   <ItemGroup>

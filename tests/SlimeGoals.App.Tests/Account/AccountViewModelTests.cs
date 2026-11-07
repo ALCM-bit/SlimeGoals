@@ -516,14 +516,14 @@ public class AccountViewModelTests
         var account = await LoadedAsync();
         var vm = new SettingsPageViewModel(new AppSettings(_repo),
             capabilities: PlatformCapabilities.Desktop with { Sync = true }, account: account);
-        vm.IsMainOpen.Should().BeTrue();
+        (vm.IsMainOpen, vm.IsAccountPageOpen, account.PageTitle).Should().Be((true, false, (string?)null));
 
         account.OpenLoginCommand.Execute(null);
-        vm.IsMainOpen.Should().BeFalse();
+        (vm.IsMainOpen, vm.IsAccountPageOpen, account.PageTitle).Should().Be((false, true, "Entrar"));
 
         vm.TryGoBack().Should().BeTrue();
         account.Page.Should().Be(AccountPage.None);
-        vm.IsMainOpen.Should().BeTrue();
+        (vm.IsMainOpen, vm.IsAccountPageOpen).Should().Be((true, false));
         vm.TryGoBack().Should().BeFalse();
     }
 

@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using SlimeGoals.App.Account;
 using SlimeGoals.App.Goals;
 using SlimeGoals.App.Hosting;
 using SlimeGoals.App.ViewModels;
@@ -8,6 +9,9 @@ using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Infrastructure;
 using SlimeGoals.Infrastructure.Data;
+using SlimeGoals.Sync;
+using SlimeGoals.Sync.Account;
+using SlimeGoals.Sync.Contracts;
 
 namespace SlimeGoals.Render;
 
@@ -44,9 +48,12 @@ public sealed class Sample : IDisposable
     /// Monta um shell novo (páginas novas, com os dados do banco de exemplo). Na variação
     /// <paramref name="phone"/>, com as capacidades do Android (nada de lembretes, autostart, janela nem Sair).
     /// </summary>
-    public ShellViewModel CreateShell(bool phone)
+    /// <param name="account">Com ela, a seção "Conta e sincronização" aparece (capacidades do desktop com <c>Sync</c>).</param>
+    public ShellViewModel CreateShell(bool phone, AccountViewModel? account = null)
     {
         var capabilities = phone ? new PlatformCapabilities(true, false, false, false) : PlatformCapabilities.Desktop;
+        if (account is not null)
+            capabilities = capabilities with { Sync = true };
         IReminderPermissions? permissions = phone ? new DeniedPermissions() : null;
         var s = _services;
         PageViewModel[] pages =
@@ -59,7 +66,7 @@ public sealed class Sample : IDisposable
             new ReportsPageViewModel(s.GetRequiredService<ReportService>(), TimeProvider.System,
                 s.GetRequiredService<DataChangeNotifier>()),
             new SettingsPageViewModel(s.GetRequiredService<AppSettings>(), capabilities: capabilities, permissions: permissions,
-                changes: s.GetRequiredService<DataChangeNotifier>()),
+                changes: s.GetRequiredService<DataChangeNotifier>(), account: account),
         ];
         return new ShellViewModel(pages, capabilities: capabilities);
     }
@@ -103,6 +110,10 @@ public sealed class Sample : IDisposable
         }
     }
 
+    /// <summary>A seção da conta sobre uma conta falsa (nenhuma rede), com o despacho direto na thread da Render.</summary>
+    public AccountViewModel CreateAccount(SampleAccount account) =>
+        new(account, _services.GetRequiredService<AppSettings>(), new AccountDefaults("notebook-da-ana"), a => a());
+
     public void Dispose()
     {
         _services.Dispose();
@@ -134,6 +145,90 @@ internal sealed class DeniedPermissions : IReminderPermissions
     }
 
     public void RequestBatteryUnrestricted()
+    {
+    }
+}
+
+/// <summary>
+/// Conta falsa para as imagens: devolve o status que a Render mandar, um cadastro pendente e aparelhos de exemplo.
+/// Nada sai para a rede, e os códigos são de mentira.
+/// </summary>
+public sealed class SampleAccount : ISyncAccount
+{
+    public AccountStatus Status { get; set; } = new(AccountState.SignedOut, null, null, null, 0, null);
+
+    /// <summary>Lançada pelas operações de conta, para a imagem do erro.</summary>
+    public Exception? Failure { get; set; }
+
+    /// <summary>Segura as operações, para a imagem do "ocupado".</summary>
+    public bool Hang { get; set; }
+
+    public int FlushResult { get; set; }
+
+    public event EventHandler? StatusChanged { add { } remove { } }
+
+    private async Task OpAsync()
+    {
+        if (Hang)
+            await new TaskCompletionSource().Task;
+        if (Failure is { } failure)
+            throw failure;
+    }
+
+    public Task<AccountStatus> GetStatusAsync(CancellationToken ct = default) => Task.FromResult(Status);
+
+    public Task StartAsync(CancellationToken ct = default) => Task.CompletedTask;
+
+    public Task StopAsync() => Task.CompletedTask;
+
+    public async Task<PendingRegistration> RegisterAsync(Uri server, string email, string password, CancellationToken ct = default)
+    {
+        await OpAsync();
+        return new PendingRegistration(server, email, "K7QM-3XRT-9PWD-HB2C-VN6F-YJ8L-4S", new byte[32], new byte[32]);
+    }
+
+    public Task ConfirmAsync(PendingRegistration pending, string code, string deviceName, CancellationToken ct = default) => OpAsync();
+
+    public Task LoginAsync(Uri server, string email, string password, string deviceName, CancellationToken ct = default) => OpAsync();
+
+    public async Task<string> RecoverAsync(Uri server, string email, string recoveryCode, string newPassword, string deviceName,
+        CancellationToken ct = default)
+    {
+        await OpAsync();
+        return "M2ZC-8TQX-5HRB-WJ3N-KD7P-FV9G-6L";
+    }
+
+    public Task ReauthenticateAsync(string password, string deviceName, CancellationToken ct = default) => OpAsync();
+
+    public Task RetryVaultAsync(CancellationToken ct = default) => OpAsync();
+
+    public Task ChangePasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default) => OpAsync();
+
+    public async Task<int> FlushAsync(CancellationToken ct = default)
+    {
+        await OpAsync();
+        return FlushResult;
+    }
+
+    public Task SignOutAsync(CancellationToken ct = default) => OpAsync();
+
+    public Task DeleteAccountAsync(string password, CancellationToken ct = default) => OpAsync();
+
+    public async Task<IReadOnlyList<DeviceDto>> ListDevicesAsync(CancellationToken ct = default)
+    {
+        await OpAsync();
+        var seen = DateTimeOffset.Now;
+        return
+        [
+            new DeviceDto(Guid.NewGuid(), "notebook-da-ana", seen, true),
+            new DeviceDto(Guid.NewGuid(), "Celular da Ana (Pixel 8 Pro, Android 15)", seen.AddHours(-3), false),
+            new DeviceDto(Guid.NewGuid(), "desktop-escritorio", seen.AddDays(-12), false),
+        ];
+    }
+
+    public Task RevokeDeviceAsync(Guid id, CancellationToken ct = default) => OpAsync();
+
+    public void SyncNow()
     {
     }
 }
