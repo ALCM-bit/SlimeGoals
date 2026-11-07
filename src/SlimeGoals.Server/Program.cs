@@ -6,6 +6,7 @@ using SlimeGoals.Server;
 using SlimeGoals.Server.Accounts;
 using SlimeGoals.Server.Auth;
 using SlimeGoals.Server.Data;
+using SlimeGoals.Server.Limits;
 using SlimeGoals.Server.Sync;
 using SlimeGoals.Sync.Contracts;
 
@@ -20,6 +21,7 @@ builder.Services.AddSingleton(sp =>
 builder.Services.AddSingleton<Db>();
 builder.Services.AddSingleton<ServerMigrator>();
 builder.Services.AddSingleton<AccountStore>();
+builder.Services.AddSingleton<AuthRateLimits>();
 builder.Services.AddSingleton<RecordStore>();
 builder.Services.AddSingleton<RecordPurger>();
 builder.Services.AddHostedService<MaintenanceService>();
@@ -37,6 +39,7 @@ if (app.Services.GetRequiredService<IOptions<ServerOptions>>().Value.Server.Migr
     await app.Services.GetRequiredService<ServerMigrator>().RunAsync(CancellationToken.None);
 }
 
+app.UseBodyLimits();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapAccountEndpoints();

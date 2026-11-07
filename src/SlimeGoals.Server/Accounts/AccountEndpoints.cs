@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.Options;
 using SlimeGoals.Server.Auth;
+using SlimeGoals.Server.Limits;
 using SlimeGoals.Sync.Contracts;
 
 namespace SlimeGoals.Server.Accounts;
@@ -22,7 +23,7 @@ public static class AccountEndpoints
 
     public static void MapAccountEndpoints(this IEndpointRouteBuilder routes)
     {
-        var auth = routes.MapGroup("/auth");
+        var auth = routes.MapGroup("/auth").WithIpRateLimit();
         auth.MapPost("/prelogin", PreloginAsync);
         auth.MapPost("/register", RegisterAsync);
         auth.MapPost("/confirm", ConfirmAsync);
@@ -63,20 +64,26 @@ public static class AccountEndpoints
         {
             return await request.ReadFromJsonAsync(typeInfo, cancellationToken);
         }
-        catch (Exception ex) when (ex is JsonException or InvalidOperationException or BadHttpRequestException)
+        // Corpo grande demais (413) sobe até o middleware de limites; as demais falhas de leitura viram 400.
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or BadHttpRequestException { StatusCode: not StatusCodes.Status413PayloadTooLarge })
         {
             return null;
         }
     }
 
     private static async Task<IResult> PreloginAsync(
-        HttpRequest request, AccountStore store, IOptions<ServerOptions> options, CancellationToken cancellationToken)
+        HttpRequest request, AccountStore store, AuthRateLimits limits, IOptions<ServerOptions> options, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.PreloginRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
         if (email is null)
         {
             return InvalidRequest();
+        }
+
+        if (limits.HitEmail(email) is { } retry)
+        {
+            return new RateLimitedResult(retry);
         }
 
         var serverOptions = options.Value.Server;
@@ -94,6 +101,7 @@ public static class AccountEndpoints
     private static async Task<IResult> RegisterAsync(
         HttpRequest request,
         AccountStore store,
+        AuthRateLimits limits,
         IEmailSender emailSender,
         IOptions<ServerOptions> options,
         TimeProvider time,
@@ -104,6 +112,11 @@ public static class AccountEndpoints
         if (body is null || email is null || !IsValid(body))
         {
             return InvalidRequest();
+        }
+
+        if (limits.HitEmail(email) is { } retry)
+        {
+            return new RateLimitedResult(retry);
         }
 
         var now = time.GetUtcNow();
@@ -167,7 +180,7 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> LoginAsync(
-        HttpRequest request, AccountStore store, TimeProvider time, CancellationToken cancellationToken)
+        HttpRequest request, AccountStore store, AuthRateLimits limits, TimeProvider time, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.LoginRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
@@ -176,6 +189,11 @@ public static class AccountEndpoints
             || string.IsNullOrEmpty(deviceName) || deviceName.Length > MaxDeviceNameLength || HasControl(deviceName))
         {
             return InvalidRequest();
+        }
+
+        if (limits.HitEmail(email) is { } retry)
+        {
+            return new RateLimitedResult(retry);
         }
 
         var account = await store.FindForLoginAsync(email, cancellationToken);
@@ -217,6 +235,7 @@ public static class AccountEndpoints
         HttpRequest request,
         System.Security.Claims.ClaimsPrincipal user,
         AccountStore store,
+        AuthRateLimits limits,
         TimeProvider time,
         CancellationToken cancellationToken)
     {
@@ -228,9 +247,17 @@ public static class AccountEndpoints
         }
 
         var accountId = user.AccountId();
+
+        // Antes de comparar: um token roubado não pode testar senhas sem o limite que o login tem.
+        if (limits.AccountBlocked(accountId) is { } retry)
+        {
+            return new RateLimitedResult(retry);
+        }
+
         var currentHash = await store.FindAuthHashAsync(accountId, cancellationToken);
         if (currentHash is null || !SecretHash.Equal(SecretHash.Of(body.CurrentAuthKey), currentHash))
         {
+            limits.RecordKeyFailure(accountId);
             return Unauthorized();
         }
 
@@ -260,13 +287,18 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> RecoverBeginAsync(
-        HttpRequest request, AccountStore store, CancellationToken cancellationToken)
+        HttpRequest request, AccountStore store, AuthRateLimits limits, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.RecoverBeginRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
         if (email is null || body?.RecoveryKey is not { Length: KeyBytes })
         {
             return InvalidRequest();
+        }
+
+        if (limits.HitEmail(email) is { } retry)
+        {
+            return new RateLimitedResult(retry);
         }
 
         var account = await CheckRecoveryCodeAsync(store, email, body.RecoveryKey, cancellationToken);
@@ -276,7 +308,7 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> RecoverAsync(
-        HttpRequest request, AccountStore store, TimeProvider time, CancellationToken cancellationToken)
+        HttpRequest request, AccountStore store, AuthRateLimits limits, TimeProvider time, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.RecoverRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
@@ -284,6 +316,11 @@ public static class AccountEndpoints
             || !IsValidKeyMaterial(body.KdfSalt, body.KdfParams, body.AuthKey, body.WrappedKeyPassword))
         {
             return InvalidRequest();
+        }
+
+        if (limits.HitEmail(email) is { } retry)
+        {
+            return new RateLimitedResult(retry);
         }
 
         // Confere o código aqui mesmo: nunca confia em que o begin tenha rodado antes.
@@ -320,7 +357,11 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> DeleteAccountAsync(
-        HttpRequest request, System.Security.Claims.ClaimsPrincipal user, AccountStore store, CancellationToken cancellationToken)
+        HttpRequest request,
+        System.Security.Claims.ClaimsPrincipal user,
+        AccountStore store,
+        AuthRateLimits limits,
+        CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.DeleteAccountRequest, cancellationToken);
         if (body?.AuthKey is not { Length: KeyBytes })
@@ -329,9 +370,15 @@ public static class AccountEndpoints
         }
 
         var accountId = user.AccountId();
+        if (limits.AccountBlocked(accountId) is { } retry)
+        {
+            return new RateLimitedResult(retry);
+        }
+
         var currentHash = await store.FindAuthHashAsync(accountId, cancellationToken);
         if (currentHash is null || !SecretHash.Equal(SecretHash.Of(body.AuthKey), currentHash))
         {
+            limits.RecordKeyFailure(accountId);
             return Unauthorized();
         }
 

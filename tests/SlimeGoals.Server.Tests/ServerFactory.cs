@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using SlimeGoals.Server.Accounts;
 
@@ -26,6 +27,7 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
             ["Limits:AuthPerEmailPerMinute"] = "100000",
             ["Limits:MaxBatchItems"] = "100000",
             ["Limits:MaxBlobBytes"] = "10000000",
+            ["Limits:AuthKeyFailuresPerAccountPerMinute"] = "100000",
         };
         if (overrides is not null)
         {
@@ -48,6 +50,9 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
 
     public FakeEmailSender Email { get; } = new();
 
+    /// <summary>Tudo que o servidor registrou; o nível vem da configuração <c>Logging</c>.</summary>
+    public CapturingLoggerProvider Logs { get; } = new();
+
     public string ConnectionString => _settings["ConnectionStrings:Postgres"]!;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -61,6 +66,7 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
         builder.ConfigureServices(services =>
         {
             services.Replace(ServiceDescriptor.Singleton<TimeProvider>(Time));
+            services.AddSingleton<ILoggerProvider>(Logs);
             if (_environment == "Development")
             {
                 services.Replace(ServiceDescriptor.Singleton<IEmailSender>(Email));

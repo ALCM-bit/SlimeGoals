@@ -1,12 +1,13 @@
 using System.Data;
 using Dapper;
+using Microsoft.Extensions.Options;
 using SlimeGoals.Server.Data;
 using SlimeGoals.Sync.Contracts;
 
 namespace SlimeGoals.Server.Sync;
 
 /// <summary>Registros cifrados de uma conta. A conta vem sempre da sessão, nunca do cliente (regra 6).</summary>
-public sealed class RecordStore(Db db, TimeProvider time)
+public sealed class RecordStore(Db db, TimeProvider time, IOptions<ServerOptions> options)
 {
     /// <summary>Ponto de teste, chamado entre a leitura do ponto da limpeza e a dos registros.</summary>
     internal Func<Task>? AfterPointRead { get; set; }
@@ -81,6 +82,7 @@ public sealed class RecordStore(Db db, TimeProvider time)
             transaction,
             cancellationToken: cancellationToken))).ToDictionary(r => r.Key, r => r.Seq);
 
+        var existingKeys = currentSeq.Keys.ToHashSet();
         var accepted = new List<AcceptedDto>();
         var conflicts = new List<string>();
         // Por chave, só o último aceito do lote: um mesmo INSERT não pode tocar duas vezes na mesma linha.
@@ -102,6 +104,20 @@ public sealed class RecordStore(Db db, TimeProvider time)
 
         if (writes.Count > 0)
         {
+            // Só chave nova aumenta a conta; editar ou apagar o que existe não (apagar deixa a marca, que também conta).
+            if (options.Value.Sync.MaxRecordsPerAccount is { } quota)
+            {
+                var total = await connection.ExecuteScalarAsync<long>(new CommandDefinition(
+                    "SELECT count(*) FROM records WHERE account_id = @account",
+                    new { account },
+                    transaction,
+                    cancellationToken: cancellationToken));
+                if (total + writes.Keys.Count(k => !existingKeys.Contains(k)) > quota)
+                {
+                    throw new QuotaExceededException();
+                }
+            }
+
             await connection.ExecuteAsync(new CommandDefinition(
                 """
                 INSERT INTO records (account_id, record_key, seq, blob, deleted_at)
@@ -134,3 +150,6 @@ public sealed class RecordStore(Db db, TimeProvider time)
 
 /// <summary>O aparelho parou antes do ponto da limpeza e precisa ler tudo de novo (<c>410</c>).</summary>
 public sealed class ResetRequiredException : Exception;
+
+/// <summary>O lote passaria da cota de registros da conta (<c>403</c>); nada foi gravado.</summary>
+public sealed class QuotaExceededException : Exception;

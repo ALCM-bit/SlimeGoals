@@ -46,6 +46,9 @@ public sealed class ServerOptions
         public int AuthPerIpPerMinute { get; set; } = 20;
 
         public int AuthPerEmailPerMinute { get; set; } = 10;
+
+        /// <summary>Falhas de <c>auth_key</c> por conta e por minuto em <c>DELETE /account</c> e <c>POST /auth/password</c>.</summary>
+        public int AuthKeyFailuresPerAccountPerMinute { get; set; } = 10;
     }
 
     public sealed class RetentionSection
