@@ -69,9 +69,19 @@ public class AccountMessagesTests
     {
         AccountMessages.For(Thrown(() => throw new InvalidOperationException("Saia da conta antes de entrar em outra.")),
             AccountAction.Login).Should().Be("Saia da conta antes de entrar em outra.");
-        AccountMessages.For(Thrown(() => throw new ArgumentException("Informe um e-mail válido, com até 254 caracteres.")),
+        // Como em AccountService: com paramName, que o .NET acrescenta à Message.
+        AccountMessages.For(Thrown(() => throw new ArgumentException("Informe um e-mail válido, com até 254 caracteres.", "email")),
             AccountAction.Register).Should().Be("Informe um e-mail válido, com até 254 caracteres.");
+        AccountMessages.For(Thrown(() => throw new ArgumentException("O nome do aparelho deve ter de 1 a 100 caracteres.",
+            "deviceName")), AccountAction.Login).Should().Be("O nome do aparelho deve ter de 1 a 100 caracteres.");
+        AccountMessages.For(Thrown(() => throw new ArgumentException("Este cadastro é de outro servidor.")),
+            AccountAction.Confirm).Should().Be("Este cadastro é de outro servidor.");
     }
+
+    [Fact]
+    public void Own_argument_out_of_range_is_generic() =>
+        AccountMessages.For(Thrown(() => throw new ArgumentOutOfRangeException("key")), AccountAction.Login)
+            .Should().Be(Generic);
 
     [Fact]
     public void Framework_argument_and_invalid_operation_messages_are_hidden()

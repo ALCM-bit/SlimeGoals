@@ -38,7 +38,10 @@ public static class AccountMessages
             "O chaveiro do sistema não está disponível ou o pedido foi recusado. Sem ele, a sincronização não liga.",
         FormatException when action == AccountAction.Recover => "Código de recuperação inválido. Confira os 26 caracteres.",
         CryptographicException when action == AccountAction.Recover => "Este código não abre a conta. Confira se é o desta conta.",
-        ArgumentException or InvalidOperationException when ThrownBySlimeGoals(e) => e.Message,
+        // A mensagem padrão do ArgumentOutOfRangeException é do framework, em inglês.
+        ArgumentOutOfRangeException => Generic,
+        ArgumentException arg when ThrownBySlimeGoals(e) => WithoutParamName(arg),
+        InvalidOperationException when ThrownBySlimeGoals(e) => e.Message,
         _ => Generic,
     };
 
@@ -66,6 +69,16 @@ public static class AccountMessages
 
     private static string Seconds(TimeSpan wait) =>
         Math.Max(1, (long)Math.Ceiling(wait.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>A <c>Message</c> sem o " (Parameter '…')" que o .NET acrescenta quando há <c>ParamName</c>.</summary>
+    private static string WithoutParamName(ArgumentException e)
+    {
+        if (string.IsNullOrEmpty(e.ParamName))
+            return e.Message;
+        // O sufixo vem do mesmo recurso do runtime, no idioma que ele usar.
+        var suffix = new ArgumentException("", e.ParamName).Message;
+        return e.Message.EndsWith(suffix, StringComparison.Ordinal) ? e.Message[..^suffix.Length] : e.Message;
+    }
 
     /// <summary>
     /// As mensagens de <see cref="ArgumentException"/> e <see cref="InvalidOperationException"/> lançadas pelo próprio

@@ -88,6 +88,7 @@ public sealed partial class AccountViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsMainOpen), nameof(ConfirmText))]
+    [NotifyCanExecuteChangedFor(nameof(CloseCommand))]
     public partial AccountPage Page { get; private set; }
 
     [ObservableProperty]
@@ -125,7 +126,7 @@ public sealed partial class AccountViewModel : ObservableObject
     [ObservableProperty] public partial string? ShownRecoveryCode { get; private set; }
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ContinueCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ContinueCommand), nameof(CloseCommand))]
     public partial bool RecoveryCodeSaved { get; set; }
 
     [ObservableProperty] public partial IReadOnlyList<DeviceItemViewModel> Devices { get; private set; } = [];
@@ -384,16 +385,27 @@ public sealed partial class AccountViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(IsIdle))]
     private Task RetryVaultAsync() => RunAsync(AccountAction.Reauthenticate, () => _account.RetryVaultAsync());
 
-    /// <summary>Fecha a subpágina ("Esperar" no aviso de sair); parado enquanto ocupado (decisão 13).</summary>
-    [RelayCommand(CanExecute = nameof(IsIdle))]
+    /// <summary>
+    /// Fecha a subpágina ("Esperar" no aviso de sair); parado enquanto ocupado (decisão 13) e, nas páginas do código de
+    /// recuperação, até marcar "Guardei o código" (decisão 16): o código não volta a aparecer.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanClose))]
     private void Close() => Page = AccountPage.None;
 
-    /// <summary>Voltar do sistema: falso na seção principal; ocupado, engole o voltar sem mudar nada.</summary>
+    private bool CanClose() => IsIdle && !CodeNotYetSaved;
+
+    private bool CodeNotYetSaved =>
+        Page is AccountPage.RecoveryCode or AccountPage.RecoveredCode && !RecoveryCodeSaved;
+
+    /// <summary>
+    /// Voltar do sistema: falso na seção principal; ocupado, ou com o código de recuperação ainda não guardado, engole o
+    /// voltar sem mudar nada.
+    /// </summary>
     public bool TryGoBack()
     {
         if (Page == AccountPage.None)
             return false;
-        if (!IsBusy)
+        if (CanClose())
             Page = AccountPage.None;
         return true;
     }

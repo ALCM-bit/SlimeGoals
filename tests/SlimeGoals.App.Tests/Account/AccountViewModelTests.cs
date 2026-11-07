@@ -289,6 +289,44 @@ public class AccountViewModelTests
     }
 
     [Fact]
+    public async Task Recovery_code_page_cannot_be_left_before_the_box_is_checked()
+    {
+        var vm = await LoadedAsync();
+        vm.OpenRegisterCommand.Execute(null);
+        (vm.Email, vm.Password, vm.PasswordConfirmation) = ("ana@exemplo.com", "senha longa", "senha longa");
+        await vm.SubmitRegisterCommand.ExecuteAsync(null);
+
+        vm.CloseCommand.CanExecute(null).Should().BeFalse();
+        vm.TryGoBack().Should().BeTrue();
+        vm.Page.Should().Be(AccountPage.RecoveryCode);
+        vm.ShownRecoveryCode.Should().Be(_account.Pending.RecoveryCode);
+
+        vm.RecoveryCodeSaved = true;
+        vm.CloseCommand.CanExecute(null).Should().BeTrue();
+        vm.TryGoBack().Should().BeTrue();
+        vm.Page.Should().Be(AccountPage.None);
+    }
+
+    [Fact]
+    public async Task Recovered_code_page_cannot_be_left_before_the_box_is_checked()
+    {
+        var vm = await LoadedAsync();
+        vm.OpenRecoverCommand.Execute(null);
+        (vm.Email, vm.RecoveryCodeInput, vm.Password, vm.PasswordConfirmation) =
+            ("ana@exemplo.com", "ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-23", "nova senha", "nova senha");
+        await vm.SubmitRecoverCommand.ExecuteAsync(null);
+
+        vm.CloseCommand.CanExecute(null).Should().BeFalse();
+        vm.TryGoBack().Should().BeTrue();
+        vm.Page.Should().Be(AccountPage.RecoveredCode);
+
+        vm.RecoveryCodeSaved = true;
+        vm.CloseCommand.CanExecute(null).Should().BeTrue();
+        vm.CloseCommand.Execute(null);
+        vm.Page.Should().Be(AccountPage.None);
+    }
+
+    [Fact]
     public async Task Change_password_and_delete_account_send_the_passwords()
     {
         _account.Status = SignedIn();
