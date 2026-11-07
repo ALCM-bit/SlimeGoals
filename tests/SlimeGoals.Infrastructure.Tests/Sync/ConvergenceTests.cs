@@ -140,7 +140,7 @@ public sealed class ConvergenceTests : IDisposable
         a.Snapshot().Goals.Should().ContainSingle().Which.Title.Should().Be("Beber mais água");
         (await a.ShownTotal(goal.Id)).Should().Be(5);
         _server.Records.Should().NotBeEmpty().And.OnlyContain(r => r.RecordKey.Length == 43);
-        var clear = System.Text.Encoding.UTF8.GetBytes("água");
+        var clear = System.Text.Encoding.UTF8.GetBytes("Beber");
         _server.Records.Select(r => r.Blob!).Where(blob => blob.AsSpan().IndexOf(clear) >= 0).Should().BeEmpty("o servidor não vê o título");
     }
 
