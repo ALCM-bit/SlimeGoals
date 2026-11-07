@@ -6,15 +6,20 @@ namespace SlimeGoals.Platform.Linux.Secrets;
 
 /// <summary>
 /// <see cref="ISecretVault"/> sobre o Secret Service do freedesktop (gnome-keyring, KeePassXC...), direto pelo
-/// Tmds.DBus.Protocol. Os itens vão para a coleção <c>default</c>, com os atributos <c>application=slimegoals</c>
-/// e <c>name</c>. A sessão é <c>plain</c>: o segredo passa sem cifra extra pelo D-Bus local (ver o spike).
+/// Tmds.DBus.Protocol. Os itens vão para a coleção <c>default</c>, com os atributos <c>application=slimegoals</c>,
+/// <c>name</c> e <c>profile</c>. A sessão é <c>plain</c>: o segredo passa sem cifra extra pelo D-Bus local (ver o spike).
+/// <para>
+/// O <c>profile</c> separa os bancos (decisão 14 da 9.5a): é o hash curto do caminho do banco, o mesmo da instância
+/// única, para dois apps com <c>XDG_DATA_HOME</c> diferentes no mesmo login não dividirem o segredo. A procura usa
+/// os três atributos.
+/// </para>
 /// <para>
 /// Cada operação pede uma conexão nova a <c>connect</c> e a descarta no fim, junto com a sessão. Coleção travada
 /// chama <c>Unlock</c> e espera o <c>Prompt</c>; recusa, serviço ausente ou falha de D-Bus viram
 /// <see cref="SecretVaultUnavailableException"/>. Nada é gravado em arquivo como alternativa (§6).
 /// </para>
 /// </summary>
-public sealed class SecretServiceVault(Func<Task<DBusConnection>> connect) : ISecretVault
+public sealed class SecretServiceVault : ISecretVault
 {
     private const string Service = "org.freedesktop.secrets";
     private const string ServicePath = "/org/freedesktop/secrets";
@@ -30,8 +35,21 @@ public sealed class SecretServiceVault(Func<Task<DBusConnection>> connect) : ISe
     private const string DefaultCollectionLabel = "Padrão";
     private const string ContentType = "application/octet-stream";
 
+    private readonly Func<Task<DBusConnection>> _connect;
+    private readonly string _profile;
+
+    /// <param name="connect">Abre uma conexão nova a cada operação; o cofre a descarta no fim.</param>
+    /// <param name="profile">Separa os segredos de cada banco no mesmo chaveiro (gravado no atributo <c>profile</c>).</param>
+    public SecretServiceVault(Func<Task<DBusConnection>> connect, string profile)
+    {
+        ArgumentNullException.ThrowIfNull(connect);
+        ArgumentException.ThrowIfNullOrEmpty(profile);
+        _connect = connect;
+        _profile = profile;
+    }
+
     /// <summary>Cofre no barramento da sessão do usuário (<c>DBUS_SESSION_BUS_ADDRESS</c>).</summary>
-    public static SecretServiceVault ForSessionBus() => new(async () =>
+    public static SecretServiceVault ForSessionBus(string profile) => new(async () =>
     {
         var address = DBusAddress.Session
                       ?? throw new SecretVaultUnavailableException("Não há barramento de sessão D-Bus.");
@@ -46,7 +64,7 @@ public sealed class SecretServiceVault(Func<Task<DBusConnection>> connect) : ISe
             connection.Dispose();
             throw;
         }
-    });
+    }, profile);
 
     /// <inheritdoc />
     public async Task<bool> IsAvailableAsync(CancellationToken ct = default)
@@ -110,8 +128,8 @@ public sealed class SecretServiceVault(Func<Task<DBusConnection>> connect) : ISe
         DBusConnection? connection = null;
         try
         {
-            connection = await connect().ConfigureAwait(false);
-            var session = await Session.OpenAsync(connection, ct).ConfigureAwait(false);
+            connection = await _connect().ConfigureAwait(false);
+            var session = await Session.OpenAsync(connection, _profile, ct).ConfigureAwait(false);
             try
             {
                 return await operation(session).ConfigureAwait(false);
@@ -150,7 +168,7 @@ public sealed class SecretServiceVault(Func<Task<DBusConnection>> connect) : ISe
         }
     }
 
-    private static void WriteAttributes(ref MessageWriter w, string name)
+    private static void WriteAttributes(ref MessageWriter w, string name, string profile)
     {
         var dict = w.WriteDictionaryStart();
         w.WriteDictionaryEntryStart();
@@ -159,13 +177,16 @@ public sealed class SecretServiceVault(Func<Task<DBusConnection>> connect) : ISe
         w.WriteDictionaryEntryStart();
         w.WriteString("name");
         w.WriteString(name);
+        w.WriteDictionaryEntryStart();
+        w.WriteString("profile");
+        w.WriteString(profile);
         w.WriteDictionaryEnd(dict);
     }
 
     /// <summary>Uma sessão <c>plain</c> aberta numa conexão; as operações do Secret Service usam ambas.</summary>
-    private sealed class Session(DBusConnection connection, string path, CancellationToken ct)
+    private sealed class Session(DBusConnection connection, string path, string profile, CancellationToken ct)
     {
-        public static async Task<Session> OpenAsync(DBusConnection connection, CancellationToken ct)
+        public static async Task<Session> OpenAsync(DBusConnection connection, string profile, CancellationToken ct)
         {
             var message = Build(connection, ServicePath, ServiceInterface, "OpenSession", "sv", (ref MessageWriter w) =>
             {
@@ -178,7 +199,7 @@ public sealed class SecretServiceVault(Func<Task<DBusConnection>> connect) : ISe
                 r.ReadVariantValue();
                 return r.ReadObjectPathAsString();
             }, null).ConfigureAwait(false);
-            return new Session(connection, path, ct);
+            return new Session(connection, path, profile, ct);
         }
 
         /// <summary>
@@ -229,7 +250,7 @@ public sealed class SecretServiceVault(Func<Task<DBusConnection>> connect) : ISe
 
         public Task<ObjectPath[]> SearchAsync(string collection, string name) =>
             CallAsync(Build(connection, collection, CollectionInterface, "SearchItems", "a{ss}",
-                (ref MessageWriter w) => WriteAttributes(ref w, name)), (m, _) => m.GetBodyReader().ReadArrayOfObjectPath());
+                (ref MessageWriter w) => WriteAttributes(ref w, name, profile)), (m, _) => m.GetBodyReader().ReadArrayOfObjectPath());
 
         public Task<byte[]> GetSecretAsync(ObjectPath item) =>
             CallAsync(Build(connection, item.ToString(), ItemInterface, "GetSecret", "o",
@@ -256,7 +277,7 @@ public sealed class SecretServiceVault(Func<Task<DBusConnection>> connect) : ISe
                     w.WriteDictionaryEntryStart();
                     w.WriteString("org.freedesktop.Secret.Item.Attributes");
                     w.WriteSignature("a{ss}");
-                    WriteAttributes(ref w, name);
+                    WriteAttributes(ref w, name, profile);
                     w.WriteDictionaryEnd(properties);
 
                     w.WriteStructureStart();

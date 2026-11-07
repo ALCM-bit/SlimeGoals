@@ -55,7 +55,7 @@ internal static class Program
 
         using (guard)
         {
-            using var services = OpenServices(databasePath, home, options);
+            var services = OpenServices(databasePath, home, options);
             if (services is null)
             {
                 using var failure = StartupFailureServices.Create(databasePath);
@@ -63,7 +63,16 @@ internal static class Program
                 return;
             }
 
-            Run(services, guard, args);
+            try
+            {
+                Run(services, guard, args);
+            }
+            finally
+            {
+                // DisposeAsync: o coordenador da sincronização (build de desenvolvimento) só é IAsyncDisposable, e o
+                // Dispose síncrono do container lançaria. Os serviços já pararam no Exit; aqui só se descartam.
+                services.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
         }
     }
 
