@@ -161,7 +161,7 @@ Acordos feitos ao implementar o servidor. Onde diferem do texto acima, valem est
 
 **Obrigação para a 9.4: confirmar dentro do app.** O e-mail leva um código que a pessoa digita ou cola no app, não um link solto: a confirmação precisa da `auth_key`, que só o aparelho que cadastrou tem. O app guarda a `auth_key` derivada até a confirmação, ou deriva de novo pedindo a senha.
 
-**E-mail de confirmação.** `IEmailSender`, com `LogEmailSender`, que escreve o token no log e só existe em `Development`. É a exceção à regra 8 da §5, prevista na §10. Fora de `Development`, o servidor recusa iniciar sem um envio real e sem `Server:PreloginSecret`.
+**E-mail de confirmação.** `IEmailSender`, com `LogEmailSender`, que escreve o token no log, com o e-mail mascarado (`a***@exemplo.com`), e só existe em `Development`. É a exceção à regra 8 da §5, prevista na §10. Fora de `Development`, o servidor recusa iniciar sem um envio real e sem `Server:PreloginSecret`.
 
 **Obrigação para a 9.6: envio em segundo plano.** O envio real precisa rodar em segundo plano, para um e-mail novo e um já usado levarem o mesmo tempo para responder. Enviar na própria requisição revelaria quem tem conta pelo tempo da resposta.
 

@@ -143,7 +143,7 @@ curl -fsS http://127.0.0.1:8080/health
 ```
 
 - A API responde em `http://127.0.0.1:8080`, publicada só no seu computador. O PostgreSQL não tem porta publicada.
-- O servidor sobe em `Development`, com o e-mail simulado: o token de confirmação do cadastro aparece no log (`docker compose logs server`).
+- O servidor sobe em `Development`, com o e-mail simulado: o código de confirmação do cadastro aparece no log (`docker compose logs server`), ao lado do e-mail mascarado (`a***@exemplo.com`), nunca do endereço completo. A confirmação pede também a `auth_key` de quem cadastrou.
 - O `.env` fica fora do repositório. Sem as duas variáveis, o `docker compose` recusa subir.
 - Os dados ficam no volume `slimegoals_pgdata`. `docker compose down` mantém o volume; `docker compose down -v` apaga o banco.
 - As rotas, os limites e os códigos de erro estão em [specs/Sincronizacao_v1.md](specs/Sincronizacao_v1.md), seção 5.
