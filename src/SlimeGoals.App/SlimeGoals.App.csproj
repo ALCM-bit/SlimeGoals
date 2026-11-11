@@ -23,6 +23,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SlimeGoals.Core\SlimeGoals.Core.csproj" />
+    <!-- A tela da conta precisa dos tipos de erro e do cadastro pendente (decisão 4 da 9.5a). -->
+    <ProjectReference Include="..\SlimeGoals.Sync\SlimeGoals.Sync.csproj" />
   </ItemGroup>
 
 </Project>

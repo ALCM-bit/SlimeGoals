@@ -153,10 +153,16 @@ public sealed class SingleInstanceGuard : IDisposable
         _cts.Dispose();
     }
 
+    /// <summary>
+    /// Hash curto da chave (o caminho do banco): nomeia a trava e o socket, e serve de perfil do cofre, sem expor o
+    /// caminho em claro.
+    /// </summary>
+    public static string KeyHash(string key) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..8];
+
     internal static (string LockPath, string SocketPath) FilePaths(string runtimeDirectory, string key)
     {
-        var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..8];
-        var stem = Path.Combine(runtimeDirectory, $"slimegoals-{hash}");
+        var stem = Path.Combine(runtimeDirectory, $"slimegoals-{KeyHash(key)}");
         return (stem + ".lock", stem + ".sock");
     }
 

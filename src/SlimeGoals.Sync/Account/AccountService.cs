@@ -42,7 +42,7 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
                 KeyWrap.Wrap(dataKey, passwordKeys.WrapKey, WrapPurpose.Password),
                 KeyWrap.Wrap(dataKey, recoveryKeys.WrapKey, WrapPurpose.Recovery));
             await api.RegisterAsync(request, ct);
-            return new PendingRegistration(email, code.Display, passwordKeys.AuthKey.ToArray(), passwordKeys.WrapKey.ToArray());
+            return new PendingRegistration(server, email, code.Display, passwordKeys.AuthKey.ToArray(), passwordKeys.WrapKey.ToArray());
         }
         finally
         {
@@ -60,6 +60,8 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
         ArgumentNullException.ThrowIfNull(pending);
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
         deviceName = RequireDeviceName(deviceName);
+        if (pending.Server != server)
+            throw new ArgumentException("Este cadastro é de outro servidor.");
         _ = pending.AuthKey; // confere que não foi descartado antes de qualquer pedido
         await EnsureSignedOutAsync(ct);
         await EnsureVaultAsync(ct);
@@ -70,7 +72,7 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
             pending.Confirmed = true;
         }
 
-        await EnterAsync(pending.Email, pending.AuthKey, pending.WrapKey, deviceName, ct);
+        await EnterAsync(pending.Email, pending.AuthKey, pending.WrapKey, deviceName, enableSync: true, ct);
     }
 
     /// <summary>Entra numa conta existente e liga a sincronização.</summary>
@@ -84,7 +86,28 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
         await EnsureVaultAsync(ct);
 
         using var keys = await DeriveForAccountAsync(email, password, ct);
-        await EnterAsync(email, keys.AuthKey, keys.WrapKey, deviceName, ct);
+        await EnterAsync(email, keys.AuthKey, keys.WrapKey, deviceName, enableSync: true, ct);
+    }
+
+    /// <summary>
+    /// Entra de novo com a senha quando o servidor recusou o token (decisão 6): troca só o segredo do cofre, sem sair e
+    /// sem mexer no estado, para a fila de edições offline sobreviver. Usa o e-mail da sessão e o servidor do serviço.
+    /// Se algo falhar depois do <c>login</c>, o token novo é revogado e o segredo antigo continua como estava.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Sem sessão legível no cofre ou com a sincronização desligada.</exception>
+    public async Task ReauthenticateAsync(string password, string deviceName, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(password);
+        deviceName = RequireDeviceName(deviceName);
+        using var session = await RequireSessionAsync(ct);
+        if (!(await state.GetAsync(ct)).Enabled)
+            throw new InvalidOperationException("Entre na conta antes.");
+        // A senha derivada só vale para o servidor da sessão: um endereço diferente nunca recebe nada.
+        if (!Uri.TryCreate(session.Server, UriKind.Absolute, out var sessionServer) || sessionServer != server)
+            throw new InvalidOperationException("Esta sessão é de outro servidor.");
+
+        using var keys = await DeriveForAccountAsync(session.Email!, password, ct);
+        await EnterAsync(session.Email!, keys.AuthKey, keys.WrapKey, deviceName, enableSync: false, ct, session.DataKey);
     }
 
     /// <summary>
@@ -131,7 +154,7 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
                 email, recoveryKeys.RecoveryKey, next.AuthKey, salt, KdfParams.Default.ToJson(),
                 KeyWrap.Wrap(dataKey, next.WrapKey, WrapPurpose.Password));
             await api.RecoverAsync(request, ct);
-            await EnterAsync(email, next.AuthKey, next.WrapKey, deviceName, ct);
+            await EnterAsync(email, next.AuthKey, next.WrapKey, deviceName, enableSync: true, ct);
             return code.Display;
         }
         finally
@@ -196,9 +219,16 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
 
     /// <summary>A cripto e o provedor de token para o motor, ou nulo se não há sessão no cofre. Quem recebe descarta.</summary>
     /// <exception cref="InvalidDataException">O segredo do cofre está ilegível.</exception>
-    public async Task<SyncSession?> OpenSessionAsync(CancellationToken ct = default)
+    public Task<SyncSession?> OpenSessionAsync(CancellationToken ct = default) => OpenSessionAsync(vault, ct);
+
+    /// <summary>
+    /// Abre a sessão direto do cofre, sem cliente HTTP: quem ainda não sabe se há conta (o coordenador, ao iniciar) não
+    /// cria nada de rede antes de saber (RS02).
+    /// </summary>
+    /// <exception cref="InvalidDataException">O segredo do cofre está ilegível.</exception>
+    internal static async Task<SyncSession?> OpenSessionAsync(ISecretVault vault, CancellationToken ct)
     {
-        using var session = await ReadSessionAsync(ct);
+        using var session = await ReadSessionAsync(vault, ct);
         if (session is null)
             return null;
         return new SyncSession(new Uri(session.Server!), session.Email!, session.DeviceId!.Value, session.Token!,
@@ -207,9 +237,11 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
 
     /// <summary>
     /// Ordem de entrada (decisão 12): <c>login</c>, abrir a chave de dados, gravar no cofre, ligar. Se algo depois do
-    /// <c>login</c> falhar, o token emitido é revogado, o cofre fica vazio e nada liga.
+    /// <c>login</c> falhar, o token emitido é revogado, o cofre fica vazio e nada liga. Sem <paramref name="enableSync"/>
+    /// (entrar de novo), o segredo antigo só é trocado quando a gravação dá certo e o estado local não é tocado.
     /// </summary>
-    private async Task EnterAsync(string email, byte[] authKey, byte[] wrapKey, string deviceName, CancellationToken ct)
+    private async Task EnterAsync(string email, byte[] authKey, byte[] wrapKey, string deviceName, bool enableSync, CancellationToken ct,
+        byte[]? expectedDataKey = null)
     {
         var login = await api.LoginAsync(email, authKey, deviceName, ct);
         var stored = false;
@@ -224,6 +256,9 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
                 DataKey = KeyWrap.Unwrap(login.WrappedKeyPassword, wrapKey, WrapPurpose.Password),
             })
             {
+                // Entrar de novo só vale para a mesma conta: outra chave de dados é outra conta com o mesmo e-mail.
+                if (expectedDataKey is not null && !CryptographicOperations.FixedTimeEquals(secret.DataKey, expectedDataKey))
+                    throw new InvalidOperationException("A conta no servidor não é mais a mesma. Saia e entre de novo.");
                 var bytes = secret.ToBytes();
                 try
                 {
@@ -236,11 +271,12 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
                 }
             }
 
-            await state.EnableAsync(ct);
+            if (enableSync)
+                await state.EnableAsync(ct);
         }
         catch
         {
-            if (stored)
+            if (stored && enableSync)
                 await TryDeleteSecretAsync();
             await TryLogoutAsync(login.Token);
             throw;
@@ -270,7 +306,9 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
             throw new SecretVaultUnavailableException("O cofre de segredos do sistema não está disponível.");
     }
 
-    private async Task<SessionSecret?> ReadSessionAsync(CancellationToken ct)
+    private Task<SessionSecret?> ReadSessionAsync(CancellationToken ct) => ReadSessionAsync(vault, ct);
+
+    private static async Task<SessionSecret?> ReadSessionAsync(ISecretVault vault, CancellationToken ct)
     {
         var bytes = await vault.GetAsync(SessionSecret.Name, ct);
         if (bytes is null)

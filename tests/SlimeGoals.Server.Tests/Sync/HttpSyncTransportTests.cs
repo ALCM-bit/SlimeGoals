@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using SlimeGoals.Core.Sync;
+using SlimeGoals.Server.Tests.Accounts;
 using SlimeGoals.Sync;
 
 namespace SlimeGoals.Server.Tests.Sync;
@@ -102,7 +103,7 @@ public sealed class HttpSyncTransportTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Transport_maps_410_to_reset_and_401_to_http_failure()
+    public async Task Transport_maps_410_to_reset_and_401_to_unauthorized()
     {
         var gone = Transport(HttpStatusCode.Gone, """{"error":"reset_required"}""");
         await gone.Invoking(t => t.PullAsync(0, 1, false)).Should().ThrowAsync<SyncResetRequiredException>();
@@ -110,19 +111,32 @@ public sealed class HttpSyncTransportTests(PostgresFixture postgres)
 
         await using var factory = new ServerFactory(postgres);
         var real = new HttpSyncTransport(factory.CreateClient(), _ => ValueTask.FromResult<string?>("token-desconhecido"));
-        var failure = await real.Invoking(t => t.PullAsync(0, 1, false)).Should().ThrowAsync<HttpRequestException>();
-        failure.Which.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        await real.Invoking(t => t.PullAsync(0, 1, false)).Should().ThrowAsync<SyncUnauthorizedException>();
+        await real.Invoking(t => t.PushAsync([])).Should().ThrowAsync<SyncUnauthorizedException>();
     }
 
     [Fact]
-    public async Task Real_server_without_token_is_an_http_failure()
+    public async Task Revoked_token_throws_SyncUnauthorizedException()
+    {
+        await using var factory = new ServerFactory(postgres);
+        var account = await TestAccount.CreateAsync(factory);
+        var second = await account.LoginAsync("segundo");
+        var transport = new HttpSyncTransport(factory.CreateClient(), _ => ValueTask.FromResult<string?>(second.Token));
+        await transport.PullAsync(0, 1, false);
+
+        (await account.Client.DeleteAsync($"/devices/{second.DeviceId}")).EnsureSuccessStatusCode();
+
+        await transport.Invoking(t => t.PullAsync(0, 1, false)).Should().ThrowAsync<SyncUnauthorizedException>();
+        await transport.Invoking(t => t.PushAsync([])).Should().ThrowAsync<SyncUnauthorizedException>();
+    }
+
+    [Fact]
+    public async Task Real_server_without_token_is_unauthorized()
     {
         await using var factory = new ServerFactory(postgres);
         var transport = new HttpSyncTransport(factory.CreateClient(), _ => ValueTask.FromResult<string?>(null));
 
-        var failure = await transport.Invoking(t => t.PushAsync([])).Should().ThrowAsync<HttpRequestException>();
-
-        failure.Which.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        await transport.Invoking(t => t.PushAsync([])).Should().ThrowAsync<SyncUnauthorizedException>();
     }
 
     [Theory]

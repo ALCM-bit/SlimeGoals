@@ -6,15 +6,17 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using SlimeGoals.App.Account;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.App.Views;
 using SlimeGoals.Render;
+using SlimeGoals.Sync;
 using ScrollViewer = Avalonia.Controls.ScrollViewer;
 using Window = Avalonia.Controls.Window;
 
-if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow")))
+if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "account")))
 {
-    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow]");
+    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|account]");
     return 1;
 }
 
@@ -40,7 +42,101 @@ if (which == "narrow")
 }
 if (which == "mascot")
     RenderMascot();
+if (which == "account")
+{
+    RenderAccount(320, 1400);
+    RenderAccount(360, 1400);
+    RenderAccount(900, 800);
+    RenderAccount(1100, 800);
+}
 return 0;
+
+// Seção "Conta e sincronização" em cada estado e cada subpágina, sobre uma conta falsa. Cada imagem monta um shell novo.
+void RenderAccount(int width, int height)
+{
+    var server = new Uri("http://127.0.0.1:8080/");
+    var signedIn = new AccountStatus(AccountState.SignedIn, "ana@exemplo.com", server, DateTimeOffset.Now.AddMinutes(-7), 2,
+        "Sem conexão com o servidor.");
+
+    Shot("signed-out", new AccountStatus(AccountState.SignedOut, null, null, null, 0, null), _ => { });
+    Shot("signed-in-error", signedIn, _ => { });
+    Shot("session-expired", new AccountStatus(AccountState.SessionExpired, "ana@exemplo.com", server, null, 3,
+        "A sessão deste aparelho foi encerrada. Entre de novo."), _ => { });
+    Shot("vault-locked", new AccountStatus(AccountState.VaultLocked, null, null, null, 0, null), _ => { });
+    Shot("session-unreadable", new AccountStatus(AccountState.SessionUnreadable, null, null, null, 0, null), _ => { });
+
+    var signedOut = new AccountStatus(AccountState.SignedOut, null, null, null, 0, null);
+    Shot("register", signedOut, vm => vm.OpenRegisterCommand.Execute(null));
+    Shot("recovery-code", signedOut, vm =>
+    {
+        vm.OpenRegisterCommand.Execute(null);
+        (vm.Email, vm.Password, vm.PasswordConfirmation) = ("ana@exemplo.com", "senha longa", "senha longa");
+        vm.SubmitRegisterCommand.Execute(null);
+    });
+    Shot("confirm", signedOut, vm =>
+    {
+        vm.OpenRegisterCommand.Execute(null);
+        (vm.Email, vm.Password, vm.PasswordConfirmation) = ("ana@exemplo.com", "senha longa", "senha longa");
+        vm.SubmitRegisterCommand.Execute(null);
+        Pump();
+        vm.RecoveryCodeSaved = true;
+        vm.ContinueCommand.Execute(null);
+    });
+    Shot("login", signedOut, vm =>
+    {
+        vm.OpenLoginCommand.Execute(null);
+        (vm.Email, vm.Password) = ("ana@exemplo.com", "senha longa");
+    });
+    Shot("login-busy", signedOut, vm =>
+    {
+        vm.OpenLoginCommand.Execute(null);
+        vm.Email = "ana@exemplo.com";
+        vm.SubmitLoginCommand.Execute(null);
+    }, a => a.Hang = true);
+    Shot("login-error", signedOut, vm =>
+    {
+        vm.OpenLoginCommand.Execute(null);
+        vm.Email = "ana@exemplo.com";
+        vm.SubmitLoginCommand.Execute(null);
+    }, a => a.Failure = new SlimeGoals.Sync.Account.AccountApiException(SlimeGoals.Sync.Account.AccountErrorKind.Unavailable));
+    Shot("recover", signedOut, vm => vm.OpenRecoverCommand.Execute(null));
+    Shot("recovered-code", signedOut, vm =>
+    {
+        vm.OpenRecoverCommand.Execute(null);
+        vm.Email = "ana@exemplo.com";
+        vm.SubmitRecoverCommand.Execute(null);
+    });
+    var expired = new AccountStatus(AccountState.SessionExpired, "ana@exemplo.com", server, null, 3, null);
+    Shot("reauthenticate", expired, vm => vm.OpenReauthenticateCommand.Execute(null));
+    Shot("change-password", signedIn, vm => vm.OpenChangePasswordCommand.Execute(null));
+    Shot("devices", signedIn, vm => vm.OpenDevicesCommand.Execute(null));
+    Shot("sign-out", signedIn, vm => vm.OpenSignOutCommand.Execute(null), a => a.FlushResult = 3);
+    Shot("delete-account", signedIn, vm => vm.OpenDeleteAccountCommand.Execute(null));
+
+    void Shot(string name, AccountStatus status, Action<AccountViewModel> open, Action<SampleAccount>? setup = null)
+    {
+        var fake = new SampleAccount { Status = status };
+        setup?.Invoke(fake);
+        var account = sample.CreateAccount(fake);
+        var shell = sample.CreateShell(false, account);
+        var window = new Window { Width = width, Height = height, Content = new ShellView { DataContext = shell } };
+        window.Show();
+        shell.CurrentPage = shell.Pages.OfType<SettingsPageViewModel>().Single();
+        Pump();
+        open(account);
+        Pump();
+        var path = Path.Combine(outDir, $"account-{name}-{width}.png");
+        var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException($"Sem quadro para {name}.");
+        using (var stream = File.Create(path))
+        {
+#pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
+            frame.Save(stream);
+#pragma warning restore CS0618
+        }
+        Console.WriteLine(path);
+        window.Close();
+    }
+}
 
 void RenderMascot()
 {

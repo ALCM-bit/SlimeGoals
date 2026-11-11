@@ -8,6 +8,7 @@ using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Sync;
 using SlimeGoals.Infrastructure.Data;
 using SlimeGoals.Infrastructure.Tests;
+using SlimeGoals.Sync;
 using SlimeGoals.Sync.Account;
 using SlimeGoals.Sync.Contracts;
 using SlimeGoals.Sync.Crypto;
@@ -430,6 +431,164 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
         await device.Service.LoginAsync(email, Password, "pc");
         (await device.State.GetAsync()).Enabled.Should().BeTrue();
         (await device.Service.OpenSessionAsync()).Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Reauthenticate_after_revocation_keeps_queue_and_state()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var first = new Device(factory);
+        using var second = new Device(factory);
+        var email = NewEmail();
+        await RegisterAndConfirmAsync(factory, first, email);
+        await second.Service.LoginAsync(email, Password, "celular");
+        await second.Service.ChangePasswordAsync(Password, NewPassword);
+        (await FailureOf(() => first.Service.ListDevicesAsync())).Kind.Should().Be(AccountErrorKind.Unauthorized);
+        first.Db.Anchor.Execute("UPDATE sync_state SET last_seq = 7");
+        await new GoalRepository(first.Db.Factory).AddAsync(NewGoal());
+        first.Db.Anchor.ExecuteScalar<int>("SELECT COUNT(*) FROM sync_outbox").Should().Be(1);
+        var stateBefore = await first.State.GetAsync();
+        string oldToken;
+        using (var before = await first.SecretAsync())
+            oldToken = before.RootElement.GetProperty("token").GetString()!;
+
+        await first.Service.ReauthenticateAsync(NewPassword, "notebook");
+
+        (await first.State.GetAsync()).Should().Be(stateBefore with { LastSeq = 7 }).And.Match<SyncState>(s => s.Enabled);
+        first.Db.Anchor.ExecuteScalar<int>("SELECT COUNT(*) FROM sync_outbox").Should().Be(1);
+        using var secret = await first.SecretAsync();
+        var newToken = secret.RootElement.GetProperty("token").GetString();
+        newToken.Should().NotBe(oldToken);
+        first.Handler.LoginTokens.Should().HaveCount(2).And.Contain(newToken!);
+        secret.RootElement.GetProperty("email").GetString().Should().Be(email);
+        secret.RootElement.GetProperty("server").GetString().Should().Be(first.Server.ToString());
+        await ShouldShareDataKeyAsync(first, second);
+
+        using var session = (await first.Service.OpenSessionAsync())!;
+        var transport = new HttpSyncTransport(factory.CreateClient(), session.Token);
+        var envelope = Envelope();
+        var result = await transport.PushAsync([new PushItem(session.Crypto.RecordKey(envelope.RecordId), 0, session.Crypto.Seal(envelope))]);
+        result.Accepted.Should().ContainSingle();
+        (await first.Service.ListDevicesAsync()).Should().ContainSingle(d => d.IsCurrent).Which.Name.Should().Be("notebook");
+    }
+
+    [Fact]
+    public async Task Reauthenticate_refuses_an_invalid_device_name_before_any_request()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var device = new Device(factory);
+        await RegisterAndConfirmAsync(factory, device, NewEmail());
+        var sent = device.Handler.Sent.Count;
+
+        await FluentActions.Awaiting(() => device.Service.ReauthenticateAsync(Password, " ")).Should().ThrowAsync<ArgumentException>();
+
+        device.Handler.Sent.Should().HaveCount(sent);
+    }
+
+    [Fact]
+    public async Task Reauthenticate_with_wrong_password_changes_nothing()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var device = new Device(factory);
+        await RegisterAndConfirmAsync(factory, device, NewEmail());
+        var secretBefore = await device.Vault.GetAsync(SessionName);
+        var stateBefore = await device.State.GetAsync();
+
+        (await FailureOf(() => device.Service.ReauthenticateAsync("senha-errada-123", "notebook"))).Kind.Should().Be(AccountErrorKind.Unauthorized);
+
+        (await device.Vault.GetAsync(SessionName)).Should().Equal(secretBefore);
+        (await device.State.GetAsync()).Should().Be(stateBefore);
+    }
+
+    [Fact]
+    public async Task Reauthenticate_without_session_is_refused()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var device = new Device(factory);
+
+        await FluentActions.Awaiting(() => device.Service.ReauthenticateAsync(Password, "notebook"))
+            .Should().ThrowAsync<InvalidOperationException>().WithMessage("Entre na conta antes.");
+
+        device.Handler.Sent.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Reauthenticate_failing_after_login_revokes_the_new_token()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var device = new Device(factory);
+        await RegisterAndConfirmAsync(factory, device, NewEmail());
+        var secretBefore = await device.Vault.GetAsync(SessionName);
+        device.Vault.FailWritesWith = new SecretVaultUnavailableException("desbloqueio recusado");
+
+        await FluentActions.Awaiting(() => device.Service.ReauthenticateAsync(Password, "notebook"))
+            .Should().ThrowAsync<SecretVaultUnavailableException>();
+
+        device.Vault.FailWritesWith = null;
+        (await device.Vault.GetAsync(SessionName)).Should().Equal(secretBefore);
+        (await device.State.GetAsync()).Enabled.Should().BeTrue();
+        var raw = new HttpAccountApi(factory.CreateClient());
+        (await FailureOf(() => raw.ListDevicesAsync(device.Handler.LoginTokens.Last()))).Kind.Should().Be(AccountErrorKind.Unauthorized);
+        (await device.Service.ListDevicesAsync()).Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Reauthenticate_with_a_service_for_another_server_is_refused_before_any_request()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var device = new Device(factory);
+        await RegisterAndConfirmAsync(factory, device, NewEmail());
+        var secretBefore = await device.Vault.GetAsync(SessionName);
+        var rogue = new Recorder();
+        var service = new AccountService(new HttpAccountApi(factory.CreateDefaultClient(rogue)), device.Vault, device.State, new Uri("http://outro.exemplo/"));
+
+        await FluentActions.Awaiting(() => service.ReauthenticateAsync(Password, "notebook"))
+            .Should().ThrowAsync<InvalidOperationException>().WithMessage("Esta sessão é de outro servidor.");
+
+        rogue.Sent.Should().BeEmpty();
+        (await device.Vault.GetAsync(SessionName)).Should().Equal(secretBefore);
+    }
+
+    [Fact]
+    public async Task Reauthenticate_against_a_different_account_with_the_same_email_revokes_the_new_token()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var first = new Device(factory);
+        using var second = new Device(factory);
+        using var third = new Device(factory);
+        var email = NewEmail();
+        await RegisterAndConfirmAsync(factory, first, email);
+        await second.Service.LoginAsync(email, Password, "celular");
+        await second.Service.DeleteAccountAsync(Password);
+        await RegisterAndConfirmAsync(factory, third, email);
+        var secretBefore = await first.Vault.GetAsync(SessionName);
+        var stateBefore = await first.State.GetAsync();
+
+        await FluentActions.Awaiting(() => first.Service.ReauthenticateAsync(Password, "notebook"))
+            .Should().ThrowAsync<InvalidOperationException>().WithMessage("A conta no servidor não é mais a mesma. Saia e entre de novo.");
+
+        (await first.Vault.GetAsync(SessionName)).Should().Equal(secretBefore);
+        (await first.State.GetAsync()).Should().Be(stateBefore);
+        var raw = new HttpAccountApi(factory.CreateClient());
+        (await FailureOf(() => raw.ListDevicesAsync(first.Handler.LoginTokens.Last()))).Kind.Should().Be(AccountErrorKind.Unauthorized);
+        (await third.Service.ListDevicesAsync()).Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Confirm_with_pending_from_other_server_is_refused()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var device = new Device(factory);
+        using var other = new Device(factory);
+        var otherService = new AccountService(new HttpAccountApi(factory.CreateClient()), other.Vault, other.State, new Uri("http://outro.exemplo/"));
+        using var pending = await otherService.RegisterAsync(NewEmail(), Password);
+        var sent = device.Handler.Sent.Count;
+
+        await FluentActions.Awaiting(() => device.Service.ConfirmAsync(pending, factory.Email.LastToken, "pc"))
+            .Should().ThrowAsync<ArgumentException>().WithMessage("Este cadastro é de outro servidor.");
+
+        device.Handler.Sent.Should().HaveCount(sent);
+        device.Vault.Names.Should().BeEmpty();
     }
 
     [Fact]

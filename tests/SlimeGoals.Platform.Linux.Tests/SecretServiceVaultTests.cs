@@ -13,6 +13,7 @@ namespace SlimeGoals.Platform.Linux.Tests;
 public sealed class SecretServiceVaultTests
 {
     private const string Login = "/org/freedesktop/secrets/collection/login";
+    private const string Profile = "0123abcd";
 
     private static readonly byte[] Binary = [0x00, 0xff, 0x7b, 0x22, 0x80, 0x0a, 0x00];
 
@@ -20,7 +21,7 @@ public sealed class SecretServiceVaultTests
     public async Task Set_get_and_replace_round_trip()
     {
         await using var keyring = await IsolatedKeyring.StartAsync();
-        var vault = new SecretServiceVault(keyring.ConnectAsync);
+        var vault = new SecretServiceVault(keyring.ConnectAsync, Profile);
 
         await vault.SetAsync("sync-session", Binary);
         (await vault.GetAsync("sync-session")).Should().Equal(Binary);
@@ -34,7 +35,7 @@ public sealed class SecretServiceVaultTests
     public async Task Delete_removes_and_tolerates_missing()
     {
         await using var keyring = await IsolatedKeyring.StartAsync();
-        var vault = new SecretServiceVault(keyring.ConnectAsync);
+        var vault = new SecretServiceVault(keyring.ConnectAsync, Profile);
         await vault.SetAsync("sync-session", Binary);
         await vault.SetAsync("other", [9]);
 
@@ -51,7 +52,7 @@ public sealed class SecretServiceVaultTests
     public async Task Get_of_missing_name_returns_null()
     {
         await using var keyring = await IsolatedKeyring.StartAsync();
-        var vault = new SecretServiceVault(keyring.ConnectAsync);
+        var vault = new SecretServiceVault(keyring.ConnectAsync, Profile);
 
         (await vault.IsAvailableAsync()).Should().BeTrue();
         (await vault.GetAsync("sync-session")).Should().BeNull();
@@ -61,7 +62,7 @@ public sealed class SecretServiceVaultTests
     public async Task Items_are_tagged_with_application_and_name()
     {
         await using var keyring = await IsolatedKeyring.StartAsync();
-        var vault = new SecretServiceVault(keyring.ConnectAsync);
+        var vault = new SecretServiceVault(keyring.ConnectAsync, Profile);
 
         await vault.SetAsync("sync-session", Binary);
 
@@ -69,9 +70,30 @@ public sealed class SecretServiceVaultTests
         item.Should().StartWith(Login + "/", "vai para a coleção default, que é o login");
         var (label, attributes) = await keyring.ReadItemAsync(item);
         label.Should().Be("SlimeGoals: sincronização");
-        attributes.Should().Contain("application", "slimegoals").And.Contain("name", "sync-session");
+        attributes.Should().Contain("application", "slimegoals").And.Contain("name", "sync-session")
+            .And.Contain("profile", Profile);
         (await keyring.SearchItemsAsync(new Dictionary<string, string> { ["application"] = "slimegoals" }))
             .Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Profiles_do_not_share_the_secret()
+    {
+        // Dois apps de teste (bancos diferentes) no mesmo chaveiro: cada um lê só o seu sync-session.
+        await using var keyring = await IsolatedKeyring.StartAsync();
+        var first = new SecretServiceVault(keyring.ConnectAsync, "aaaa1111");
+        var second = new SecretServiceVault(keyring.ConnectAsync, "bbbb2222");
+
+        await first.SetAsync("sync-session", [1]);
+        (await second.GetAsync("sync-session")).Should().BeNull("o segredo do outro perfil não aparece");
+        await second.SetAsync("sync-session", [2]);
+
+        (await first.GetAsync("sync-session")).Should().Equal(1);
+        (await second.GetAsync("sync-session")).Should().Equal(2);
+        (await keyring.SearchItemsAsync(Tags("sync-session"))).Should().HaveCount(2, "gravar num perfil não substitui o outro");
+
+        await second.DeleteAsync("sync-session");
+        (await first.GetAsync("sync-session")).Should().Equal(new byte[] { 1 }, "apagar num perfil não apaga o outro");
     }
 
     [Fact]
@@ -79,7 +101,7 @@ public sealed class SecretServiceVaultTests
     {
         await using var bus = await IsolatedKeyring.StartAsync(keyring: false);
         using var service = await FakeSecretService.StartAsync(bus);
-        var vault = new SecretServiceVault(bus.ConnectAsync);
+        var vault = new SecretServiceVault(bus.ConnectAsync, Profile);
 
         (await vault.GetAsync("sync-session")).Should().BeNull();
 
@@ -92,7 +114,7 @@ public sealed class SecretServiceVaultTests
     {
         await using var bus = await IsolatedKeyring.StartAsync(keyring: false);
         using var service = await FakeSecretService.StartAsync(bus, dismissPrompt: true);
-        var vault = new SecretServiceVault(bus.ConnectAsync);
+        var vault = new SecretServiceVault(bus.ConnectAsync, Profile);
 
         await FluentActions.Awaiting(() => vault.GetAsync("sync-session"))
             .Should().ThrowAsync<SecretVaultUnavailableException>();
@@ -106,7 +128,7 @@ public sealed class SecretServiceVaultTests
     {
         // O gnome-keyring de teste não acha o org.gnome.keyring.SystemPrompter e recusa o prompt.
         await using var keyring = await IsolatedKeyring.StartAsync();
-        var vault = new SecretServiceVault(keyring.ConnectAsync);
+        var vault = new SecretServiceVault(keyring.ConnectAsync, Profile);
         await keyring.LockAsync(Login);
         using var recorder = await keyring.RecordCallsAsync();
 
@@ -123,7 +145,7 @@ public sealed class SecretServiceVaultTests
     public async Task Without_default_collection_reads_are_empty_and_refused_creation_is_unavailable()
     {
         await using var keyring = await IsolatedKeyring.StartAsync(loginPassword: null);
-        var vault = new SecretServiceVault(keyring.ConnectAsync);
+        var vault = new SecretServiceVault(keyring.ConnectAsync, Profile);
         using var recorder = await keyring.RecordCallsAsync();
 
         (await vault.IsAvailableAsync()).Should().BeTrue();
@@ -140,7 +162,7 @@ public sealed class SecretServiceVaultTests
     public async Task Missing_service_is_unavailable()
     {
         await using var bus = await IsolatedKeyring.StartAsync(keyring: false);
-        var vault = new SecretServiceVault(bus.ConnectAsync);
+        var vault = new SecretServiceVault(bus.ConnectAsync, Profile);
 
         (await vault.IsAvailableAsync()).Should().BeFalse();
         await FluentActions.Awaiting(() => vault.SetAsync("sync-session", Binary))
@@ -168,7 +190,7 @@ public sealed class SecretServiceVaultTests
                 connection.Dispose();
                 throw;
             }
-        });
+        }, Profile);
 
         (await vault.IsAvailableAsync()).Should().BeFalse();
         await FluentActions.Awaiting(() => vault.SetAsync("sync-session", Binary))

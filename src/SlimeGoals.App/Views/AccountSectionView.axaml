@@ -1,0 +1,88 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:acc="using:SlimeGoals.App.Account"
+             xmlns:views="using:SlimeGoals.App.Views"
+             x:Class="SlimeGoals.App.Views.AccountSectionView"
+             x:DataType="acc:AccountViewModel">
+  <!-- Seção "Conta e sincronização" na página principal de Configurações (fase 9.5a, decisão 16).
+       Um bloco por estado da conta; as ações abrem as subpáginas de AccountView. -->
+  <Border Classes="card account-card">
+    <!-- Na largura toda da lista: o texto curto de um estado não a encolhe -->
+    <views:FillWidthStackPanel Spacing="12">
+      <TextBlock Classes="section-title" Text="Conta e sincronização" />
+
+      <!-- Sem conta -->
+      <StackPanel Spacing="12" IsVisible="{Binding IsSignedOut}">
+        <TextBlock Text="{x:Static acc:AccountViewModel.IntroText}" Foreground="{DynamicResource Muted}"
+                   TextWrapping="Wrap" />
+        <WrapPanel ItemSpacing="8" LineSpacing="8">
+          <Button Classes="primary" Content="Criar conta" Command="{Binding OpenRegisterCommand}" />
+          <Button Classes="ghost" Content="Entrar" Command="{Binding OpenLoginCommand}" />
+          <Button Classes="ghost" Content="Recuperar conta" Command="{Binding OpenRecoverCommand}" />
+        </WrapPanel>
+      </StackPanel>
+
+      <!-- Conta ligada -->
+      <StackPanel Spacing="12" IsVisible="{Binding IsSignedIn}">
+        <StackPanel Spacing="4">
+          <TextBlock Text="{Binding ConnectedText}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding ServerLineText}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding LastSyncText}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding PendingText}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+        </StackPanel>
+        <Border Classes="warning-band"
+                IsVisible="{Binding LastError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Text="{Binding LastError}" TextWrapping="Wrap" />
+        </Border>
+        <WrapPanel ItemSpacing="8" LineSpacing="8">
+          <Button Classes="ghost" Content="Aparelhos" Command="{Binding OpenDevicesCommand}" />
+          <Button Classes="ghost" Content="Trocar senha" Command="{Binding OpenChangePasswordCommand}" />
+          <Button Classes="ghost" Content="Sair" Command="{Binding OpenSignOutCommand}" />
+          <Button Classes="danger" Content="Apagar conta" Command="{Binding OpenDeleteAccountCommand}" />
+        </WrapPanel>
+      </StackPanel>
+
+      <!-- Sessão encerrada pelo servidor: entra de novo sem perder a fila (decisão 6) -->
+      <StackPanel Spacing="12" IsVisible="{Binding IsSessionExpired}">
+        <StackPanel Spacing="4">
+          <TextBlock Text="{Binding Status.Email}" TextWrapping="Wrap"
+                     IsVisible="{Binding Status.Email, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <TextBlock Text="{Binding PendingText}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+        </StackPanel>
+        <Border Classes="warning-band">
+          <TextBlock Text="{x:Static acc:AccountViewModel.SessionExpiredText}" TextWrapping="Wrap" />
+        </Border>
+        <WrapPanel ItemSpacing="8" LineSpacing="8">
+          <Button Classes="primary" Content="{x:Static acc:AccountViewModel.ReauthenticateLabel}"
+                  Command="{Binding OpenReauthenticateCommand}" />
+          <Button Classes="ghost" Content="Sair" Command="{Binding OpenSignOutCommand}" />
+        </WrapPanel>
+      </StackPanel>
+
+      <!-- Chaveiro travado -->
+      <StackPanel Spacing="12" IsVisible="{Binding IsVaultLocked}">
+        <Border Classes="warning-band">
+          <TextBlock Text="{x:Static acc:AccountViewModel.VaultLockedText}" TextWrapping="Wrap" />
+        </Border>
+        <WrapPanel ItemSpacing="8" LineSpacing="8">
+          <Button Classes="primary" Content="{x:Static acc:AccountViewModel.RetryVaultLabel}"
+                  Command="{Binding RetryVaultCommand}" />
+          <Button Classes="ghost" Content="Sair" Command="{Binding OpenSignOutCommand}" />
+        </WrapPanel>
+      </StackPanel>
+
+      <!-- Segredo ilegível: só sair -->
+      <StackPanel Spacing="12" IsVisible="{Binding IsSessionUnreadable}">
+        <Border Classes="warning-band">
+          <TextBlock Text="{x:Static acc:AccountViewModel.SessionUnreadableText}" TextWrapping="Wrap" />
+        </Border>
+        <Button Classes="ghost" HorizontalAlignment="Left" Content="Sair" Command="{Binding OpenSignOutCommand}" />
+      </StackPanel>
+
+      <!-- Sair (envia a fila) e "Tentar de novo" rodam daqui: ocupado e erro também na seção -->
+      <ProgressBar Classes="busy" IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+      <TextBlock Classes="form-error" Text="{Binding Error}"
+                 IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    </views:FillWidthStackPanel>
+  </Border>
+</UserControl>

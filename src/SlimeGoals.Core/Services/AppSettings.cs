@@ -16,6 +16,12 @@ public sealed class AppSettings(ISettingsRepository settings, DataChangeNotifier
     /// <summary>Chave: "hide" ou "quit".</summary>
     public const string CloseActionKey = "window.close_action";
 
+    /// <summary>Chave: endereço do servidor de sincronização, usado ao criar conta, entrar ou recuperar.</summary>
+    public const string SyncServerKey = "sync_server";
+
+    /// <summary>Servidor padrão: o do <c>compose.yaml</c> de desenvolvimento.</summary>
+    public static Uri DefaultSyncServer { get; } = new("http://127.0.0.1:8080");
+
     /// <summary>Adiar padrão, em minutos.</summary>
     public const int DefaultSnoozeMinutes = 10;
 
@@ -51,6 +57,28 @@ public sealed class AppSettings(ISettingsRepository settings, DataChangeNotifier
     public async Task SetCloseActionAsync(CloseAction action, CancellationToken ct = default)
     {
         await settings.SetAsync(CloseActionKey, action == CloseAction.Quit ? "quit" : "hide", ct);
+        changes?.NotifyChanged();
+    }
+
+    /// <summary>Servidor de sincronização; ausente, ou sem endereço absoluto http/https, vale <see cref="DefaultSyncServer"/>.</summary>
+    public async Task<Uri> GetSyncServerAsync(CancellationToken ct = default)
+    {
+        if (await settings.GetAsync(SyncServerKey, ct) is not { } raw)
+            return DefaultSyncServer;
+        if (Uri.TryCreate(raw, UriKind.Absolute, out var server)
+            && (server.Scheme == Uri.UriSchemeHttp || server.Scheme == Uri.UriSchemeHttps))
+            return server;
+        Trace.TraceWarning($"Valor inválido em {SyncServerKey}.");
+        return DefaultSyncServer;
+    }
+
+    /// <summary>Grava o servidor de sincronização; endereço relativo lança <see cref="ArgumentException"/>.</summary>
+    public async Task SetSyncServerAsync(Uri server, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        if (!server.IsAbsoluteUri)
+            throw new ArgumentException("O servidor precisa de um endereço absoluto.", nameof(server));
+        await settings.SetAsync(SyncServerKey, server.AbsoluteUri, ct);
         changes?.NotifyChanged();
     }
 }

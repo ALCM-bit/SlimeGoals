@@ -44,8 +44,11 @@ public sealed partial class ShellViewModel : ObservableObject
                 OnPropertyChanged();
                 return;
             }
-            if (SetProperty(ref _currentPage, value))
-                value.Activate();
+            var left = _currentPage;
+            if (!SetProperty(ref _currentPage, value))
+                return;
+            left.Deactivate();
+            value.Activate();
         }
     }
 

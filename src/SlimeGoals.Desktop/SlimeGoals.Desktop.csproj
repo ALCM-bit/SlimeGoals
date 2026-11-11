@@ -6,6 +6,12 @@
     <RootNamespace>SlimeGoals.Desktop</RootNamespace>
   </PropertyGroup>
 
+  <!-- Build de desenvolvimento (decisão 2 da 9.5a): a conta e a sincronização só entram em Debug ou com
+       -p:SyncDev=true. O Release (packaging/linux/build.sh) fica sem rede, sem cofre e sem a seção. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug' Or '$(SyncDev)' == 'true'">
+    <DefineConstants>$(DefineConstants);SYNC_DEV</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Avalonia.Desktop" />
   </ItemGroup>
@@ -15,6 +21,7 @@
     <ProjectReference Include="..\SlimeGoals.Core\SlimeGoals.Core.csproj" />
     <ProjectReference Include="..\SlimeGoals.Infrastructure\SlimeGoals.Infrastructure.csproj" />
     <ProjectReference Include="..\SlimeGoals.Platform.Linux\SlimeGoals.Platform.Linux.csproj" />
+    <ProjectReference Include="..\SlimeGoals.Sync\SlimeGoals.Sync.csproj" />
   </ItemGroup>
 
 </Project>

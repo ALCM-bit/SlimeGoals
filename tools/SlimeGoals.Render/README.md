@@ -5,7 +5,7 @@ Ferramenta de desenvolvimento que renderiza as telas do app sem janela (Avalonia
 ## Uso
 
 ```
-dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot]
+dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|account]
 ```
 
 Sem o segundo argumento, vale `all`. Grava um PNG por tela e tamanho, sempre o `ShellView` inteiro:
@@ -13,6 +13,13 @@ Sem o segundo argumento, vale `all`. Grava um PNG por tela e tamanho, sempre o `
 - `today-<tamanho>.png`, `goals-<tamanho>.png`, `goal-edit-<tamanho>.png`, `goal-edit-end-<tamanho>.png` (o formulário rolado até o fim),
   `reports-week-<tamanho>.png`, `reports-month-<tamanho>.png`, `settings-<tamanho>.png`;
 - `<tamanho>` é `phone` (412×915) ou `desktop` (1100×720).
+
+O modo `account` grava a seção "Conta e sincronização" de Configurações sobre uma conta falsa (`SampleAccount`, em `Sample.cs`: nenhuma rede, códigos de mentira), a 320×1400, 360×1400 e 1100×800, como `account-<tela>-<largura>.png`:
+
+- estados da seção: `signed-out`, `signed-in-error` (com `last_error`), `session-expired`, `vault-locked`, `session-unreadable`;
+- subpáginas: `register`, `recovery-code`, `confirm`, `login`, `login-busy` (operação presa, com a barra de ocupado), `login-error`, `recover`, `recovered-code`, `reauthenticate`, `change-password`, `devices`, `sign-out` (aviso com 3 pendências), `delete-account`.
+
+O cadastro pendente da conta falsa usa o construtor interno de `PendingRegistration` (`InternalsVisibleTo` no `SlimeGoals.Sync.csproj`).
 
 O modo `mascot` grava só `mascot.png`: as quatro poses do slime (dormindo, parado, feliz, comemorando), lado a lado em 160×160 sobre o `HeroBrush`, com o nome acessível embaixo. O quadro é capturado cerca de 0,8 s depois de montar a tela, com as animações já em andamento.
 

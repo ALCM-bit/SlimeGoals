@@ -133,7 +133,7 @@ Para conferir os layouts sem emulador, `dotnet run --project tools/SlimeGoals.Re
 
 ## Servidor de sincronização (desenvolvimento)
 
-O servidor da fase 9 (`src/SlimeGoals.Server`, ASP.NET Core + PostgreSQL) ainda não é usado pelo app; esta etapa só o deixa rodando e testado. Pré-requisito: Docker com o plugin Compose.
+O servidor da fase 9 (`src/SlimeGoals.Server`, ASP.NET Core + PostgreSQL) só é usado pelo build de desenvolvimento do Linux (veja [Sincronização (em desenvolvimento)](#sincronização-em-desenvolvimento)); o app instalado não fala com ele. Pré-requisito: Docker com o plugin Compose.
 
 ```bash
 cp .env.example .env
@@ -155,9 +155,38 @@ docker pull postgres:18-alpine
 docker pull testcontainers/ryuk:0.14.0   # use a versão que o erro indicar
 ```
 
-**Criptografia e conta (fase 9.4).** `src/SlimeGoals.Sync` já cifra cada registro antes de ele sair do aparelho e tem o serviço de conta: cadastro com confirmação dentro do app, entrada, troca de senha, recuperação pelo código, sair e apagar a conta. A senha, a chave de dados e o conteúdo nunca vão ao servidor. No Linux, a sessão fica no chaveiro do sistema (Secret Service); sem chaveiro, a sincronização não liga. O app ainda não usa nada disso: as telas chegam na 9.5. As decisões e os vetores de teste estão em [specs/Sincronizacao_v1.md](specs/Sincronizacao_v1.md), seção 6.
+**Criptografia e conta (fase 9.4).** `src/SlimeGoals.Sync` já cifra cada registro antes de ele sair do aparelho e tem o serviço de conta: cadastro com confirmação dentro do app, entrada, troca de senha, recuperação pelo código, sair e apagar a conta. A senha, a chave de dados e o conteúdo nunca vão ao servidor. No Linux, a sessão fica no chaveiro do sistema (Secret Service); sem chaveiro, a sincronização não liga. Na 9.5a, o build de desenvolvimento do Linux passa a usar tudo isso pela seção "Conta e sincronização" de Configurações. As decisões e os vetores de teste estão em [specs/Sincronizacao_v1.md](specs/Sincronizacao_v1.md), seção 6.
 
 **Os testes do chaveiro precisam do `dbus-daemon` e do `gnome-keyring-daemon`.** Eles sobem um barramento e um chaveiro isolados, num diretório temporário, sem tocar no seu chaveiro. Sem esses programas, os testes são ignorados, não reprovados.
+
+## Sincronização (em desenvolvimento)
+
+No build de desenvolvimento do Linux (Debug, ou qualquer build com `-p:SyncDev=true`), Configurações ganha, no topo, a seção **Conta e sincronização**: criar conta, confirmar, entrar, recuperar, trocar a senha, ver e remover aparelhos, sair e apagar a conta. O app instalado (Release, `packaging/linux/build.sh`) não tem a seção, nem cofre, nem rede. O Android ainda não sincroniza (fase 9.5b).
+
+```bash
+# 1. suba o servidor (veja a seção anterior para o .env)
+docker compose up -d --build --wait
+
+# 2. rode o app em Debug, com dados e configuração de teste
+XDG_DATA_HOME=/tmp/sg-a/data XDG_CONFIG_HOME=/tmp/sg-a/config dotnet run --project src/SlimeGoals.Desktop
+```
+
+- O servidor padrão é `http://127.0.0.1:8080`, o do `compose.yaml`. O endereço só pode ser trocado com a conta desligada.
+- Ao criar a conta, o código de confirmação não chega por e-mail: ele aparece no log do servidor.
+
+  ```bash
+  docker compose logs server
+  ```
+
+- A sessão fica no chaveiro do sistema (Secret Service, por exemplo o gnome-keyring), separada por banco de dados. Sem chaveiro, a sincronização não liga.
+- **Dois aparelhos no mesmo computador:** rode duas cópias, cada uma com o seu `XDG_DATA_HOME` e o seu `XDG_CONFIG_HOME`, e entre com a mesma conta nas duas. Cada banco tem a sua instância e o seu segredo no chaveiro. O `XDG_CONFIG_HOME` próprio evita que ligar "Iniciar com o sistema" numa cópia de teste grave a entrada de autostart de verdade.
+
+  ```bash
+  XDG_DATA_HOME=/tmp/sg-a/data XDG_CONFIG_HOME=/tmp/sg-a/config dotnet run --project src/SlimeGoals.Desktop
+  XDG_DATA_HOME=/tmp/sg-b/data XDG_CONFIG_HOME=/tmp/sg-b/config dotnet run --project src/SlimeGoals.Desktop   # em outro terminal
+  ```
+
+  Com o app aberto, uma edição feita num chega ao outro em até uns 20 s.
 
 ## Instalar no Android
 
