@@ -25,6 +25,9 @@ public sealed record RecoveryAccount(Guid Id, byte[] RecoveryHash, byte[] Wrappe
 
 public sealed record NewPassword(byte[] AuthHash, byte[] KdfSalt, string KdfParams, byte[] WrappedKeyPassword);
 
+/// <summary>O código de recuperação que substitui o usado: o hash da sua chave e a chave de dados cifrada por ele.</summary>
+public sealed record NewRecovery(byte[] RecoveryHash, byte[] WrappedKeyRecovery);
+
 public sealed record DeviceInfo(Guid Id, string Name, DateTimeOffset LastSeenAt);
 
 internal sealed record DeviceListRow(Guid Id, string Name, DateTime LastSeenAt);
@@ -205,7 +208,7 @@ public sealed class AccountStore(Db db)
 
     /// <summary>
     /// Troca o material de senha e revoga aparelhos na mesma transação: os outros aparelhos da conta
-    /// (<paramref name="keepDeviceId"/> fica) ou todos, se nulo. Só vale se a auth_key atual ainda for a esperada (nula na recuperação, que já conferiu o código).
+    /// (<paramref name="keepDeviceId"/> fica) ou todos, se nulo. Só vale se a auth_key atual ainda for a esperada.
     /// </summary>
     public async Task<bool> SetPasswordAsync(
         Guid accountId, byte[]? expectedAuthHash, NewPassword password, Guid? keepDeviceId, DateTimeOffset now, CancellationToken cancellationToken)
@@ -226,7 +229,50 @@ public sealed class AccountStore(Db db)
             return false;
         }
 
-        await connection.ExecuteAsync(new CommandDefinition(
+        await RevokeDevicesAsync(connection, transaction, accountId, keepDeviceId, now, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    /// <summary>
+    /// Recuperação: troca o material de senha e o código de recuperação e revoga todos os aparelhos, numa transação.
+    /// Só vale se o código atual ainda for o conferido (<paramref name="usedRecoveryHash"/>): de dois pedidos com o
+    /// mesmo código, só o primeiro passa, e o código usado nunca vale duas vezes.
+    /// </summary>
+    public async Task<bool> RecoverAsync(
+        Guid accountId, byte[] usedRecoveryHash, NewPassword password, NewRecovery recovery, DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var rows = await connection.ExecuteAsync(new CommandDefinition(
+            """
+            UPDATE accounts
+               SET auth_hash = @AuthHash, kdf_salt = @KdfSalt, kdf_params = @KdfParams, wrapped_key_password = @WrappedKeyPassword,
+                   recovery_hash = @RecoveryHash, wrapped_key_recovery = @WrappedKeyRecovery
+             WHERE id = @accountId AND recovery_hash = @usedRecoveryHash
+            """,
+            new
+            {
+                password.AuthHash, password.KdfSalt, password.KdfParams, password.WrappedKeyPassword,
+                recovery.RecoveryHash, recovery.WrappedKeyRecovery, accountId, usedRecoveryHash,
+            },
+            transaction,
+            cancellationToken: cancellationToken));
+        if (rows != 1)
+        {
+            return false;
+        }
+
+        await RevokeDevicesAsync(connection, transaction, accountId, null, now, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    private static Task RevokeDevicesAsync(
+        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction transaction, Guid accountId, Guid? keepDeviceId,
+        DateTimeOffset now, CancellationToken cancellationToken) =>
+        connection.ExecuteAsync(new CommandDefinition(
             """
             UPDATE devices SET revoked_at = @now
              WHERE account_id = @accountId AND revoked_at IS NULL AND (@keepDeviceId::uuid IS NULL OR id <> @keepDeviceId::uuid)
@@ -234,9 +280,6 @@ public sealed class AccountStore(Db db)
             new { now, accountId, keepDeviceId },
             transaction,
             cancellationToken: cancellationToken));
-        await transaction.CommitAsync(cancellationToken);
-        return true;
-    }
 
     public async Task<IReadOnlyList<DeviceInfo>> ListDevicesAsync(Guid accountId, CancellationToken cancellationToken)
     {

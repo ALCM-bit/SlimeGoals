@@ -16,7 +16,9 @@ public sealed class RecoverTests(PostgresFixture postgres)
         RandomNumberGenerator.GetBytes(32),
         RandomNumberGenerator.GetBytes(16),
         "{\"v\":1,\"m\":65536,\"t\":3,\"p\":1}",
-        [42, 43, 44]);
+        [42, 43, 44],
+        RandomNumberGenerator.GetBytes(32),
+        [7, 6, 5, 4]);
 
     private static Task<HttpResponseMessage> BeginAsync(HttpClient client, string email, byte[] recoveryKey) =>
         client.PostAsJsonAsync("/auth/recover/begin", new RecoverBeginRequest(email, recoveryKey), SyncJsonContext.Default.RecoverBeginRequest);
@@ -100,10 +102,46 @@ public sealed class RecoverTests(PostgresFixture postgres)
         var prelogin = await client.PostAsJsonAsync("/auth/prelogin", new PreloginRequest(account.Email), SyncJsonContext.Default.PreloginRequest);
         (await prelogin.Content.ReadFromJsonAsync(SyncJsonContext.Default.PreloginResponse))!.KdfSalt.Should().Equal(request.KdfSalt);
 
-        // O código continua o mesmo e a chave cifrada por ele também.
-        var again = await BeginAsync(client, account.Email, account.RecoveryKey);
+        // O código usado deixa de valer; o novo abre a chave cifrada por ele.
+        (await BeginAsync(client, account.Email, account.RecoveryKey)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        var again = await BeginAsync(client, account.Email, request.NewRecoveryKey!);
         again.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await again.Content.ReadFromJsonAsync(SyncJsonContext.Default.RecoverBeginResponse))!.WrappedKeyRecovery.Should().Equal(WrappedRecovery);
+        (await again.Content.ReadFromJsonAsync(SyncJsonContext.Default.RecoverBeginResponse))!.WrappedKeyRecovery
+            .Should().Equal(request.NewWrappedKeyRecovery);
+    }
+
+    [Fact]
+    public async Task Recovery_code_works_only_once()
+    {
+        await using var factory = new ServerFactory(postgres);
+        var account = await TestAccount.CreateAsync(factory);
+        using var client = factory.CreateClient();
+        var first = NewRecover(account.Email, account.RecoveryKey);
+        (await RecoverAsync(client, first)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var second = NewRecover(account.Email, account.RecoveryKey);
+        var response = await RecoverAsync(client, second);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await PasswordTests.LoginAsync(factory, account.Email, second.AuthKey!)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await PasswordTests.LoginAsync(factory, account.Email, first.AuthKey!)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await BeginAsync(client, account.Email, second.NewRecoveryKey!)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Two_recoveries_at_once_with_the_same_code_let_only_one_through()
+    {
+        await using var factory = new ServerFactory(postgres);
+        var account = await TestAccount.CreateAsync(factory);
+        using var client = factory.CreateClient();
+        var requests = Enumerable.Range(0, 6).Select(_ => NewRecover(account.Email, account.RecoveryKey)).ToArray();
+
+        var responses = await Task.WhenAll(requests.Select(r => RecoverAsync(client, r)));
+
+        responses.Count(r => r.StatusCode == HttpStatusCode.NoContent).Should().Be(1);
+        var winner = requests[Array.FindIndex(responses, r => r.StatusCode == HttpStatusCode.NoContent)];
+        (await PasswordTests.LoginAsync(factory, account.Email, winner.AuthKey!)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await BeginAsync(client, account.Email, winner.NewRecoveryKey!)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
@@ -115,6 +153,10 @@ public sealed class RecoverTests(PostgresFixture postgres)
 
         var shortKey = await RecoverAsync(client, NewRecover(account.Email, account.RecoveryKey) with { AuthKey = [1] });
         var control = await RecoverAsync(client, NewRecover(account.Email, account.RecoveryKey) with { KdfParams = "a\u0000b" });
+        var noNewKey = await RecoverAsync(client, NewRecover(account.Email, account.RecoveryKey) with { NewRecoveryKey = null });
+        var shortNewKey = await RecoverAsync(client, NewRecover(account.Email, account.RecoveryKey) with { NewRecoveryKey = [1, 2] });
+        var noNewWrap = await RecoverAsync(client, NewRecover(account.Email, account.RecoveryKey) with { NewWrappedKeyRecovery = [] });
+        var sameCode = await RecoverAsync(client, NewRecover(account.Email, account.RecoveryKey) with { NewRecoveryKey = account.RecoveryKey });
         var beginMalformed = await client.PostAsync("/auth/recover/begin", new StringContent("[", Encoding.UTF8, "application/json"));
         var beginShort = await BeginAsync(client, account.Email, [1, 2]);
 
@@ -122,5 +164,12 @@ public sealed class RecoverTests(PostgresFixture postgres)
         control.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         beginMalformed.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         beginShort.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        noNewKey.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        shortNewKey.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        noNewWrap.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        sameCode.StatusCode.Should().Be(HttpStatusCode.BadRequest, "trocar o código pelo mesmo não é trocar");
+
+        // Nenhum desses pedidos mexeu na conta: o código continua valendo.
+        (await BeginAsync(client, account.Email, account.RecoveryKey)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 }

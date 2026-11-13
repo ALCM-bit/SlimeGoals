@@ -6,7 +6,7 @@ namespace SlimeGoals.Core.Services;
 /// </summary>
 public sealed class DataChangeNotifier
 {
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
     private int _deferrals;
     private bool _pending;
 

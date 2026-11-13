@@ -150,12 +150,16 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
         {
             var salt = RandomNumberGenerator.GetBytes(SaltSize);
             using var next = PasswordKeys.Derive(newPassword, salt, KdfParams.Default);
+            // O código usado deixa de valer no servidor: a chave de dados vai cifrada também pelo código novo.
+            using var nextCode = RecoveryCode.Generate();
+            using var nextRecovery = nextCode.Keys();
             var request = new RecoverRequest(
                 email, recoveryKeys.RecoveryKey, next.AuthKey, salt, KdfParams.Default.ToJson(),
-                KeyWrap.Wrap(dataKey, next.WrapKey, WrapPurpose.Password));
+                KeyWrap.Wrap(dataKey, next.WrapKey, WrapPurpose.Password),
+                nextRecovery.RecoveryKey, KeyWrap.Wrap(dataKey, nextRecovery.WrapKey, WrapPurpose.Recovery));
             await api.RecoverAsync(request, ct);
             await EnterAsync(email, next.AuthKey, next.WrapKey, deviceName, enableSync: true, ct);
-            return code.Display;
+            return nextCode.Display;
         }
         finally
         {

@@ -316,7 +316,11 @@ public static class AccountEndpoints
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.RecoverRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
         if (email is null || body?.RecoveryKey is not { Length: KeyBytes }
-            || !IsValidKeyMaterial(body.KdfSalt, body.KdfParams, body.AuthKey, body.WrappedKeyPassword))
+            || !IsValidKeyMaterial(body.KdfSalt, body.KdfParams, body.AuthKey, body.WrappedKeyPassword)
+            || body.NewRecoveryKey is not { Length: KeyBytes }
+            || body.NewWrappedKeyRecovery is not { Length: > 0 and <= MaxWrappedKeyBytes }
+            // Trocar o código pelo mesmo deixaria o código usado valendo.
+            || CryptographicOperations.FixedTimeEquals(body.NewRecoveryKey, body.RecoveryKey))
         {
             return InvalidRequest();
         }
@@ -333,14 +337,15 @@ public static class AccountEndpoints
             return Unauthorized();
         }
 
-        await store.SetPasswordAsync(
+        // O código só vale uma vez: se outro pedido com o mesmo código chegou antes, este não muda nada.
+        var recovered = await store.RecoverAsync(
             account.Id,
-            null,
+            account.RecoveryHash,
             new NewPassword(SecretHash.Of(body.AuthKey!), body.KdfSalt!, body.KdfParams!, body.WrappedKeyPassword!),
-            null,
+            new NewRecovery(SecretHash.Of(body.NewRecoveryKey), body.NewWrappedKeyRecovery),
             time.GetUtcNow(),
             cancellationToken);
-        return Results.NoContent();
+        return recovered ? Results.NoContent() : Unauthorized();
     }
 
     private static async Task<IResult> ListDevicesAsync(

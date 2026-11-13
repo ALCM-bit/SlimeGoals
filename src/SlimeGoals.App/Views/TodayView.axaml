@@ -28,30 +28,44 @@
       </Grid>
     </Border>
 
-    <UniformGrid DockPanel.Dock="Top" Classes="tiles" Margin="0,0,0,16">
+    <!-- A linha do rótulo tem a mesma altura nos três blocos (SharedSizeGroup): os valores ficam alinhados mesmo
+         quando um rótulo quebra em duas linhas na tela estreita -->
+    <UniformGrid DockPanel.Dock="Top" Classes="tiles" Grid.IsSharedSizeScope="True" Margin="0,0,0,16">
       <Border Classes="stat">
-        <StackPanel>
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" SharedSizeGroup="StatLabel" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
           <TextBlock Classes="stat-label" Text="Em andamento" />
-          <TextBlock Classes="stat-value" Text="{Binding InProgress}" />
-        </StackPanel>
+          <TextBlock Grid.Row="1" Classes="stat-value" Text="{Binding InProgress}" />
+        </Grid>
       </Border>
       <Border Classes="stat">
-        <StackPanel>
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" SharedSizeGroup="StatLabel" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
           <TextBlock Classes="stat-label" Text="Concluídas hoje" />
-          <TextBlock Classes="stat-value" Text="{Binding Completed}" />
-        </StackPanel>
+          <TextBlock Grid.Row="1" Classes="stat-value" Text="{Binding Completed}" />
+        </Grid>
       </Border>
       <Border Classes="stat">
-        <StackPanel>
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" SharedSizeGroup="StatLabel" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
           <TextBlock Classes="stat-label" Text="Sequência" />
-          <StackPanel Orientation="Horizontal" Spacing="4">
+          <!-- A meta da sequência fica ao lado do valor na tela larga e embaixo na estreita (estilo stat-caption) -->
+          <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*" RowDefinitions="Auto,Auto">
             <TextBlock Classes="stat-value" Text="{Binding StreakValue}" />
-            <TextBlock Classes="stat-unit" Text="{Binding StreakUnit}" VerticalAlignment="Bottom" />
-          </StackPanel>
-          <TextBlock Text="{Binding StreakGoal}" Foreground="{DynamicResource Muted}" FontSize="12"
-                     TextTrimming="CharacterEllipsis"
-                     IsVisible="{Binding StreakGoal, Converter={x:Static ObjectConverters.IsNotNull}}" />
-        </StackPanel>
+            <TextBlock Grid.Column="1" Classes="stat-unit" Text="{Binding StreakUnit}" />
+            <TextBlock Classes="stat-caption" Text="{Binding StreakGoal}"
+                       IsVisible="{Binding StreakGoal, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          </Grid>
+        </Grid>
       </Border>
     </UniformGrid>
 
@@ -118,12 +132,16 @@
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
                       <DockPanel LastChildFill="True">
-                        <TextBlock DockPanel.Dock="Right" Text="concluída" Foreground="{DynamicResource Success}" FontSize="12"
-                                   Margin="8,0,0,0" VerticalAlignment="Center" IsVisible="{Binding IsMet}" />
+                        <!-- Meta cumprida: a palavra na tela larga; na estreita, o ✓ dos Relatórios, que não espreme o título -->
+                        <TextBlock DockPanel.Dock="Right" Classes="met-tag" Classes.met="{Binding IsMet}" Text="concluída" />
+                        <Path DockPanel.Dock="Right" Classes="met-icon in-title" Classes.met="{Binding IsMet}"
+                              Data="{StaticResource IconCheck}" AutomationProperties.Name="concluída" ToolTip.Tip="Concluída" />
                         <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                       </DockPanel>
-                      <TextBlock Text="{Binding ProgressText}" Foreground="{DynamicResource Muted}" FontSize="13" />
-                      <ProgressBar Classes="goal" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
+                      <!-- Na tela estreita o tempo corrido vem para cá: ao lado dos botões ele espremia o título -->
+                      <TextBlock Classes="elapsed narrow" Classes.running="{Binding IsTimerRunning}" Text="{Binding Elapsed}" />
+                      <TextBlock Text="{Binding ProgressText}" Foreground="{DynamicResource Muted}" FontSize="13"
+                                 TextWrapping="Wrap" />
                     </StackPanel>
 
                     <!-- Controles por medida -->
@@ -155,8 +173,7 @@
                         <Path Classes="btn-icon" Data="{StaticResource IconPlus}" />
                       </Button>
                       <!-- Tempo -->
-                      <TextBlock Text="{Binding Elapsed}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"
-                                 IsVisible="{Binding IsTimerRunning}" />
+                      <TextBlock Classes="elapsed wide" Classes.running="{Binding IsTimerRunning}" Text="{Binding Elapsed}" />
                       <Button Classes="primary icon" AutomationProperties.Name="Iniciar cronômetro" ToolTip.Tip="Iniciar cronômetro"
                               IsEnabled="{Binding CanStartTimer}"
                               Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).StartTimerCommand}"
@@ -184,6 +201,9 @@
                       </Button>
                     </StackPanel>
                   </Grid>
+
+                  <!-- Barra na largura do cartão: igual em todos, sem depender dos botões ao lado do texto -->
+                  <ProgressBar Classes="goal" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
 
                   <!-- Painel de valor -->
                   <Border Classes="inline-panel" IsVisible="{Binding IsPanelOpen}">

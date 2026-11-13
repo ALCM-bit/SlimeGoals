@@ -37,7 +37,7 @@ public class SystemAlarmReminderSchedulerTests : IDisposable
     {
         private int _sets;
         private int _cancels;
-        private readonly object _lock = new();
+        private readonly Lock _lock = new();
         private DateTimeOffset? _armedFor;
 
         public DateTimeOffset? ArmedFor { get { lock (_lock) return _armedFor; } }

@@ -13,7 +13,7 @@ public sealed class DbusNotificationService : INotificationService, IDisposable
     private sealed class Entry(Guid logId) { public Guid LogId { get; } = logId; public bool Answered { get; set; } }
 
     private readonly INotificationBus _bus;
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
     private readonly Dictionary<uint, Entry> _byId = [];
     private readonly Dictionary<Guid, uint> _byLogId = [];
     private bool? _bodyMarkup;
