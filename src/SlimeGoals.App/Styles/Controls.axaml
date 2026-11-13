@@ -443,6 +443,17 @@
   <Style Selector="Border.card.today.met">
     <Setter Property="Opacity" Value="0.7" />
   </Style>
+  <!-- Marca de meta cumprida no título do cartão de Hoje: palavra (tela larga) ou ✓ (estreita) -->
+  <Style Selector="TextBlock.met-tag">
+    <Setter Property="Foreground" Value="{DynamicResource Success}" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Margin" Value="8,0,0,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="TextBlock.met-tag.met">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
   <!-- Tempo do cronômetro no cartão de Hoje: ao lado dos botões (wide) ou sob o título na tela estreita (narrow) -->
   <Style Selector="TextBlock.elapsed">
     <Setter Property="FontSize" Value="16" />
@@ -529,6 +540,11 @@
     <Setter Property="StrokeJoin" Value="Round" />
     <Setter Property="Stroke" Value="{DynamicResource Success}" />
     <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <!-- No título do cartão: a margem negativa tira os 24 px do ícone da altura da linha -->
+  <Style Selector="Path.met-icon.in-title">
+    <Setter Property="Margin" Value="6,-2,0,-2" />
+    <Setter Property="IsVisible" Value="False" />
   </Style>
   <Style Selector="TextBlock.bar-label">
     <Setter Property="FontSize" Value="12" />
@@ -669,6 +685,12 @@
   </Style>
   <Style Selector=".compact UniformGrid.tiles TextBlock.stat-value">
     <Setter Property="FontSize" Value="24" />
+  </Style>
+  <Style Selector=".compact TextBlock.met-tag.met">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector=".compact Path.met-icon.in-title.met">
+    <Setter Property="IsVisible" Value="True" />
   </Style>
   <Style Selector=".compact TextBlock.elapsed.wide.running">
     <Setter Property="IsVisible" Value="False" />
