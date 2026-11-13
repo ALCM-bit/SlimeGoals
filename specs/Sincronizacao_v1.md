@@ -368,6 +368,8 @@ Fica para a 9.6: gerar um código novo com a conta ligada, para quem perdeu o pa
 
 **Diagnóstico sem mensagens de exceção.** No Linux, o `Trace` do app vai para o journal do sistema e fica gravado. Por isso nenhuma chamada grava a exceção inteira nem a mensagem dela: `TraceText.Of` dá os tipos da cadeia, o status HTTP e a pilha; `TraceText.Types`, só os tipos. Um teste varre o código e falha se alguma chamada voltar a interpolar a exceção. O caminho do banco também saiu dessas mensagens.
 
+O custo é investigar sem a mensagem: o tipo e a pilha dizem onde falhou, mas às vezes não dizem por quê. Possibilidade guardada para quando fizer falta, por decisão do autor em 13/11/2026: uma variável de ambiente (por exemplo `SLIMEGOALS_TRACE_DETALHE=1`) que volta a gravar a mensagem completa, desligada por padrão.
+
 **Arquivo do banco.** Na primeira abertura, o banco e os arquivos ao lado dele (WAL, cópias antigas) ficam com permissão só para o dono (600), além da pasta de dados, que já é privada.
 
 ## 7. Interface e Android
