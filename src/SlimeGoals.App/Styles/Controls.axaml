@@ -384,7 +384,16 @@
     <Setter Property="FontSize" Value="16" />
     <Setter Property="Foreground" Value="{DynamicResource Muted}" />
     <Setter Property="VerticalAlignment" Value="Bottom" />
-    <Setter Property="Margin" Value="0,0,0,5" />
+    <Setter Property="Margin" Value="4,0,0,5" />
+  </Style>
+  <!-- Legenda do valor: ao lado dele na tela larga, para os três blocos terem as mesmas duas linhas -->
+  <Style Selector="TextBlock.stat-caption">
+    <Setter Property="Grid.Column" Value="2" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    <Setter Property="VerticalAlignment" Value="Bottom" />
+    <Setter Property="Margin" Value="8,0,0,7" />
   </Style>
   <Style Selector="Border.hero">
     <Setter Property="Background" Value="{DynamicResource HeroBrush}" />
@@ -434,7 +443,19 @@
   <Style Selector="Border.card.today.met">
     <Setter Property="Opacity" Value="0.7" />
   </Style>
+  <!-- Tempo do cronômetro no cartão de Hoje: ao lado dos botões (wide) ou sob o título na tela estreita (narrow) -->
+  <Style Selector="TextBlock.elapsed">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="TextBlock.elapsed.wide.running">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
   <Style Selector="ProgressBar.goal">
+    <!-- O tema traz MinWidth 200: num espaço menor a barra vazava para os lados, centralizada -->
+    <Setter Property="MinWidth" Value="0" />
     <Setter Property="MinHeight" Value="6" />
     <Setter Property="Height" Value="6" />
     <Setter Property="CornerRadius" Value="3" />
@@ -648,6 +669,19 @@
   </Style>
   <Style Selector=".compact UniformGrid.tiles TextBlock.stat-value">
     <Setter Property="FontSize" Value="24" />
+  </Style>
+  <Style Selector=".compact TextBlock.elapsed.wide.running">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector=".compact TextBlock.elapsed.narrow.running">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
+  <!-- Sem largura para a legenda ao lado do valor: ela desce para a linha de baixo -->
+  <Style Selector=".compact TextBlock.stat-caption">
+    <Setter Property="Grid.Row" Value="1" />
+    <Setter Property="Grid.Column" Value="0" />
+    <Setter Property="Grid.ColumnSpan" Value="3" />
+    <Setter Property="Margin" Value="0" />
   </Style>
   <!-- Metas: ações do cartão na linha de baixo, sob o texto -->
   <Style Selector=".compact StackPanel.card-actions">

@@ -39,6 +39,9 @@ if (which == "narrow")
 {
     RenderNarrow(320);
     RenderNarrow(360);
+    RenderTodayWithTimer(320);
+    RenderTodayWithTimer(360);
+    RenderTodayWithTimer(1100);
 }
 if (which == "mascot")
     RenderMascot();
@@ -194,6 +197,33 @@ void RenderNarrow(int width)
 #pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
     frame.Save(stream);
 #pragma warning restore CS0618
+    Console.WriteLine(path);
+    window.Close();
+}
+
+// Hoje com um cronômetro rodando: o cartão mais apertado (tempo + parar + mais opções).
+void RenderTodayWithTimer(int width)
+{
+    var shell = sample.CreateShell(width < 720);
+    var window = new Window { Width = width, Height = width < 720 ? 1100 : 720, Content = new ShellView { DataContext = shell } };
+    window.Show();
+    var today = shell.Pages.OfType<TodayPageViewModel>().Single();
+    shell.CurrentPage = today;
+    Pump();
+    // O cronômetro fica rodando de uma largura para a outra: só inicia se ainda não houver um.
+    if (today.Goals.FirstOrDefault(g => g.IsDuration && g.CanStartTimer) is { } timed)
+    {
+        today.StartTimerCommand.Execute(timed);
+        Pump();
+    }
+    var path = Path.Combine(outDir, $"today-timer-{width}.png");
+    var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para capturar.");
+    using (var stream = File.Create(path))
+    {
+#pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
+        frame.Save(stream);
+#pragma warning restore CS0618
+    }
     Console.WriteLine(path);
     window.Close();
 }

@@ -21,6 +21,8 @@ O modo `account` grava a seção "Conta e sincronização" de Configurações so
 
 O cadastro pendente da conta falsa usa o construtor interno de `PendingRegistration` (`InternalsVisibleTo` no `SlimeGoals.Sync.csproj`).
 
+O modo `narrow` grava o editor de meta com a confirmação de exclusão a 320 e 360 px (`goal-edit-delete-<largura>.png`) e o Hoje com um cronômetro rodando a 320, 360 e 1100 px (`today-timer-<largura>.png`): é o cartão mais apertado, com o tempo, o botão de parar e o de mais opções.
+
 O modo `mascot` grava só `mascot.png`: as quatro poses do slime (dormindo, parado, feliz, comemorando), lado a lado em 160×160 sobre o `HeroBrush`, com o nome acessível embaixo. O quadro é capturado cerca de 0,8 s depois de montar a tela, com as animações já em andamento.
 
 ## Dados
