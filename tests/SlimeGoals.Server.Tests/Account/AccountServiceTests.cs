@@ -375,6 +375,98 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Recover_whose_answer_is_lost_still_returns_the_new_code()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var first = new Device(factory);
+        using var fresh = new Device(factory);
+        var email = NewEmail();
+        var code = await RegisterAndConfirmAsync(factory, first, email);
+        fresh.Handler.DropAnswerOf = "/auth/recover";
+
+        var newCode = await fresh.Service.RecoverAsync(email, code, NewPassword, "novo");
+
+        newCode.Should().NotBe(code);
+        (await fresh.State.GetAsync()).Enabled.Should().BeTrue();
+        using var again = new Device(factory);
+        (await FailureOf(() => again.Service.RecoverAsync(email, code, Password, "outro"))).Kind.Should().Be(AccountErrorKind.Unauthorized);
+        await again.Service.RecoverAsync(email, newCode, Password, "outro");
+    }
+
+    [Fact]
+    public async Task Recover_that_never_reached_the_server_fails_and_keeps_the_old_code()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var first = new Device(factory);
+        using var fresh = new Device(factory);
+        var email = NewEmail();
+        var code = await RegisterAndConfirmAsync(factory, first, email);
+        fresh.Handler.Intercept = request => request.RequestUri!.AbsolutePath == "/auth/recover"
+            ? throw new HttpRequestException("sem rede")
+            : null;
+
+        (await FailureOf(() => fresh.Service.RecoverAsync(email, code, NewPassword, "novo"))).Kind
+            .Should().Be(AccountErrorKind.Unavailable);
+
+        fresh.Vault.Names.Should().BeEmpty();
+        (await fresh.State.GetAsync()).Enabled.Should().BeFalse();
+        (await first.Service.ListDevicesAsync()).Should().ContainSingle("a conta não mudou");
+        fresh.Handler.Intercept = null;
+        await fresh.Service.RecoverAsync(email, code, NewPassword, "novo");
+    }
+
+    [Fact]
+    public async Task Recover_with_unknown_outcome_hands_over_the_new_code()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var first = new Device(factory);
+        using var fresh = new Device(factory);
+        var email = NewEmail();
+        var code = await RegisterAndConfirmAsync(factory, first, email);
+        // A resposta do recover se perde e, logo depois, a rede cai de vez: nem a conferência chega ao servidor.
+        fresh.Handler.DropAnswerOf = "/auth/recover";
+        var begins = 0;
+        fresh.Handler.Intercept = request =>
+            request.RequestUri!.AbsolutePath == "/auth/recover/begin" && Interlocked.Increment(ref begins) > 1
+                ? throw new HttpRequestException("sem rede")
+                : null;
+
+        var unconfirmed = (await FluentActions.Awaiting(() => fresh.Service.RecoverAsync(email, code, NewPassword, "novo"))
+            .Should().ThrowAsync<RecoveryUnconfirmedException>()).Which;
+
+        unconfirmed.Message.Should().NotContain(unconfirmed.NewRecoveryCode, "o código só aparece na página dele");
+        fresh.Vault.Names.Should().BeEmpty();
+        (await fresh.State.GetAsync()).Enabled.Should().BeFalse();
+        fresh.Handler.Intercept = null;
+        await fresh.Service.LoginAsync(email, NewPassword, "novo");
+        using var again = new Device(factory);
+        await again.Service.RecoverAsync(email, unconfirmed.NewRecoveryCode, Password, "outro");
+    }
+
+    [Fact]
+    public async Task Recover_that_cannot_sign_in_still_returns_the_new_code()
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var first = new Device(factory);
+        using var fresh = new Device(factory);
+        var email = NewEmail();
+        var code = await RegisterAndConfirmAsync(factory, first, email);
+        fresh.Handler.Intercept = request => request.RequestUri!.AbsolutePath == "/auth/login"
+            ? throw new HttpRequestException("sem rede")
+            : null;
+
+        var newCode = await fresh.Service.RecoverAsync(email, code, NewPassword, "novo");
+
+        newCode.Should().NotBe(code);
+        fresh.Vault.Names.Should().BeEmpty();
+        (await fresh.State.GetAsync()).Enabled.Should().BeFalse();
+        fresh.Handler.Intercept = null;
+        await fresh.Service.LoginAsync(email, NewPassword, "novo");
+        using var again = new Device(factory);
+        await again.Service.RecoverAsync(email, newCode, Password, "outro");
+    }
+
+    [Fact]
     public async Task Wrong_recovery_code_is_unauthorized()
     {
         await using var factory = new ServerFactory(postgres);
@@ -725,6 +817,9 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
 
         public Func<HttpRequestMessage, HttpResponseMessage?>? Intercept { get; set; }
 
+        /// <summary>O servidor recebe e responde o próximo pedido para este caminho, mas a resposta se perde (uma vez).</summary>
+        public string? DropAnswerOf { get; set; }
+
         public IReadOnlyList<SentRequest> Sent
         {
             get { lock (_sent) return _sent.ToArray(); }
@@ -744,6 +839,13 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
                 return fake;
 
             var response = await base.SendAsync(request, cancellationToken);
+            if (path == DropAnswerOf)
+            {
+                DropAnswerOf = null;
+                response.Dispose();
+                throw new HttpRequestException("resposta perdida");
+            }
+
             if (path == "/auth/login" && response.IsSuccessStatusCode)
             {
                 var text = await response.Content.ReadAsStringAsync(cancellationToken);

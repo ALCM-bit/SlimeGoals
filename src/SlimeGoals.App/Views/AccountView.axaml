@@ -40,7 +40,7 @@
       <StackPanel Spacing="14"
                   IsVisible="{Binding ShownRecoveryCode, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
         <TextBlock Classes="section-title" Text="{x:Static acc:AccountViewModel.RecoveryCodeTitle}" TextWrapping="Wrap" />
-        <TextBlock Text="{x:Static acc:AccountViewModel.RecoveryCodeText}" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding RecoveryCodePageText}" TextWrapping="Wrap" />
         <Border Classes="recovery-code">
           <SelectableTextBlock Text="{Binding ShownRecoveryCode}" FontFamily="monospace" FontSize="18"
                                TextWrapping="Wrap" AutomationProperties.Name="Código de recuperação" />
