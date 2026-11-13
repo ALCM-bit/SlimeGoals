@@ -12,8 +12,6 @@ namespace SlimeGoals.Server.Accounts;
 /// <summary>Rotas de cadastro, entrada e saída: <c>/auth/*</c>.</summary>
 public static class AccountEndpoints
 {
-    private const int MaxEmailLength = 254;
-    private const int MaxDeviceNameLength = 100;
     private const int KeyBytes = 32;
     private const int MaxKdfParamsLength = 256;
     private const int MaxWrappedKeyBytes = 256;
@@ -38,15 +36,8 @@ public static class AccountEndpoints
         routes.MapDelete("/account", DeleteAccountAsync).RequireAuthorization();
     }
 
-    /// <summary>Remove espaços e usa minúsculas; nulo se vazio, grande demais ou sem arroba (decisão 15).</summary>
-    public static string? NormalizeEmail(string? email)
-    {
-        var normalized = email?.Trim().ToLowerInvariant();
-        return string.IsNullOrEmpty(normalized) || normalized.Length > MaxEmailLength || !normalized.Contains('@')
-            || normalized.Any(c => char.IsControl(c) || char.IsWhiteSpace(c))
-            ? null
-            : normalized;
-    }
+    /// <summary>A regra é a de <see cref="AccountRules.NormalizeEmail"/>, a mesma que o app aplica antes de enviar.</summary>
+    public static string? NormalizeEmail(string? email) => AccountRules.NormalizeEmail(email);
 
     internal static bool HasControl(string text) => text.Any(char.IsControl);
 
@@ -186,9 +177,8 @@ public static class AccountEndpoints
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.LoginRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
-        var deviceName = body?.DeviceName?.Trim();
-        if (email is null || body?.AuthKey is not { Length: KeyBytes }
-            || string.IsNullOrEmpty(deviceName) || deviceName.Length > MaxDeviceNameLength || HasControl(deviceName))
+        var deviceName = AccountRules.NormalizeDeviceName(body?.DeviceName);
+        if (email is null || body?.AuthKey is not { Length: KeyBytes } || deviceName is null)
         {
             return InvalidRequest();
         }

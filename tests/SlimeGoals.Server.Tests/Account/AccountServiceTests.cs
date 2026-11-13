@@ -584,6 +584,33 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
         device.Handler.Sent.Should().HaveCount(sent);
     }
 
+    [Theory]
+    [InlineData("pc\nlinha")]
+    [InlineData("pc\u0000")]
+    public async Task Login_refuses_a_device_name_the_server_would_refuse_before_any_request(string name)
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var device = new Device(factory);
+
+        (await FluentActions.Awaiting(() => device.Service.LoginAsync(NewEmail(), Password, name))
+            .Should().ThrowAsync<ArgumentException>()).Which.Message.Should().StartWith("O nome do aparelho deve ter de 1 a 100 caracteres");
+
+        device.Handler.Sent.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("ana@")]
+    [InlineData("ana@exemplo")]
+    public async Task Login_refuses_a_malformed_email_before_any_request(string email)
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var device = new Device(factory);
+
+        await FluentActions.Awaiting(() => device.Service.LoginAsync(email, Password, "pc")).Should().ThrowAsync<ArgumentException>();
+
+        device.Handler.Sent.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task Reauthenticate_with_wrong_password_changes_nothing()
     {

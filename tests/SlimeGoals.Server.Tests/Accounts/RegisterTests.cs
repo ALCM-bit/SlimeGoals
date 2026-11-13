@@ -79,7 +79,12 @@ public sealed class RegisterTests(PostgresFixture postgres)
     [InlineData("a\u0000@b.com")]
     [InlineData("a\r\nBcc: x@y.com@b.com")]
     [InlineData("a b@b.com")]
-    public async Task Prelogin_and_register_with_control_characters_in_email_answer_invalid_request(string email)
+    [InlineData("ana@")]
+    [InlineData("@exemplo.com")]
+    [InlineData("ana@exemplo")]
+    [InlineData("ana@@exemplo.com")]
+    [InlineData("ana@exemplo..com")]
+    public async Task Prelogin_and_register_with_a_malformed_email_answer_invalid_request(string email)
     {
         await using var factory = new ServerFactory(postgres);
         using var client = factory.CreateClient();

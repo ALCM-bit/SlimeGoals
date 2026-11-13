@@ -14,8 +14,6 @@ namespace SlimeGoals.Sync.Account;
 /// <param name="server">Endereço do servidor, gravado no segredo da sessão.</param>
 public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISyncStateStore state, Uri server)
 {
-    private const int MaxEmailLength = 254;
-    private const int MaxDeviceNameLength = 100;
     private const int SaltSize = 16;
 
     /// <summary>Cadastra a conta e devolve as chaves para a confirmação; nada vai ao cofre antes de confirmar (decisão 2).</summary>
@@ -412,19 +410,12 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
         }
     }
 
-    private static string NormalizeEmail(string email)
-    {
-        var normalized = email?.Trim().ToLowerInvariant();
-        if (string.IsNullOrEmpty(normalized) || normalized.Length > MaxEmailLength || !normalized.Contains('@', StringComparison.Ordinal))
-            throw new ArgumentException("Informe um e-mail válido, com até 254 caracteres.", nameof(email));
-        return normalized;
-    }
+    private static string NormalizeEmail(string email) =>
+        AccountRules.NormalizeEmail(email)
+        ?? throw new ArgumentException($"Informe um e-mail válido, com até {AccountRules.MaxEmailLength} caracteres.", nameof(email));
 
-    private static string RequireDeviceName(string deviceName)
-    {
-        var trimmed = deviceName?.Trim();
-        if (string.IsNullOrEmpty(trimmed) || trimmed.Length > MaxDeviceNameLength)
-            throw new ArgumentException("O nome do aparelho deve ter de 1 a 100 caracteres.", nameof(deviceName));
-        return trimmed;
-    }
+    private static string RequireDeviceName(string deviceName) =>
+        AccountRules.NormalizeDeviceName(deviceName)
+        ?? throw new ArgumentException(
+            $"O nome do aparelho deve ter de 1 a {AccountRules.MaxDeviceNameLength} caracteres, sem quebras de linha.", nameof(deviceName));
 }
