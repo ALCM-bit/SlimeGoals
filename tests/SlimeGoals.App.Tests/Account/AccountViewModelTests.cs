@@ -191,8 +191,12 @@ public class AccountViewModelTests
         vm.Error.Should().Be("Não foi possível falar com o servidor. Confira o endereço e a conexão.");
         vm.IsBusy.Should().BeFalse();
         vm.Page.Should().Be(page);
-        CommandOf(vm, page).CanExecute(null).Should().BeTrue();
         (vm.Password, vm.PasswordConfirmation, vm.RecoveryCodeInput).Should().Be(("", "", ""));
+
+        // As senhas foram limpas: o botão volta assim que a pessoa as digita de novo.
+        (vm.Password, vm.PasswordConfirmation, vm.RecoveryCodeInput) =
+            ("senha longa", "senha longa", "ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-23");
+        CommandOf(vm, page).CanExecute(null).Should().BeTrue();
     }
 
     [Fact]
@@ -204,6 +208,7 @@ public class AccountViewModelTests
         await vm.SubmitRegisterCommand.ExecuteAsync(null);
         vm.RecoveryCodeSaved = true;
         vm.ContinueCommand.Execute(null);
+        vm.ConfirmationCode = "codigo-do-email";
         _account.Failure = new AccountApiException(AccountErrorKind.Unauthorized);
 
         await vm.SubmitConfirmCommand.ExecuteAsync(null);
@@ -286,6 +291,80 @@ public class AccountViewModelTests
         vm.ContinueCommand.Execute(null);
         vm.Page.Should().Be(AccountPage.None);
         vm.ShownRecoveryCode.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Confirm_without_a_code_asks_for_it_and_calls_nothing()
+    {
+        var vm = await LoadedAsync();
+        vm.OpenRegisterCommand.Execute(null);
+        (vm.Email, vm.Password, vm.PasswordConfirmation) = ("ana@exemplo.com", "uma senha boa", "uma senha boa");
+        await vm.SubmitRegisterCommand.ExecuteAsync(null);
+        vm.RecoveryCodeSaved = true;
+        vm.ContinueCommand.Execute(null);
+        vm.Page.Should().Be(AccountPage.Confirm);
+        vm.ConfirmationCode = "   ";
+
+        await vm.SubmitConfirmCommand.ExecuteAsync(null);
+
+        vm.Error.Should().Be("Informe o código de confirmação.");
+        _account.Calls.Should().NotContain("confirm");
+        vm.Page.Should().Be(AccountPage.Confirm);
+    }
+
+    [Fact]
+    public async Task Submit_buttons_wait_for_the_required_fields()
+    {
+        var vm = await LoadedAsync();
+
+        vm.OpenLoginCommand.Execute(null);
+        vm.SubmitLoginCommand.CanExecute(null).Should().BeFalse("faltam e-mail e senha");
+        vm.Email = "ana@exemplo.com";
+        vm.SubmitLoginCommand.CanExecute(null).Should().BeFalse("falta a senha");
+        vm.Password = "uma senha boa";
+        vm.SubmitLoginCommand.CanExecute(null).Should().BeTrue();
+        vm.DeviceName = " ";
+        vm.SubmitLoginCommand.CanExecute(null).Should().BeFalse("falta o nome do aparelho");
+        vm.DeviceName = "notebook";
+
+        vm.CloseCommand.Execute(null);
+        vm.OpenRegisterCommand.Execute(null);
+        vm.SubmitRegisterCommand.CanExecute(null).Should().BeFalse("trocar de página limpa as senhas");
+        (vm.Password, vm.PasswordConfirmation) = ("uma senha boa", "uma senha boa");
+        vm.SubmitRegisterCommand.CanExecute(null).Should().BeTrue();
+
+        vm.CloseCommand.Execute(null);
+        vm.OpenRecoverCommand.Execute(null);
+        (vm.Password, vm.PasswordConfirmation) = ("uma senha boa", "uma senha boa");
+        vm.SubmitRecoverCommand.CanExecute(null).Should().BeFalse("falta o código de recuperação");
+        vm.RecoveryCodeInput = "ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-23";
+        vm.SubmitRecoverCommand.CanExecute(null).Should().BeTrue();
+
+        vm.CloseCommand.Execute(null);
+        vm.OpenChangePasswordCommand.Execute(null);
+        (vm.Password, vm.PasswordConfirmation) = ("outra senha boa", "outra senha boa");
+        vm.SubmitChangePasswordCommand.CanExecute(null).Should().BeFalse("falta a senha atual");
+        vm.CurrentPassword = "uma senha boa";
+        vm.SubmitChangePasswordCommand.CanExecute(null).Should().BeTrue();
+
+        vm.CloseCommand.Execute(null);
+        vm.OpenDeleteAccountCommand.Execute(null);
+        vm.SubmitDeleteAccountCommand.CanExecute(null).Should().BeFalse();
+        vm.Password = "uma senha boa";
+        vm.SubmitDeleteAccountCommand.CanExecute(null).Should().BeTrue();
+
+        vm.CloseCommand.Execute(null);
+        vm.OpenReauthenticateCommand.Execute(null);
+        vm.SubmitReauthenticateCommand.CanExecute(null).Should().BeFalse();
+        vm.Password = "uma senha boa";
+        vm.SubmitReauthenticateCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Screen_limits_come_from_the_account_rules()
+    {
+        AccountViewModel.MaxEmailLength.Should().Be(AccountRules.MaxEmailLength);
+        AccountViewModel.MaxDeviceNameLength.Should().Be(AccountRules.MaxDeviceNameLength);
     }
 
     [Fact]
