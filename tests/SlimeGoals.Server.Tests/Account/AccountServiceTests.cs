@@ -357,7 +357,8 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
         await second.Service.LoginAsync(email, Password, "celular");
 
         var typed = code.Replace("-", " ", StringComparison.Ordinal).ToLowerInvariant();
-        (await fresh.Service.RecoverAsync(email, typed, NewPassword, "novo")).Should().Be(code);
+        var newCode = await fresh.Service.RecoverAsync(email, typed, NewPassword, "novo");
+        newCode.Should().NotBe(code, "o código usado é trocado").And.MatchRegex("^([0-9A-HJKMNP-TV-Z]{4}-){6}[0-9A-HJKMNP-TV-Z]{2}$");
 
         (await fresh.State.GetAsync()).Enabled.Should().BeTrue();
         (await fresh.Service.ListDevicesAsync()).Should().ContainSingle().Which.Name.Should().Be("novo");
@@ -365,6 +366,12 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
         (await FailureOf(() => second.Service.ListDevicesAsync())).Kind.Should().Be(AccountErrorKind.Unauthorized);
         await ShouldShareDataKeyAsync(first, fresh);
         fresh.Handler.Sent.Select(s => s.Path).Should().NotContain("/auth/prelogin");
+
+        // O código antigo não abre mais a conta; o novo abre, com a mesma chave de dados.
+        using var again = new Device(factory);
+        (await FailureOf(() => again.Service.RecoverAsync(email, code, Password, "outro"))).Kind.Should().Be(AccountErrorKind.Unauthorized);
+        await again.Service.RecoverAsync(email, newCode, Password, "outro");
+        await ShouldShareDataKeyAsync(first, again);
     }
 
     [Fact]

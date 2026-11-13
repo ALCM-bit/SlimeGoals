@@ -47,7 +47,7 @@ public sealed class HttpAccountApiTests(PostgresFixture postgres)
 
         // Recuperação.
         (await api.RecoverBeginAsync(email, Key(2))).WrappedKeyRecovery.Should().Equal(4, 5, 6);
-        await api.RecoverAsync(new RecoverRequest(email, Key(2), Key(4), salt, Kdf, [8, 8]));
+        await api.RecoverAsync(new RecoverRequest(email, Key(2), Key(4), salt, Kdf, [8, 8], Key(6), [6, 6, 6]));
         var recovered = await api.LoginAsync(email, Key(4), "pc");
         recovered.WrappedKeyPassword.Should().Equal(8, 8);
 

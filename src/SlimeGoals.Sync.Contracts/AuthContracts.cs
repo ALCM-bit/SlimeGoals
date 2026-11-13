@@ -38,14 +38,19 @@ public sealed record RecoverBeginRequest(string? Email, byte[]? RecoveryKey);
 
 public sealed record RecoverBeginResponse(byte[] WrappedKeyRecovery);
 
-/// <summary>Segunda etapa da recuperação: confere o código de novo e define a nova senha.</summary>
+/// <summary>
+/// Segunda etapa da recuperação: confere o código de novo, define a nova senha e troca o código de recuperação.
+/// O código usado deixa de valer: <c>NewRecoveryKey</c> e <c>NewWrappedKeyRecovery</c> são os do código novo.
+/// </summary>
 public sealed record RecoverRequest(
     string? Email,
     byte[]? RecoveryKey,
     byte[]? AuthKey,
     byte[]? KdfSalt,
     string? KdfParams,
-    byte[]? WrappedKeyPassword);
+    byte[]? WrappedKeyPassword,
+    byte[]? NewRecoveryKey,
+    byte[]? NewWrappedKeyRecovery);
 
 public sealed record DeviceDto(Guid Id, string Name, DateTimeOffset LastSeenAt, bool IsCurrent);
 
