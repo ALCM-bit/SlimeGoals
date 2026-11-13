@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
+using SlimeGoals.Core.Diagnostics;
 
 namespace SlimeGoals.Infrastructure.Data;
 
@@ -62,7 +63,7 @@ public static partial class MigrationRunner
         }
         catch (SqliteException e)
         {
-            Trace.TraceError($"Falha no VACUUM depois da migração {PurgeVersion:000}: {e}");
+            Trace.TraceError($"Falha no VACUUM depois da migração {PurgeVersion:000}: {TraceText.Of(e)}");
         }
     }
 

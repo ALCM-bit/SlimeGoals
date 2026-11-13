@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Tmds.DBus.Protocol;
+using SlimeGoals.Core.Diagnostics;
 
 namespace SlimeGoals.Platform.Linux.Power;
 
@@ -37,7 +38,7 @@ public sealed class LogindSleepSignalSource : ISleepSignalSource
                     }
                     catch (Exception e)
                     {
-                        Trace.TraceError($"Falha ao tratar o sinal {Member}: {e}");
+                        Trace.TraceError($"Falha ao tratar o sinal {Member}: {TraceText.Of(e)}");
                     }
                 }, ObserverFlags.None, false, null).ConfigureAwait(false);
         }

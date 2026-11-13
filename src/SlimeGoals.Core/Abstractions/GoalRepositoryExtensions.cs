@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Domain;
 
 namespace SlimeGoals.Core.Abstractions;
@@ -18,7 +19,7 @@ internal static class GoalRepositoryExtensions
         }
         catch (Exception e) when (e is FormatException or ArgumentException)
         {
-            Trace.TraceError($"Meta {id} ilegível; tratada como inexistente: {e.Message}");
+            Trace.TraceError($"Meta {id} ilegível; tratada como inexistente: {TraceText.Types(e)}");
             return null;
         }
     }

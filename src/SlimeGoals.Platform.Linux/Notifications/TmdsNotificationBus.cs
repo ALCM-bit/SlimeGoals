@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Tmds.DBus.Protocol;
+using SlimeGoals.Core.Diagnostics;
 
 namespace SlimeGoals.Platform.Linux.Notifications;
 
@@ -128,7 +129,7 @@ public sealed class TmdsNotificationBus : INotificationBus
                 }
                 catch (Exception e)
                 {
-                    Trace.TraceError($"Falha ao tratar o sinal {member}: {e}");
+                    Trace.TraceError($"Falha ao tratar o sinal {member}: {TraceText.Of(e)}");
                 }
             }, ObserverFlags.None, false, null).ConfigureAwait(false);
 

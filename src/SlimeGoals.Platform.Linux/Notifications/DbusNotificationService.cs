@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using SlimeGoals.Core.Abstractions;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Domain;
 
 namespace SlimeGoals.Platform.Linux.Notifications;
@@ -62,7 +63,7 @@ public sealed class DbusNotificationService : INotificationService, IDisposable
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
-            Trace.TraceError($"Falha ao consultar as capacidades do servidor de notificações: {e}");
+            Trace.TraceError($"Falha ao consultar as capacidades do servidor de notificações: {TraceText.Of(e)}");
             return false;
         }
     }
@@ -112,7 +113,7 @@ public sealed class DbusNotificationService : INotificationService, IDisposable
         }
         catch (Exception ex)
         {
-            Trace.TraceError($"Falha ao tratar ActionInvoked: {ex}");
+            Trace.TraceError($"Falha ao tratar ActionInvoked: {TraceText.Of(ex)}");
         }
     }
 
@@ -132,7 +133,7 @@ public sealed class DbusNotificationService : INotificationService, IDisposable
         }
         catch (Exception ex)
         {
-            Trace.TraceError($"Falha ao tratar NotificationClosed: {ex}");
+            Trace.TraceError($"Falha ao tratar NotificationClosed: {TraceText.Of(ex)}");
         }
     }
 
@@ -144,7 +145,7 @@ public sealed class DbusNotificationService : INotificationService, IDisposable
         }
         catch (Exception ex)
         {
-            Trace.TraceError($"Falha em assinante de ActionReceived: {ex}");
+            Trace.TraceError($"Falha em assinante de ActionReceived: {TraceText.Of(ex)}");
         }
     }
 

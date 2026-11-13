@@ -4,6 +4,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SlimeGoals.App.Goals;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
@@ -177,7 +178,7 @@ public sealed partial class ReportsPageViewModel(ReportService reports, TimeProv
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Trace.TraceError($"Falha ao carregar o relatório: {ex}");
+            Trace.TraceError($"Falha ao carregar o relatório: {TraceText.Of(ex)}");
             ErrorMessage = "Não foi possível carregar o relatório.";
         }
         finally

@@ -6,6 +6,7 @@ using Avalonia.Android;
 using Microsoft.Extensions.DependencyInjection;
 using SlimeGoals.App.Hosting;
 using SlimeGoals.App.ViewModels;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Infrastructure.Data;
 
@@ -54,7 +55,7 @@ public class AndroidApplication : AvaloniaAndroidApplication<AndroidApplication.
         catch (Exception ex)
         {
             // Relançar derrubaria o processo em toda abertura e todo broadcast. O arquivo fica como está.
-            Trace.TraceError($"Falha ao montar o container ou migrar o banco em {databasePath}: {ex}");
+            Trace.TraceError($"Falha ao montar o container ou migrar o banco: {TraceText.Of(ex)}");
             services?.Dispose();
             _failureServices = StartupFailureServices.Create(databasePath);
         }

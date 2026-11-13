@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using SlimeGoals.Core.Diagnostics;
 
 namespace SlimeGoals.Platform.Linux.SingleInstance;
 
@@ -58,7 +59,7 @@ public sealed class SingleInstanceGuard : IDisposable
         catch (IOException ex)
         {
             // Normalmente é outra instância segurando a trava; o texto ajuda a ver disco cheio ou somente leitura.
-            Trace.TraceInformation($"SingleInstanceGuard: trava {lockPath} indisponível: {ex.Message}");
+            Trace.TraceInformation($"SingleInstanceGuard: trava {lockPath} indisponível: {TraceText.Types(ex)}");
             return null;
         }
 
@@ -114,7 +115,7 @@ public sealed class SingleInstanceGuard : IDisposable
         }
         catch (Exception ex)
         {
-            Trace.TraceWarning($"SingleInstanceGuard: sinal para {socketPath} falhou: {ex.Message}");
+            Trace.TraceWarning($"SingleInstanceGuard: sinal para {socketPath} falhou: {TraceText.Types(ex)}");
             return false;
         }
     }
@@ -137,7 +138,7 @@ public sealed class SingleInstanceGuard : IDisposable
         }
         catch (Exception ex)
         {
-            Trace.TraceError($"SingleInstanceGuard: não consegui apagar {_socketPath}: {ex}");
+            Trace.TraceError($"SingleInstanceGuard: não consegui apagar {_socketPath}: {TraceText.Of(ex)}");
         }
     }
 
@@ -206,7 +207,7 @@ public sealed class SingleInstanceGuard : IDisposable
             }
             catch (Exception ex)
             {
-                Trace.TraceError($"SingleInstanceGuard: falha ao aceitar conexão: {ex}");
+                Trace.TraceError($"SingleInstanceGuard: falha ao aceitar conexão: {TraceText.Of(ex)}");
                 // Pausa curta: um erro persistente (ex.: EMFILE) não pode girar o laço sem parar.
                 try
                 {
@@ -242,11 +243,11 @@ public sealed class SingleInstanceGuard : IDisposable
         }
         catch (Exception ex) when (ct.IsCancellationRequested)
         {
-            Trace.TraceWarning($"SingleInstanceGuard: conexão interrompida no encerramento: {ex.Message}");
+            Trace.TraceWarning($"SingleInstanceGuard: conexão interrompida no encerramento: {TraceText.Types(ex)}");
         }
         catch (Exception ex)
         {
-            Trace.TraceError($"SingleInstanceGuard: falha ao tratar conexão: {ex}");
+            Trace.TraceError($"SingleInstanceGuard: falha ao tratar conexão: {TraceText.Of(ex)}");
         }
     }
 
@@ -261,7 +262,7 @@ public sealed class SingleInstanceGuard : IDisposable
         }
         catch (Exception ex)
         {
-            Trace.TraceError($"SingleInstanceGuard: falha no ShowRequested: {ex}");
+            Trace.TraceError($"SingleInstanceGuard: falha no ShowRequested: {TraceText.Of(ex)}");
         }
     }
 

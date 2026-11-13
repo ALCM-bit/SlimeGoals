@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using SlimeGoals.Core.Abstractions;
+using SlimeGoals.Core.Diagnostics;
 
 namespace SlimeGoals.Core.Services;
 
@@ -53,7 +54,7 @@ public sealed class SystemAlarmReminderScheduler(ReminderService reminders, ISys
             }
             catch (Exception e)
             {
-                Trace.TraceError($"Falha ao sincronizar lembretes: {e}");
+                Trace.TraceError($"Falha ao sincronizar lembretes: {TraceText.Of(e)}");
                 next = time.GetUtcNow() + RetryAfterFailure;
             }
 
@@ -100,7 +101,7 @@ public sealed class SystemAlarmReminderScheduler(ReminderService reminders, ISys
         }
         catch (Exception e)
         {
-            Trace.TraceError($"Falha ao reagendar lembretes: {e}");
+            Trace.TraceError($"Falha ao reagendar lembretes: {TraceText.Of(e)}");
         }
     }
 }

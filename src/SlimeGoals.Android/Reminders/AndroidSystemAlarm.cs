@@ -2,6 +2,7 @@ using Android.App;
 using System.Diagnostics;
 using Android.Content;
 using SlimeGoals.Core.Abstractions;
+using SlimeGoals.Core.Diagnostics;
 
 namespace SlimeGoals.Android.Reminders;
 
@@ -31,7 +32,7 @@ internal sealed class AndroidSystemAlarm(Context context) : ISystemAlarm
             catch (Java.Lang.SecurityException e)
             {
                 // Permissão revogada entre a checagem e a chamada: cai para o alarme inexato.
-                Trace.TraceWarning($"Alarme exato negado, usando inexato: {e.Message}");
+                Trace.TraceWarning($"Alarme exato negado, usando inexato: {TraceText.Types(e)}");
             }
         }
         alarms.SetAndAllowWhileIdle(AlarmType.RtcWakeup, triggerAt, CreatePendingIntent());

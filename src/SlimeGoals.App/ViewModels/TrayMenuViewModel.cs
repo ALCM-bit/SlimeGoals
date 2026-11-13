@@ -2,6 +2,7 @@ using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SlimeGoals.App.Hosting;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Services;
 
 namespace SlimeGoals.App.ViewModels;
@@ -46,7 +47,7 @@ public sealed partial class TrayMenuViewModel : ObservableObject
         }
         catch (Exception e)
         {
-            Trace.TraceError($"Falha ao ler a pausa dos lembretes para a bandeja: {e}");
+            Trace.TraceError($"Falha ao ler a pausa dos lembretes para a bandeja: {TraceText.Of(e)}");
         }
     }
 
@@ -65,7 +66,7 @@ public sealed partial class TrayMenuViewModel : ObservableObject
         }
         catch (Exception e)
         {
-            Trace.TraceError($"Falha ao pausar/retomar os lembretes pela bandeja: {e}");
+            Trace.TraceError($"Falha ao pausar/retomar os lembretes pela bandeja: {TraceText.Of(e)}");
         }
         await RefreshAsync();
     }

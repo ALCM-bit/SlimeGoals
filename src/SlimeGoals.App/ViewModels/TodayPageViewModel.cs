@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SlimeGoals.App.Goals;
 using SlimeGoals.App.Hosting;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
@@ -177,7 +178,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Trace.TraceError($"Falha ao carregar a sequência: {ex}");
+            Trace.TraceError($"Falha ao carregar a sequência: {TraceText.Of(ex)}");
         }
         if (version != _loadVersion)
             return;
@@ -202,7 +203,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Trace.TraceError($"Falha ao carregar os próximos lembretes: {ex}");
+            Trace.TraceError($"Falha ao carregar os próximos lembretes: {TraceText.Of(ex)}");
             upcoming = [];
         }
         if (version != _loadVersion)
@@ -233,7 +234,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Trace.TraceError($"Falha ao pausar/retomar os lembretes: {ex}");
+            Trace.TraceError($"Falha ao pausar/retomar os lembretes: {TraceText.Of(ex)}");
             ErrorMessage = "Não foi possível alterar a pausa dos lembretes.";
         }
     }

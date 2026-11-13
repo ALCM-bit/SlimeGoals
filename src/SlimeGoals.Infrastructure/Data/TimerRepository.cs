@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Dapper;
 using Microsoft.Data.Sqlite;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Domain;
@@ -26,7 +27,7 @@ public sealed class TimerRepository(SqliteConnectionFactory db) : ITimerReposito
         catch (Exception e) when (RowReader.IsInvalidRow(e))
         {
             // Sem o início não há tempo a recuperar, e a linha ocuparia a vaga do único cronômetro para sempre.
-            Trace.TraceError($"Cronômetro inválido descartado: {e.Message}");
+            Trace.TraceError($"Cronômetro inválido descartado: {TraceText.Types(e)}");
             await c.ExecuteAsync(new CommandDefinition("DELETE FROM active_timer", cancellationToken: ct));
             return null;
         }

@@ -6,6 +6,7 @@ using SlimeGoals.App.About;
 using SlimeGoals.App.Account;
 using SlimeGoals.App.Hosting;
 using SlimeGoals.Core.Abstractions;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Services;
 
 namespace SlimeGoals.App.ViewModels;
@@ -108,7 +109,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Trace.TraceError($"Falha ao ler a licença {entry.File}: {ex}");
+            Trace.TraceError($"Falha ao ler a licença {entry.File}: {TraceText.Of(ex)}");
             return "Não foi possível abrir a licença.";
         }
     }
@@ -291,7 +292,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Trace.TraceError($"Falha ao carregar as configurações: {ex}");
+            Trace.TraceError($"Falha ao carregar as configurações: {TraceText.Of(ex)}");
             ErrorMessage = "Não foi possível carregar a configuração.";
         }
     }
@@ -310,7 +311,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Trace.TraceError($"Falha ao alterar o início com o sistema: {ex}");
+            Trace.TraceError($"Falha ao alterar o início com o sistema: {TraceText.Of(ex)}");
             Revert(() => StartWithSystem = oldValue);
             ErrorMessage = AutostartError;
         }
@@ -341,7 +342,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Trace.TraceError($"Falha ao salvar a configuração: {ex}");
+            Trace.TraceError($"Falha ao salvar a configuração: {TraceText.Of(ex)}");
             Revert(revert);
             ErrorMessage = SaveError;
         }
