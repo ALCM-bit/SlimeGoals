@@ -492,7 +492,7 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
     /// <summary>Um motor ligado: sessão, cliente, serviço de conta, motor e agendador, descartados juntos.</summary>
     private sealed class EngineRun(SyncSession session, HttpClient http, AccountService account, SyncEngine engine)
     {
-        public object Lock { get; } = new();
+        public Lock Lock { get; } = new();
         public SyncSession Session { get; } = session;
         public HttpClient Http { get; } = http;
         public AccountService Account { get; } = account;

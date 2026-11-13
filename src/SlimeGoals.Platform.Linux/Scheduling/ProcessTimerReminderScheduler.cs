@@ -13,7 +13,7 @@ public sealed class ProcessTimerReminderScheduler(ReminderService reminders, Dat
     : IReminderScheduler
 {
     private readonly SemaphoreSlim _gate = new(1);
-    private readonly object _subscriptionLock = new();
+    private readonly Lock _subscriptionLock = new();
     private ITimer? _timer;
     private DateTimeOffset _midnight;
     private bool _subscribed;

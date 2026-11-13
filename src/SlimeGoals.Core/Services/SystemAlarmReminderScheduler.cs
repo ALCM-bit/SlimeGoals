@@ -14,7 +14,7 @@ public sealed class SystemAlarmReminderScheduler(ReminderService reminders, ISys
     public static readonly TimeSpan RetryAfterFailure = TimeSpan.FromMinutes(15);
 
     private readonly SemaphoreSlim _gate = new(1);
-    private readonly object _subscriptionLock = new();
+    private readonly Lock _subscriptionLock = new();
     private bool _subscribed;
     private bool _disposed;
 

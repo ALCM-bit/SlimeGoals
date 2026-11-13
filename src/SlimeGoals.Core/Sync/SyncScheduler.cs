@@ -18,7 +18,7 @@ public sealed class SyncScheduler : IDisposable
     private readonly Func<CancellationToken, Task<SyncCycleResult>> _runCycle;
     private readonly DataChangeNotifier _changes;
     private readonly ITimer _timer;
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
 
     private bool _started;
     private bool _cycleRunning;
