@@ -29,6 +29,83 @@ public class SettingsPageViewModelTests
     }
 
     [Fact]
+    public void Main_page_is_the_list_of_groups_and_a_group_opens_alone()
+    {
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()));
+        (vm.Section, vm.IsMainOpen, vm.HeaderTitle).Should().Be((SettingsSection.None, true, "Configurações"));
+
+        vm.OpenSectionCommand.Execute(SettingsSection.Reminders);
+
+        (vm.IsMainOpen, vm.IsSectionOpen, vm.HeaderTitle).Should().Be((false, true, "Lembretes"));
+        (vm.IsRemindersOpen, vm.IsWindowOpen, vm.IsGeneralOpen, vm.IsAboutOpen, vm.IsSyncOpen)
+            .Should().Be((true, false, false, false, false));
+
+        vm.CloseSectionCommand.Execute(null);
+        (vm.Section, vm.IsMainOpen, vm.IsSectionOpen).Should().Be((SettingsSection.None, true, false));
+    }
+
+    [Theory]
+    [InlineData(SettingsSection.Window, "Janela")]
+    [InlineData(SettingsSection.General, "Geral")]
+    [InlineData(SettingsSection.About, "Sobre")]
+    public void Each_group_has_its_title(SettingsSection section, string title)
+    {
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()));
+
+        vm.OpenSectionCommand.Execute(section);
+
+        vm.HeaderTitle.Should().Be(title);
+    }
+
+    [Fact]
+    public void A_group_the_platform_lacks_does_not_open()
+    {
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()), null,
+            new PlatformCapabilities(true, false, false, false));
+
+        vm.OpenSectionCommand.Execute(SettingsSection.Window);
+        vm.Section.Should().Be(SettingsSection.None);
+        vm.OpenSectionCommand.Execute(SettingsSection.Sync);
+        vm.Section.Should().Be(SettingsSection.None, "sem conta registrada não há sincronização");
+        vm.OpenSectionCommand.Execute(SettingsSection.Reminders);
+        vm.Section.Should().Be(SettingsSection.Reminders);
+    }
+
+    [Fact]
+    public void Back_walks_from_license_text_up_to_the_list_of_groups()
+    {
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()));
+        vm.OpenSectionCommand.Execute(SettingsSection.About);
+        vm.OpenLicensesCommand.Execute(null);
+        vm.SelectedLicense = vm.Licenses[0];
+        (vm.IsAboutOpen, vm.IsLicenseTextOpen).Should().Be((false, true));
+
+        vm.TryGoBack().Should().BeTrue();
+        (vm.IsAboutOpen, vm.IsLicenseListOpen).Should().Be((false, true));
+        vm.TryGoBack().Should().BeTrue();
+        (vm.IsAboutOpen, vm.IsLicenseListOpen, vm.IsMainOpen).Should().Be((true, false, false));
+        vm.TryGoBack().Should().BeTrue();
+        vm.IsMainOpen.Should().BeTrue();
+        vm.TryGoBack().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Group_summaries_follow_the_settings()
+    {
+        var vm = await LoadedAsync(new RecordingSettings(), new FakeAutostart());
+        (vm.RemindersSummary, vm.WindowSummary, vm.GeneralSummary)
+            .Should().Be(("Adiar por 10 min", "Ao fechar: manter em segundo plano", "Iniciar com o sistema: desligado"));
+
+        vm.SelectedSnooze = vm.SnoozeOptions.Single(o => o.Minutes == 60);
+        vm.CloseQuits = true;
+        vm.StartWithSystem = true;
+        await vm.LastSave;
+
+        (vm.RemindersSummary, vm.WindowSummary, vm.GeneralSummary)
+            .Should().Be(("Adiar por 1 h", "Ao fechar: encerrar o app", "Iniciar com o sistema: ligado"));
+    }
+
+    [Fact]
     public void About_shows_version()
     {
         var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()), appVersion: "0.7.0");

@@ -4,12 +4,11 @@
              xmlns:views="using:SlimeGoals.App.Views"
              x:Class="SlimeGoals.App.Views.AccountSectionView"
              x:DataType="acc:AccountViewModel">
-  <!-- Seção "Conta e sincronização" na página principal de Configurações (fase 9.5a, decisão 16).
+  <!-- Página do grupo "Sincronização" em Configurações (fase 9.5a, decisão 16); o título vem da página.
        Um bloco por estado da conta; as ações abrem as subpáginas de AccountView. -->
   <Border Classes="card account-card">
     <!-- Na largura toda da lista: o texto curto de um estado não a encolhe -->
     <views:FillWidthStackPanel Spacing="12">
-      <TextBlock Classes="section-title" Text="Conta e sincronização" />
 
       <!-- Sem conta -->
       <StackPanel Spacing="12" IsVisible="{Binding IsSignedOut}">

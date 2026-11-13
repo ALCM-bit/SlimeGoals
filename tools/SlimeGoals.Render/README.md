@@ -11,7 +11,8 @@ dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|al
 Sem o segundo argumento, vale `all`. Grava um PNG por tela e tamanho, sempre o `ShellView` inteiro:
 
 - `today-<tamanho>.png`, `goals-<tamanho>.png`, `goal-edit-<tamanho>.png`, `goal-edit-end-<tamanho>.png` (o formulário rolado até o fim),
-  `reports-week-<tamanho>.png`, `reports-month-<tamanho>.png`, `settings-<tamanho>.png`;
+  `reports-week-<tamanho>.png`, `reports-month-<tamanho>.png`, `settings-<tamanho>.png` (a lista de grupos) e
+  `settings-<grupo>-<tamanho>.png` para cada grupo que a plataforma tem (`reminders`, `window`, `general`, `about`);
 - `<tamanho>` é `phone` (412×915) ou `desktop` (1100×720).
 
 O modo `account` grava a seção "Conta e sincronização" de Configurações sobre uma conta falsa (`SampleAccount`, em `Sample.cs`: nenhuma rede, códigos de mentira), a 320×1400, 360×1400 e 1100×800, como `account-<tela>-<largura>.png`:
