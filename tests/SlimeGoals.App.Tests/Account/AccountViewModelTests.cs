@@ -289,6 +289,76 @@ public class AccountViewModelTests
     }
 
     [Fact]
+    public async Task Register_and_recover_explain_their_code_differently()
+    {
+        var vm = await LoadedAsync();
+        vm.OpenRegisterCommand.Execute(null);
+        (vm.Email, vm.Password, vm.PasswordConfirmation) = ("ana@exemplo.com", "uma senha", "uma senha");
+        await vm.SubmitRegisterCommand.ExecuteAsync(null);
+        vm.RecoveryCodePageText.Should().Be(AccountViewModel.RecoveryCodeText);
+
+        vm.RecoveryCodeSaved = true;
+        vm.CloseCommand.Execute(null);
+        await RecoverAsync(vm);
+
+        vm.RecoveryCodePageText.Should().Be(AccountViewModel.RecoveredCodeText).And.Contain("anterior deixou de valer");
+    }
+
+    [Fact]
+    public async Task Recover_that_signed_in_leaves_no_message()
+    {
+        var vm = await LoadedAsync();
+        _account.Status = new AccountStatus(AccountState.SignedIn, "ana@exemplo.com", new Uri("http://127.0.0.1:8080/"), null, 0, null);
+
+        await RecoverAsync(vm);
+        vm.RecoveryCodeSaved = true;
+        vm.ContinueCommand.Execute(null);
+
+        vm.Page.Should().Be(AccountPage.None);
+        vm.Error.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Recover_that_left_the_device_signed_out_asks_to_sign_in()
+    {
+        var vm = await LoadedAsync();
+
+        await RecoverAsync(vm);
+        vm.Error.Should().BeNull();
+        vm.RecoveryCodeSaved = true;
+        vm.ContinueCommand.Execute(null);
+
+        vm.Page.Should().Be(AccountPage.None);
+        vm.Error.Should().Be(AccountViewModel.SignInWithNewPasswordText);
+    }
+
+    [Fact]
+    public async Task Recover_without_the_server_confirmation_still_shows_the_new_code()
+    {
+        var vm = await LoadedAsync();
+        _account.Failure = new RecoveryUnconfirmedException("NOVO-CODI-GONA-OCON-FIRM-ADO0-12", new IOException("sem rede"));
+
+        await RecoverAsync(vm);
+
+        vm.Page.Should().Be(AccountPage.RecoveredCode);
+        vm.ShownRecoveryCode.Should().Be("NOVO-CODI-GONA-OCON-FIRM-ADO0-12");
+        vm.RecoveryCodePageText.Should().Be(AccountViewModel.RecoveryUnconfirmedText);
+        vm.Error.Should().BeNull();
+        vm.CloseCommand.CanExecute(null).Should().BeFalse("o código não volta a aparecer");
+        vm.RecoveryCodeSaved = true;
+        vm.ContinueCommand.Execute(null);
+        vm.Error.Should().Be(AccountViewModel.SignInWithNewPasswordText);
+    }
+
+    private static async Task RecoverAsync(AccountViewModel vm)
+    {
+        vm.OpenRecoverCommand.Execute(null);
+        (vm.Email, vm.RecoveryCodeInput, vm.Password, vm.PasswordConfirmation) =
+            ("ana@exemplo.com", "ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-23", "nova senha", "nova senha");
+        await vm.SubmitRecoverCommand.ExecuteAsync(null);
+    }
+
+    [Fact]
     public async Task Recovery_code_page_cannot_be_left_before_the_box_is_checked()
     {
         var vm = await LoadedAsync();
