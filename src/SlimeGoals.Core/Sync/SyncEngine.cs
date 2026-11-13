@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using SlimeGoals.Core.Abstractions;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Services;
 
 namespace SlimeGoals.Core.Sync;
@@ -37,13 +38,13 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
         }
         catch (SyncFormatException e)
         {
-            Trace.TraceWarning($"Sincronização pausada: {e.Message}");
+            Trace.TraceWarning($"Sincronização pausada: {TraceText.Types(e)}");
             await RecordErrorAsync(UpdateAppMessage).ConfigureAwait(false);
             return SyncCycleResult.Paused;
         }
         catch (SyncUnauthorizedException e)
         {
-            Trace.TraceWarning($"Sincronização recusada pelo servidor (401): {e.Message}");
+            Trace.TraceWarning($"Sincronização recusada pelo servidor (401): {TraceText.Types(e)}");
             await RecordErrorAsync(SyncErrorText.For(e)).ConfigureAwait(false);
             return SyncCycleResult.Unauthorized;
         }
@@ -173,7 +174,7 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
         }
         catch (Exception e) when (e is not (SyncFormatException or OperationCanceledException))
         {
-            Trace.TraceError($"Registro ilegível ignorado na sincronização ({record.RecordKey}, seq {record.Seq}): {e.Message}");
+            Trace.TraceError($"Registro ilegível ignorado na sincronização ({record.RecordKey}, seq {record.Seq}): {TraceText.Types(e)}");
             return new IncomingRecord(record.RecordKey, record.Seq, null, Unreadable: true);
         }
     }
@@ -245,7 +246,7 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
         }
         catch (Exception e)
         {
-            Trace.TraceError($"Falha ao gravar o erro da sincronização: {e}");
+            Trace.TraceError($"Falha ao gravar o erro da sincronização: {TraceText.Of(e)}");
         }
     }
 }

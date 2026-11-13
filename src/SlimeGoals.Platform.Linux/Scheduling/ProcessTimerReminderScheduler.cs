@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using SlimeGoals.Core.Abstractions;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
 
@@ -62,7 +63,7 @@ public sealed class ProcessTimerReminderScheduler(ReminderService reminders, Dat
             }
             catch (Exception e)
             {
-                Trace.TraceError($"Falha ao sincronizar lembretes: {e}");
+                Trace.TraceError($"Falha ao sincronizar lembretes: {TraceText.Of(e)}");
             }
 
             Arm(next is { } n && n < midnight ? n : midnight, midnight);
@@ -118,7 +119,7 @@ public sealed class ProcessTimerReminderScheduler(ReminderService reminders, Dat
         }
         catch (Exception e)
         {
-            Trace.TraceError($"Falha no disparo do agendador de lembretes: {e}");
+            Trace.TraceError($"Falha no disparo do agendador de lembretes: {TraceText.Of(e)}");
         }
     }
 
@@ -132,7 +133,7 @@ public sealed class ProcessTimerReminderScheduler(ReminderService reminders, Dat
         }
         catch (Exception e)
         {
-            Trace.TraceError($"Falha ao reagendar lembretes: {e}");
+            Trace.TraceError($"Falha ao reagendar lembretes: {TraceText.Of(e)}");
         }
     }
 }

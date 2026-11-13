@@ -1,3 +1,5 @@
+using SlimeGoals.Core.Diagnostics;
+
 namespace SlimeGoals.Core.Services;
 
 /// <summary>
@@ -64,7 +66,7 @@ public sealed class DataChangeNotifier
             }
             catch (Exception e)
             {
-                System.Diagnostics.Trace.TraceError($"Assinante de DataChangeNotifier falhou: {e}");
+                System.Diagnostics.Trace.TraceError($"Assinante de DataChangeNotifier falhou: {TraceText.Of(e)}");
             }
         }
     }

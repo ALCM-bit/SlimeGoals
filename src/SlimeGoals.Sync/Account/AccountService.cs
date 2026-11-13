@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Sync.Contracts;
@@ -130,8 +131,10 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
 
     /// <summary>
     /// Recupera a conta pelo código: abre a chave de dados com ele, define a nova senha (o servidor derruba todos os
-    /// aparelhos) e entra neste aparelho. Devolve o mesmo código, já formatado, para a tela lembrar de guardá-lo.
+    /// aparelhos), troca o código e entra neste aparelho. Devolve o código novo, já formatado: o usado deixou de valer.
+    /// Se a entrada falhar depois da troca, devolve o código assim mesmo, com a conta desligada neste aparelho.
     /// </summary>
+    /// <exception cref="RecoveryUnconfirmedException">Não deu para saber se o servidor aplicou a recuperação.</exception>
     /// <exception cref="FormatException">Código de recuperação malformado.</exception>
     /// <exception cref="CryptographicException">O embrulho de recuperação não abre com o código.</exception>
     public async Task<string> RecoverAsync(string email, string recoveryCode, string newPassword, string deviceName, CancellationToken ct = default)
@@ -157,13 +160,63 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
                 email, recoveryKeys.RecoveryKey, next.AuthKey, salt, KdfParams.Default.ToJson(),
                 KeyWrap.Wrap(dataKey, next.WrapKey, WrapPurpose.Password),
                 nextRecovery.RecoveryKey, KeyWrap.Wrap(dataKey, nextRecovery.WrapKey, WrapPurpose.Recovery));
-            await api.RecoverAsync(request, ct);
-            await EnterAsync(email, next.AuthKey, next.WrapKey, deviceName, enableSync: true, ct);
+            await ReplaceCodeAsync(request, nextCode.Display, ct);
+
+            // Daqui em diante só o código novo vale: ele chega à pessoa mesmo que a entrada falhe (rede, cofre). Sem
+            // sessão, a tela pede a nova senha.
+            try
+            {
+                await EnterAsync(email, next.AuthKey, next.WrapKey, deviceName, enableSync: true, CancellationToken.None);
+            }
+            catch (Exception e)
+            {
+                Trace.TraceWarning($"Conta recuperada, mas a entrada falhou: {e.GetType().Name}");
+            }
+
             return nextCode.Display;
         }
         finally
         {
             CryptographicOperations.ZeroMemory(dataKey);
+        }
+    }
+
+    private enum CodeInForce { New, Old, Unknown }
+
+    /// <summary>
+    /// Envia a recuperação. Sem resposta, o servidor pode ter trocado o código ou não: o <c>begin</c> com o código novo
+    /// diz qual vale. Se nem isso chegar, quem chamou recebe o código novo para mostrar com o aviso.
+    /// </summary>
+    private async Task ReplaceCodeAsync(RecoverRequest request, string newCode, CancellationToken ct)
+    {
+        try
+        {
+            await api.RecoverAsync(request, ct);
+        }
+        catch (AccountApiException lost) when (lost.Kind == AccountErrorKind.Unavailable)
+        {
+            switch (await CodeInForceAsync(request.Email!, request.NewRecoveryKey!))
+            {
+                case CodeInForce.New:
+                    return;
+                case CodeInForce.Old:
+                    throw;
+                default:
+                    throw new RecoveryUnconfirmedException(newCode, lost);
+            }
+        }
+    }
+
+    private async Task<CodeInForce> CodeInForceAsync(string email, byte[] newRecoveryKey)
+    {
+        try
+        {
+            await api.RecoverBeginAsync(email, newRecoveryKey, CancellationToken.None);
+            return CodeInForce.New;
+        }
+        catch (AccountApiException e)
+        {
+            return e.Kind == AccountErrorKind.Unauthorized ? CodeInForce.Old : CodeInForce.Unknown;
         }
     }
 

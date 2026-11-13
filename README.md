@@ -136,15 +136,15 @@ Para conferir os layouts sem emulador, `dotnet run --project tools/SlimeGoals.Re
 O servidor da fase 9 (`src/SlimeGoals.Server`, ASP.NET Core + PostgreSQL) só é usado pelo build de desenvolvimento do Linux (veja [Sincronização (em desenvolvimento)](#sincronização-em-desenvolvimento)); o app instalado não fala com ele. Pré-requisito: Docker com o plugin Compose.
 
 ```bash
-cp .env.example .env
-# preencha POSTGRES_PASSWORD e SERVER_PRELOGIN_SECRET (ex.: openssl rand -base64 32)
+packaging/server/init-env.sh        # cria o .env com segredos aleatórios, se ainda não existir
 docker compose up -d --build --wait
 curl -fsS http://127.0.0.1:8080/health
 ```
 
 - A API responde em `http://127.0.0.1:8080`, publicada só no seu computador. O PostgreSQL não tem porta publicada.
 - O servidor sobe em `Development`, com o e-mail simulado: o código de confirmação do cadastro aparece no log (`docker compose logs server`), ao lado do e-mail mascarado (`a***@exemplo.com`), nunca do endereço completo. A confirmação pede também a `auth_key` de quem cadastrou.
-- O `.env` fica fora do repositório. Sem as duas variáveis, o `docker compose` recusa subir.
+- O `.env` fica fora do repositório, legível só pelo seu usuário. Sem as duas variáveis, o `docker compose` recusa subir. Para preencher à mão, copie o `.env.example`.
+- Use sempre `--build`: sem ele, o Compose reaproveita a imagem antiga do servidor, e o app novo pode não conversar com ela.
 - Os dados ficam no volume `slimegoals_pgdata`. `docker compose down` mantém o volume; `docker compose down -v` apaga o banco.
 - As rotas, os limites e os códigos de erro estão em [specs/Sincronizacao_v1.md](specs/Sincronizacao_v1.md), seção 5.
 

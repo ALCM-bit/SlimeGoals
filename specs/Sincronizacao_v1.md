@@ -113,7 +113,7 @@ Acréscimos da 9.3 ao esquema: `purge_point` (ponto da limpeza, começa em 0), `
 |---|---|
 | `POST /auth/prelogin` | Devolve sal e parâmetros do e-mail |
 | `POST /auth/register`, `/auth/confirm`, `/auth/login`, `/auth/logout` | Conta e sessão |
-| `POST /auth/recover/begin`, `/auth/recover` | Recuperar com o código, em duas etapas: o `begin` confere o código e devolve `wrapped_key_recovery`, sem a qual o aparelho não abre a chave de dados; o `recover` confere o código de novo, define a nova senha e revoga todos os aparelhos |
+| `POST /auth/recover/begin`, `/auth/recover` | Recuperar com o código, em duas etapas: o `begin` confere o código e devolve `wrapped_key_recovery`, sem a qual o aparelho não abre a chave de dados; o `recover` confere o código de novo, define a nova senha, troca o código de recuperação (o usado deixa de valer) e revoga todos os aparelhos |
 | `POST /auth/password` | Trocar senha: exige a `auth_key` atual no corpo |
 | `GET /devices`, `DELETE /devices/{id}` | Aparelhos da conta |
 | `DELETE /account` | Apaga conta e dados; exige a `auth_key` no corpo, além do token |
@@ -221,7 +221,7 @@ Acordos feitos ao implementar o servidor. Onde diferem do texto acima, valem est
 | Conteúdo | AES-256-GCM, nonce aleatório de 96 bits, com subchave da chave de dados |
 | Dado autenticado | Versão do formato, tipo e id do registro ficam dentro do conteúdo cifrado, porque quem baixa um blob só tem a `record_key`. `Open` recebe a chave, abre o blob e recusa se `RecordKey(id)` não bater. O servidor não consegue trocar um blob por outro |
 | `record_key` | HMAC-SHA-256 do id, com subchave da chave de dados |
-| Código de recuperação | 128 bits aleatórios, mostrado uma vez. Gera outro par de chaves, como a senha |
+| Código de recuperação | 128 bits aleatórios, mostrado uma vez. Gera outro par de chaves, como a senha. Vale para uma recuperação só: cada recuperação gera um código novo |
 | Guarda no servidor | Hash da `auth_key` e do código, e a chave de dados cifrada duas vezes |
 | Guarda no aparelho | Android Keystore; Secret Service no Linux. Sem cofre disponível, a sincronização não liga: nunca em arquivo sem proteção |
 | Senha | Mínimo de 10 caracteres |
@@ -347,6 +347,28 @@ Acordos feitos ao ligar a conta e a sincronização no Linux (`SyncCoordinator`,
 **Segredos na tela.** Os campos de senha e o código de recuperação digitado são limpos depois de cada envio, com sucesso ou falha, e ao fechar a subpágina. A página do código de recuperação só fecha (Voltar ou Continuar) depois de marcar "Guardei o código", porque o servidor já trocou o código.
 
 **Cliente HTTP do head.** Um por servidor, com 30 s de prazo e sem seguir redirecionamento, para um `3xx` não levar o token a outro host.
+
+### Decisões depois do teste manual da 9.5a
+
+**Código de recuperação de uso único.** Até a 9.5a, recuperar a conta trocava só a senha, e o mesmo código continuava valendo. Um código já digitado pode ter sido visto por alguém, então cada recuperação passa a trocar o código:
+
+- O `POST /auth/recover` leva também `new_recovery_key` e `new_wrapped_key_recovery`, os do código novo, gerado no aparelho. Sem eles, ou com a mesma chave do código usado, a resposta é `400`.
+- O servidor troca a senha, o código e revoga os aparelhos numa transação, e só se o código conferido ainda for o atual. De dois pedidos com o mesmo código, só o primeiro passa; o outro recebe `401`.
+- O app mostra o código novo com o aviso de que o anterior deixou de valer.
+
+**Resposta perdida na recuperação.** Depois que o servidor troca o código, só o novo vale, e ele só existe na memória do aparelho. Por isso:
+
+- Sem resposta do `recover`, o app pergunta ao servidor qual código vale, com um `recover/begin` do código novo. Se for o novo, segue como se a resposta tivesse chegado. Se for o antigo, mostra o erro de conexão, e nada mudou.
+- Se nem essa conferência chegar, o app mostra o código novo com outro texto: a pessoa guarda o novo e tenta entrar com a nova senha. Se a senha nova funcionar, vale o código novo; se não, o antigo continua valendo.
+- Se a troca passou mas a entrada no aparelho falhou (rede ou cofre), o app mostra o código novo assim mesmo e pede para entrar com a nova senha.
+
+Fica para a 9.6: gerar um código novo com a conta ligada, para quem perdeu o papel ou ficou em dúvida sobre qual código vale.
+
+**Segredos do servidor em desenvolvimento.** `packaging/server/init-env.sh` cria o `.env` do Compose com valores aleatórios quando ele não existe, com permissão só para o dono. Em produção (9.6), os segredos entram como segredos do Docker Compose, em arquivos sob `/run/secrets`, e não como variáveis de ambiente.
+
+**Diagnóstico sem mensagens de exceção.** No Linux, o `Trace` do app vai para o journal do sistema e fica gravado. Por isso nenhuma chamada grava a exceção inteira nem a mensagem dela: `TraceText.Of` dá os tipos da cadeia, o status HTTP e a pilha; `TraceText.Types`, só os tipos. Um teste varre o código e falha se alguma chamada voltar a interpolar a exceção. O caminho do banco também saiu dessas mensagens.
+
+**Arquivo do banco.** Na primeira abertura, o banco e os arquivos ao lado dele (WAL, cópias antigas) ficam com permissão só para o dono (600), além da pasta de dados, que já é privada.
 
 ## 7. Interface e Android
 

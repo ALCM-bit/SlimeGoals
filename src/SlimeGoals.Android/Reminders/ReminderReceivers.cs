@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Android.Content;
 using Microsoft.Extensions.DependencyInjection;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
 
@@ -35,7 +36,7 @@ internal static class ReceiverWork
             }
             catch (Exception e)
             {
-                Trace.TraceError($"Falha no receiver {name}: {e}");
+                Trace.TraceError($"Falha no receiver {name}: {TraceText.Of(e)}");
             }
             finally
             {

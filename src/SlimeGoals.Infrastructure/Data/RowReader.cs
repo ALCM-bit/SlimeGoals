@@ -2,6 +2,7 @@ using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
 using Dapper;
+using SlimeGoals.Core.Diagnostics;
 
 namespace SlimeGoals.Infrastructure.Data;
 
@@ -27,7 +28,7 @@ internal static class RowReader
             }
             catch (Exception e) when (IsInvalidRow(e))
             {
-                Trace.TraceError($"Linha inválida ignorada em {table} (id {reader["Id"]}): {e.Message}");
+                Trace.TraceError($"Linha inválida ignorada em {table} (id {reader["Id"]}): {TraceText.Types(e)}");
             }
         }
         return items;

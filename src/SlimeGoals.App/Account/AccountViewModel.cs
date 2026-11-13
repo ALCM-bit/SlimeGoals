@@ -49,6 +49,12 @@ public sealed partial class AccountViewModel : ObservableObject
     public const string RecoveryCodeTitle = "Seu código de recuperação";
     public const string RecoveryCodeText = "Guarde este código num lugar seguro. Ele é a única forma de recuperar a conta se " +
         "você esquecer a senha, e não será mostrado de novo.";
+    public const string RecoveredCodeText = "Este é o seu novo código de recuperação. O código anterior deixou de valer. " +
+        "Guarde o novo num lugar seguro: ele não será mostrado de novo.";
+    public const string RecoveryUnconfirmedText = "Não foi possível confirmar com o servidor se a recuperação terminou. " +
+        "Guarde este código novo e tente entrar com a nova senha. Se ela funcionar, o código que vale é este. " +
+        "Se não funcionar, o código anterior continua valendo, e você pode repetir a recuperação.";
+    public const string SignInWithNewPasswordText = "Entre com a nova senha para ligar a sincronização neste aparelho.";
     public const string RecoveryCodeSavedLabel = "Guardei o código";
     public const string ContinueLabel = "Continuar";
     public const string CopyLabel = "Copiar";
@@ -296,7 +302,19 @@ public sealed partial class AccountViewModel : ObservableObject
 
     /// <summary>Só com "Guardei o código" marcado: do cadastro vai à confirmação; da recuperação, à seção.</summary>
     [RelayCommand(CanExecute = nameof(CanContinue))]
-    private void Continue() => Page = Page == AccountPage.RecoveryCode ? AccountPage.Confirm : AccountPage.None;
+    private void Continue()
+    {
+        if (Page == AccountPage.RecoveryCode)
+        {
+            Page = AccountPage.Confirm;
+            return;
+        }
+
+        Page = AccountPage.None;
+        // A recuperação trocou a senha, mas este aparelho não entrou (ou não se sabe se trocou): o próximo passo é entrar.
+        if (!IsSignedIn)
+            Error = SignInWithNewPasswordText;
+    }
 
     private bool CanContinue() => IsIdle && RecoveryCodeSaved;
 
@@ -337,8 +355,16 @@ public sealed partial class AccountViewModel : ObservableObject
             return;
         await RunAsync(AccountAction.Recover, async () =>
         {
-            var newCode = await _account.RecoverAsync(server, email, code, password, deviceName);
-            ShowRecoveryCode(newCode, AccountPage.RecoveredCode);
+            try
+            {
+                var newCode = await _account.RecoverAsync(server, email, code, password, deviceName);
+                ShowRecoveryCode(newCode, AccountPage.RecoveredCode);
+            }
+            catch (RecoveryUnconfirmedException unconfirmed)
+            {
+                // Sem saber se o servidor trocou o código, a pessoa guarda o novo também: o texto explica qual vale.
+                ShowRecoveryCode(unconfirmed.NewRecoveryCode, AccountPage.RecoveredCode, unconfirmed: true);
+            }
         });
     }
 
@@ -491,11 +517,20 @@ public sealed partial class AccountViewModel : ObservableObject
         return false;
     }
 
-    private void ShowRecoveryCode(string code, AccountPage page)
+    /// <summary>O texto da página do código: o do cadastro, o da recuperação ou o da recuperação sem confirmação.</summary>
+    public string RecoveryCodePageText => Page != AccountPage.RecoveredCode ? RecoveryCodeText
+        : _recoveryUnconfirmed ? RecoveryUnconfirmedText
+        : RecoveredCodeText;
+
+    private bool _recoveryUnconfirmed;
+
+    private void ShowRecoveryCode(string code, AccountPage page, bool unconfirmed = false)
     {
+        _recoveryUnconfirmed = unconfirmed;
         Page = page;
         RecoveryCodeSaved = false;
         ShownRecoveryCode = code;
+        OnPropertyChanged(nameof(RecoveryCodePageText));
     }
 
     /// <summary>Esvazia os campos de senha e o código de recuperação digitado (a cada envio, ao trocar de subpágina e ao

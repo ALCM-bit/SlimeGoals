@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using SlimeGoals.Core.Diagnostics;
 
 namespace SlimeGoals.Platform.Linux;
 
@@ -29,7 +30,7 @@ public static class PrivateDirectory
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Trace.TraceError($"Falha ao restringir a pasta {path}: {ex}");
+            Trace.TraceError($"Falha ao restringir a pasta {path}: {TraceText.Of(ex)}");
         }
     }
 }

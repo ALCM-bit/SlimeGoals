@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Services;
 
 namespace SlimeGoals.Platform.Linux.Power;
@@ -19,7 +20,7 @@ public sealed class SleepResumeWatcher(ISleepSignalSource source, DataChangeNoti
         }
         catch (Exception e)
         {
-            Trace.TraceError($"Não foi possível observar a suspensão: {e}");
+            Trace.TraceError($"Não foi possível observar a suspensão: {TraceText.Of(e)}");
         }
     }
 
@@ -32,7 +33,7 @@ public sealed class SleepResumeWatcher(ISleepSignalSource source, DataChangeNoti
         }
         catch (Exception e)
         {
-            Trace.TraceError($"Falha ao tratar o despertar da suspensão: {e}");
+            Trace.TraceError($"Falha ao tratar o despertar da suspensão: {TraceText.Of(e)}");
         }
     }
 
@@ -45,7 +46,7 @@ public sealed class SleepResumeWatcher(ISleepSignalSource source, DataChangeNoti
         }
         catch (Exception e)
         {
-            Trace.TraceError($"Falha ao encerrar a observação da suspensão: {e}");
+            Trace.TraceError($"Falha ao encerrar a observação da suspensão: {TraceText.Of(e)}");
         }
     }
 }

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Services;
 
 namespace SlimeGoals.App.Hosting;
@@ -41,7 +42,7 @@ public sealed class WindowCloseBehavior(AppSettings settings, DataChangeNotifier
         }
         catch (Exception e)
         {
-            Trace.TraceError($"Falha ao ler a ação ao fechar a janela; mantendo {Current}: {e}");
+            Trace.TraceError($"Falha ao ler a ação ao fechar a janela; mantendo {Current}: {TraceText.Of(e)}");
         }
     }
 }

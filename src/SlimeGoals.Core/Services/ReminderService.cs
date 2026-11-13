@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using SlimeGoals.Core.Abstractions;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Sync;
 
@@ -128,7 +129,7 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
-                Trace.TraceError($"Falha ao mostrar o lembrete da meta {goal.Id}: {e}");
+                Trace.TraceError($"Falha ao mostrar o lembrete da meta {goal.Id}: {TraceText.Of(e)}");
             }
         }
 
@@ -174,7 +175,7 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
-            Trace.TraceError($"Falha ao retirar o lembrete {logId}: {e}");
+            Trace.TraceError($"Falha ao retirar o lembrete {logId}: {TraceText.Of(e)}");
         }
     }
 

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using SlimeGoals.Core.Abstractions;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
 
@@ -26,7 +27,7 @@ public sealed class ReminderHost(IReminderScheduler scheduler, INotificationServ
         catch (Exception e)
         {
             // O app segue sem lembretes (decisão 5 do plano): nada de derrubar a janela.
-            Trace.TraceError($"Falha ao iniciar os lembretes: {e}");
+            Trace.TraceError($"Falha ao iniciar os lembretes: {TraceText.Of(e)}");
         }
     }
 
@@ -48,7 +49,7 @@ public sealed class ReminderHost(IReminderScheduler scheduler, INotificationServ
         }
         catch (Exception ex)
         {
-            Trace.TraceError($"Falha ao tratar a ação {e.Action} do lembrete {e.LogId}: {ex}");
+            Trace.TraceError($"Falha ao tratar a ação {e.Action} do lembrete {e.LogId}: {TraceText.Of(ex)}");
         }
     }
 }

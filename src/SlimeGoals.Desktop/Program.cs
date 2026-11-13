@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Microsoft.Extensions.DependencyInjection;
 using SlimeGoals.App.Hosting;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Infrastructure.Data;
 using SlimeGoals.Platform.Linux;
 using SlimeGoals.Platform.Linux.SingleInstance;
@@ -49,7 +50,7 @@ internal static class Program
         catch (Exception e)
         {
             // Pasta ou socket indisponível: o app segue sem instância única em vez de não abrir.
-            Trace.TraceError($"Falha ao garantir instância única; seguindo sem ela: {e}");
+            Trace.TraceError($"Falha ao garantir instância única; seguindo sem ela: {TraceText.Of(e)}");
             guard = null;
         }
 
@@ -89,7 +90,7 @@ internal static class Program
         }
         catch (Exception e)
         {
-            Trace.TraceError($"Falha ao abrir ou migrar o banco em {databasePath}: {e}");
+            Trace.TraceError($"Falha ao abrir ou migrar o banco: {TraceText.Of(e)}");
             services?.Dispose();
             return null;
         }
@@ -108,7 +109,7 @@ internal static class Program
                 }
                 catch (Exception e)
                 {
-                    Trace.TraceError($"Falha ao mostrar a janela a pedido da segunda instância: {e}");
+                    Trace.TraceError($"Falha ao mostrar a janela a pedido da segunda instância: {TraceText.Of(e)}");
                 }
             };
         }

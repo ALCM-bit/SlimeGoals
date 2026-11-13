@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using Dapper;
 using Microsoft.Data.Sqlite;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Sync;
 
@@ -212,7 +213,7 @@ internal sealed class SyncApply
             }
             catch (FormatException e)
             {
-                Trace.TraceError($"Registro pendente inválido ignorado na sincronização ({row.RecordId}): {e.Message}");
+                Trace.TraceError($"Registro pendente inválido ignorado na sincronização ({row.RecordId}): {TraceText.Types(e)}");
             }
             await RunAsync("DELETE FROM sync_pending WHERE record_id = @Id", new { Id = row.RecordId });
         }
@@ -252,7 +253,7 @@ internal sealed class SyncApply
         }
         catch (SqliteException e) when (e.SqliteExtendedErrorCode == CheckViolation)
         {
-            Trace.TraceError($"Meta inválida ignorada na sincronização ({goal.Id:D}): {e.Message}");
+            Trace.TraceError($"Meta inválida ignorada na sincronização ({goal.Id:D}): {TraceText.Types(e)}");
             return false;
         }
     }
@@ -343,7 +344,7 @@ internal sealed class SyncApply
         }
         catch (FormatException e)
         {
-            Trace.TraceError($"Registro inválido ignorado na sincronização ({envelope.Kind} {envelope.RecordId:D}): {e.Message}");
+            Trace.TraceError($"Registro inválido ignorado na sincronização ({envelope.Kind} {envelope.RecordId:D}): {TraceText.Types(e)}");
         }
         return null;
     }

@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SlimeGoals.App.Hosting;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.App.Views;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Services;
 
 namespace SlimeGoals.App;
@@ -137,7 +138,7 @@ public partial class App(IServiceProvider services) : Application
         }
         catch (Exception e)
         {
-            Trace.TraceError($"Falha ao criar o ícone da bandeja: {e}");
+            Trace.TraceError($"Falha ao criar o ícone da bandeja: {TraceText.Of(e)}");
             return;
         }
         _ = RefreshTraySafelyAsync(tray);
@@ -151,7 +152,7 @@ public partial class App(IServiceProvider services) : Application
         }
         catch (Exception e)
         {
-            Trace.TraceError($"Falha ao atualizar a bandeja: {e}");
+            Trace.TraceError($"Falha ao atualizar a bandeja: {TraceText.Of(e)}");
         }
     }
 
@@ -164,7 +165,7 @@ public partial class App(IServiceProvider services) : Application
         }
         catch (Exception e)
         {
-            Trace.TraceError($"Falha ao iniciar {service.GetType().Name}: {e}");
+            Trace.TraceError($"Falha ao iniciar {service.GetType().Name}: {TraceText.Of(e)}");
         }
     }
 
@@ -180,7 +181,7 @@ public partial class App(IServiceProvider services) : Application
             }
             catch (Exception e)
             {
-                Trace.TraceError($"Falha ao encerrar {service.GetType().Name}: {e}");
+                Trace.TraceError($"Falha ao encerrar {service.GetType().Name}: {TraceText.Of(e)}");
             }
         }
     }
