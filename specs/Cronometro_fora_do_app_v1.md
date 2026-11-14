@@ -1,6 +1,6 @@
 # Cronômetro visível fora do app (v1)
 
-> Desenho para aprovação do autor, em 13/11/2026. Depois de aprovado, vira um plano em `specs/plans/`.
+> Desenho aprovado pelo autor em 14/11/2026, com as cinco escolhas da seção 7 e a opção A da janelinha. O plano fica em `specs/plans/`.
 
 ## 1. Para que serve
 
@@ -22,7 +22,7 @@ Este desenho mantém o tempo à vista enquanto o app está fora da tela:
 └──────────────────────────────┘
 ```
 
-O desenho acima é só a disposição. A aparência, com os estilos do app, está em `specs/design/cronometro-janelinha-prototipo.png`, em duas opções para o autor escolher: **A**, com o nome em cima e o tempo embaixo, e **B**, tudo numa linha.
+O desenho acima é só a disposição. A aparência, com os estilos do app, está em `specs/design/cronometro-janelinha-prototipo.png`, em duas opções. **O autor escolheu a opção A em 14/11/2026:** o nome da meta em cima, menor, e o tempo embaixo, em destaque, com cerca de 280 px de largura.
 
 ![Protótipo da janelinha](design/cronometro-janelinha-prototipo.png)
 
