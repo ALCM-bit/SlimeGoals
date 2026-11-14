@@ -11,6 +11,17 @@ using SlimeGoals.Core.Services;
 
 namespace SlimeGoals.App.ViewModels;
 
+/// <summary>Os grupos de Configurações. A página principal é a lista deles; cada um abre numa página própria.</summary>
+public enum SettingsSection
+{
+    None,
+    Sync,
+    Reminders,
+    Window,
+    General,
+    About,
+}
+
 /// <summary>Uma opção do adiar na lista de Configurações.</summary>
 public sealed record SnoozeOptionViewModel(int Minutes, string Label);
 
@@ -55,6 +66,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
                 {
                     OnPropertyChanged(nameof(IsMainOpen));
                     OnPropertyChanged(nameof(IsAccountPageOpen));
+                    NotifySectionChanged();
                 }
             };
     }
@@ -71,9 +83,81 @@ public sealed partial class SettingsPageViewModel : PageViewModel
 
     public IReadOnlyList<LicenseEntry> Licenses => LicenseCatalog.All;
 
+    /// <summary>O grupo aberto; <see cref="SettingsSection.None"/> é a lista de grupos.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsMainOpen), nameof(HeaderTitle))]
+    public partial SettingsSection Section { get; private set; }
+
+    /// <summary>A página de um grupo está à vista: nenhuma subpágina dele (licenças, telas da conta) aberta.</summary>
+    public bool IsSectionOpen => Section != SettingsSection.None && !LicensesOpen && !IsAccountPageOpen;
+
+    public bool IsSyncOpen => IsSectionOpen && Section == SettingsSection.Sync;
+
+    public bool IsRemindersOpen => IsSectionOpen && Section == SettingsSection.Reminders;
+
+    public bool IsWindowOpen => IsSectionOpen && Section == SettingsSection.Window;
+
+    public bool IsGeneralOpen => IsSectionOpen && Section == SettingsSection.General;
+
+    public bool IsAboutOpen => IsSectionOpen && Section == SettingsSection.About;
+
+    /// <summary>Título no topo: o da tela na lista de grupos, o do grupo na página dele.</summary>
+    public string HeaderTitle => Section switch
+    {
+        SettingsSection.Sync => "Sincronização",
+        SettingsSection.Reminders => "Lembretes",
+        SettingsSection.Window => "Janela",
+        SettingsSection.General => "Geral",
+        SettingsSection.About => "Sobre",
+        _ => Title,
+    };
+
+    /// <summary>Abre um grupo; o que a plataforma não tem é ignorado.</summary>
+    [RelayCommand]
+    private void OpenSection(SettingsSection section)
+    {
+        var available = section switch
+        {
+            SettingsSection.Sync => ShowAccount,
+            SettingsSection.Reminders => ShowReminders,
+            SettingsSection.Window => ShowWindow,
+            SettingsSection.General => ShowGeneral,
+            SettingsSection.About => true,
+            _ => false,
+        };
+        if (available)
+            Section = section;
+    }
+
+    [RelayCommand]
+    private void CloseSection() => Section = SettingsSection.None;
+
+    partial void OnSectionChanged(SettingsSection value) => NotifySectionChanged();
+
+    private void NotifySectionChanged()
+    {
+        OnPropertyChanged(nameof(IsSectionOpen));
+        OnPropertyChanged(nameof(IsSyncOpen));
+        OnPropertyChanged(nameof(IsRemindersOpen));
+        OnPropertyChanged(nameof(IsWindowOpen));
+        OnPropertyChanged(nameof(IsGeneralOpen));
+        OnPropertyChanged(nameof(IsAboutOpen));
+    }
+
+    // Resumos mostrados na lista de grupos, ao lado do nome de cada um.
+    public string RemindersSummary => SelectedSnooze is { } snooze ? $"Adiar por {snooze.Label}" : "";
+
+    public string WindowSummary => CloseHides ? "Ao fechar: manter em segundo plano" : "Ao fechar: encerrar o app";
+
+    public string GeneralSummary => !CanAutostart ? "Iniciar com o sistema: indisponível"
+        : StartWithSystem ? "Iniciar com o sistema: ligado"
+        : "Iniciar com o sistema: desligado";
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsLicenseListOpen), nameof(IsMainOpen))]
     public partial bool LicensesOpen { get; set; }
+
+    partial void OnLicensesOpenChanged(bool value) => NotifySectionChanged();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsLicenseListOpen), nameof(IsLicenseTextOpen))]
@@ -84,8 +168,9 @@ public sealed partial class SettingsPageViewModel : PageViewModel
 
     public bool IsLicenseTextOpen => SelectedLicense is not null;
 
-    /// <summary>Página principal (seções + Sobre): nenhuma licença nem subpágina da conta aberta.</summary>
-    public bool IsMainOpen => !LicensesOpen && (Account?.Page ?? AccountPage.None) == AccountPage.None;
+    /// <summary>A lista de grupos está à vista: nenhum grupo, licença nem subpágina da conta aberta.</summary>
+    public bool IsMainOpen =>
+        Section == SettingsSection.None && !LicensesOpen && (Account?.Page ?? AccountPage.None) == AccountPage.None;
 
     /// <summary>Uma subpágina da conta está aberta (no lugar onde a lista de licenças abre).</summary>
     public bool IsAccountPageOpen => Account is { IsMainOpen: false };
@@ -138,6 +223,8 @@ public sealed partial class SettingsPageViewModel : PageViewModel
             CloseLicenseText();
         else if (LicensesOpen)
             CloseLicenses();
+        else if (Section != SettingsSection.None)
+            CloseSection();
         else
             return false;
         return true;
@@ -217,12 +304,16 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     public IReadOnlyList<SnoozeOptionViewModel> SnoozeOptions { get; } =
         [.. AppSettings.SnoozeOptions.Select(m => new SnoozeOptionViewModel(m, m == 60 ? "1 h" : $"{m} min"))];
 
-    [ObservableProperty] public partial bool StartWithSystem { get; set; }
-
-    [ObservableProperty] public partial SnoozeOptionViewModel? SelectedSnooze { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(GeneralSummary))]
+    public partial bool StartWithSystem { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CloseQuits), nameof(CloseHint))]
+    [NotifyPropertyChangedFor(nameof(RemindersSummary))]
+    public partial SnoozeOptionViewModel? SelectedSnooze { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CloseQuits), nameof(CloseHint), nameof(WindowSummary))]
     public partial bool CloseHides { get; set; } = true;
 
     /// <summary>Segmento "Encerrar o app" (RadioButton, dois sentidos); par de <see cref="CloseHides"/>.</summary>

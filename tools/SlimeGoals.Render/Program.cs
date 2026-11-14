@@ -124,7 +124,9 @@ void RenderAccount(int width, int height)
         var shell = sample.CreateShell(false, account);
         var window = new Window { Width = width, Height = height, Content = new ShellView { DataContext = shell } };
         window.Show();
-        shell.CurrentPage = shell.Pages.OfType<SettingsPageViewModel>().Single();
+        var settings = shell.Pages.OfType<SettingsPageViewModel>().Single();
+        shell.CurrentPage = settings;
+        settings.OpenSectionCommand.Execute(SettingsSection.Sync);
         Pump();
         open(account);
         Pump();
@@ -261,6 +263,17 @@ void Render(bool phone, string suffix, int width, int height)
     reports.Mode = ReportMode.Week;
 
     Show("settings", settings);
+    // Cada grupo de Configurações na página dele (os que a plataforma tem).
+    foreach (var section in new[] { SettingsSection.Reminders, SettingsSection.Window, SettingsSection.General, SettingsSection.About })
+    {
+        settings.OpenSectionCommand.Execute(section);
+        if (settings.Section != section)
+            continue;
+        Pump();
+        Capture($"settings-{section.ToString().ToLowerInvariant()}");
+        settings.CloseSectionCommand.Execute(null);
+    }
+
     window.Close();
 
     void Show(string name, PageViewModel page)

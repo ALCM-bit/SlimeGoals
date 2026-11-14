@@ -7,14 +7,18 @@
              x:DataType="vm:SettingsPageViewModel">
   <DockPanel Classes="page">
     <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,16">
-      <Button Classes="ghost back" Content="← Configurações" Command="{Binding CloseLicensesCommand}"
+      <!-- Voltar: um nível por vez (texto da licença → lista → Sobre → grupos; tela da conta → Sincronização → grupos) -->
+      <Button Classes="ghost back" Content="← Configurações" Command="{Binding CloseSectionCommand}"
+              HorizontalAlignment="Left" IsVisible="{Binding IsSectionOpen}" />
+      <Button Classes="ghost back" Content="← Sobre" Command="{Binding CloseLicensesCommand}"
               HorizontalAlignment="Left" IsVisible="{Binding IsLicenseListOpen}" />
       <Button Classes="ghost back" Content="← Licenças" Command="{Binding CloseLicenseTextCommand}"
               HorizontalAlignment="Left" IsVisible="{Binding IsLicenseTextOpen}" />
       <!-- Subpágina da conta: o Voltar fica parado enquanto ocupado e até guardar o código de recuperação -->
-      <Button Classes="ghost back" Content="← Configurações" Command="{Binding Account.CloseCommand, FallbackValue={x:Null}}"
+      <Button Classes="ghost back" Content="← Sincronização" Command="{Binding Account.CloseCommand, FallbackValue={x:Null}}"
               HorizontalAlignment="Left" IsVisible="{Binding IsAccountPageOpen}" />
-      <TextBlock Classes="page-title" Text="{Binding Title}" IsVisible="{Binding IsMainOpen}" />
+      <TextBlock Classes="page-title" Text="{Binding HeaderTitle}" IsVisible="{Binding IsMainOpen}" />
+      <TextBlock Classes="page-title" Text="{Binding HeaderTitle}" IsVisible="{Binding IsSectionOpen}" />
       <TextBlock Classes="page-title" Text="Licenças" IsVisible="{Binding IsLicenseListOpen}" />
       <TextBlock Classes="page-title" Text="{Binding SelectedLicense.Component}" TextWrapping="Wrap"
                  IsVisible="{Binding IsLicenseTextOpen}" />
@@ -28,32 +32,77 @@
     </Border>
 
     <Panel>
+      <!-- Lista de grupos: cada linha mostra o estado atual e abre a página do grupo -->
       <ScrollViewer Classes="page" IsVisible="{Binding IsMainOpen}">
-        <StackPanel Classes="settings-list" Spacing="16" Margin="0,0,0,14">
-          <Panel IsVisible="{Binding ShowAccount}">
-            <views:AccountSectionView DataContext="{Binding Account}" />
-          </Panel>
-
-          <Border Classes="card" IsVisible="{Binding ShowGeneral}">
-            <StackPanel Spacing="12">
-              <TextBlock Classes="section-title" Text="Geral" />
-              <ToggleSwitch MinHeight="44" Content="Iniciar com o sistema" OnContent="" OffContent="" IsChecked="{Binding StartWithSystem}"
-                            IsEnabled="{Binding CanAutostart}" />
-              <TextBlock Text="Abre em segundo plano ao entrar na sessão." Foreground="{DynamicResource Muted}"
-                         TextWrapping="Wrap" IsVisible="{Binding CanAutostart}" />
-              <TextBlock Text="{Binding AutostartUnavailableText}" Foreground="{DynamicResource Muted}"
-                         TextWrapping="Wrap" IsVisible="{Binding !CanAutostart}" />
-            </StackPanel>
-          </Border>
-
+        <views:FillWidthStackPanel Classes="settings-list" Spacing="10" Margin="0,0,0,14">
           <Border Classes="card" IsVisible="{Binding IsEmpty}">
             <TextBlock Text="{Binding EmptyMessage}"
                        Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
           </Border>
+          <Button Classes="nav-row" IsVisible="{Binding ShowAccount}" Command="{Binding OpenSectionCommand}"
+                  CommandParameter="{x:Static vm:SettingsSection.Sync}" AutomationProperties.Name="Sincronização">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+              <StackPanel Spacing="2" VerticalAlignment="Center">
+                <TextBlock Classes="nav-row-title" Text="Sincronização" />
+                <TextBlock Classes="nav-row-summary" Text="{Binding Account.SummaryText, FallbackValue={x:Null}}" />
+              </StackPanel>
+              <TextBlock Grid.Column="1" Classes="nav-row-chevron" Text="›" />
+            </Grid>
+          </Button>
+          <Button Classes="nav-row" IsVisible="{Binding ShowReminders}" Command="{Binding OpenSectionCommand}"
+                  CommandParameter="{x:Static vm:SettingsSection.Reminders}" AutomationProperties.Name="Lembretes">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+              <StackPanel Spacing="2" VerticalAlignment="Center">
+                <TextBlock Classes="nav-row-title" Text="Lembretes" />
+                <TextBlock Classes="nav-row-summary" Text="{Binding RemindersSummary}" />
+              </StackPanel>
+              <TextBlock Grid.Column="1" Classes="nav-row-chevron" Text="›" />
+            </Grid>
+          </Button>
+          <Button Classes="nav-row" IsVisible="{Binding ShowWindow}" Command="{Binding OpenSectionCommand}"
+                  CommandParameter="{x:Static vm:SettingsSection.Window}" AutomationProperties.Name="Janela">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+              <StackPanel Spacing="2" VerticalAlignment="Center">
+                <TextBlock Classes="nav-row-title" Text="Janela" />
+                <TextBlock Classes="nav-row-summary" Text="{Binding WindowSummary}" />
+              </StackPanel>
+              <TextBlock Grid.Column="1" Classes="nav-row-chevron" Text="›" />
+            </Grid>
+          </Button>
+          <Button Classes="nav-row" IsVisible="{Binding ShowGeneral}" Command="{Binding OpenSectionCommand}"
+                  CommandParameter="{x:Static vm:SettingsSection.General}" AutomationProperties.Name="Geral">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+              <StackPanel Spacing="2" VerticalAlignment="Center">
+                <TextBlock Classes="nav-row-title" Text="Geral" />
+                <TextBlock Classes="nav-row-summary" Text="{Binding GeneralSummary}" />
+              </StackPanel>
+              <TextBlock Grid.Column="1" Classes="nav-row-chevron" Text="›" />
+            </Grid>
+          </Button>
+          <Button Classes="nav-row" Command="{Binding OpenSectionCommand}"
+                  CommandParameter="{x:Static vm:SettingsSection.About}" AutomationProperties.Name="Sobre">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+              <StackPanel Spacing="2" VerticalAlignment="Center">
+                <TextBlock Classes="nav-row-title" Text="Sobre" />
+                <TextBlock Classes="nav-row-summary" Text="{Binding VersionText}" />
+              </StackPanel>
+              <TextBlock Grid.Column="1" Classes="nav-row-chevron" Text="›" />
+            </Grid>
+          </Button>
+        </views:FillWidthStackPanel>
+      </ScrollViewer>
 
-          <Border Classes="card" IsVisible="{Binding ShowReminders}">
+      <!-- Sincronização -->
+      <ScrollViewer Classes="page" IsVisible="{Binding IsSyncOpen}">
+        <views:FillWidthStackPanel Classes="settings-list" Margin="0,0,0,14">
+          <views:AccountSectionView DataContext="{Binding Account}" />
+        </views:FillWidthStackPanel>
+      </ScrollViewer>
+
+      <ScrollViewer Classes="page" IsVisible="{Binding IsRemindersOpen}">
+        <views:FillWidthStackPanel Classes="settings-list" Margin="0,0,0,14">
+          <Border Classes="card">
             <StackPanel Spacing="12">
-              <TextBlock Classes="section-title" Text="Lembretes" />
               <TextBlock Text="Adiar lembretes por" />
               <ComboBox MinHeight="44" MinWidth="160" HorizontalAlignment="Left" ItemsSource="{Binding SnoozeOptions}"
                         SelectedItem="{Binding SelectedSnooze}" AutomationProperties.Name="Adiar lembretes por">
@@ -89,10 +138,13 @@
               </Grid>
             </StackPanel>
           </Border>
+        </views:FillWidthStackPanel>
+      </ScrollViewer>
 
-          <Border Classes="card" IsVisible="{Binding ShowWindow}">
+      <ScrollViewer Classes="page" IsVisible="{Binding IsWindowOpen}">
+        <views:FillWidthStackPanel Classes="settings-list" Margin="0,0,0,14">
+          <Border Classes="card">
             <StackPanel Spacing="12">
-              <TextBlock Classes="section-title" Text="Janela" />
               <TextBlock Text="Ao fechar a janela" />
               <Border Classes="segment" HorizontalAlignment="Left">
                 <StackPanel Orientation="Horizontal">
@@ -105,17 +157,35 @@
               <TextBlock Text="{Binding CloseHint}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
             </StackPanel>
           </Border>
+        </views:FillWidthStackPanel>
+      </ScrollViewer>
 
+      <ScrollViewer Classes="page" IsVisible="{Binding IsGeneralOpen}">
+        <views:FillWidthStackPanel Classes="settings-list" Margin="0,0,0,14">
           <Border Classes="card">
             <StackPanel Spacing="12">
-              <TextBlock Classes="section-title" Text="Sobre" />
+              <ToggleSwitch MinHeight="44" Content="Iniciar com o sistema" OnContent="" OffContent="" IsChecked="{Binding StartWithSystem}"
+                            IsEnabled="{Binding CanAutostart}" />
+              <TextBlock Text="Abre em segundo plano ao entrar na sessão." Foreground="{DynamicResource Muted}"
+                         TextWrapping="Wrap" IsVisible="{Binding CanAutostart}" />
+              <TextBlock Text="{Binding AutostartUnavailableText}" Foreground="{DynamicResource Muted}"
+                         TextWrapping="Wrap" IsVisible="{Binding !CanAutostart}" />
+            </StackPanel>
+          </Border>
+        </views:FillWidthStackPanel>
+      </ScrollViewer>
+
+      <ScrollViewer Classes="page" IsVisible="{Binding IsAboutOpen}">
+        <views:FillWidthStackPanel Classes="settings-list" Margin="0,0,0,14">
+          <Border Classes="card">
+            <StackPanel Spacing="12">
               <TextBlock Text="{Binding VersionText}" />
               <TextBlock Text="{Binding LicenseText}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
               <Button Classes="ghost" MinHeight="44" HorizontalAlignment="Left" Content="Licenças"
                       Command="{Binding OpenLicensesCommand}" />
             </StackPanel>
           </Border>
-        </StackPanel>
+        </views:FillWidthStackPanel>
       </ScrollViewer>
 
       <!-- Subpáginas da conta -->

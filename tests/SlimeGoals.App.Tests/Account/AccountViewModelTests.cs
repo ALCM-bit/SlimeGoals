@@ -581,6 +581,39 @@ public class AccountViewModelTests
     }
 
     [Fact]
+    public async Task Account_pages_open_inside_the_sync_group()
+    {
+        var account = await LoadedAsync();
+        var vm = new SettingsPageViewModel(new AppSettings(_repo),
+            capabilities: PlatformCapabilities.Desktop with { Sync = true }, account: account);
+        vm.OpenSectionCommand.Execute(SettingsSection.Sync);
+        (vm.IsSyncOpen, vm.HeaderTitle).Should().Be((true, "Sincronização"));
+
+        account.OpenLoginCommand.Execute(null);
+        (vm.IsSyncOpen, vm.IsAccountPageOpen).Should().Be((false, true));
+
+        vm.TryGoBack().Should().BeTrue();
+        (vm.IsSyncOpen, vm.IsAccountPageOpen).Should().Be((true, false));
+        vm.TryGoBack().Should().BeTrue();
+        vm.IsMainOpen.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(AccountState.SignedOut, "Sem conta")]
+    [InlineData(AccountState.SignedIn, "Conectado como ana@exemplo.com")]
+    [InlineData(AccountState.SessionExpired, "Entre de novo para continuar")]
+    [InlineData(AccountState.VaultLocked, "Chaveiro travado")]
+    [InlineData(AccountState.SessionUnreadable, "Sessão ilegível")]
+    public async Task Summary_for_the_settings_list_follows_the_state(AccountState state, string summary)
+    {
+        _account.Status = new AccountStatus(state, "ana@exemplo.com", Local, null, 0, null);
+
+        var vm = await LoadedAsync();
+
+        vm.SummaryText.Should().Be(summary);
+    }
+
+    [Fact]
     public async Task Settings_back_closes_account_page_first()
     {
         var account = await LoadedAsync();

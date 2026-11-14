@@ -116,7 +116,7 @@ public sealed partial class AccountViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSignedOut), nameof(IsSignedIn), nameof(IsSessionExpired), nameof(IsVaultLocked),
         nameof(IsSessionUnreadable), nameof(IsServerEditable), nameof(ConnectedText), nameof(ServerLineText),
-        nameof(LastSyncText), nameof(PendingText), nameof(LastError))]
+        nameof(LastSyncText), nameof(PendingText), nameof(LastError), nameof(SummaryText))]
     public partial AccountStatus Status { get; private set; } = new(AccountState.SignedOut, null, null, null, 0, null);
 
     // Campos dos formulários.
@@ -194,6 +194,16 @@ public sealed partial class AccountViewModel : ObservableObject
           "aparelhos, e metas excluídas depois disso podem voltar quando você entrar de novo.";
 
     public string ConnectedText => $"Conectado como {Status.Email}";
+
+    /// <summary>O estado em uma linha, para a lista de grupos de Configurações.</summary>
+    public string SummaryText => Status.State switch
+    {
+        AccountState.SignedIn => ConnectedText,
+        AccountState.SessionExpired => "Entre de novo para continuar",
+        AccountState.VaultLocked => "Chaveiro travado",
+        AccountState.SessionUnreadable => "Sessão ilegível",
+        _ => "Sem conta",
+    };
 
     public string ServerLineText => $"Servidor: {(Status.Server is { } server ? ServerAddress.Display(server) : "")}";
 
