@@ -1,0 +1,40 @@
+# Compila e roda os testes a cada PR e a cada commit na main.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Só leitura: o fluxo não publica nada nem escreve no repositório.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      # Ações fixadas pelo commit: uma tag pode ser movida para outro código.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      # O barramento e o chaveiro isolados dos testes do Linux; sem eles, esses testes são pulados.
+      - name: Instala dbus e gnome-keyring
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends dbus gnome-keyring
+
+      - name: Compila em Release (avisos são erros)
+        run: dotnet build SlimeGoals.slnx -c Release
+
+      # Os testes do servidor sobem um PostgreSQL no Docker (Testcontainers).
+      - name: Testa
+        run: dotnet test --solution SlimeGoals.slnx
