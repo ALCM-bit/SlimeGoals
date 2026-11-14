@@ -22,6 +22,10 @@ Este desenho mantém o tempo à vista enquanto o app está fora da tela:
 └──────────────────────────────┘
 ```
 
+O desenho acima é só a disposição. A aparência, com os estilos do app, está em `specs/design/cronometro-janelinha-prototipo.png`, em duas opções para o autor escolher: **A**, com o nome em cima e o tempo embaixo, e **B**, tudo numa linha.
+
+![Protótipo da janelinha](design/cronometro-janelinha-prototipo.png)
+
 - Mostra o ícone e o nome da meta, o tempo correndo (segundo a segundo) e um botão de parar.
 - **Aparece** quando há cronômetro rodando e a janela principal some: fechada (escondida na bandeja) ou minimizada.
 - **Some** quando a janela principal volta, ou quando o cronômetro para.
