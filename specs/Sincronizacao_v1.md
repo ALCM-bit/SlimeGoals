@@ -372,6 +372,13 @@ O custo é investigar sem a mensagem: o tipo e a pilha dizem onde falhou, mas à
 
 **Arquivo do banco.** Na primeira abertura, o banco e os arquivos ao lado dele (WAL, cópias antigas) ficam com permissão só para o dono (600), além da pasta de dados, que já é privada.
 
+**Validação dos campos da conta.** As regras de e-mail e de nome do aparelho ficam em `AccountRules` (`SlimeGoals.Sync.Contracts`), usadas pelo app e pelo servidor: o app recusa antes de enviar exatamente o que o servidor recusaria.
+
+- **E-mail:** até 254 caracteres, um só `@`, algo antes dele e um domínio com pelo menos um ponto e sem partes vazias, sem espaços nem caracteres de controle. Quem prova que o endereço existe é o e-mail de confirmação.
+- **Nome do aparelho:** de 1 a 100 caracteres, sem caracteres de controle.
+- **Tela:** os campos de texto limitam o tamanho com as mesmas constantes do código. Os campos de senha não limitam, porque cortar em silêncio o que foi colado num campo mascarado trocaria a senha sem a pessoa ver; o tamanho (10 a 1024) é conferido no envio. Os botões de enviar só ligam com os campos obrigatórios preenchidos.
+- **Banco do servidor:** a migração `002_limits` repete os tamanhos em restrições `CHECK` (e-mail, parâmetros de derivação, chaves, nome do aparelho, chave do registro), como segunda barreira.
+
 ## 7. Interface e Android
 
 - Configurações ganha a seção **Conta e sincronização**, visível por `PlatformCapabilities`.

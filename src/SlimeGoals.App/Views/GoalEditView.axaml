@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:SlimeGoals.App.ViewModels"
+             xmlns:validation="using:SlimeGoals.Core.Validation"
              x:Class="SlimeGoals.App.Views.GoalEditView"
              x:DataType="vm:GoalEditViewModel">
   <UserControl.Resources>
@@ -52,7 +53,7 @@
 
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Título" />
-            <TextBox Text="{Binding Title}" MaxLength="80" PlaceholderText="Ex.: Estudar inglês"
+            <TextBox Text="{Binding Title}" MaxLength="{x:Static validation:GoalValidator.MaxTitleLength}" PlaceholderText="Ex.: Estudar inglês"
                      AutomationProperties.Name="Título" />
             <TextBlock Classes="field-error" Text="{Binding TitleError}"
                        IsVisible="{Binding TitleError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
@@ -89,7 +90,7 @@
               <StackPanel Orientation="Horizontal" Spacing="10">
                 <NumericUpDown Value="{Binding TargetInput}" Minimum="1" Maximum="9999" Increment="1" FormatString="0"
                                Width="130" AutomationProperties.Name="Alvo" />
-                <TextBox Text="{Binding Unit}" MaxLength="20" Width="150" PlaceholderText="Ex.: copos"
+                <TextBox Text="{Binding Unit}" MaxLength="{x:Static validation:GoalValidator.MaxUnitLength}" Width="150" PlaceholderText="Ex.: copos"
                          AutomationProperties.Name="Unidade" />
               </StackPanel>
               <TextBlock Text="{Binding TargetSuffix}" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />

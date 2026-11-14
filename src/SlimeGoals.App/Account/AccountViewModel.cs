@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Sync;
 using SlimeGoals.Sync.Account;
+using SlimeGoals.Sync.Contracts;
 
 namespace SlimeGoals.App.Account;
 
@@ -56,6 +57,15 @@ public sealed partial class AccountViewModel : ObservableObject
         "Se não funcionar, o código anterior continua valendo, e você pode repetir a recuperação.";
     public const string SignInWithNewPasswordText = "Entre com a nova senha para ligar a sincronização neste aparelho.";
     public const string RecoveryCodeSavedLabel = "Guardei o código";
+    public const string ConfirmationCodeMissingText = "Informe o código de confirmação.";
+
+    // Limites de tamanho dos campos, lidos pela tela. Os campos de senha não têm: cortar em silêncio o que foi colado
+    // num campo mascarado trocaria a senha sem a pessoa ver; o tamanho é conferido no envio, com mensagem.
+    public const int MaxEmailLength = AccountRules.MaxEmailLength;
+    public const int MaxDeviceNameLength = AccountRules.MaxDeviceNameLength;
+    public const int MaxServerLength = 512;
+    public const int MaxConfirmationCodeLength = 128;
+    public const int MaxRecoveryCodeLength = 64;
     public const string ContinueLabel = "Continuar";
     public const string CopyLabel = "Copiar";
     public const string WaitLabel = "Esperar";
@@ -120,14 +130,30 @@ public sealed partial class AccountViewModel : ObservableObject
     public partial AccountStatus Status { get; private set; } = new(AccountState.SignedOut, null, null, null, 0, null);
 
     // Campos dos formulários.
-    [ObservableProperty] public partial string ServerText { get; set; }
-    [ObservableProperty] public partial string Email { get; set; } = "";
-    [ObservableProperty] public partial string Password { get; set; } = "";
-    [ObservableProperty] public partial string PasswordConfirmation { get; set; } = "";
-    [ObservableProperty] public partial string CurrentPassword { get; set; } = "";
-    [ObservableProperty] public partial string ConfirmationCode { get; set; } = "";
-    [ObservableProperty] public partial string RecoveryCodeInput { get; set; } = "";
-    [ObservableProperty] public partial string DeviceName { get; set; }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SubmitRegisterCommand), nameof(SubmitLoginCommand), nameof(SubmitRecoverCommand))]
+    public partial string ServerText { get; set; }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SubmitRegisterCommand), nameof(SubmitLoginCommand), nameof(SubmitRecoverCommand))]
+    public partial string Email { get; set; } = "";
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SubmitRegisterCommand), nameof(SubmitLoginCommand), nameof(SubmitRecoverCommand), nameof(SubmitReauthenticateCommand), nameof(SubmitChangePasswordCommand), nameof(SubmitDeleteAccountCommand))]
+    public partial string Password { get; set; } = "";
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SubmitRegisterCommand), nameof(SubmitRecoverCommand), nameof(SubmitChangePasswordCommand))]
+    public partial string PasswordConfirmation { get; set; } = "";
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SubmitChangePasswordCommand))]
+    public partial string CurrentPassword { get; set; } = "";
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SubmitConfirmCommand))]
+    public partial string ConfirmationCode { get; set; } = "";
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SubmitRecoverCommand))]
+    public partial string RecoveryCodeInput { get; set; } = "";
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SubmitConfirmCommand), nameof(SubmitLoginCommand), nameof(SubmitRecoverCommand), nameof(SubmitReauthenticateCommand))]
+    public partial string DeviceName { get; set; }
 
     /// <summary>Código de recuperação para mostrar; só existe nas páginas dele.</summary>
     [ObservableProperty] public partial string? ShownRecoveryCode { get; private set; }
@@ -294,7 +320,7 @@ public sealed partial class AccountViewModel : ObservableObject
         Page = AccountPage.SignOut;
     });
 
-    [RelayCommand(CanExecute = nameof(IsIdle))]
+    [RelayCommand(CanExecute = nameof(CanSubmitRegister))]
     private async Task SubmitRegisterAsync()
     {
         var (email, password, confirmation) = (Email, Password, PasswordConfirmation);
@@ -328,12 +354,47 @@ public sealed partial class AccountViewModel : ObservableObject
 
     private bool CanContinue() => IsIdle && RecoveryCodeSaved;
 
-    [RelayCommand(CanExecute = nameof(IsIdle))]
+    // Os botões de enviar só ligam com os campos obrigatórios preenchidos. O formato (e-mail, tamanho da senha) é
+    // conferido no envio, com a mensagem de cada regra.
+    private bool CanSubmitRegister() => IsIdle && Typed(ServerText, Email) && Password.Length > 0 && PasswordConfirmation.Length > 0;
+
+    private bool CanSubmitConfirm() => IsIdle && Typed(DeviceName);
+
+    private bool CanSubmitLogin() => IsIdle && Typed(ServerText, Email, DeviceName) && Password.Length > 0;
+
+    private bool CanSubmitRecover() => IsIdle && Typed(ServerText, Email, RecoveryCodeInput, DeviceName)
+        && Password.Length > 0 && PasswordConfirmation.Length > 0;
+
+    private bool CanSubmitReauthenticate() => IsIdle && Typed(DeviceName) && Password.Length > 0;
+
+    private bool CanSubmitChangePassword() =>
+        IsIdle && CurrentPassword.Length > 0 && Password.Length > 0 && PasswordConfirmation.Length > 0;
+
+    private bool CanSubmitDeleteAccount() => IsIdle && Password.Length > 0;
+
+    private static bool Typed(params ReadOnlySpan<string> values)
+    {
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+        }
+
+        return true;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanSubmitConfirm))]
     private async Task SubmitConfirmAsync()
     {
         if (_pending is not { } pending)
             return;
-        var (code, deviceName) = (ConfirmationCode, DeviceName);
+        var (code, deviceName) = (ConfirmationCode.Trim(), DeviceName);
+        if (code.Length == 0)
+        {
+            Error = ConfirmationCodeMissingText;
+            return;
+        }
+
         await RunAsync(AccountAction.Confirm, async () =>
         {
             await _account.ConfirmAsync(pending, code, deviceName);
@@ -341,7 +402,7 @@ public sealed partial class AccountViewModel : ObservableObject
         });
     }
 
-    [RelayCommand(CanExecute = nameof(IsIdle))]
+    [RelayCommand(CanExecute = nameof(CanSubmitLogin))]
     private async Task SubmitLoginAsync()
     {
         var (email, password, deviceName) = (Email, Password, DeviceName);
@@ -355,7 +416,7 @@ public sealed partial class AccountViewModel : ObservableObject
         });
     }
 
-    [RelayCommand(CanExecute = nameof(IsIdle))]
+    [RelayCommand(CanExecute = nameof(CanSubmitRecover))]
     private async Task SubmitRecoverAsync()
     {
         var (email, code, password, confirmation, deviceName) =
@@ -378,7 +439,7 @@ public sealed partial class AccountViewModel : ObservableObject
         });
     }
 
-    [RelayCommand(CanExecute = nameof(IsIdle))]
+    [RelayCommand(CanExecute = nameof(CanSubmitReauthenticate))]
     private Task SubmitReauthenticateAsync()
     {
         var (password, deviceName) = (Password, DeviceName);
@@ -390,7 +451,7 @@ public sealed partial class AccountViewModel : ObservableObject
         });
     }
 
-    [RelayCommand(CanExecute = nameof(IsIdle))]
+    [RelayCommand(CanExecute = nameof(CanSubmitChangePassword))]
     private async Task SubmitChangePasswordAsync()
     {
         var (current, password, confirmation) = (CurrentPassword, Password, PasswordConfirmation);
@@ -412,7 +473,7 @@ public sealed partial class AccountViewModel : ObservableObject
         Page = AccountPage.None;
     });
 
-    [RelayCommand(CanExecute = nameof(IsIdle))]
+    [RelayCommand(CanExecute = nameof(CanSubmitDeleteAccount))]
     private Task SubmitDeleteAccountAsync()
     {
         var password = Password;

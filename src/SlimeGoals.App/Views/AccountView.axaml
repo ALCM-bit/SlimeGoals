@@ -17,11 +17,11 @@
         <StackPanel Spacing="18" IsEnabled="{Binding IsIdle}">
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Servidor" />
-            <TextBox Text="{Binding ServerText}" IsEnabled="{Binding IsServerEditable}" AutomationProperties.Name="Servidor" />
+            <TextBox Text="{Binding ServerText}" MaxLength="{x:Static acc:AccountViewModel.MaxServerLength}" IsEnabled="{Binding IsServerEditable}" AutomationProperties.Name="Servidor" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="E-mail" />
-            <TextBox Text="{Binding Email}" AutomationProperties.Name="E-mail" />
+            <TextBox Text="{Binding Email}" MaxLength="{x:Static acc:AccountViewModel.MaxEmailLength}" AutomationProperties.Name="E-mail" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Senha" />
@@ -59,11 +59,11 @@
         <StackPanel Spacing="18" IsEnabled="{Binding IsIdle}">
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Código" />
-            <TextBox Text="{Binding ConfirmationCode}" AutomationProperties.Name="Código" />
+            <TextBox Text="{Binding ConfirmationCode}" MaxLength="{x:Static acc:AccountViewModel.MaxConfirmationCodeLength}" AutomationProperties.Name="Código" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Nome do aparelho" />
-            <TextBox Text="{Binding DeviceName}" AutomationProperties.Name="Nome do aparelho" />
+            <TextBox Text="{Binding DeviceName}" MaxLength="{x:Static acc:AccountViewModel.MaxDeviceNameLength}" AutomationProperties.Name="Nome do aparelho" />
           </StackPanel>
         </StackPanel>
         <Button Classes="primary" HorizontalAlignment="Left" Content="Confirmar" Command="{Binding SubmitConfirmCommand}" />
@@ -76,11 +76,11 @@
         <StackPanel Spacing="18" IsEnabled="{Binding IsIdle}">
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Servidor" />
-            <TextBox Text="{Binding ServerText}" IsEnabled="{Binding IsServerEditable}" AutomationProperties.Name="Servidor" />
+            <TextBox Text="{Binding ServerText}" MaxLength="{x:Static acc:AccountViewModel.MaxServerLength}" IsEnabled="{Binding IsServerEditable}" AutomationProperties.Name="Servidor" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="E-mail" />
-            <TextBox Text="{Binding Email}" AutomationProperties.Name="E-mail" />
+            <TextBox Text="{Binding Email}" MaxLength="{x:Static acc:AccountViewModel.MaxEmailLength}" AutomationProperties.Name="E-mail" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Senha" />
@@ -88,7 +88,7 @@
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Nome do aparelho" />
-            <TextBox Text="{Binding DeviceName}" AutomationProperties.Name="Nome do aparelho" />
+            <TextBox Text="{Binding DeviceName}" MaxLength="{x:Static acc:AccountViewModel.MaxDeviceNameLength}" AutomationProperties.Name="Nome do aparelho" />
           </StackPanel>
         </StackPanel>
         <Button Classes="primary" HorizontalAlignment="Left" Content="Entrar" Command="{Binding SubmitLoginCommand}" />
@@ -99,15 +99,15 @@
         <StackPanel Spacing="18" IsEnabled="{Binding IsIdle}">
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Servidor" />
-            <TextBox Text="{Binding ServerText}" IsEnabled="{Binding IsServerEditable}" AutomationProperties.Name="Servidor" />
+            <TextBox Text="{Binding ServerText}" MaxLength="{x:Static acc:AccountViewModel.MaxServerLength}" IsEnabled="{Binding IsServerEditable}" AutomationProperties.Name="Servidor" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="E-mail" />
-            <TextBox Text="{Binding Email}" AutomationProperties.Name="E-mail" />
+            <TextBox Text="{Binding Email}" MaxLength="{x:Static acc:AccountViewModel.MaxEmailLength}" AutomationProperties.Name="E-mail" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Código de recuperação" />
-            <TextBox Text="{Binding RecoveryCodeInput}" PasswordChar="•" RevealPassword="False"
+            <TextBox Text="{Binding RecoveryCodeInput}" MaxLength="{x:Static acc:AccountViewModel.MaxRecoveryCodeLength}" PasswordChar="•" RevealPassword="False"
                      AutomationProperties.Name="Código de recuperação" />
           </StackPanel>
           <StackPanel Classes="field">
@@ -121,7 +121,7 @@
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Nome do aparelho" />
-            <TextBox Text="{Binding DeviceName}" AutomationProperties.Name="Nome do aparelho" />
+            <TextBox Text="{Binding DeviceName}" MaxLength="{x:Static acc:AccountViewModel.MaxDeviceNameLength}" AutomationProperties.Name="Nome do aparelho" />
           </StackPanel>
         </StackPanel>
         <Button Classes="primary" HorizontalAlignment="Left" Content="Recuperar conta" Command="{Binding SubmitRecoverCommand}" />
@@ -137,7 +137,7 @@
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Nome do aparelho" />
-            <TextBox Text="{Binding DeviceName}" AutomationProperties.Name="Nome do aparelho" />
+            <TextBox Text="{Binding DeviceName}" MaxLength="{x:Static acc:AccountViewModel.MaxDeviceNameLength}" AutomationProperties.Name="Nome do aparelho" />
           </StackPanel>
         </StackPanel>
         <Button Classes="primary" HorizontalAlignment="Left" Content="{x:Static acc:AccountViewModel.ReauthenticateLabel}"

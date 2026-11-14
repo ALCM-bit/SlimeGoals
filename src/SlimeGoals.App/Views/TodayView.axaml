@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:views="using:SlimeGoals.App.Views"
              xmlns:vm="using:SlimeGoals.App.ViewModels"
+             xmlns:services="using:SlimeGoals.Core.Services"
              x:Class="SlimeGoals.App.Views.TodayView"
              x:DataType="vm:TodayPageViewModel">
   <DockPanel Classes="page">
@@ -222,7 +223,7 @@
                                        FormatString="0" Width="110" AutomationProperties.Name="Minutos" />
                         <TextBlock Text="min" VerticalAlignment="Center" />
                       </StackPanel>
-                      <TextBox Text="{Binding PanelNote}" MaxLength="200" PlaceholderText="Nota (opcional)"
+                      <TextBox Text="{Binding PanelNote}" MaxLength="{x:Static services:CheckinService.MaxNoteLength}" PlaceholderText="Nota (opcional)"
                                AutomationProperties.Name="Nota" />
                       <TextBlock Classes="field-error" Text="{Binding PanelError}"
                                  IsVisible="{Binding PanelError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
@@ -246,7 +247,7 @@
                                        FormatString="0" Width="130" AutomationProperties.Name="Minutos cronometrados" />
                         <TextBlock Text="min" VerticalAlignment="Center" />
                       </StackPanel>
-                      <TextBox Text="{Binding PanelNote}" MaxLength="200" PlaceholderText="Nota (opcional)"
+                      <TextBox Text="{Binding PanelNote}" MaxLength="{x:Static services:CheckinService.MaxNoteLength}" PlaceholderText="Nota (opcional)"
                                AutomationProperties.Name="Nota" />
                       <TextBlock Classes="field-error" Text="{Binding PanelError}"
                                  IsVisible="{Binding PanelError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
