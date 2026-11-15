@@ -203,11 +203,11 @@ adb reverse tcp:8080 tcp:8080                       # o 127.0.0.1:8080 do celula
 - O endereço no app é o padrão, `http://127.0.0.1:8080`. O APK de desenvolvimento só aceita texto puro para `127.0.0.1` e `localhost`.
 - A sessão fica cifrada com uma chave do Android Keystore, num arquivo privado do app que não vai para backup.
 - Para voltar ao app normal, instale por cima o APK sem `-dev`. A seção some, e a sessão fica guardada, sem uso.
-- **Conferir a criptografia no aparelho:** o APK de desenvolvimento calcula os vetores fixos da spec quando o `adb` pede (só o `adb` e o sistema conseguem pedir):
+- **Conferir a criptografia no aparelho:** o APK de desenvolvimento calcula os vetores fixos da spec e faz uma ida e volta no cofre quando o `adb` pede (só o `adb` e o sistema conseguem pedir):
 
   ```bash
   adb shell am broadcast -a dev.alcm.slimegoals.VERIFICAR_CRIPTO -n dev.alcm.slimegoals/dev.alcm.slimegoals.CryptoSelfCheckReceiver
-  adb logcat -d -s SlimeGoals    # esperado: "cripto: 5/5 vetores conferem"
+  adb logcat -d -s SlimeGoals    # esperado: "cripto: 5/5 vetores conferem" e "cofre: ida e volta confere"
   ```
 
 ## Instalar no Android
