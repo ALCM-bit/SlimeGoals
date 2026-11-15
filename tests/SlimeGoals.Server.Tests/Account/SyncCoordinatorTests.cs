@@ -168,6 +168,42 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
     }
 
     [Fact]
+    public async Task Sign_out_clears_even_when_reading_the_secret_fails_unexpectedly()
+    {
+        // Uma exceção que o cofre não traduziu (no Android, um erro do Keystore vindo do Java) não pode prender a
+        // pessoa: "Tentar de novo" repete o erro, e "Sair" tem de limpar sem precisar ler a sessão.
+        var a = NewDevice();
+        await a.State.EnableAsync();
+        await a.Vault.SetAsync("sync-session", "ilegível"u8.ToArray());
+        a.Vault.FailReadsWith = new InvalidOperationException();
+        await a.Account.StartAsync();
+        (await a.Account.GetStatusAsync()).State.Should().Be(AccountState.VaultLocked);
+
+        await a.Account.SignOutAsync();
+
+        (await a.Account.GetStatusAsync()).State.Should().Be(AccountState.SignedOut);
+        a.Vault.Names.Should().BeEmpty();
+        (await a.State.GetAsync()).Enabled.Should().BeFalse();
+        a.Net.ClientsCreated.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Sign_out_with_the_vault_unavailable_fails_and_keeps_the_account()
+    {
+        var a = NewDevice();
+        await a.State.EnableAsync();
+        await a.Vault.SetAsync("sync-session", "trancado"u8.ToArray());
+        a.Vault.FailReadsWith = new SecretVaultUnavailableException("trancado");
+        await a.Account.StartAsync();
+
+        var act = () => a.Account.SignOutAsync();
+
+        await act.Should().ThrowAsync<SecretVaultUnavailableException>();
+        a.Vault.Names.Should().ContainSingle();
+        (await a.State.GetAsync()).Enabled.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Revocation_moves_to_SessionExpired_and_reauth_sends_the_queue()
     {
         var a = NewDevice();

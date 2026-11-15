@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using SlimeGoals.Core.Abstractions;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Core.Sync;
 using SlimeGoals.Sync.Account;
@@ -149,7 +150,8 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
 
     /// <summary>
     /// Para o motor e espera o ciclo antes de sair: nenhum pedido do ciclo sai depois de limpar a fila. Com o segredo
-    /// ilegível (ou faltando), não há servidor nem token: só a limpeza local, sem rede.
+    /// ilegível (ou faltando, ou com uma falha inesperada do cofre ao ler), não há servidor nem token: só a limpeza
+    /// local, sem rede. Só o cofre indisponível (trancado) impede sair.
     /// </summary>
     public Task SignOutAsync(CancellationToken ct = default) => RunOpAsync(async () =>
     {
@@ -167,6 +169,11 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
             }
             catch (InvalidDataException)
             {
+            }
+            catch (Exception e) when (e is not SecretVaultUnavailableException and not OperationCanceledException)
+            {
+                // Falha que o cofre não traduziu: a sessão não serve para nada, e "Sair" é a única saída que sobra.
+                Trace.TraceWarning($"Sessão ilegível ao sair; só a limpeza local: {TraceText.Types(e)}");
             }
 
             if (server is not null)
