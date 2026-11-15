@@ -15,7 +15,8 @@ public sealed partial class TodayGoalViewModel : ObservableObject
     private readonly ActiveTimer? _timer;
     private readonly TimeProvider _time;
 
-    public TodayGoalViewModel(GoalProgress progress, ActiveTimer? timer, TimeProvider time)
+    public TodayGoalViewModel(GoalProgress progress, ActiveTimer? timer, TimeProvider time,
+        IReadOnlyList<Checkin>? todayCheckins = null)
     {
         Goal = progress.Goal;
         ProgressText = GoalFormatting.Progress(progress);
@@ -31,8 +32,25 @@ public sealed partial class TodayGoalViewModel : ObservableObject
             PanelNote = _timer.Task; // a tarefa vira a nota do registro, e a pessoa pode editar
         }
         TaskInput = TimerTask;
+        var records = IsDuration ? todayCheckins ?? [] : [];
+        HasChunks = records.Count > 0;
+        ChunksHeader = $"Hoje · {GoalFormatting.Duration(Math.Max(0, records.Sum(c => c.Amount)))}";
+        if (IsTimerRunning)
+            _runningChunk = TodayChunkViewModel.Running(Goal.Id, _timer!.Task);
+        Chunks = [.. _runningChunk is null ? [] : new[] { _runningChunk }, .. records.Select(TodayChunkViewModel.Of)];
         UpdateElapsed();
     }
+
+    private readonly TodayChunkViewModel? _runningChunk;
+
+    // ---- Trechos de hoje (specs/Tarefas_no_cronometro_v1.md §7.2) ----
+    /// <summary>Registros do dia, do mais recente para o mais antigo; com o cronômetro rodando, o trecho dele vem antes.</summary>
+    public IReadOnlyList<TodayChunkViewModel> Chunks { get; }
+    /// <summary>Só meta de tempo com algum registro hoje.</summary>
+    public bool HasChunks { get; }
+    /// <summary>Soma só dos registros gravados, limitada a 0; o trecho em andamento fica de fora.</summary>
+    public string ChunksHeader { get; }
+    [ObservableProperty] public partial bool IsChunksOpen { get; set; }
 
     public Goal Goal { get; }
     public string Title => Goal.Title;
@@ -134,5 +152,6 @@ public sealed partial class TodayGoalViewModel : ObservableObject
     {
         if (_timer is not null)
             Elapsed = GoalFormatting.Elapsed((_timer.StoppedAt ?? _time.GetUtcNow()) - _timer.StartedAt);
+        _runningChunk?.Text = Elapsed;
     }
 }

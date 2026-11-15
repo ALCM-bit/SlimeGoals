@@ -133,15 +133,32 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         {
             await goals.ArchiveExpiredAsync();
             var snapshot = await progress.GetTodayAsync();
+            var todayCheckins = await checkins.TodayAsync();
             if (version != _loadVersion)
                 return;
 
             StopTicker();
             // O texto do campo da tarefa sobrevive à recarga (sincronização, outro processo) enquanto for o mesmo cronômetro.
             var draft = Goals.FirstOrDefault(g => g.HasTaskDraft);
+            // A lista aberta e o editor de um trecho também sobrevivem à recarga, se o registro ainda existir.
+            var openChunks = Goals.Where(g => g.IsChunksOpen).Select(g => g.Goal.Id).ToHashSet();
+            var chunkDraft = Goals.SelectMany(g => g.Chunks).FirstOrDefault(c => c.IsEditing);
             Goals.Clear();
             foreach (var item in snapshot.Goals)
-                Goals.Add(new TodayGoalViewModel(item, snapshot.Timer, time) { CanStartTimer = snapshot.Timer is null });
+            {
+                var card = new TodayGoalViewModel(item, snapshot.Timer, time,
+                    todayCheckins.Where(c => c.GoalId == item.Goal.Id).ToList())
+                {
+                    CanStartTimer = snapshot.Timer is null,
+                };
+                card.IsChunksOpen = card.HasChunks && openChunks.Contains(card.Goal.Id);
+                if (chunkDraft is not null && card.Chunks.FirstOrDefault(c => c.CheckinId == chunkDraft.CheckinId) is { } same)
+                {
+                    same.OpenEditor();
+                    (same.MinutesInput, same.NoteInput, same.Error) = (chunkDraft.MinutesInput, chunkDraft.NoteInput, chunkDraft.Error);
+                }
+                Goals.Add(card);
+            }
             var running = Goals.FirstOrDefault(g => g.IsTimerRunning);
             if (draft is not null && running is not null && running.Goal.Id == draft.Goal.Id
                 && (draft.IsSwitchingTask || draft.IsEditingTask
@@ -408,6 +425,87 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             item.IsSwitchingTask = false;
             item.TaskInput = TodayGoalViewModel.NormalizeTask(item.TaskInput);
         });
+    }
+
+    // ---- Trechos de hoje (specs/Tarefas_no_cronometro_v1.md §7.2) ----
+
+    [RelayCommand]
+    private static void ToggleChunks(TodayGoalViewModel? item)
+    {
+        if (item is { HasChunks: true })
+            item.IsChunksOpen = !item.IsChunksOpen;
+    }
+
+    /// <summary>Abre o editor do trecho; só um editor fica aberto na página.</summary>
+    [RelayCommand]
+    private void EditChunk(TodayChunkViewModel? chunk)
+    {
+        if (chunk is not { CanEdit: true })
+            return;
+        foreach (var other in Goals.SelectMany(g => g.Chunks).Where(c => c != chunk && c.IsEditing))
+            other.CloseEditor();
+        chunk.OpenEditor();
+    }
+
+    [RelayCommand]
+    private static void CancelChunkEdit(TodayChunkViewModel? chunk) => chunk?.CloseEditor();
+
+    [RelayCommand]
+    private Task SaveChunkAsync(TodayChunkViewModel? chunk)
+    {
+        if (chunk is not { IsEditing: true, CheckinId: { } id })
+            return Task.CompletedTask;
+        if (chunk.Minutes() is not { } minutes)
+        {
+            chunk.Error = "Informe um valor.";
+            return Task.CompletedTask;
+        }
+        return RunChunkAsync(chunk, () => checkins.ReplaceAsync(chunk.GoalId, id, minutes, chunk.NoteInput));
+    }
+
+    [RelayCommand]
+    private Task DeleteChunkAsync(TodayChunkViewModel? chunk) =>
+        chunk is { IsEditing: true, CheckinId: { } id }
+            ? RunChunkAsync(chunk, () => checkins.DeleteAsync(chunk.GoalId, id))
+            : Task.CompletedTask;
+
+    /// <summary>
+    /// Os erros ficam no editor, que continua aberto; só a meta excluída vai para a faixa da página. Depois de gravar,
+    /// fecha o editor antes de recarregar, para a recarga não reabri-lo.
+    /// </summary>
+    private async Task RunChunkAsync(TodayChunkViewModel chunk, Func<Task> action)
+    {
+        ErrorMessage = null;
+        chunk.Error = null;
+        try
+        {
+            await action();
+        }
+        catch (GoalValidationException ex)
+        {
+            chunk.Error = ex.Errors[0].Message;
+            return;
+        }
+        catch (GoalStateException ex)
+        {
+            chunk.Error = ex.Message;
+            return;
+        }
+        catch (GoalNotFoundException)
+        {
+            chunk.CloseEditor();
+            await LoadCommand.ExecuteAsync(null);
+            ErrorMessage ??= "Esta meta não existe mais.";
+            return;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Trace.TraceError($"Falha ao ajustar um trecho de hoje: {TraceText.Of(ex)}");
+            chunk.Error = "Não foi possível salvar.";
+            return;
+        }
+        chunk.CloseEditor();
+        await LoadCommand.ExecuteAsync(null);
     }
 
     [RelayCommand]

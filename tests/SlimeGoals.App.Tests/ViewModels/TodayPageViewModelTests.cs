@@ -864,4 +864,193 @@ public class TodayPageViewModelTests
 
         (Card(page, "Estudar").IsEditingTask, Card(page, "Estudar").TaskInput).Should().Be((true, "Inglês"));
     }
+
+    // ---- Trechos de hoje no cartão (specs/Tarefas_no_cronometro_v1.md §7.2) ----
+
+    private async Task<Goal> StudyWithRecordsAsync()
+    {
+        var goal = await Create("Estudar", Measure.Duration, 60, unit: null);
+        await CheckinService.AdjustAsync(goal.Id, 25, "Inglês");
+        _time.Advance(TimeSpan.FromMinutes(1));
+        await CheckinService.AdjustAsync(goal.Id, 12);
+        return goal;
+    }
+
+    private static IEnumerable<(string Name, string Text)> Rows(TodayGoalViewModel card) =>
+        card.Chunks.Select(c => (c.Name, c.Text));
+
+    [Fact]
+    public async Task Duration_card_lists_todays_records_newest_first()
+    {
+        await StudyWithRecordsAsync();
+
+        var card = Card(await Loaded(), "Estudar");
+
+        Rows(card).Should().Equal(("Sem nome", "12 min"), ("Inglês", "25 min"));
+        (card.HasChunks, card.ChunksHeader, card.IsChunksOpen).Should().Be((true, "Hoje · 37 min", false));
+        card.Chunks.Should().OnlyContain(c => c.CanEdit && !c.IsRunning);
+    }
+
+    [Fact]
+    public async Task Card_without_records_today_has_no_list()
+    {
+        await Create("Estudar", Measure.Duration, 60, unit: null);
+        var water = await Create("Água");
+        await CheckinService.AdjustAsync(water.Id, 2);
+
+        var page = await Loaded();
+
+        (Card(page, "Estudar").HasChunks, Card(page, "Água").HasChunks).Should().Be((false, false));
+    }
+
+    [Fact]
+    public async Task Running_chunk_comes_first_and_is_not_editable()
+    {
+        var goal = await StudyWithRecordsAsync();
+        await Timers.StartAsync(goal.Id);
+        await Timers.SetTaskAsync("Leitura");
+        _time.Advance(TimeSpan.FromMinutes(3));
+
+        var card = Card(await Loaded(), "Estudar");
+
+        var running = card.Chunks[0];
+        (running.IsRunning, running.CanEdit, running.Name, running.Text, running.CheckinId).Should().Be((true, false, "Leitura", "0:03:00", null));
+        card.ChunksHeader.Should().Be("Hoje · 37 min");
+        _time.Advance(TimeSpan.FromSeconds(5));
+        card.UpdateElapsed();
+        running.Text.Should().Be("0:03:05");
+    }
+
+    [Fact]
+    public async Task Compensation_record_is_not_editable()
+    {
+        var goal = await Create("Estudar", Measure.Duration, 60, unit: null);
+        await _checkins.AddAsync(new Checkin
+        {
+            Id = Guid.CreateVersion7(), GoalId = goal.Id, DoneAt = Now, Amount = 5, UpdatedAt = Now,
+            Compensation = new Compensation(new DateOnly(2026, 11, 4), []),
+        });
+
+        Card(await Loaded(), "Estudar").Chunks.Should().ContainSingle().Which.CanEdit.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Negative_record_shows_with_minus()
+    {
+        var goal = await StudyWithRecordsAsync();
+        _time.Advance(TimeSpan.FromMinutes(1));
+        await CheckinService.AdjustAsync(goal.Id, -5);
+
+        var card = Card(await Loaded(), "Estudar");
+
+        (card.Chunks[0].Text, card.ChunksHeader).Should().Be(("-5 min", "Hoje · 32 min"));
+    }
+
+    [Fact]
+    public async Task Toggle_survives_reload()
+    {
+        await StudyWithRecordsAsync();
+        var page = await Loaded();
+
+        page.ToggleChunksCommand.Execute(Card(page, "Estudar"));
+        _changes.NotifyChanged();
+
+        Card(page, "Estudar").IsChunksOpen.Should().BeTrue();
+        page.ToggleChunksCommand.Execute(Card(page, "Estudar"));
+        _changes.NotifyChanged();
+        Card(page, "Estudar").IsChunksOpen.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Edit_chunk_prefills_and_closes_other_editors()
+    {
+        await StudyWithRecordsAsync();
+        var page = await Loaded();
+        var (unnamed, english) = (Card(page, "Estudar").Chunks[0], Card(page, "Estudar").Chunks[1]);
+
+        page.EditChunkCommand.Execute(unnamed);
+        page.EditChunkCommand.Execute(english);
+
+        unnamed.IsEditing.Should().BeFalse();
+        (english.IsEditing, english.MinutesInput, english.NoteInput).Should().Be((true, 25m, "Inglês"));
+        page.CancelChunkEditCommand.Execute(english);
+        english.IsEditing.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Save_chunk_replaces_the_record()
+    {
+        await StudyWithRecordsAsync();
+        var page = await Loaded();
+        var english = Card(page, "Estudar").Chunks[1];
+        page.EditChunkCommand.Execute(english);
+        english.MinutesInput = 20;
+        english.NoteInput = "Inglês 2";
+
+        await page.SaveChunkCommand.ExecuteAsync(english);
+
+        var card = Card(page, "Estudar");
+        (card.ChunksHeader, card.Chunks.Any(c => c.IsEditing)).Should().Be(("Hoje · 32 min", false));
+        Rows(card).Should().Contain(("Inglês 2", "20 min"));
+    }
+
+    [Fact]
+    public async Task Delete_chunk_removes_it()
+    {
+        await StudyWithRecordsAsync();
+        var page = await Loaded();
+        var unnamed = Card(page, "Estudar").Chunks[0];
+        page.EditChunkCommand.Execute(unnamed);
+
+        await page.DeleteChunkCommand.ExecuteAsync(unnamed);
+
+        Rows(Card(page, "Estudar")).Should().Equal(("Inglês", "25 min"));
+    }
+
+    [Fact]
+    public async Task Chunk_error_stays_in_the_editor()
+    {
+        await StudyWithRecordsAsync();
+        var page = await Loaded();
+        var unnamed = Card(page, "Estudar").Chunks[0];
+        page.EditChunkCommand.Execute(unnamed);
+        await _checkins.DeleteAsync(unnamed.CheckinId!.Value); // outro aparelho apagou
+
+        unnamed.MinutesInput = 10;
+        await page.SaveChunkCommand.ExecuteAsync(unnamed);
+
+        (unnamed.IsEditing, unnamed.Error, page.ErrorMessage).Should().Be((true, "O registro mudou. Confira em Hoje.", null));
+    }
+
+    [Fact]
+    public async Task Reload_keeps_the_open_chunk_editor()
+    {
+        await StudyWithRecordsAsync();
+        var page = await Loaded();
+        var english = Card(page, "Estudar").Chunks[1];
+        page.EditChunkCommand.Execute(english);
+        english.MinutesInput = 18;
+
+        _changes.NotifyChanged();
+
+        var reloaded = Card(page, "Estudar").Chunks[1];
+        reloaded.Should().NotBeSameAs(english);
+        (reloaded.IsEditing, reloaded.MinutesInput, reloaded.NoteInput).Should().Be((true, 18m, "Inglês"));
+    }
+
+    [Fact]
+    public async Task Empty_minutes_shows_inform_value()
+    {
+        await StudyWithRecordsAsync();
+        var page = await Loaded();
+        var english = Card(page, "Estudar").Chunks[1];
+        page.EditChunkCommand.Execute(english);
+        english.MinutesInput = null;
+
+        await page.SaveChunkCommand.ExecuteAsync(english);
+
+        english.Error.Should().Be("Informe um valor.");
+        _checkins.All.Should().HaveCount(2);
+    }
+
 }

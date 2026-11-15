@@ -262,6 +262,35 @@ void RenderTodayWithTimer(int width)
     Capture($"today-timer-edit-{width}.png");
     today.CancelEditTaskCommand.Execute(running);
     Pump();
+    // Trechos de hoje: a lista aberta e o editor do registro mais recente
+    running = today.Goals.Single(g => g.IsTimerRunning);
+    if (!running.HasChunks)
+    {
+        sample.Checkins.AdjustAsync(running.Goal.Id, 25, "Inglês").GetAwaiter().GetResult();
+        sample.Checkins.AdjustAsync(running.Goal.Id, 12).GetAwaiter().GetResult();
+        today.LoadCommand.Execute(null);
+        Pump();
+        running = today.Goals.Single(g => g.IsTimerRunning);
+    }
+    today.ToggleChunksCommand.Execute(running);
+    Pump();
+    // O cartão do cronômetro, com a lista aberta, fica abaixo da dobra: rola até o começo da lista
+    window.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("chunks-toggle") && b.IsEffectivelyVisible)
+        .BringIntoView(new Rect(0, 0, 1, 400));
+    Pump();
+    Capture($"today-chunks-{width}.png");
+    today.EditChunkCommand.Execute(running.Chunks.First(c => c.CanEdit));
+    Pump();
+    // O cartão do cronômetro, com a lista aberta, fica abaixo da dobra: rola até o começo da lista
+    window.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("chunks-toggle") && b.IsEffectivelyVisible)
+        .BringIntoView(new Rect(0, 0, 1, 400));
+    Pump();
+    Capture($"today-chunk-edit-{width}.png");
+    today.CancelChunkEditCommand.Execute(running.Chunks.First(c => c.CanEdit));
+    today.ToggleChunksCommand.Execute(running);
+    window.GetVisualDescendants().OfType<TodayView>().Single()
+        .GetVisualDescendants().OfType<ScrollViewer>().First().ScrollToHome();
+    Pump();
     // Modo de troca: o campo vazio com Cancelar e Trocar
     running = today.Goals.Single(g => g.IsTimerRunning);
     today.BeginSwitchTaskCommand.Execute(running);

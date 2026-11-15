@@ -49,6 +49,9 @@ public sealed class Sample : IDisposable
     /// <paramref name="phone"/>, com as capacidades do Android (nada de lembretes, autostart, janela nem Sair).
     /// </summary>
     /// <param name="account">Com ela, a seção "Conta e sincronização" aparece (capacidades do desktop com <c>Sync</c>).</param>
+    /// <summary>Para as cenas que precisam de registros além dos da amostra (trechos de hoje).</summary>
+    public CheckinService Checkins => _services.GetRequiredService<CheckinService>();
+
     public ShellViewModel CreateShell(bool phone, AccountViewModel? account = null)
     {
         var capabilities = phone ? new PlatformCapabilities(true, false, false, false) : PlatformCapabilities.Desktop;
