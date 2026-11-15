@@ -23,6 +23,25 @@ public class AccountViewModelTests
         new(_account, new AppSettings(_repo), new AccountDefaults("notebook-da-ana"),
             inlineDispatch ? a => a() : _posted.Add, _time);
 
+    [Fact]
+    public void The_platform_clipboard_is_kept_for_the_view()
+    {
+        var clipboard = new NullClipboard();
+
+        new AccountViewModel(_account, new AppSettings(_repo), new AccountDefaults("x"), a => a(), _time, clipboard)
+            .PlatformClipboard.Should().BeSameAs(clipboard);
+        Create().PlatformClipboard.Should().BeNull();
+    }
+
+    private sealed class NullClipboard : ITextClipboard
+    {
+        public Task SetTextAsync(string text) => Task.CompletedTask;
+
+        public Task<string?> TryGetTextAsync() => Task.FromResult<string?>(null);
+
+        public Task ClearAsync() => Task.CompletedTask;
+    }
+
     private async Task<AccountViewModel> LoadedAsync()
     {
         var vm = Create();
