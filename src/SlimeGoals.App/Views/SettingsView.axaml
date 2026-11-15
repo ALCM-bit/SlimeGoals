@@ -142,7 +142,7 @@
       </ScrollViewer>
 
       <ScrollViewer Classes="page" IsVisible="{Binding IsWindowOpen}">
-        <views:FillWidthStackPanel Classes="settings-list" Margin="0,0,0,14">
+        <views:FillWidthStackPanel Classes="settings-list" Spacing="10" Margin="0,0,0,14">
           <Border Classes="card">
             <StackPanel Spacing="12">
               <TextBlock Text="Ao fechar a janela" />
@@ -155,6 +155,14 @@
                 </StackPanel>
               </Border>
               <TextBlock Text="{Binding CloseHint}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+          <Border Classes="card" IsVisible="{Binding ShowMiniTimer}">
+            <StackPanel Spacing="12">
+              <ToggleSwitch MinHeight="44" Content="Mostrar o cronômetro numa janela pequena" OnContent="" OffContent=""
+                            IsChecked="{Binding MiniTimerEnabled}" />
+              <TextBlock Text="Aparece quando a janela principal está fechada ou minimizada e há um cronômetro rodando."
+                         Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
             </StackPanel>
           </Border>
         </views:FillWidthStackPanel>

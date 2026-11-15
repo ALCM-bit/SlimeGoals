@@ -247,6 +247,9 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     /// <summary>Seção "Janela" (ao fechar).</summary>
     public bool ShowWindow => _capabilities.WindowClose;
 
+    /// <summary>Opção da janelinha do cronômetro, no grupo Janela.</summary>
+    public bool ShowMiniTimer => _capabilities.MiniTimer;
+
     /// <summary>Nenhuma seção se aplica à plataforma: a tela mostra um aviso no lugar.</summary>
     public bool IsEmpty => !ShowAccount && !ShowGeneral && !ShowReminders && !ShowWindow;
 
@@ -327,6 +330,9 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         }
     }
 
+    /// <summary>Janelinha do cronômetro ligada; grava na hora.</summary>
+    [ObservableProperty] public partial bool MiniTimerEnabled { get; set; } = true;
+
     public string CloseHint => CloseHides
         ? "Os lembretes continuam com a janela fechada."
         : "Com o app fechado, os lembretes param.";
@@ -368,6 +374,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         {
             var snooze = await _settings.GetSnoozeMinutesAsync();
             var close = await _settings.GetCloseActionAsync();
+            var miniTimer = await _settings.GetMiniTimerEnabledAsync();
             var enabled = _autostart?.IsEnabled() ?? false;
             _loading = true;
             try
@@ -375,6 +382,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
                 StartWithSystem = enabled;
                 SelectedSnooze = SnoozeOptions.FirstOrDefault(o => o.Minutes == snooze);
                 CloseHides = close == CloseAction.Hide;
+                MiniTimerEnabled = miniTimer;
             }
             finally
             {
@@ -422,6 +430,13 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         LastSave = SaveAsync(
             () => _settings.SetCloseActionAsync(newValue ? CloseAction.Hide : CloseAction.Quit),
             () => CloseHides = oldValue);
+    }
+
+    partial void OnMiniTimerEnabledChanged(bool oldValue, bool newValue)
+    {
+        if (_loading)
+            return;
+        LastSave = SaveAsync(() => _settings.SetMiniTimerEnabledAsync(newValue), () => MiniTimerEnabled = oldValue);
     }
 
     private async Task SaveAsync(Func<Task> save, Action revert)
