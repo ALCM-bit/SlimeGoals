@@ -14,9 +14,9 @@ using SlimeGoals.Sync;
 using ScrollViewer = Avalonia.Controls.ScrollViewer;
 using Window = Avalonia.Controls.Window;
 
-if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "account")))
+if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "account" or "mini")))
 {
-    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|account]");
+    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|account|mini]");
     return 1;
 }
 
@@ -45,6 +45,11 @@ if (which == "narrow")
 }
 if (which == "mascot")
     RenderMascot();
+if (which == "mini")
+{
+    RenderMini("mini-timer", "Leitura");
+    RenderMini("mini-timer-long", "Aula de inglês com a professora particular às terças");
+}
 if (which == "account")
 {
     RenderAccount(320, 1400);
@@ -170,6 +175,29 @@ void RenderMascot()
     Pump();
     var path = Path.Combine(outDir, "mascot.png");
     var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para mascot.");
+    using (var stream = File.Create(path))
+    {
+#pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
+        frame.Save(stream);
+#pragma warning restore CS0618
+    }
+    Console.WriteLine(path);
+    window.Close();
+}
+
+// A janelinha do cronômetro de verdade, sobre um fundo neutro com folga, para ver os cantos arredondados.
+void RenderMini(string name, string title)
+{
+    var window = new MiniTimerWindow
+    {
+        DataContext = sample.CreateMiniTimer(title),
+        Background = new SolidColorBrush(Color.Parse("#3B4250")),
+        Padding = new Thickness(24),
+    };
+    window.Show();
+    Pump();
+    var path = Path.Combine(outDir, $"{name}.png");
+    var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para capturar.");
     using (var stream = File.Create(path))
     {
 #pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui

@@ -59,6 +59,10 @@ public partial class App(IServiceProvider services) : Application
             };
             if (services.GetService<MainWindowActivator>() is { } activator)
                 activator.Window = window;
+            // A janelinha do cronômetro acompanha a principal; ela mesma só é criada quando a regra manda mostrar.
+            if (services.GetService<PlatformCapabilities>() is { MiniTimer: true }
+                && services.GetService<MainWindowPresence>() is { } presence)
+                presence.Window = window;
             if (lifetime is not null)
                 lifetime.Desktop = desktop;
             desktop.Exit += (_, _) => StopAll(hosted);

@@ -209,6 +209,21 @@
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
     <Setter Property="Padding" Value="16,14" />
   </Style>
+  <!-- Janelinha do cronômetro (desktop): cartão de 280 px, nome em cima e o tempo em destaque -->
+  <Style Selector="Border.card.mini-timer">
+    <Setter Property="Width" Value="280" />
+    <Setter Property="Padding" Value="12,10" />
+  </Style>
+  <Style Selector="TextBlock.mini-timer-title">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+  </Style>
+  <Style Selector="TextBlock.mini-timer-elapsed">
+    <Setter Property="FontSize" Value="22" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="FontFeatures" Value="+tnum" />
+  </Style>
   <Style Selector="Border.icon-tile">
     <Setter Property="Width" Value="44" />
     <Setter Property="Height" Value="44" />

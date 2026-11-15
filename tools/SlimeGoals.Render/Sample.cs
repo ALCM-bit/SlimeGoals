@@ -110,6 +110,29 @@ public sealed class Sample : IDisposable
         }
     }
 
+    /// <summary>
+    /// A janelinha do cronômetro com a meta <paramref name="title"/> rodando há 23 min 51 s. Grava o cronômetro direto no
+    /// repositório, sem as regras do <see cref="TimerService"/>: a meta longa de exemplo nem é de tempo.
+    /// </summary>
+    public MiniTimerViewModel CreateMiniTimer(string title)
+    {
+        var s = _services;
+        var goal = s.GetRequiredService<GoalService>().ListAsync().GetAwaiter().GetResult().Single(g => g.Title == title);
+        var timers = s.GetRequiredService<ITimerRepository>();
+        timers.ClearAsync().GetAwaiter().GetResult();
+        timers.TryStartAsync(new ActiveTimer(goal.Id, DateTimeOffset.UtcNow - new TimeSpan(0, 23, 51))).GetAwaiter().GetResult();
+        var watcher = new RunningTimerWatcher(s.GetRequiredService<TimerService>(), s.GetRequiredService<IGoalRepository>(),
+            s.GetRequiredService<DataChangeNotifier>());
+        watcher.StartAsync().GetAwaiter().GetResult();
+        return new MiniTimerViewModel(watcher, s.GetRequiredService<TimerService>(), new NoWindow(), CreateShell(false),
+            TimeProvider.System);
+    }
+
+    private sealed class NoWindow : IWindowActivator
+    {
+        public void Activate() { }
+    }
+
     /// <summary>A seção da conta sobre uma conta falsa (nenhuma rede), com o despacho direto na thread da Render.</summary>
     public AccountViewModel CreateAccount(SampleAccount account) =>
         new(account, _services.GetRequiredService<AppSettings>(), new AccountDefaults("notebook-da-ana"), a => a());

@@ -1,0 +1,32 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SlimeGoals.App.ViewModels"
+        x:Class="SlimeGoals.App.Views.MiniTimerWindow"
+        x:DataType="vm:MiniTimerViewModel"
+        Title="SlimeGoals: cronômetro"
+        WindowDecorations="None" Topmost="True" ShowInTaskbar="False" ShowActivated="False" CanResize="False"
+        SizeToContent="WidthAndHeight" WindowStartupLocation="Manual"
+        Background="Transparent" TransparencyLevelHint="Transparent">
+  <!-- Opção A do protótipo (specs/design/cronometro-janelinha-prototipo.png): nome em cima, tempo embaixo em destaque -->
+  <Border Classes="card mini-timer" ToolTip.Tip="Abrir o SlimeGoals">
+    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+      <Border Classes="icon-tile" VerticalAlignment="Center"
+              Background="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Bg}">
+        <Viewbox Width="22" Height="22">
+          <Canvas Width="24" Height="24">
+            <Path Classes="goal-icon" Data="{Binding IconKey, Converter={StaticResource IconGeometry}}"
+                  Stroke="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
+          </Canvas>
+        </Viewbox>
+      </Border>
+      <StackPanel Grid.Column="1" VerticalAlignment="Center">
+        <TextBlock Classes="mini-timer-title" Text="{Binding Title}" />
+        <TextBlock Classes="mini-timer-elapsed" Text="{Binding Elapsed}" />
+      </StackPanel>
+      <Button Grid.Column="2" Classes="danger-solid icon" VerticalAlignment="Center"
+              AutomationProperties.Name="Parar cronômetro" ToolTip.Tip="Parar cronômetro" Command="{Binding StopCommand}">
+        <Path Classes="btn-icon" Data="{StaticResource IconStop}" />
+      </Button>
+    </Grid>
+  </Border>
+</Window>

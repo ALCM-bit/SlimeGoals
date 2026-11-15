@@ -1,3 +1,4 @@
+using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using SlimeGoals.App.Goals;
 using SlimeGoals.App.Hosting;
@@ -66,6 +67,19 @@ internal static class CompositionRoot
         services.AddSingleton<ISleepSignalSource, LogindSleepSignalSource>();
         services.AddSingleton<SleepResumeWatcher>();
         services.AddSingleton<IAppHostedService, SleepResumeHost>();
+
+        // Janelinha do cronômetro: a janela e o ViewModel nascem no primeiro "mostrar" (MiniTimerWindowHost)
+        services.AddSingleton<RunningTimerWatcher>();
+        services.AddSingleton<MainWindowPresence>();
+        services.AddSingleton<MiniTimerViewModel>();
+        services.AddSingleton(sp => new MiniTimerWindowHost(sp.GetRequiredService<MiniTimerViewModel>));
+        services.AddSingleton<IAppHostedService>(sp => new MiniTimerController(
+            sp.GetRequiredService<RunningTimerWatcher>(),
+            sp.GetRequiredService<MainWindowPresence>(),
+            sp.GetRequiredService<MiniTimerWindowHost>(),
+            sp.GetRequiredService<AppSettings>(),
+            sp.GetRequiredService<DataChangeNotifier>(),
+            action => Dispatcher.UIThread.Post(action)));
 #if SYNC_DEV
         AddSync(services, databasePath);
 #endif
