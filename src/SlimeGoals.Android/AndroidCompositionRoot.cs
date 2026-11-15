@@ -48,7 +48,9 @@ internal static class AndroidCompositionRoot
 
         // Cronômetro na notificação — ligado no AndroidApplication.OnCreate, para valer também sem a tela aberta
         services.AddSingleton<RunningTimerWatcher>();
-        services.AddSingleton<ITimerNotification>(_ => new AndroidTimerNotification(context));
+        services.AddSingleton(_ => new StopTimerSecretStore(context));
+        services.AddSingleton<ITimerNotification>(sp
+            => new AndroidTimerNotification(context, sp.GetRequiredService<StopTimerSecretStore>()));
         services.AddSingleton<TimerNotificationSync>();
 
         // UI — ordem de registro = ordem na navegação

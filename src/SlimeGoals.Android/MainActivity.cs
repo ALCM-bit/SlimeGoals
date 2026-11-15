@@ -1,3 +1,4 @@
+using Trace = System.Diagnostics.Trace;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
@@ -51,14 +52,24 @@ public class MainActivity : AvaloniaMainActivity
         HandleStopTimer(intent);
     }
 
-    /// <summary>"Parar" da notificação do cronômetro: para e mostra Hoje. O extra sai do intent atendido.</summary>
+    /// <summary>
+    /// "Parar" da notificação do cronômetro: para e mostra Hoje, se o pedido trouxer o código da instalação. A Activity
+    /// é exportada, então outro app pode mandar o mesmo extra; sem o código, o pedido é ignorado. O extra sai do intent.
+    /// </summary>
     private static void HandleStopTimer(Intent? intent)
     {
-        if (intent is null || !intent.GetBooleanExtra(AndroidTimerNotification.ExtraStopTimer, false))
+        if (intent?.HasExtra(AndroidTimerNotification.ExtraStopTimer) != true)
             return;
+        // O extra vem como texto; um de outro tipo (de outro app, ou da notificação de antes do código) lê como nulo.
+        var received = intent.Extras?.Get(AndroidTimerNotification.ExtraStopTimer) as Java.Lang.String;
         intent.RemoveExtra(AndroidTimerNotification.ExtraStopTimer);
         if (AndroidApplication.Services is not { } services)
             return;
+        if (!StopRequestSecret.Matches(services.GetRequiredService<StopTimerSecretStore>().Get(), received?.ToString()))
+        {
+            Trace.TraceWarning("Pedido de parar o cronômetro sem o código da notificação: ignorado.");
+            return;
+        }
         var timers = services.GetRequiredService<TimerService>();
         var shell = services.GetRequiredService<ShellViewModel>();
         Dispatcher.UIThread.Post(() => _ = StopRequest.RunAsync(timers, shell));
