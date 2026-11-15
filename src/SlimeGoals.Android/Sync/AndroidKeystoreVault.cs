@@ -49,8 +49,8 @@ internal sealed class AndroidKeystoreVault(Context context) : ISecretVault
             var blob = File.ReadAllBytes(path);
             if (!SealedSecretFormat.TryUnpack(blob, out var nonce, out var cipherAndTag))
                 throw new InvalidDataException("O segredo do cofre está em formato desconhecido.");
-            if (LoadKeyStore().GetKey(KeyAlias, null) is not ISecretKey key)
-                throw new InvalidDataException("A chave do cofre não existe mais.");
+            var key = LoadKeyStore().GetKey(KeyAlias, null)
+                ?? throw new InvalidDataException("A chave do cofre não existe mais.");
             try
             {
                 using var cipher = Cipher.GetInstance(Transformation)!;
@@ -71,7 +71,7 @@ internal sealed class AndroidKeystoreVault(Context context) : ISecretVault
         var path = PathOf(name);
         lock (_lock)
         {
-            var key = LoadKeyStore().GetKey(KeyAlias, null) as ISecretKey ?? CreateKey();
+            var key = LoadKeyStore().GetKey(KeyAlias, null) ?? CreateKey();
             byte[] blob;
             try
             {
@@ -125,7 +125,9 @@ internal sealed class AndroidKeystoreVault(Context context) : ISecretVault
         }
     }
 
-    private static ISecretKey CreateKey()
+    // GetKey devolve só IKey: a classe Java da chave do Keystore é oculta, sem binding, e "is ISecretKey" daria falso
+    // mesmo com a chave lá. Por isso o código trata a chave como IKey, que é o que o Cipher.Init recebe.
+    private static IKey CreateKey()
     {
         try
         {
