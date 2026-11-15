@@ -41,6 +41,7 @@ Este desenho cobre as tarefas. Numa meta de tempo, a pessoa diz no que está tra
 3. **O campo no cartão: "No que está trabalhando?"**
    - Fica vazio por padrão e mostra até 5 sugestões: as notas distintas mais recentes dos registros ativos daquela meta.
    - O nome é gravado ao confirmar (Enter), ao escolher uma sugestão ou ao sair do campo.
+   - *Revisto na §7.1:* sair do campo não grava mais; o nome gravado aparece como texto, com ✎ e ⇄, e o campo ganha ✓ e ✕.
    - O nome passa por trim; vazio vira `null`. O limite é de 200 caracteres, como o da nota.
    - Core: `TimerService.SetTaskAsync(string? task)`, que vale para o cronômetro rodando ou parado.
 4. **Parar.** O painel de conferência já vem com a nota preenchida com o nome da tarefa, e a pessoa pode editar. Registrar funciona como hoje.
@@ -141,3 +142,22 @@ O autor escolheu ver e ajustar os trechos de hoje dentro do cartão (caminho A).
   - a fila da sincronização: exclusão de um registro conhecido e de um que nunca foi enviado;
   - os ViewModels do campo e da lista.
 
+### 7.4 Verificação (15/11/2026)
+
+- **Testes automatizados:** `dotnet test --solution SlimeGoals.slnx` (1600 testes), `dotnet build SlimeGoals.slnx -c Release` e o build de `SlimeGoals.Android.slnx` passam sem warnings. O único aviso do Android é o XA0033, que vem do ambiente.
+- **Telas:** `tools/SlimeGoals.Render` grava o campo em edição, a lista aberta e o editor de um trecho a 320, 360 e 1100 px.
+  - A 320 px, "Apagar" não cabia na linha de Cancelar e Salvar e foi para a linha dos minutos.
+  - A coluna do ✎ fica reservada em toda linha, para o tempo do trecho em andamento e o das compensações ficarem alinhados com os outros.
+- **Android (emulador, API 36, conta de teste, meta "Estudo teste"):**
+  - o nome gravado aparece como "▸ Ingles", com ✎ e ⇄;
+  - ✎ abre o campo com o texto selecionado, ✓ e ✕;
+  - digitar outro nome e tocar fora do campo não grava: a notificação continua "Estudo teste · Ingles", e o rascunho fica no campo com o ✓;
+  - o ✓ grava, e a notificação passa a "Estudo teste · Capitulo 4";
+  - "Hoje · 2 min" abre a lista, com o trecho em andamento no topo e sem ✎; a lista continua aberta depois de gravar;
+  - ajustar "Ingles" de 1 para 5 min, com o nome "Ingles B", leva o cabeçalho a "Hoje · 6 min" e o progresso da semana de 25% a 28%;
+  - apagar "Capitulo 3" leva a "Hoje · 5 min" e a 27%;
+  - com o teclado aberto, o editor do trecho fica inteiro à vista, porque o destaque e os blocos somem.
+- **A conferir pelo autor:**
+  - no celular, ajustar e apagar um trecho e ver o resultado chegar ao GNOME pela sincronização;
+  - no GNOME, o campo com ✓ e ✕ e a lista de trechos no Hoje.
+- **Não exercitado no aparelho:** o erro de um registro apagado por outro aparelho com o editor aberto. O teste `Chunk_error_stays_in_the_editor` cobre esse caminho.
