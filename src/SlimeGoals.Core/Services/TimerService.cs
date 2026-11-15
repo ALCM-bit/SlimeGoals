@@ -40,13 +40,12 @@ public sealed class TimerService(IGoalRepository goals, ITimerRepository timers,
     /// <summary>Congela o cronômetro (idempotente) e devolve os minutos.</summary>
     public async Task<int> StopAsync(CancellationToken ct = default)
     {
-        var timer = await timers.GetAsync(ct) ?? throw NoTimer();
-        if (timer.StoppedAt is null)
-        {
-            timer = timer with { StoppedAt = time.GetUtcNow() };
-            await timers.SaveAsync(timer, ct);
+        if (await timers.GetAsync(ct) is null)
+            throw NoTimer();
+        if (await timers.StopAsync(time.GetUtcNow(), ct))
             changes?.NotifyChanged();
-        }
+        // Relê: uma troca de tarefa de outro processo pode ter mudado o início entre a leitura e a parada.
+        var timer = await timers.GetAsync(ct) ?? throw NoTimer();
         return Minutes(timer, time.GetUtcNow());
     }
 
@@ -78,21 +77,24 @@ public sealed class TimerService(IGoalRepository goals, ITimerRepository timers,
     public async Task<int> SwitchTaskAsync(string? newTask, CancellationToken ct = default)
     {
         newTask = NormalizeTask(newTask);
-        var timer = await timers.GetAsync(ct) ?? throw NoTimer();
-        if (timer.StoppedAt is not null)
-            throw new GoalStateException(timer.GoalId, "O cronômetro está parado. Registre ou descarte antes de trocar a tarefa.");
+        // Só há ⇄ com o cronômetro rodando: parado ou sumido, foi outro processo (o "Parar" da notificação, da janelinha).
+        if (await timers.GetAsync(ct) is not { StoppedAt: null } timer)
+            throw Changed(Guid.Empty);
 
         var minutes = (int)Math.Floor((time.GetUtcNow() - timer.StartedAt).TotalMinutes);
         if (minutes <= 0)
         {
-            await SetTaskAsync(newTask, ct);
+            // Sem trecho, só o nome muda, mas pela mesma guarda: um cronômetro parado nesse meio-tempo não é renomeado.
+            if (!await timers.SwitchAsync(timer.StartedAt, timer with { Task = newTask }, chunk: null, ct))
+                throw Changed(timer.GoalId);
+            changes?.NotifyChanged();
             return await checkins.PeriodTotalAsync(timer.GoalId, ct);
         }
 
         var (chunk, total) = await checkins.PrepareAsync(timer.GoalId, minutes, timer.Task, ct);
         var next = timer with { StartedAt = timer.StartedAt.AddMinutes(minutes), Task = newTask };
         if (!await timers.SwitchAsync(timer.StartedAt, next, chunk, ct))
-            throw new GoalStateException(timer.GoalId, "O cronômetro mudou. Confira em Hoje.");
+            throw Changed(timer.GoalId);
         changes?.NotifyChanged();
         return total;
     }
@@ -111,6 +113,8 @@ public sealed class TimerService(IGoalRepository goals, ITimerRepository timers,
     }
 
     private static GoalStateException NoTimer() => new(Guid.Empty, "Nenhum cronômetro rodando.");
+
+    private static GoalStateException Changed(Guid goalId) => new(goalId, "O cronômetro mudou. Confira em Hoje.");
 
     public async Task DiscardAsync(CancellationToken ct = default)
     {

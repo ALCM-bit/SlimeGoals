@@ -35,6 +35,13 @@ public sealed class InMemoryTimerRepository(InMemoryCheckinRepository? checkins 
         return Task.CompletedTask;
     }
 
+    public Task<bool> StopAsync(DateTimeOffset at, CancellationToken ct = default)
+    {
+        if (_timer is not { StoppedAt: null } running) return Task.FromResult(false);
+        _timer = running with { StoppedAt = at };
+        return Task.FromResult(true);
+    }
+
     public Task ClearAsync(CancellationToken ct = default)
     {
         _timer = null;
@@ -52,14 +59,15 @@ public sealed class InMemoryTimerRepository(InMemoryCheckinRepository? checkins 
         return Task.FromResult(true);
     }
 
-    public async Task<bool> SwitchAsync(DateTimeOffset expectedStartedAt, ActiveTimer next, Checkin chunk, CancellationToken ct = default)
+    public async Task<bool> SwitchAsync(DateTimeOffset expectedStartedAt, ActiveTimer next, Checkin? chunk, CancellationToken ct = default)
     {
-        if (checkins is null)
+        if (checkins is null && chunk is not null)
             throw new InvalidOperationException("Passe o repositório de registros para trocar de tarefa.");
         if (FailSwitches || _timer is not { StoppedAt: null } current || current.GoalId != next.GoalId
             || current.StartedAt != expectedStartedAt)
             return false;
-        await checkins.AddAsync(chunk, ct);
+        if (chunk is not null)
+            await checkins!.AddAsync(chunk, ct);
         _timer = next;
         return true;
     }

@@ -57,6 +57,15 @@ public sealed class TimerRepository(SqliteConnectionFactory db) : ITimerReposito
             Params(timer), cancellationToken: ct));
     }
 
+    public async Task<bool> StopAsync(DateTimeOffset at, CancellationToken ct = default)
+    {
+        await using var c = db.Open();
+        // UPDATE só do fim: o início e o nome ficam como estão agora, não como estavam quando quem para os leu.
+        return await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE active_timer SET stopped_at = @At WHERE id = 1 AND stopped_at IS NULL",
+            new { At = SqlText.Instant(at) }, cancellationToken: ct)) == 1;
+    }
+
     public async Task<bool> SetTaskAsync(string? task, CancellationToken ct = default)
     {
         await using var c = db.Open();
@@ -65,7 +74,7 @@ public sealed class TimerRepository(SqliteConnectionFactory db) : ITimerReposito
             "UPDATE active_timer SET task = @Task WHERE id = 1", new { Task = task }, cancellationToken: ct)) == 1;
     }
 
-    public async Task<bool> SwitchAsync(DateTimeOffset expectedStartedAt, ActiveTimer next, Checkin chunk, CancellationToken ct = default)
+    public async Task<bool> SwitchAsync(DateTimeOffset expectedStartedAt, ActiveTimer next, Checkin? chunk, CancellationToken ct = default)
     {
         await using var c = db.Open();
         await using var tx = await c.BeginTransactionAsync(ct);
@@ -88,13 +97,14 @@ public sealed class TimerRepository(SqliteConnectionFactory db) : ITimerReposito
                 return false;
             }
 
-            await CheckinRepository.InsertAsync(c, tx, chunk, ct);
+            if (chunk is not null)
+                await CheckinRepository.InsertAsync(c, tx, chunk, ct);
             await tx.CommitAsync(ct);
             return true;
         }
         catch (SqliteException e) when (e.SqliteExtendedErrorCode == SqlText.ForeignKeyViolation)
         {
-            throw new GoalNotFoundException(chunk.GoalId);
+            throw new GoalNotFoundException(next.GoalId);
         }
     }
 

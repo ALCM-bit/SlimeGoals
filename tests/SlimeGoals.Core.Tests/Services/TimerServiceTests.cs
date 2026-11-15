@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Time.Testing;
+using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Core.Tests.Validation;
@@ -269,7 +270,8 @@ public class TimerServiceTests
 
         var act = () => Service.SwitchTaskAsync("B");
 
-        await act.Should().ThrowAsync<GoalStateException>();
+        // Só há ⇄ com o cronômetro rodando: se ele está parado, outro processo o parou.
+        await act.Should().ThrowAsync<GoalStateException>().WithMessage("O cronômetro mudou. Confira em Hoje.");
         _checkins.All.Should().BeEmpty();
     }
 
@@ -308,7 +310,61 @@ public class TimerServiceTests
     {
         var act = () => Service.SwitchTaskAsync("B");
 
-        await act.Should().ThrowAsync<GoalStateException>().WithMessage("Nenhum cronômetro rodando.");
+        await act.Should().ThrowAsync<GoalStateException>().WithMessage("O cronômetro mudou. Confira em Hoje.");
+    }
+
+    [Fact]
+    public async Task Stop_racing_a_switch_keeps_the_switched_timer()
+    {
+        var goal = await Study();
+        await Service.StartAsync(goal.Id);
+        await Service.SetTaskAsync("A");
+        _time.Advance(TimeSpan.FromMinutes(5));
+        // O "Parar" da notificação lê o cronômetro; antes de gravar, o Hoje troca para "B" e registra os 5 min de "A".
+        var racing = new RacingTimers(_timers, () => Service.SwitchTaskAsync("B"));
+
+        var minutes = await new TimerService(_goals, racing, Checkins, _time).StopAsync();
+
+        minutes.Should().Be(0);
+        _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(5);
+        (await _timers.GetAsync()).Should().Be(new ActiveTimer(goal.Id, T0.AddMinutes(5), T0.AddMinutes(5), "B"));
+    }
+
+    [Fact]
+    public async Task Switch_under_a_minute_racing_a_stop_fails_and_keeps_the_name()
+    {
+        var goal = await Study();
+        await Service.StartAsync(goal.Id);
+        await Service.SetTaskAsync("A");
+        _time.Advance(TimeSpan.FromSeconds(40));
+        var racing = new RacingTimers(_timers, () => Service.StopAsync());
+
+        var act = () => new TimerService(_goals, racing, Checkins, _time).SwitchTaskAsync("B");
+
+        await act.Should().ThrowAsync<GoalStateException>().WithMessage("O cronômetro mudou. Confira em Hoje.");
+        (await _timers.GetAsync()).Should().Be(new ActiveTimer(goal.Id, T0, T0.AddSeconds(40), "A"));
+    }
+
+    /// <summary>Outro processo age logo depois da primeira leitura do cronômetro (a corrida entre ler e gravar).</summary>
+    private sealed class RacingTimers(ITimerRepository inner, Func<Task> race) : ITimerRepository
+    {
+        private Func<Task>? _race = race;
+
+        public async Task<ActiveTimer?> GetAsync(CancellationToken ct = default)
+        {
+            var timer = await inner.GetAsync(ct);
+            if (Interlocked.Exchange(ref _race, null) is { } r)
+                await r();
+            return timer;
+        }
+
+        public Task<bool> TryStartAsync(ActiveTimer timer, CancellationToken ct = default) => inner.TryStartAsync(timer, ct);
+        public Task SaveAsync(ActiveTimer timer, CancellationToken ct = default) => inner.SaveAsync(timer, ct);
+        public Task<bool> StopAsync(DateTimeOffset at, CancellationToken ct = default) => inner.StopAsync(at, ct);
+        public Task ClearAsync(CancellationToken ct = default) => inner.ClearAsync(ct);
+        public Task<bool> SetTaskAsync(string? task, CancellationToken ct = default) => inner.SetTaskAsync(task, ct);
+        public Task<bool> SwitchAsync(DateTimeOffset expectedStartedAt, ActiveTimer next, Checkin? chunk, CancellationToken ct = default) =>
+            inner.SwitchAsync(expectedStartedAt, next, chunk, ct);
     }
 
     [Fact]

@@ -144,4 +144,49 @@ public class TimerRepositoryTests : IDisposable
         (await Repo.GetAsync()).Should().BeNull();
         Count("SELECT COUNT(*) FROM checkins").Should().Be(0);
     }
+
+    [Fact]
+    public async Task Stop_freezes_only_the_running_timer_and_keeps_its_start_and_task()
+    {
+        // O "Parar" de outro processo leu o cronômetro antes de uma troca: a parada não volta o início nem o nome.
+        await Repo.TryStartAsync(new ActiveTimer(_a, T0, null, "A"));
+        await Repo.SwitchAsync(T0, new ActiveTimer(_a, T0.AddMinutes(25), null, "B"), Chunk(_a, 25, "A"));
+
+        (await Repo.StopAsync(T0.AddMinutes(30))).Should().BeTrue();
+        (await Repo.StopAsync(T0.AddMinutes(40))).Should().BeFalse();
+
+        (await Repo.GetAsync()).Should().Be(new ActiveTimer(_a, T0.AddMinutes(25), T0.AddMinutes(30), "B"));
+    }
+
+    [Fact]
+    public async Task Stop_without_timer_returns_false_and_creates_nothing()
+    {
+        (await Repo.StopAsync(T0)).Should().BeFalse();
+
+        (await Repo.GetAsync()).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Switch_without_chunk_only_renames_the_same_running_timer()
+    {
+        _db.Anchor.Execute("UPDATE sync_state SET enabled = 1");
+        await Repo.TryStartAsync(new ActiveTimer(_a, T0, null, "A"));
+
+        (await Repo.SwitchAsync(T0, new ActiveTimer(_a, T0, null, "B"), chunk: null)).Should().BeTrue();
+
+        (await Repo.GetAsync()).Should().Be(new ActiveTimer(_a, T0, null, "B"));
+        Count("SELECT COUNT(*) FROM checkins").Should().Be(0);
+        Count("SELECT COUNT(*) FROM sync_outbox WHERE kind = 'checkin'").Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Switch_without_chunk_on_a_stopped_timer_returns_false_and_keeps_the_name()
+    {
+        var stopped = new ActiveTimer(_a, T0, T0.AddSeconds(40), "A");
+        await Repo.SaveAsync(stopped);
+
+        (await Repo.SwitchAsync(T0, new ActiveTimer(_a, T0, null, "B"), chunk: null)).Should().BeFalse();
+
+        (await Repo.GetAsync()).Should().Be(stopped);
+    }
 }
