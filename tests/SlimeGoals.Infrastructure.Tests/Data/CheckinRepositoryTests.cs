@@ -154,4 +154,19 @@ public class CheckinRepositoryTests : IDisposable
 
         (await Repo.CompensationIdsAsync(_goal.Id, Monday)).Should().BeEquivalentTo([mine.Id, superseded.Id]);
     }
+
+    [Fact]
+    public async Task Recent_notes_skip_deleted_and_null_and_are_distinct_newest_first()
+    {
+        await Repo.AddAsync(At(_goal, T0, 1, "a"));
+        await Repo.AddAsync(At(_goal, T0.AddMinutes(1), 1, "b"));
+        await Repo.AddAsync(At(_goal, T0.AddMinutes(2), 1));
+        await Repo.AddAsync(At(_goal, T0.AddMinutes(3), 1, "a"));
+        await Repo.AddAsync(At(_other, T0.AddMinutes(4), 1, "outra meta"));
+        await Repo.AddAsync(At(_goal, T0.AddMinutes(5), 1, "excluída") with { DeletedAt = T0.AddMinutes(6) });
+        await Repo.AddAsync(At(_goal, T0.AddMinutes(7), 1, "c"));
+
+        (await Repo.RecentNotesAsync(_goal.Id, 5)).Should().Equal("c", "a", "b");
+        (await Repo.RecentNotesAsync(_goal.Id, 2)).Should().Equal("c", "a");
+    }
 }

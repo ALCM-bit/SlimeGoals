@@ -1,3 +1,4 @@
+using System.Data;
 using Dapper;
 using Microsoft.Data.Sqlite;
 using SlimeGoals.Core;
@@ -15,11 +16,7 @@ public sealed class CheckinRepository(SqliteConnectionFactory db) : ICheckinRepo
         await using var tx = await c.BeginTransactionAsync(ct);
         try
         {
-            await c.ExecuteAsync(new CommandDefinition("""
-                INSERT INTO checkins (id, goal_id, done_at, amount, note, updated_at, deleted_at, compensation_period, compensation_seen)
-                VALUES (@Id, @GoalId, @DoneAt, @Amount, @Note, @UpdatedAt, @DeletedAt, @CompensationPeriod, @CompensationSeen)
-                """, Row.FromDomain(checkin), tx, cancellationToken: ct));
-            await SyncOutbox.EnqueueAsync(c, tx, checkin.Id, SyncOutbox.Checkin, ct);
+            await InsertAsync(c, tx, checkin, ct);
             await tx.CommitAsync(ct);
         }
         catch (SqliteException e) when (e.SqliteExtendedErrorCode == SqlText.ForeignKeyViolation)
@@ -28,8 +25,28 @@ public sealed class CheckinRepository(SqliteConnectionFactory db) : ICheckinRepo
         }
     }
 
-    public Task<IReadOnlyList<string>> RecentNotesAsync(Guid goalId, int limit, CancellationToken ct = default) =>
-        throw new NotSupportedException();
+    /// <summary>Grava o registro e o põe na fila da sincronização, dentro da transação de quem chama.</summary>
+    internal static async Task InsertAsync(SqliteConnection c, IDbTransaction tx, Checkin checkin, CancellationToken ct)
+    {
+        await c.ExecuteAsync(new CommandDefinition("""
+            INSERT INTO checkins (id, goal_id, done_at, amount, note, updated_at, deleted_at, compensation_period, compensation_seen)
+            VALUES (@Id, @GoalId, @DoneAt, @Amount, @Note, @UpdatedAt, @DeletedAt, @CompensationPeriod, @CompensationSeen)
+            """, Row.FromDomain(checkin), tx, cancellationToken: ct));
+        await SyncOutbox.EnqueueAsync(c, tx, checkin.Id, SyncOutbox.Checkin, ct);
+    }
+
+    public async Task<IReadOnlyList<string>> RecentNotesAsync(Guid goalId, int limit, CancellationToken ct = default)
+    {
+        await using var c = db.Open();
+        var notes = await c.QueryAsync<string>(new CommandDefinition("""
+            SELECT note FROM checkins
+            WHERE goal_id = @GoalId AND note IS NOT NULL AND deleted_at IS NULL
+            GROUP BY note
+            ORDER BY MAX(done_at) DESC
+            LIMIT @Limit
+            """, new { GoalId = SqlText.Id(goalId), Limit = limit }, cancellationToken: ct));
+        return notes.ToList();
+    }
 
     public async Task<IReadOnlyList<Checkin>> ListAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken ct = default)
     {

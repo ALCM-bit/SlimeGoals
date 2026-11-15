@@ -21,9 +21,9 @@ public class Migration006Tests
             """, new { Now });
         c.Execute("INSERT INTO checkins (id, goal_id, done_at, note, updated_at) VALUES ('c1', 'g1', @Now, 'nota', @Now)", new { Now });
 
-        MigrationRunner.Migrate(c).Should().Be(6);
+        MigrationRunner.Migrate(c).Should().Be(7);
 
-        c.ExecuteScalar<long>("PRAGMA user_version").Should().Be(6);
+        c.ExecuteScalar<long>("PRAGMA user_version").Should().Be(7);
         var row = c.QuerySingle("SELECT superseded, compensation_period AS Period, compensation_seen AS Seen FROM checkins WHERE id = 'c1'");
         ((long)row.superseded).Should().Be(0);
         ((object?)row.Period).Should().BeNull();
