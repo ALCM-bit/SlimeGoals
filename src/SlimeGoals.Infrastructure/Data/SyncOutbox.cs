@@ -25,8 +25,9 @@ internal static class SyncOutbox
             """ + ReplaceOnConflict, new { Id = SqlText.Id(recordId), Kind = kind }, tx, cancellationToken: ct));
 
     /// <summary>
-    /// Leva a exclusão de um registro para a fila. O que o servidor já conhece vira exclusão com a base dele; o que nunca
-    /// foi enviado só sai da fila. Sem efeito com a sincronização desligada.
+    /// Leva a exclusão de um registro para a fila. O que o servidor já conhece vira exclusão com a base dele. O que não está
+    /// no mapa mas já ganhou chave (envio no ar ou aceite perdido) pode ter chegado ao servidor: vira exclusão com base 0,
+    /// senão o <c>pull</c> o traz de volta. Só o que nunca ganhou chave sai da fila. Sem efeito com a sincronização desligada.
     /// </summary>
     public static async Task EnqueueDeletionAsync(SqliteConnection c, IDbTransaction tx, Guid recordId, string kind, CancellationToken ct)
     {
@@ -38,7 +39,10 @@ internal static class SyncOutbox
             INSERT INTO sync_outbox (record_id, kind, op, base_seq)
             SELECT r.record_id, @Kind, 'delete', r.seq FROM sync_records r WHERE r.record_id = @Id
             """ + ReplaceOnConflict + """
-            DELETE FROM sync_outbox WHERE record_id = @Id AND record_id NOT IN (SELECT record_id FROM sync_records);
+            DELETE FROM sync_outbox WHERE record_id = @Id AND record_key IS NULL
+              AND record_id NOT IN (SELECT record_id FROM sync_records);
+            UPDATE sync_outbox SET op = 'delete', base_seq = 0, revision = revision + 1
+            WHERE record_id = @Id AND op = 'upsert' AND record_id NOT IN (SELECT record_id FROM sync_records);
             """, new { Id = SqlText.Id(recordId), Kind = kind }, tx, cancellationToken: ct));
     }
 
