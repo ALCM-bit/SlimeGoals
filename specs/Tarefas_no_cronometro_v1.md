@@ -96,3 +96,48 @@ Este desenho cobre as tarefas. Numa meta de tempo, a pessoa diz no que está tra
 
   Conferido no emulador.
 - **Não exercitado no aparelho:** o "Iniciar" do lembrete. O teste `Timer_started_from_a_reminder_has_an_empty_task_field` cobre esse caminho.
+
+## 7. Revisão depois do teste do autor (15/11/2026)
+
+O autor conferiu a janelinha ("ficou boa") e apontou dois problemas no Hoje:
+- "não tem um confirmar ou algo ali que mostre que o que o usuário escreveu está sendo seguido";
+- a pessoa "não consegue ver essas subatividades nem ajustá-las se precisar".
+
+O autor escolheu ver e ajustar os trechos de hoje dentro do cartão (caminho A). O histórico da meta pelo ⋯ fica para depois.
+
+### 7.1 O campo da tarefa ganha estados
+
+- **Com nome gravado:** o nome aparece como texto ("▸ Capítulo 3"), com ✎ para editar e ⇄ para trocar. O texto mostrar o nome é a confirmação de que ele está valendo.
+- **Sem nome, ou editando:** o campo "No que está trabalhando?" aparece com um botão ✓. O ✓, o Enter e escolher uma sugestão gravam; Esc ou ✕ cancelam a edição.
+- *Decisão minha:* sair do campo **não grava mais**. O texto fica no campo como rascunho, com o ✓ à vista, até a pessoa confirmar ou cancelar. ■ e ⇄ continuam usando o texto digitado. Gravar ao sair do campo era o que tirava o botão de baixo do dedo no toque seguinte.
+
+```
+│ 🎯 Estudar        0:23:51   [■] [⋯] │
+│ ▸ Capítulo 3                 [✎] [⇄]│   nome gravado
+
+│ [ No que está trabalhando?   ] [✓]  │   sem nome ou editando
+```
+
+### 7.2 Trechos de hoje no cartão
+
+- **Onde aparece:** só em metas de tempo, com pelo menos um registro no dia de hoje, rodando ou não. Abaixo do cartão vem uma linha recolhível, "Hoje · 37 min ▾", fechada por padrão.
+- **Ao abrir:** os registros do dia, do mais recente para o mais antigo, com o nome (a nota, ou "Sem nome") e os minutos. O trecho em andamento entra no topo, só para ver, com o tempo correndo.
+- **Ajustar:** o ✎ de um registro abre, no lugar dele, os minutos, o nome e os botões Apagar, Cancelar e Salvar.
+  - **Salvar substitui o registro.** Numa transação só, o antigo é apagado e um novo é gravado com o mesmo horário (`done_at`), os novos minutos e o novo nome. A sincronização não altera registros, mas leva exclusões e registros novos, então isso chega aos outros aparelhos sem mudar o formato.
+  - **Apagar** exclui o registro, na mesma transação da fila da sincronização.
+  - **Validação:** os minutos vão de 1 a 24 h, o nome segue o limite de 200 caracteres, e o total do período não pode ficar negativo. As mensagens ficam no próprio editor.
+- *Decisão minha:* os registros de compensação aparecem na lista, mas sem ✎. Eles só surgem depois de juntar aparelhos que estavam sem rede ou de mudar a recorrência da meta, e alterá-los mudaria a conta da junção.
+- *Decisão minha:* os registros negativos (o "tirar" do painel) aparecem como "−5 min" e também podem ser apagados ou ajustados.
+
+### 7.3 O que fica para quem constrói
+
+- **Core:** `CheckinService.ReplaceAsync(id, minutes, note)` e `CheckinService.DeleteAsync(id)`, além de uma consulta dos registros do dia de uma meta.
+- **Infra:** a exclusão de um registro com a fila da sincronização, com `op = 'delete'` se o servidor já conhece o registro; se não conhece, ele só sai da fila. A substituição roda numa transação só.
+- **App:** os estados do campo, a lista recolhível e o editor do registro, conferidos com `tools/SlimeGoals.Render` em várias larguras e no emulador.
+- **Testes:**
+  - substituir e apagar, sem contar duas vezes;
+  - total negativo recusado;
+  - compensação sem edição;
+  - a fila da sincronização: exclusão de um registro conhecido e de um que nunca foi enviado;
+  - os ViewModels do campo e da lista.
+
