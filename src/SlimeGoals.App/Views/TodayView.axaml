@@ -5,7 +5,14 @@
              xmlns:services="using:SlimeGoals.Core.Services"
              x:Class="SlimeGoals.App.Views.TodayView"
              x:DataType="vm:TodayPageViewModel">
-  <DockPanel Classes="page">
+  <UserControl.Styles>
+    <!-- Teclado aberto (celular): some o destaque e os blocos, senão a lista fica sem altura e o campo em edição some -->
+    <Style Selector="DockPanel.keyboard > Border.hero, DockPanel.keyboard > UniformGrid.tiles">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel x:Name="PageRoot" Classes="page">
     <TextBlock DockPanel.Dock="Top" Classes="page-title" Text="{Binding Title}" Margin="0,0,0,16" />
 
     <!-- Cartão de destaque: progresso da semana e mascote -->

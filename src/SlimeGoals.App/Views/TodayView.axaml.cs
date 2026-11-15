@@ -1,7 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Platform;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using SlimeGoals.App.ViewModels;
 
@@ -15,6 +17,36 @@ public partial class TodayView : UserControl
         // Depois do AutoCompleteBox: o Enter que escolhe uma sugestão já pôs o texto no campo quando chega aqui.
         AddHandler(KeyDownEvent, OnTaskKeyDown, RoutingStrategies.Bubble, handledEventsToo: true);
         AddHandler(LostFocusEvent, OnTaskLostFocus, RoutingStrategies.Bubble, handledEventsToo: true);
+    }
+
+    private IInputPane? _inputPane;
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _inputPane = TopLevel.GetTopLevel(this)?.InputPane;
+        if (_inputPane is not null)
+            _inputPane.StateChanged += OnInputPaneChanged;
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        if (_inputPane is not null)
+            _inputPane.StateChanged -= OnInputPaneChanged;
+        _inputPane = null;
+        base.OnDetachedFromVisualTree(e);
+    }
+
+    /// <summary>
+    /// Teclado do celular aberto: esconde o destaque e os blocos (classe <c>keyboard</c>) e rola até o campo em edição,
+    /// que de outro modo ficaria atrás do teclado.
+    /// </summary>
+    private void OnInputPaneChanged(object? sender, InputPaneStateEventArgs e)
+    {
+        var open = e.NewState == InputPaneState.Open;
+        PageRoot.Classes.Set("keyboard", open);
+        if (open && TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is Control focused)
+            Dispatcher.UIThread.Post(() => focused.BringIntoView(), DispatcherPriority.Loaded);
     }
 
     /// <summary>O cartão e a página do campo da tarefa em que o evento nasceu, ou nada se veio de outro controle.</summary>
