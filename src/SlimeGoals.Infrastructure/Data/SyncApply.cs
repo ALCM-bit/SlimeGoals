@@ -184,7 +184,8 @@ internal sealed class SyncApply
             await KeepUnreadableAsync(record);
             return;
         }
-        if (await IsTombstonedAsync(checkin.GoalId))
+        // Lápide da meta, ou exclusão do registro ainda na fila: uma leitura completa não traz de volta o que foi apagado aqui.
+        if (await IsTombstonedAsync(checkin.GoalId) || await QueuedDeletionAsync(envelope.RecordId))
         {
             await DiscardAsync(record, envelope, SyncOutbox.Checkin);
             return;
@@ -199,6 +200,10 @@ internal sealed class SyncApply
                 ON CONFLICT (record_id) DO UPDATE SET goal_id = excluded.goal_id, seq = excluded.seq, payload = excluded.payload
                 """, new { Id = SqlText.Id(checkin.Id), GoalId = SqlText.Id(checkin.GoalId), record.Seq, envelope.Payload });
     }
+
+    private Task<bool> QueuedDeletionAsync(Guid recordId) => _c.ExecuteScalarAsync<bool>(new CommandDefinition(
+        "SELECT EXISTS (SELECT 1 FROM sync_outbox WHERE record_id = @Id AND op = 'delete')",
+        new { Id = SqlText.Id(recordId) }, _tx, cancellationToken: _ct));
 
     private async Task ApplyPendingAsync(Guid goalId)
     {

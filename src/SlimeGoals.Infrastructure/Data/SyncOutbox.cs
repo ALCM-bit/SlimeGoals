@@ -25,6 +25,24 @@ internal static class SyncOutbox
             """ + ReplaceOnConflict, new { Id = SqlText.Id(recordId), Kind = kind }, tx, cancellationToken: ct));
 
     /// <summary>
+    /// Leva a exclusão de um registro para a fila. O que o servidor já conhece vira exclusão com a base dele; o que nunca
+    /// foi enviado só sai da fila. Sem efeito com a sincronização desligada.
+    /// </summary>
+    public static async Task EnqueueDeletionAsync(SqliteConnection c, IDbTransaction tx, Guid recordId, string kind, CancellationToken ct)
+    {
+        if (await c.ExecuteScalarAsync<long>(new CommandDefinition(
+                "SELECT enabled FROM sync_state", transaction: tx, cancellationToken: ct)) != 1)
+            return;
+
+        await c.ExecuteAsync(new CommandDefinition("""
+            INSERT INTO sync_outbox (record_id, kind, op, base_seq)
+            SELECT r.record_id, @Kind, 'delete', r.seq FROM sync_records r WHERE r.record_id = @Id
+            """ + ReplaceOnConflict + """
+            DELETE FROM sync_outbox WHERE record_id = @Id AND record_id NOT IN (SELECT record_id FROM sync_records);
+            """, new { Id = SqlText.Id(recordId), Kind = kind }, tx, cancellationToken: ct));
+    }
+
+    /// <summary>
     /// Leva a exclusão da meta e de seus registros para a fila. Chamar antes dos DELETE, com os registros
     /// ainda presentes. O que o servidor já conhece vira exclusão; o que nunca foi enviado só sai da fila.
     /// </summary>

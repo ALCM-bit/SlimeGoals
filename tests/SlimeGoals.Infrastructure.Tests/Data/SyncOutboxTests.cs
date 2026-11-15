@@ -266,4 +266,69 @@ public class SyncOutboxTests : IDisposable
         Count("sync_tombstones").Should().Be(0);
         Count("sync_pending").Should().Be(1);
     }
+
+    [Fact]
+    public async Task Deleting_a_known_checkin_queues_a_delete_with_its_seq()
+    {
+        var goal = NewGoal();
+        await Goals.AddAsync(goal);
+        var checkin = NewCheckin(goal);
+        await Checkins.AddAsync(checkin);
+        EnableSync();
+        MarkKnown(checkin.Id, "checkin", 7);
+
+        (await Checkins.DeleteAsync(checkin.Id)).Should().BeTrue();
+
+        var row = _db.Anchor.QuerySingle("SELECT record_id, op, base_seq FROM sync_outbox");
+        ((string)row.record_id).Should().Be(Text(checkin.Id));
+        ((string)row.op).Should().Be("delete");
+        ((long)row.base_seq).Should().Be(7);
+    }
+
+    [Fact]
+    public async Task Deleting_a_never_sent_checkin_only_leaves_the_queue()
+    {
+        EnableSync();
+        var goal = NewGoal();
+        await Goals.AddAsync(goal);
+        _db.Anchor.Execute("DELETE FROM sync_outbox");
+        var checkin = NewCheckin(goal);
+        await Checkins.AddAsync(checkin);
+
+        await Checkins.DeleteAsync(checkin.Id);
+
+        Count("sync_outbox").Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Deleting_with_sync_disabled_queues_nothing()
+    {
+        var goal = NewGoal();
+        await Goals.AddAsync(goal);
+        var checkin = NewCheckin(goal);
+        await Checkins.AddAsync(checkin);
+        MarkKnown(checkin.Id, "checkin", 7);
+
+        await Checkins.DeleteAsync(checkin.Id);
+
+        Count("sync_outbox").Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Replace_queues_the_old_deletion_and_the_new_upsert()
+    {
+        var goal = NewGoal();
+        await Goals.AddAsync(goal);
+        var old = NewCheckin(goal);
+        await Checkins.AddAsync(old);
+        EnableSync();
+        MarkKnown(old.Id, "checkin", 7);
+        var replacement = NewCheckin(goal) with { Amount = 2 };
+
+        await Checkins.ReplaceAsync(old.Id, replacement);
+
+        var rows = (await _db.Anchor.QueryAsync<(string Id, string Op)>(
+            "SELECT record_id, op FROM sync_outbox ORDER BY position")).ToList();
+        rows.Should().Equal((Text(old.Id), "delete"), (Text(replacement.Id), "upsert"));
+    }
 }
