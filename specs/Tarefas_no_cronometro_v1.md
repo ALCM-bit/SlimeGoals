@@ -69,3 +69,22 @@ Este desenho cobre as tarefas. Numa meta de tempo, a pessoa diz no que está tra
 - Como a janelinha e a notificação encaixam a segunda linha.
 - A consulta das sugestões: no repositório de registros, filtrando por meta, `note` não nula e não excluídos, por `done_at` decrescente.
 - Testes: unitários no `TimerService` (definir, limpar, trocar, trecho de 0 min, nada contado duas vezes), integração no SQLite (migração e sugestões) e ViewModels do Hoje.
+
+## 6. Verificação (15/11/2026)
+
+- **Testes automatizados:** `dotnet test --solution SlimeGoals.slnx`, `dotnet build SlimeGoals.slnx -c Release` e o build de `SlimeGoals.Android.slnx` passam sem warnings.
+- **Desktop:** o Hoje real foi conferido sem janela, com o SQLite de verdade numa pasta temporária. Foram 12 de 12 verificações:
+  - ▶ começa com o campo vazio, e as sugestões aparecem;
+  - Enter, sair do campo e escolher uma sugestão gravam o nome;
+  - ⇄ esconde ⇄ e ■;
+  - trocar depois de 3 min registra 3 min com a tarefa antiga como nota, e o novo início é o antigo mais 3 min;
+  - parar preenche a nota com a tarefa.
+- **A conferir pelo autor no GNOME:** a janelinha real com "Meta · Tarefa". O Wayland não deixa automatizar a janela.
+- **Android (emulador, API 36, conta de teste):**
+  - ▶ começa na hora, e o campo vem vazio;
+  - Enter grava, e a notificação mostra "Estudo teste · Ingles";
+  - ⇄ com "Capitulo 3" depois de mais de 1 min registra 1 min e muda a notificação; os segundos passam para a tarefa nova;
+  - tocar numa sugestão grava;
+  - parar preenche a nota com a tarefa.
+- **Achado no celular, corrigido:** com o teclado aberto, a lista do Hoje ficava sem altura, porque o título, o destaque e os blocos ocupavam a tela, e o campo em edição sumia atrás do teclado. Agora, com o teclado aberto, o destaque e os blocos somem, e a página rola até o campo. O mesmo valia para a nota do painel de registro.
+- **Não exercitado no aparelho:** o "Iniciar" do lembrete. O teste `Timer_started_from_a_reminder_has_an_empty_task_field` cobre esse caminho.
