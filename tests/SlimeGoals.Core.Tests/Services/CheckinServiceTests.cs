@@ -250,4 +250,17 @@ public class CheckinServiceTests
 
         _checkins.All.Single().Compensation.Should().BeNull();
     }
+
+    [Fact]
+    public async Task Recent_notes_are_distinct_newest_first_and_limited_to_5()
+    {
+        var goal = await Create();
+        foreach (var note in new[] { "a", "b", "c", null, "d", "b", "e", "f" })
+        {
+            await Service.AdjustAsync(goal.Id, 1, note);
+            _time.Advance(TimeSpan.FromMinutes(1));
+        }
+
+        (await Service.RecentNotesAsync(goal.Id)).Should().Equal("f", "e", "b", "d", "c");
+    }
 }

@@ -28,6 +28,9 @@ public sealed class CheckinRepository(SqliteConnectionFactory db) : ICheckinRepo
         }
     }
 
+    public Task<IReadOnlyList<string>> RecentNotesAsync(Guid goalId, int limit, CancellationToken ct = default) =>
+        throw new NotSupportedException();
+
     public async Task<IReadOnlyList<Checkin>> ListAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken ct = default)
     {
         await using var c = db.Open();

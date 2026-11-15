@@ -13,9 +13,13 @@ public class TimerServiceTests
     private readonly FakeTimeProvider _time = new(T0);
     private readonly InMemoryGoalRepository _goals = new();
     private readonly InMemoryCheckinRepository _checkins = new();
-    private readonly InMemoryTimerRepository _timers = new();
+    private readonly InMemoryTimerRepository _timers;
 
-    public TimerServiceTests() => _time.SetLocalTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
+    public TimerServiceTests()
+    {
+        _timers = new(_checkins);
+        _time.SetLocalTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
+    }
 
     private GoalService Goals => new(_goals, _checkins, _timers, _time);
     private CheckinService Checkins => new(_goals, _checkins, _time);
@@ -152,5 +156,167 @@ public class TimerServiceTests
 
         (await reopened.GetAsync())!.StoppedAt.Should().BeNull();
         (await reopened.StopAsync()).Should().Be(7);
+    }
+
+    // Tarefas no cronômetro (specs/Tarefas_no_cronometro_v1.md).
+
+    [Fact]
+    public async Task Set_task_trims_and_is_kept_on_the_timer()
+    {
+        var goal = await Study();
+        await Service.StartAsync(goal.Id);
+
+        await Service.SetTaskAsync("  Inglês ");
+
+        (await Service.GetAsync())!.Task.Should().Be("Inglês");
+    }
+
+    [Fact]
+    public async Task Set_task_with_only_spaces_clears_it()
+    {
+        var goal = await Study();
+        await Service.StartAsync(goal.Id);
+        await Service.SetTaskAsync("Inglês");
+
+        await Service.SetTaskAsync("   ");
+
+        (await Service.GetAsync())!.Task.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Set_task_accepts_emoji_and_200_characters()
+    {
+        var goal = await Study();
+        await Service.StartAsync(goal.Id);
+
+        await Service.SetTaskAsync(new string('a', 200));
+        (await Service.GetAsync())!.Task.Should().HaveLength(200);
+        await Service.SetTaskAsync("📖 Ler");
+        (await Service.GetAsync())!.Task.Should().Be("📖 Ler");
+    }
+
+    [Fact]
+    public async Task Set_task_longer_than_200_characters_is_refused()
+    {
+        var goal = await Study();
+        await Service.StartAsync(goal.Id);
+
+        var act = () => Service.SetTaskAsync(new string('a', 201));
+
+        (await act.Should().ThrowAsync<GoalValidationException>()).Which.Errors.Should().ContainSingle()
+            .Which.Message.Should().Be("A tarefa deve ter até 200 caracteres.");
+        (await Service.GetAsync())!.Task.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Set_task_without_timer_fails()
+    {
+        var act = () => Service.SetTaskAsync("Inglês");
+
+        await act.Should().ThrowAsync<GoalStateException>().WithMessage("Nenhum cronômetro rodando.");
+        (await Service.GetAsync()).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Switch_registers_whole_minutes_with_the_old_task_and_carries_the_seconds()
+    {
+        var goal = await Study();
+        await Service.StartAsync(goal.Id);
+        await Service.SetTaskAsync("Inglês");
+        _time.Advance(TimeSpan.FromSeconds(25 * 60 + 40));
+
+        (await Service.SwitchTaskAsync("Capítulo 3")).Should().Be(25);
+
+        _checkins.All.Should().ContainSingle().Which.Should().Match<Checkin>(c => c.Amount == 25 && c.Note == "Inglês");
+        (await Service.GetAsync()).Should().Be(new ActiveTimer(goal.Id, T0.AddMinutes(25), null, "Capítulo 3"));
+    }
+
+    [Fact]
+    public async Task Switch_then_stop_adds_up_to_the_whole_elapsed_time()
+    {
+        var goal = await Study();
+        await Service.StartAsync(goal.Id);
+        _time.Advance(TimeSpan.FromSeconds(10 * 60 + 50));
+        await Service.SwitchTaskAsync("B");
+        _time.Advance(TimeSpan.FromSeconds(19 * 60 + 30)); // 30 min 20 s desde o início
+
+        var minutes = await Service.StopAsync();
+        await Service.RegisterAsync(minutes);
+
+        _checkins.All.Sum(c => c.Amount).Should().Be(30);
+    }
+
+    [Fact]
+    public async Task Switch_under_a_minute_only_renames()
+    {
+        var goal = await Study();
+        await Service.StartAsync(goal.Id);
+        _time.Advance(TimeSpan.FromSeconds(40));
+
+        (await Service.SwitchTaskAsync("B")).Should().Be(0);
+
+        _checkins.All.Should().BeEmpty();
+        (await Service.GetAsync()).Should().Be(new ActiveTimer(goal.Id, T0, null, "B"));
+    }
+
+    [Fact]
+    public async Task Switch_with_a_stopped_timer_fails_and_registers_nothing()
+    {
+        var goal = await Study();
+        await Service.StartAsync(goal.Id);
+        _time.Advance(TimeSpan.FromMinutes(5));
+        await Service.StopAsync();
+
+        var act = () => Service.SwitchTaskAsync("B");
+
+        await act.Should().ThrowAsync<GoalStateException>();
+        _checkins.All.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Switch_refused_by_checkin_validation_keeps_the_timer()
+    {
+        var goal = await Study();
+        await Service.StartAsync(goal.Id);
+        await Service.SetTaskAsync("A");
+        var before = await Service.GetAsync();
+        _time.Advance(TimeSpan.FromMinutes(24 * 60 + 1));
+
+        var act = () => Service.SwitchTaskAsync("B");
+
+        await act.Should().ThrowAsync<GoalValidationException>();
+        (await Service.GetAsync()).Should().Be(before);
+        _checkins.All.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Switch_loses_the_race_when_the_timer_changed()
+    {
+        var goal = await Study();
+        await Service.StartAsync(goal.Id);
+        _time.Advance(TimeSpan.FromMinutes(5));
+        _timers.FailSwitches = true;
+
+        var act = () => Service.SwitchTaskAsync("B");
+
+        await act.Should().ThrowAsync<GoalStateException>().WithMessage("O cronômetro mudou. Confira em Hoje.");
+        _checkins.All.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Switch_without_timer_fails()
+    {
+        var act = () => Service.SwitchTaskAsync("B");
+
+        await act.Should().ThrowAsync<GoalStateException>().WithMessage("Nenhum cronômetro rodando.");
+    }
+
+    [Fact]
+    public async Task Task_suggestions_come_from_the_goal_notes()
+    {
+        var goal = await Study();
+        await Checkins.AdjustAsync(goal.Id, 10, "Inglês");
+
+        (await Service.TaskSuggestionsAsync(goal.Id)).Should().Equal("Inglês");
     }
 }

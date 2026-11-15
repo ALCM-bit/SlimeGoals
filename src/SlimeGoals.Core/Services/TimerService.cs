@@ -1,5 +1,6 @@
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Domain;
+using SlimeGoals.Core.Validation;
 
 namespace SlimeGoals.Core.Services;
 
@@ -39,7 +40,7 @@ public sealed class TimerService(IGoalRepository goals, ITimerRepository timers,
     /// <summary>Congela o cronômetro (idempotente) e devolve os minutos.</summary>
     public async Task<int> StopAsync(CancellationToken ct = default)
     {
-        var timer = await timers.GetAsync(ct) ?? throw new GoalStateException(Guid.Empty, "Nenhum cronômetro rodando.");
+        var timer = await timers.GetAsync(ct) ?? throw NoTimer();
         if (timer.StoppedAt is null)
         {
             timer = timer with { StoppedAt = time.GetUtcNow() };
@@ -59,6 +60,57 @@ public sealed class TimerService(IGoalRepository goals, ITimerRepository timers,
         changes?.NotifyChanged();
         return total;
     }
+
+    /// <summary>Dá (ou tira, com vazio) o nome da tarefa do cronômetro, rodando ou parado. Nunca cria um cronômetro.</summary>
+    public async Task SetTaskAsync(string? task, CancellationToken ct = default)
+    {
+        task = NormalizeTask(task);
+        if (!await timers.SetTaskAsync(task, ct))
+            throw NoTimer();
+        changes?.NotifyChanged();
+    }
+
+    /// <summary>
+    /// Registra o trecho da tarefa atual e segue contando com <paramref name="newTask"/>. O trecho leva só os minutos
+    /// inteiros, e o novo início é o antigo mais esses minutos: os segundos que sobram passam para a próxima tarefa, e
+    /// nenhum instante é contado duas vezes nem perdido. Abaixo de um minuto, só o nome muda. Devolve o total do período.
+    /// </summary>
+    public async Task<int> SwitchTaskAsync(string? newTask, CancellationToken ct = default)
+    {
+        newTask = NormalizeTask(newTask);
+        var timer = await timers.GetAsync(ct) ?? throw NoTimer();
+        if (timer.StoppedAt is not null)
+            throw new GoalStateException(timer.GoalId, "O cronômetro está parado. Registre ou descarte antes de trocar a tarefa.");
+
+        var minutes = (int)Math.Floor((time.GetUtcNow() - timer.StartedAt).TotalMinutes);
+        if (minutes <= 0)
+        {
+            await SetTaskAsync(newTask, ct);
+            return await checkins.PeriodTotalAsync(timer.GoalId, ct);
+        }
+
+        var (chunk, total) = await checkins.PrepareAsync(timer.GoalId, minutes, timer.Task, ct);
+        var next = timer with { StartedAt = timer.StartedAt.AddMinutes(minutes), Task = newTask };
+        if (!await timers.SwitchAsync(timer.StartedAt, next, chunk, ct))
+            throw new GoalStateException(timer.GoalId, "O cronômetro mudou. Confira em Hoje.");
+        changes?.NotifyChanged();
+        return total;
+    }
+
+    /// <summary>Sugestões para o nome da tarefa: as notas recentes dos registros da meta.</summary>
+    public Task<IReadOnlyList<string>> TaskSuggestionsAsync(Guid goalId, CancellationToken ct = default) =>
+        checkins.RecentNotesAsync(goalId, ct);
+
+    private static string? NormalizeTask(string? task)
+    {
+        task = string.IsNullOrWhiteSpace(task) ? null : task.Trim();
+        if (task is { Length: > CheckinService.MaxNoteLength })
+            throw new GoalValidationException(
+                [new ValidationError("Task", $"A tarefa deve ter até {CheckinService.MaxNoteLength} caracteres.")]);
+        return task;
+    }
+
+    private static GoalStateException NoTimer() => new(Guid.Empty, "Nenhum cronômetro rodando.");
 
     public async Task DiscardAsync(CancellationToken ct = default)
     {

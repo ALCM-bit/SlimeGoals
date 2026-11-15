@@ -39,6 +39,13 @@ public sealed class InMemoryCheckinRepository : ICheckinRepository
             .Select(c => c.Id).ToList());
 
     /// <summary>Apaga os registros da meta (a exclusão da meta).</summary>
+    public Task<IReadOnlyList<string>> RecentNotesAsync(Guid goalId, int limit, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<string>>(_checkins
+            .Where(c => c.GoalId == goalId && c.DeletedAt is null && c.Note is not null)
+            .GroupBy(c => c.Note!)
+            .OrderByDescending(g => g.Max(c => c.DoneAt))
+            .Select(g => g.Key).Take(limit).ToList());
+
     public void RemoveOf(Guid goalId) => _checkins.RemoveAll(c => c.GoalId == goalId);
 
     private IEnumerable<Checkin> Live(DateTimeOffset fromUtc, DateTimeOffset toUtc) =>

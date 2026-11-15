@@ -14,4 +14,14 @@ public interface ITimerRepository
     Task SaveAsync(ActiveTimer timer, CancellationToken ct = default);
 
     Task ClearAsync(CancellationToken ct = default);
+
+    /// <summary>Troca só o nome da tarefa do cronômetro existente. Falso quando não há cronômetro (nunca cria um).</summary>
+    Task<bool> SetTaskAsync(string? task, CancellationToken ct = default);
+
+    /// <summary>
+    /// Numa transação só: grava o trecho <paramref name="chunk"/> (com a fila da sincronização) e passa o cronômetro para
+    /// <paramref name="next"/>, mas só se ele ainda for o da mesma meta, rodando, com início <paramref name="expectedStartedAt"/>.
+    /// Falso, sem gravar nada, se o cronômetro mudou.
+    /// </summary>
+    Task<bool> SwitchAsync(DateTimeOffset expectedStartedAt, ActiveTimer next, Checkin chunk, CancellationToken ct = default);
 }

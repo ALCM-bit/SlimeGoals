@@ -15,9 +15,26 @@ public sealed class CheckinService(IGoalRepository goals, ICheckinRepository che
     public const int MaxNoteLength = 200;
     public const int MaxQuantityAmount = 9999;
     public const int MaxDurationAmount = 24 * 60;
+    public const int RecentNotesLimit = 5;
+
+    /// <summary>Até <see cref="RecentNotesLimit"/> notas distintas da meta, da mais recente para a mais antiga.</summary>
+    public Task<IReadOnlyList<string>> RecentNotesAsync(Guid goalId, CancellationToken ct = default) =>
+        checkins.RecentNotesAsync(goalId, RecentNotesLimit, ct);
 
     /// <summary>Registra um ajuste no período atual e devolve o novo total do período.</summary>
     public async Task<int> AdjustAsync(Guid goalId, int amount, string? note = null, CancellationToken ct = default)
+    {
+        var (checkin, total) = await PrepareAsync(goalId, amount, note, ct);
+        await checkins.AddAsync(checkin, ct);
+        changes?.NotifyChanged();
+        return total;
+    }
+
+    /// <summary>
+    /// Valida e monta o registro de um ajuste no período atual, sem gravar, com o total que ele deixará. Quem chama grava
+    /// (a troca de tarefa do cronômetro grava junto com o novo início, numa transação só).
+    /// </summary>
+    internal async Task<(Checkin Checkin, int Total)> PrepareAsync(Guid goalId, int amount, string? note, CancellationToken ct)
     {
         var goal = await goals.GetAsync(goalId, ct) ?? throw new GoalNotFoundException(goalId);
         if (goal.ArchivedAt is not null)
@@ -49,7 +66,7 @@ public sealed class CheckinService(IGoalRepository goals, ICheckinRepository che
         Compensation? compensation = null;
         if (stored != amount && GoalPeriod.EvaluationPeriod(goal, today) is { } range)
             compensation = new Compensation(range.Start, await checkins.CompensationIdsAsync(goalId, range.Start, ct));
-        await checkins.AddAsync(new Checkin
+        var checkin = new Checkin
         {
             Id = Guid.CreateVersion7(now),
             GoalId = goalId,
@@ -60,9 +77,8 @@ public sealed class CheckinService(IGoalRepository goals, ICheckinRepository che
             Note = note,
             UpdatedAt = now,
             Compensation = compensation,
-        }, ct);
-        changes?.NotifyChanged();
-        return total;
+        };
+        return (checkin, total);
     }
 
     /// <summary>Soma do período atual da meta (0 se a meta não existe ou está fora do período).</summary>

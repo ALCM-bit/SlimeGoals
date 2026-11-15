@@ -1,6 +1,6 @@
 # Tarefas no cronômetro (v1)
 
-> Desenho curto, conversado com o autor em 15/11/2026. Aguarda aprovação. O Pomodoro (intervalos de foco e pausa) vem num desenho seguinte e reaproveita a tarefa como o foco de cada ciclo.
+> Desenho curto, aprovado pelo autor em 15/11/2026. O plano está em `specs/plans/2026-11-15-tarefas-no-cronometro.md`. O Pomodoro (intervalos de foco e pausa) vem num desenho seguinte e reaproveita a tarefa como o foco de cada ciclo.
 
 ## 1. Para que serve
 
@@ -46,10 +46,12 @@ Este desenho cobre as tarefas. Numa meta de tempo, a pessoa diz no que está tra
 4. **Parar.** O painel de conferência já vem com a nota preenchida com o nome da tarefa, e a pessoa pode editar. Registrar funciona como hoje.
 5. **Trocar de tarefa (⇄), só com o cronômetro rodando.**
    - ⇄ abre o mesmo campo, vazio e com as sugestões, e um botão "Trocar".
-   - Ao confirmar, o trecho até agora é registrado sem conferência, com a nota igual à tarefa atual. Na mesma operação, o cronômetro recomeça agora com o novo nome.
-   - Um trecho que arredonda para 0 min não gera registro.
+   - Ao confirmar, o trecho até agora é registrado sem conferência, com a nota igual à tarefa atual. Na mesma operação, o cronômetro segue com o novo nome.
+   - O trecho leva só os **minutos inteiros**, arredondados para baixo. O novo início é o início antigo mais esses minutos, e não o instante da troca: os segundos que sobram passam para a próxima tarefa.
+   - Um trecho de menos de 1 minuto não gera registro; só o nome muda, e o início fica o mesmo.
+   - Se o cronômetro foi parado ou descartado por outro processo no meio da troca, nada é gravado, e o Hoje mostra "O cronômetro mudou. Confira em Hoje.".
    - Core: `TimerService.SwitchTaskAsync(string? newTask)`, que devolve o novo total do período.
-   - Requisito: nenhum instante é contado duas vezes nem perdido. O novo início é o mesmo instante usado para medir o trecho registrado.
+   - Requisito: nenhum instante é contado duas vezes nem perdido. O "Parar" continua arredondando ao minuto mais próximo, como hoje.
 6. **Fora do app.** A janelinha e a notificação mostram o nome da tarefa junto ao da meta, cortado com reticências se for longo. Sem tarefa, mostram o que mostram hoje.
 7. **Texto do Hoje.** Com o cronômetro rodando e uma tarefa definida, o cartão mostra o nome da tarefa abaixo do título da meta.
 

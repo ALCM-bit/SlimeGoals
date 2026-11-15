@@ -57,6 +57,11 @@ public sealed class TimerRepository(SqliteConnectionFactory db) : ITimerReposito
             Params(timer), cancellationToken: ct));
     }
 
+    public Task<bool> SetTaskAsync(string? task, CancellationToken ct = default) => throw new NotSupportedException();
+
+    public Task<bool> SwitchAsync(DateTimeOffset expectedStartedAt, ActiveTimer next, Checkin chunk, CancellationToken ct = default) =>
+        throw new NotSupportedException();
+
     public async Task ClearAsync(CancellationToken ct = default)
     {
         await using var c = db.Open();
