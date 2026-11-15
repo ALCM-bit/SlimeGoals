@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 # Gera artifacts/slimegoals-<versão>-android.apk (Release, assinado).
+# Com --dev, gera artifacts/slimegoals-<versão>-android-dev.apk: o mesmo app com a conta e a sincronização
+# (SyncDev), assinado com a mesma chave, para instalar por cima sem perder os dados.
 set -euo pipefail
+
+dev=false
+case "$#:${1:-}" in
+  0:) ;;
+  1:--dev) dev=true ;;
+  *) echo "Uso: packaging/android/build.sh [--dev]" >&2; exit 2 ;;
+esac
 
 # Caminho relativo vale a partir de onde o script foi chamado, não da raiz do repositório.
 if [ -n "${SLIMEGOALS_KEYSTORE:-}" ]; then
@@ -30,7 +39,13 @@ version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props |
 [ -n "$version" ] || { echo "Versão não encontrada em Directory.Build.props" >&2; exit 1; }
 
 export SLIMEGOALS_KEYSTORE_PASS
-out="artifacts/slimegoals-$version-android.apk"
+suffix=""
+sync_dev=()
+if [ "$dev" = true ]; then
+  suffix="-dev"
+  sync_dev=(-p:SyncDev=true)
+fi
+out="artifacts/slimegoals-$version-android$suffix.apk"
 pub="src/SlimeGoals.Android/bin/Release/net10.0-android"
 rm -f "$out"
 find "$pub" -name '*-Signed.apk' -delete 2>/dev/null || true
@@ -42,7 +57,8 @@ dotnet publish src/SlimeGoals.Android -c Release -f net10.0-android \
   -p:AndroidSigningStorePass=env:SLIMEGOALS_KEYSTORE_PASS \
   -p:AndroidSigningKeyPass=env:SLIMEGOALS_KEYSTORE_PASS \
   -p:AndroidSdkDirectory="$android_home" \
-  -p:JavaSdkDirectory="$java_home"
+  -p:JavaSdkDirectory="$java_home" \
+  "${sync_dev[@]}"
 
 apk="$(find "$pub" -name '*-Signed.apk' | head -n1)"
 [ -n "$apk" ] || { echo "APK assinado não encontrado em $pub" >&2; exit 1; }

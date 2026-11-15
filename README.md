@@ -162,7 +162,7 @@ docker pull testcontainers/ryuk:0.14.0   # use a versão que o erro indicar
 
 ## Sincronização (em desenvolvimento)
 
-No build de desenvolvimento do Linux (Debug, ou qualquer build com `-p:SyncDev=true`), Configurações ganha, no topo, a seção **Conta e sincronização**: criar conta, confirmar, entrar, recuperar, trocar a senha, ver e remover aparelhos, sair e apagar a conta. O app instalado (Release, `packaging/linux/build.sh`) não tem a seção, nem cofre, nem rede. O Android ainda não sincroniza (fase 9.5b).
+No build de desenvolvimento do Linux (Debug, ou qualquer build com `-p:SyncDev=true`), Configurações ganha, no topo, a seção **Conta e sincronização**: criar conta, confirmar, entrar, recuperar, trocar a senha, ver e remover aparelhos, sair e apagar a conta. O app instalado (Release, `packaging/linux/build.sh`) não tem a seção, nem cofre, nem rede. No Android, vale o mesmo: só o APK de desenvolvimento sincroniza (veja "No Android", abaixo).
 
 ```bash
 # 1. suba o servidor (veja a seção anterior para o .env)
@@ -189,6 +189,27 @@ XDG_DATA_HOME=/tmp/sg-a/data XDG_CONFIG_HOME=/tmp/sg-a/config dotnet run --proje
 
   Com o app aberto, uma edição feita num chega ao outro em até uns 20 s.
 
+### No Android
+
+O APK de distribuição não tem rede. Para sincronizar, use o APK de desenvolvimento: o Debug (`-t:Install`, só no emulador, porque é assinado com a chave de debug) ou o gerado por `build.sh --dev`, assinado com a sua chave, que instala por cima do app do celular sem perder os dados.
+
+```bash
+packaging/android/build.sh --dev                    # artifacts/slimegoals-<versão>-android-dev.apk
+adb install -r artifacts/slimegoals-0.8.0-android-dev.apk
+adb reverse tcp:8080 tcp:8080                       # o 127.0.0.1:8080 do celular passa a ser o do computador
+```
+
+- O servidor continua preso ao `127.0.0.1` do computador; o celular chega a ele pelo cabo. Refaça o `adb reverse` sempre que reconectar o cabo ou reiniciar o celular.
+- O endereço no app é o padrão, `http://127.0.0.1:8080`. O APK de desenvolvimento só aceita texto puro para `127.0.0.1` e `localhost`.
+- A sessão fica cifrada com uma chave do Android Keystore, num arquivo privado do app que não vai para backup.
+- Para voltar ao app normal, instale por cima o APK sem `-dev`. A seção some, e a sessão fica guardada, sem uso.
+- **Conferir a criptografia no aparelho:** o APK de desenvolvimento calcula os vetores fixos da spec quando o `adb` pede (só o `adb` e o sistema conseguem pedir):
+
+  ```bash
+  adb shell am broadcast -a dev.alcm.slimegoals.VERIFICAR_CRIPTO -n dev.alcm.slimegoals/dev.alcm.slimegoals.CryptoSelfCheckReceiver
+  adb logcat -d -s SlimeGoals    # esperado: "cripto: 5/5 vetores conferem"
+  ```
+
 ## Instalar no Android
 
 O APK é assinado com uma chave sua, que fica fora do repositório. Ele traz as arquiteturas arm64 (celulares) e x64 (emulador) e exige Android 8.0 ou mais novo (API 26). Pré-requisitos: os de [Rodar no Android](#rodar-no-android-desenvolvimento).
@@ -209,7 +230,7 @@ O APK é assinado com uma chave sua, que fica fora do repositório. Ele traz as 
 
    O script pede a senha da chave (ela não fica no histórico do shell). Para uma chave em outro lugar, aponte `SLIMEGOALS_KEYSTORE`; sem terminal (CI, por exemplo), defina `SLIMEGOALS_KEYSTORE_PASS`. O SDK do Android e o JDK vêm de `ANDROID_HOME` e `JAVA_HOME`, com padrão `~/Android/Sdk` e `/usr/lib/jvm/java-21-openjdk`.
 
-   O resultado é `artifacts/slimegoals-0.8.0-android.apk`.
+   O resultado é `artifacts/slimegoals-0.8.0-android.apk`. Com `--dev`, o script gera `artifacts/slimegoals-0.8.0-android-dev.apk`, com a sincronização em desenvolvimento (veja [No Android](#no-android)).
 
 3. **Instale no celular:** com a depuração USB ligada, `adb install artifacts/slimegoals-0.8.0-android.apk`; ou copie o APK para o aparelho e abra-o, permitindo "instalar apps desconhecidos" para o app que o abriu.
 
