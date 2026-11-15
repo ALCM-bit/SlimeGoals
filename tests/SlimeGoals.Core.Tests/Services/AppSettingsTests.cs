@@ -86,4 +86,44 @@ public class AppSettingsTests
 
         (await Sut.GetSyncServerAsync()).Should().Be(AppSettings.DefaultSyncServer);
     }
+
+    [Fact]
+    public async Task Mini_timer_is_on_by_default_and_remembers_the_choice()
+    {
+        (await Sut.GetMiniTimerEnabledAsync()).Should().BeTrue();
+
+        await Sut.SetMiniTimerEnabledAsync(false);
+
+        (await _settings.GetAsync(AppSettings.MiniTimerKey)).Should().Be("off");
+        (await Sut.GetMiniTimerEnabledAsync()).Should().BeFalse();
+        _notified.Should().Be(1);
+
+        await Sut.SetMiniTimerEnabledAsync(true);
+        (await Sut.GetMiniTimerEnabledAsync()).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Mini_timer_position_round_trips_without_notifying()
+    {
+        (await Sut.GetMiniTimerPositionAsync()).Should().BeNull();
+
+        await Sut.SetMiniTimerPositionAsync(12, -40);
+
+        (await _settings.GetAsync(AppSettings.MiniTimerPositionKey)).Should().Be("12,-40");
+        (await Sut.GetMiniTimerPositionAsync()).Should().Be((12, -40));
+        _notified.Should().Be(0, "a posição não muda dado nenhum que outra tela mostre");
+    }
+
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("1")]
+    [InlineData("1,2,3")]
+    [InlineData("")]
+    [InlineData("1,")]
+    public async Task Mini_timer_position_garbage_reads_as_null(string stored)
+    {
+        await _settings.SetAsync(AppSettings.MiniTimerPositionKey, stored);
+
+        (await Sut.GetMiniTimerPositionAsync()).Should().BeNull();
+    }
 }

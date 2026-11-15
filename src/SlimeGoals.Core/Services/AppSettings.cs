@@ -19,6 +19,12 @@ public sealed class AppSettings(ISettingsRepository settings, DataChangeNotifier
     /// <summary>Chave: endereço do servidor de sincronização, usado ao criar conta, entrar ou recuperar.</summary>
     public const string SyncServerKey = "sync_server";
 
+    /// <summary>Chave: "on" ou "off" para a janelinha do cronômetro (desktop).</summary>
+    public const string MiniTimerKey = "timer.mini_window";
+
+    /// <summary>Chave: posição da janelinha do cronômetro, "x,y" em pixels da tela.</summary>
+    public const string MiniTimerPositionKey = "timer.mini_window_position";
+
     /// <summary>Servidor padrão: o do <c>compose.yaml</c> de desenvolvimento.</summary>
     public static Uri DefaultSyncServer { get; } = new("http://127.0.0.1:8080");
 
@@ -81,4 +87,36 @@ public sealed class AppSettings(ISettingsRepository settings, DataChangeNotifier
         await settings.SetAsync(SyncServerKey, server.AbsoluteUri, ct);
         changes?.NotifyChanged();
     }
+
+    /// <summary>Janelinha do cronômetro ligada; ausente, ou qualquer valor que não "off", vale ligada.</summary>
+    public async Task<bool> GetMiniTimerEnabledAsync(CancellationToken ct = default) =>
+        await settings.GetAsync(MiniTimerKey, ct) != "off";
+
+    /// <summary>Liga ou desliga a janelinha do cronômetro.</summary>
+    public async Task SetMiniTimerEnabledAsync(bool enabled, CancellationToken ct = default)
+    {
+        await settings.SetAsync(MiniTimerKey, enabled ? "on" : "off", ct);
+        changes?.NotifyChanged();
+    }
+
+    /// <summary>Posição gravada da janelinha; nula se ausente ou ilegível.</summary>
+    public async Task<(int X, int Y)?> GetMiniTimerPositionAsync(CancellationToken ct = default)
+    {
+        if (await settings.GetAsync(MiniTimerPositionKey, ct) is not { } raw)
+            return null;
+        var parts = raw.Split(',');
+        if (parts.Length == 2
+            && int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var x)
+            && int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var y))
+            return (x, y);
+        Trace.TraceWarning($"Valor inválido em {MiniTimerPositionKey}.");
+        return null;
+    }
+
+    /// <summary>
+    /// Grava a posição da janelinha. Não avisa o <see cref="DataChangeNotifier"/>: nenhuma tela mostra a
+    /// posição, e cada arrasto faria todas recarregarem à toa.
+    /// </summary>
+    public Task SetMiniTimerPositionAsync(int x, int y, CancellationToken ct = default) =>
+        settings.SetAsync(MiniTimerPositionKey, string.Create(CultureInfo.InvariantCulture, $"{x},{y}"), ct);
 }

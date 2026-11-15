@@ -48,6 +48,14 @@
   <SolidColorBrush x:Key="Success" Color="{StaticResource SuccessColor}" />
   <SolidColorBrush x:Key="Warning" Color="{StaticResource WarningColor}" />
 
+  <!-- Interruptor ligado na cor do app (o Fluent usaria o azul do sistema) -->
+  <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="{StaticResource PrimaryColor}" />
+  <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="{StaticResource PrimarySoftColor}" />
+  <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="{StaticResource PrimaryTintColor}" />
+  <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="{StaticResource OnPrimaryColor}" />
+  <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="{StaticResource OnPrimaryColor}" />
+  <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="{StaticResource OnPrimaryColor}" />
+
   <!-- Cartão de destaque (hero): gradiente 145° -->
   <LinearGradientBrush x:Key="HeroBrush" StartPoint="0%,0%" EndPoint="100%,100%">
     <GradientStop Offset="0" Color="#7656D0" />

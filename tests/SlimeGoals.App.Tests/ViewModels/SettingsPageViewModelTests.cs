@@ -266,6 +266,43 @@ public class SettingsPageViewModelTests
     }
 
     [Fact]
+    public void Mini_timer_option_follows_the_capability()
+    {
+        var settings = new AppSettings(new RecordingSettings());
+
+        new SettingsPageViewModel(settings).ShowMiniTimer.Should().BeTrue();
+        new SettingsPageViewModel(settings, null, new PlatformCapabilities(true, false, false, false)).ShowMiniTimer.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Toggling_the_mini_timer_saves_and_a_failed_save_reverts()
+    {
+        var repo = new RecordingSettings();
+        var vm = await LoadedAsync(repo, null);
+        vm.MiniTimerEnabled.Should().BeTrue();
+        repo.Writes.Should().BeEmpty();
+
+        vm.MiniTimerEnabled = false;
+        await vm.LastSave;
+        (await repo.GetAsync(AppSettings.MiniTimerKey)).Should().Be("off");
+
+        var failing = await LoadedAsync(new RecordingSettings { Fail = true }, null);
+        failing.MiniTimerEnabled = false;
+        await failing.LastSave;
+        failing.MiniTimerEnabled.Should().BeTrue();
+        failing.ErrorMessage.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Load_reads_the_mini_timer_choice()
+    {
+        var repo = new RecordingSettings();
+        await repo.SetAsync(AppSettings.MiniTimerKey, "off");
+
+        (await LoadedAsync(repo, null)).MiniTimerEnabled.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Toggling_autostart_calls_enable_and_disable()
     {
         var autostart = new FakeAutostart();
