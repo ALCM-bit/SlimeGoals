@@ -78,6 +78,8 @@ public sealed class ReminderActionReceiver : BroadcastReceiver
             else
                 await notifications.WithdrawAsync(logId).ConfigureAwait(false);
             await services.GetRequiredService<SystemAlarmReminderScheduler>().RescheduleAsync().ConfigureAwait(false);
+            // "Iniciar" pode ter ligado um cronômetro: a notificação dele sai antes de o receiver terminar.
+            await services.GetRequiredService<TimerNotificationSync>().SyncAsync().ConfigureAwait(false);
         });
     }
 }
@@ -113,8 +115,12 @@ public sealed class SystemEventReceiver : BroadcastReceiver
         if (intent?.Action is not { } action || !Actions.Contains(action))
             return;
 
-        Trace.TraceInformation($"Evento do sistema {action}: reagendando lembretes.");
-        ReceiverWork.Run(this, context!, services
-            => services.GetRequiredService<SystemAlarmReminderScheduler>().RescheduleAsync());
+        Trace.TraceInformation($"Evento do sistema {action}: reagendando lembretes e repondo o cronômetro.");
+        ReceiverWork.Run(this, context!, async services =>
+        {
+            await services.GetRequiredService<SystemAlarmReminderScheduler>().RescheduleAsync().ConfigureAwait(false);
+            // O boot apaga as notificações: com um cronômetro rodando, a dele volta.
+            await services.GetRequiredService<TimerNotificationSync>().SyncAsync().ConfigureAwait(false);
+        });
     }
 }

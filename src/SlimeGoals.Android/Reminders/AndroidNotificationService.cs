@@ -20,7 +20,8 @@ internal sealed class AndroidNotificationService(Context context) : INotificatio
     public const string TimerConflictText = "Há um cronômetro aberto. Toque para abrir o app.";
 
     private const int NotificationId = 1;
-    private static readonly Color Accent = Color.ParseColor("#9B7BEA");
+    /// <summary>Cor do app nas notificações (lembretes e cronômetro).</summary>
+    internal static readonly Color Accent = Color.ParseColor("#9B7BEA");
 
     private NotificationManager Manager => (NotificationManager)context.GetSystemService(Context.NotificationService)!;
 

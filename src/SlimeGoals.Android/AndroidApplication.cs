@@ -51,6 +51,7 @@ public class AndroidApplication : AvaloniaAndroidApplication<AndroidApplication.
             using (var connection = services.GetRequiredService<SqliteConnectionFactory>().Open())
                 MigrationRunner.Migrate(connection);
             Services = services;
+            _ = StartTimerNotificationAsync(services);
         }
         catch (Exception ex)
         {
@@ -61,6 +62,22 @@ public class AndroidApplication : AvaloniaAndroidApplication<AndroidApplication.
         }
 
         base.OnCreate();
+    }
+
+    /// <summary>
+    /// A notificação do cronômetro acompanha o banco desde o início do processo: um cronômetro iniciado pelo "Iniciar"
+    /// de um lembrete, com a tela fechada, também aparece. Sem esperar, fora da thread principal.
+    /// </summary>
+    private static async Task StartTimerNotificationAsync(ServiceProvider services)
+    {
+        try
+        {
+            await Task.Run(() => services.GetRequiredService<TimerNotificationSync>().StartAsync()).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            Trace.TraceError($"Falha ao iniciar a notificação do cronômetro: {TraceText.Of(e)}");
+        }
     }
 
     /// <summary>Avisa as telas de que os dados podem ter mudado (ao voltar ao app, por exemplo).</summary>

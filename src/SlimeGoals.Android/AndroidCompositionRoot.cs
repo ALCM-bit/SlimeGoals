@@ -46,6 +46,11 @@ internal static class AndroidCompositionRoot
         services.AddSingleton<IWindowActivator, NoopWindowActivator>();
         services.AddSingleton<IAppHostedService, ReminderHost>();
 
+        // Cronômetro na notificação — ligado no AndroidApplication.OnCreate, para valer também sem a tela aberta
+        services.AddSingleton<RunningTimerWatcher>();
+        services.AddSingleton<ITimerNotification>(_ => new AndroidTimerNotification(context));
+        services.AddSingleton<TimerNotificationSync>();
+
         // UI — ordem de registro = ordem na navegação
         services.AddSingleton<PageViewModel, TodayPageViewModel>();
         services.AddSingleton<PageViewModel, GoalsPageViewModel>();
