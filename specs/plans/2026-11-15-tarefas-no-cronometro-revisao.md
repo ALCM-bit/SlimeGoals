@@ -41,7 +41,7 @@
 
 ---
 
-### Tarefa 1: excluir e substituir registros no SQLite e na fila da sincronização
+### Task 1: excluir e substituir registros no SQLite e na fila da sincronização
 
 **Arquivos:**
 - Modificar: `src/SlimeGoals.Core/Abstractions/ICheckinRepository.cs`
@@ -97,7 +97,7 @@ Mesmo comando. Esperado: PASS.
 
 ---
 
-### Tarefa 2: ajustar e apagar registros de hoje no Core
+### Task 2: ajustar e apagar registros de hoje no Core
 
 **Arquivos:**
 - Modificar: `src/SlimeGoals.Core/Services/CheckinService.cs`
@@ -176,7 +176,7 @@ Esperado: PASS.
 
 ---
 
-### Tarefa 3: o campo da tarefa com estados
+### Task 3: o campo da tarefa com estados
 
 **Arquivos:**
 - Modificar: `src/SlimeGoals.App/ViewModels/TodayGoalViewModel.cs`
@@ -247,7 +247,7 @@ Mesmo comando. Esperado: PASS, inclusive os testes da tarefa que já existiam.
 
 ---
 
-### Tarefa 4: trechos de hoje no cartão
+### Task 4: trechos de hoje no cartão
 
 **Arquivos:**
 - Criar: `src/SlimeGoals.App/ViewModels/TodayChunkViewModel.cs`
@@ -338,7 +338,7 @@ Mesmo comando. Esperado: PASS.
 
 ---
 
-### Tarefa 5: verificação e spec
+### Task 5: verificação e spec
 
 **Arquivos:**
 - Modificar: `specs/Tarefas_no_cronometro_v1.md` (§4 item 3, uma linha apontando para a §7.1; nova §7.4 "Verificação")
