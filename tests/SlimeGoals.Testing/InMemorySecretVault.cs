@@ -5,7 +5,7 @@ namespace SlimeGoals.Testing;
 
 /// <summary>
 /// Implementação em memória de <see cref="ISecretVault"/>. <see cref="Available"/> desligado simula o cofre ausente;
-/// <see cref="FailWritesWith"/> faz só a gravação falhar. Guarda e devolve cópias dos bytes.
+/// <see cref="FailWritesWith"/> faz só a gravação falhar, e <see cref="FailReadsWith"/>, só a leitura. Guarda e devolve cópias dos bytes.
 /// </summary>
 public sealed class InMemorySecretVault : ISecretVault
 {
@@ -17,6 +17,9 @@ public sealed class InMemorySecretVault : ISecretVault
     /// <summary>Quando definido, <see cref="SetAsync"/> lança esta exceção e não grava nada.</summary>
     public Exception? FailWritesWith { get; set; }
 
+    /// <summary>Quando definido, <see cref="GetAsync"/> lança esta exceção. Apagar continua funcionando.</summary>
+    public Exception? FailReadsWith { get; set; }
+
     /// <summary>Nomes guardados no momento.</summary>
     public IReadOnlyCollection<string> Names => _secrets.Keys.ToArray();
 
@@ -25,6 +28,7 @@ public sealed class InMemorySecretVault : ISecretVault
     public Task<byte[]?> GetAsync(string name, CancellationToken ct = default)
     {
         EnsureAvailable();
+        if (FailReadsWith is { } failure) throw failure;
         return Task.FromResult(_secrets.TryGetValue(name, out var secret) ? secret.ToArray() : null);
     }
 

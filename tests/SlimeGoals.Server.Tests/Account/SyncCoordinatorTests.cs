@@ -145,6 +145,28 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
         a.Net.ClientsCreated.Should().Be(0, "sem segredo legível não há servidor a quem falar");
     }
 
+    // O cofre do Android lança InvalidDataException quando o segredo existe mas não abre (chave do Keystore perdida).
+    [Fact]
+    public async Task Start_with_a_vault_that_cannot_open_the_secret_is_SessionUnreadable_and_sign_out_clears()
+    {
+        var a = NewDevice();
+        await a.Goals.CreateAsync(Draft("Ler"));
+        await a.State.EnableAsync();
+        await a.Vault.SetAsync("sync-session", "cifrado com uma chave que sumiu"u8.ToArray());
+        a.Vault.FailReadsWith = new InvalidDataException();
+
+        await a.Account.StartAsync();
+        (await a.Account.GetStatusAsync()).State.Should().Be(AccountState.SessionUnreadable);
+
+        await a.Account.SignOutAsync();
+
+        var status = await a.Account.GetStatusAsync();
+        status.State.Should().Be(AccountState.SignedOut);
+        a.Vault.Names.Should().BeEmpty();
+        (await a.State.GetAsync()).Enabled.Should().BeFalse();
+        a.Net.ClientsCreated.Should().Be(0);
+    }
+
     [Fact]
     public async Task Revocation_moves_to_SessionExpired_and_reauth_sends_the_queue()
     {
