@@ -87,4 +87,12 @@ Este desenho cobre as tarefas. Numa meta de tempo, a pessoa diz no que está tra
   - tocar numa sugestão grava;
   - parar preenche a nota com a tarefa.
 - **Achado no celular, corrigido:** com o teclado aberto, a lista do Hoje ficava sem altura, porque o título, o destaque e os blocos ocupavam a tela, e o campo em edição sumia atrás do teclado. Agora, com o teclado aberto, o destaque e os blocos somem, e a página rola até o campo. O mesmo valia para a nota do painel de registro.
+- **Revisão final, corrigido:**
+  - um "Parar" de outro processo no meio de uma troca podia contar o mesmo trecho duas vezes;
+  - a troca de menos de 1 min renomeava um cronômetro parado nesse meio-tempo;
+  - a troca com o cronômetro parado ou descartado por outro processo não mostrava "O cronômetro mudou. Confira em Hoje.";
+  - tocar ■ com o campo em edição não parava o cronômetro;
+  - digitar um texto que passa por uma sugestão gravava no meio da digitação.
+
+  Conferido no emulador.
 - **Não exercitado no aparelho:** o "Iniciar" do lembrete. O teste `Timer_started_from_a_reminder_has_an_empty_task_field` cobre esse caminho.
