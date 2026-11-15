@@ -104,11 +104,25 @@ public sealed partial class TodayGoalViewModel : ObservableObject
     /// O que a pessoa está digitando no campo da tarefa difere do que está gravado (ou ela está trocando de tarefa):
     /// a tela guarda isso ao recarregar, para não apagar o texto no meio da digitação.
     /// </summary>
-    public bool HasTaskDraft => IsTimerRunning && (IsSwitchingTask || NormalizeTask(TaskInput) != TimerTask);
+    public bool HasTaskDraft => IsTimerRunning && (IsSwitchingTask || IsEditingTask || NormalizeTask(TaskInput) != TimerTask);
 
     internal static string? NormalizeTask(string? task) => string.IsNullOrWhiteSpace(task) ? null : task.Trim();
     [ObservableProperty] public partial string? TaskInput { get; set; }
-    [ObservableProperty] public partial bool IsSwitchingTask { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsTaskLabel), nameof(ShowsTaskField), nameof(ShowsConfirmTask))]
+    public partial bool IsSwitchingTask { get; set; }
+
+    /// <summary>A pessoa tocou ✎ para mudar o nome gravado: o campo volta, com ✓ e ✕.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsTaskLabel), nameof(ShowsTaskField), nameof(ShowsConfirmTask))]
+    public partial bool IsEditingTask { get; set; }
+
+    /// <summary>O nome gravado aparece como texto: é a confirmação de que ele está valendo (spec §7.1).</summary>
+    public bool ShowsTaskLabel => IsTimerRunning && TimerTask is not null && !IsEditingTask && !IsSwitchingTask;
+    public bool ShowsTaskField => IsTimerRunning && !ShowsTaskLabel;
+    public bool ShowsConfirmTask => ShowsTaskField && !IsSwitchingTask;
+    public string TaskLabel => $"▸ {TimerTask}";
     [ObservableProperty] public partial IReadOnlyList<string> TaskSuggestions { get; set; } = [];
 
     [ObservableProperty] public partial string Elapsed { get; set; }

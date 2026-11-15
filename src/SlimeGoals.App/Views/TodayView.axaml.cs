@@ -16,7 +16,6 @@ public partial class TodayView : UserControl
         InitializeComponent();
         // Depois do AutoCompleteBox: o Enter que escolhe uma sugestão já pôs o texto no campo quando chega aqui.
         AddHandler(KeyDownEvent, OnTaskKeyDown, RoutingStrategies.Bubble, handledEventsToo: true);
-        AddHandler(LostFocusEvent, OnTaskLostFocus, RoutingStrategies.Bubble, handledEventsToo: true);
         AddHandler(PointerPressedEvent, (_, _) => _pointerDown = true, RoutingStrategies.Tunnel, handledEventsToo: true);
         // Depois do Click do botão solto (que roda na bolha, antes de chegar aqui).
         AddHandler(PointerReleasedEvent, OnPointerReleasedAfterClick, RoutingStrategies.Bubble, handledEventsToo: true);
@@ -95,11 +94,25 @@ public partial class TodayView : UserControl
             ? (page, item)
             : null;
 
-    /// <summary>Enter grava o nome; no modo de troca, confirma a troca.</summary>
+    /// <summary>
+    /// Enter grava o nome (no modo de troca, confirma a troca); Esc desiste da troca ou da edição. Sair do campo não grava:
+    /// o texto fica como rascunho, com o ✓ à vista (spec §7.1), e ■ e ⇄ usam o que foi digitado.
+    /// </summary>
     private void OnTaskKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter || TaskField(e.Source) is not var (page, item))
+        if (e.Key is not (Key.Enter or Key.Escape) || TaskField(e.Source) is not var (page, item))
             return;
+        if (e.Key == Key.Escape)
+        {
+            if (item.IsSwitchingTask)
+                page.CancelSwitchTaskCommand.Execute(item);
+            else if (item.IsEditingTask)
+                page.CancelEditTaskCommand.Execute(item);
+            else
+                return;
+            e.Handled = true;
+            return;
+        }
         e.Handled = true;
         if (item.IsSwitchingTask)
             page.ConfirmSwitchTaskCommand.Execute(item);
@@ -108,19 +121,16 @@ public partial class TodayView : UserControl
     }
 
     /// <summary>
-    /// Sair do campo grava o nome (fora do modo de troca, que tem os próprios botões). Se foi um toque, grava depois de
-    /// soltar, no cartão que estiver na tela: ■ e ⇄ já gravam o texto digitado eles mesmos.
+    /// ✎ põe o foco no campo que aparece no lugar do nome. O Click roda antes do comando, então o foco espera o campo
+    /// ficar visível; com o dedo ainda na tela, espera também soltar, porque o teclado que abre muda a página de lugar.
     /// </summary>
-    private void OnTaskLostFocus(object? sender, RoutedEventArgs e)
+    private void OnEditTaskClick(object? sender, RoutedEventArgs e)
     {
-        if (TaskField(e.Source) is not var (page, item))
+        if ((sender as Visual)?.FindAncestorOfType<Grid>()?.Parent is not Panel area)
             return;
-        var goalId = item.Goal.Id;
-        AfterRelease(() =>
-        {
-            if (page.Goals.FirstOrDefault(g => g.Goal.Id == goalId) is { } current)
-                page.SaveTaskCommand.Execute(current);
-        });
+        AfterRelease(() => Dispatcher.UIThread.Post(() =>
+            area.GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault(b => b.Classes.Contains("timer-task"))?.Focus(),
+            DispatcherPriority.Background));
     }
 
     /// <summary>

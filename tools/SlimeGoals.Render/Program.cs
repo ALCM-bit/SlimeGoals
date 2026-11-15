@@ -255,6 +255,13 @@ void RenderTodayWithTimer(int width)
     today.SaveTaskCommand.Execute(running);
     Pump();
     Capture($"today-timer-{width}.png");
+    // Editando o nome gravado: o campo com ✓ e ✕
+    running = today.Goals.Single(g => g.IsTimerRunning);
+    today.BeginEditTaskCommand.Execute(running);
+    Pump();
+    Capture($"today-timer-edit-{width}.png");
+    today.CancelEditTaskCommand.Execute(running);
+    Pump();
     // Modo de troca: o campo vazio com Cancelar e Trocar
     running = today.Goals.Single(g => g.IsTimerRunning);
     today.BeginSwitchTaskCommand.Execute(running);

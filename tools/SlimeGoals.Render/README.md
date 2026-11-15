@@ -22,7 +22,7 @@ O modo `account` grava a seção "Conta e sincronização" de Configurações so
 
 O cadastro pendente da conta falsa usa o construtor interno de `PendingRegistration` (`InternalsVisibleTo` no `SlimeGoals.Sync.csproj`).
 
-O modo `narrow` grava o editor de meta com a confirmação de exclusão a 320 e 360 px (`goal-edit-delete-<largura>.png`) e o Hoje com um cronômetro rodando a 320, 360 e 1100 px (`today-timer-<largura>.png`): é o cartão mais apertado, com o tempo, o botão de parar e o de mais opções.
+O modo `narrow` grava o editor de meta com a confirmação de exclusão a 320 e 360 px (`goal-edit-delete-<largura>.png`) e o Hoje com um cronômetro rodando a 320, 360 e 1100 px (`today-timer-<largura>.png`, com o nome gravado; `today-timer-edit-<largura>.png`, com o nome em edição; `today-timer-switch-<largura>.png`, trocando de tarefa): é o cartão mais apertado, com o tempo, o botão de parar e o de mais opções.
 
 O modo `mini` grava a janelinha do cronômetro (a `MiniTimerWindow` de verdade, sobre um fundo cinza com 24 px de folga em volta do cartão para os cantos aparecerem), rodando há 23 min 51 s: `mini-timer.png` com a meta "Leitura", `mini-timer-long.png` com o título longo de exemplo, para ver o corte com reticências, e `mini-timer-hover.png` com o "×" de esconder à vista, como fica com o mouse sobre a janelinha. Compare com `specs/design/cronometro-janelinha-prototipo.png` (opção A).
 

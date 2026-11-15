@@ -766,4 +766,102 @@ public class TodayPageViewModelTests
         card.IsSwitchingTask.Should().BeTrue();
         card.TaskInput.Should().BeNullOrEmpty();
     }
+
+    // ---- Campo da tarefa com estados (specs/Tarefas_no_cronometro_v1.md §7.1) ----
+
+    [Fact]
+    public async Task Saved_task_shows_as_label()
+    {
+        var page = await RunningStudyAsync("Inglês");
+
+        var card = Card(page, "Estudar");
+        (card.ShowsTaskLabel, card.ShowsTaskField, card.TaskLabel).Should().Be((true, false, "▸ Inglês"));
+    }
+
+    [Fact]
+    public async Task Running_timer_without_task_shows_the_field_with_confirm()
+    {
+        var page = await RunningStudyAsync();
+
+        var card = Card(page, "Estudar");
+        (card.ShowsTaskLabel, card.ShowsTaskField, card.ShowsConfirmTask, card.IsEditingTask).Should().Be((false, true, true, false));
+    }
+
+    [Fact]
+    public async Task Edit_task_opens_the_field_with_the_current_name()
+    {
+        var page = await RunningStudyAsync("Inglês");
+        var card = Card(page, "Estudar");
+
+        page.BeginEditTaskCommand.Execute(card);
+
+        (card.ShowsTaskLabel, card.ShowsTaskField, card.ShowsConfirmTask, card.TaskInput).Should().Be((false, true, true, "Inglês"));
+    }
+
+    [Fact]
+    public async Task Confirm_edit_saves_and_closes()
+    {
+        var page = await RunningStudyAsync("Inglês");
+        var card = Card(page, "Estudar");
+        page.BeginEditTaskCommand.Execute(card);
+        card.TaskInput = "Leitura";
+
+        await page.SaveTaskCommand.ExecuteAsync(card);
+
+        var after = Card(page, "Estudar");
+        (after.TimerTask, after.IsEditingTask, after.ShowsTaskLabel).Should().Be(("Leitura", false, true));
+    }
+
+    [Fact]
+    public async Task Confirm_unchanged_edit_closes_without_writing()
+    {
+        var page = await RunningStudyAsync("Inglês");
+        var calls = _timers.SetTaskCalls;
+        var card = Card(page, "Estudar");
+        page.BeginEditTaskCommand.Execute(card);
+
+        await page.SaveTaskCommand.ExecuteAsync(card);
+
+        (card.IsEditingTask, card.ShowsTaskLabel).Should().Be((false, true));
+        _timers.SetTaskCalls.Should().Be(calls);
+    }
+
+    [Fact]
+    public async Task Cancel_edit_restores_the_name()
+    {
+        var page = await RunningStudyAsync("Inglês");
+        var card = Card(page, "Estudar");
+        page.BeginEditTaskCommand.Execute(card);
+        card.TaskInput = "Outra";
+
+        page.CancelEditTaskCommand.Execute(card);
+
+        (card.IsEditingTask, card.TaskInput, card.ShowsTaskLabel).Should().Be((false, "Inglês", true));
+    }
+
+    [Fact]
+    public async Task Reload_keeps_the_task_being_edited()
+    {
+        var page = await RunningStudyAsync("Inglês");
+        var card = Card(page, "Estudar");
+        page.BeginEditTaskCommand.Execute(card);
+        card.TaskInput = "Lei";
+
+        _changes.NotifyChanged();
+
+        var reloaded = Card(page, "Estudar");
+        reloaded.Should().NotBeSameAs(card);
+        (reloaded.IsEditingTask, reloaded.TaskInput).Should().Be((true, "Lei"));
+    }
+
+    [Fact]
+    public async Task Reload_keeps_an_unchanged_edit_open()
+    {
+        var page = await RunningStudyAsync("Inglês");
+        page.BeginEditTaskCommand.Execute(Card(page, "Estudar"));
+
+        _changes.NotifyChanged();
+
+        (Card(page, "Estudar").IsEditingTask, Card(page, "Estudar").TaskInput).Should().Be((true, "Inglês"));
+    }
 }

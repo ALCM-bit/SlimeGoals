@@ -144,10 +144,13 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
                 Goals.Add(new TodayGoalViewModel(item, snapshot.Timer, time) { CanStartTimer = snapshot.Timer is null });
             var running = Goals.FirstOrDefault(g => g.IsTimerRunning);
             if (draft is not null && running is not null && running.Goal.Id == draft.Goal.Id
-                && (draft.IsSwitchingTask || TodayGoalViewModel.NormalizeTask(draft.TaskInput) != running.TimerTask))
+                && (draft.IsSwitchingTask || draft.IsEditingTask
+                    || TodayGoalViewModel.NormalizeTask(draft.TaskInput) != running.TimerTask))
             {
                 running.TaskInput = draft.TaskInput;
                 running.IsSwitchingTask = draft.IsSwitchingTask;
+                // Com nome gravado, o rascunho só fica à vista no modo de edição.
+                running.IsEditingTask = !draft.IsSwitchingTask && running.TimerTask is not null;
             }
             var shownInCard = Goals.Any(g => g.IsTimerRunning || g.IsTimerStopped);
             _offscreenTimer = shownInCard ? null : snapshot.Timer;
@@ -324,13 +327,44 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     }
 
     /// <summary>Grava o nome digitado no campo da tarefa, se mudou (Enter, perda de foco ou sugestão escolhida).</summary>
+    /// <summary>✓, Enter ou sugestão escolhida: grava o nome digitado e fecha a edição. Sem mudança, só fecha.</summary>
     [RelayCommand]
     private Task SaveTaskAsync(TodayGoalViewModel? item)
     {
-        if (item is not { IsTimerRunning: true, IsSwitchingTask: false }
-            || TodayGoalViewModel.NormalizeTask(item.TaskInput) == item.TimerTask)
+        if (item is not { IsTimerRunning: true, IsSwitchingTask: false })
             return Task.CompletedTask;
-        return RunAsync(item, _ => timers.SetTaskAsync(item.TaskInput));
+        if (TodayGoalViewModel.NormalizeTask(item.TaskInput) == item.TimerTask)
+        {
+            item.IsEditingTask = false;
+            item.TaskInput = item.TimerTask;
+            return Task.CompletedTask;
+        }
+        // Fecha só se gravou: se falhar, o texto digitado continua no campo depois da recarga.
+        return RunAsync(item, async _ =>
+        {
+            await timers.SetTaskAsync(item.TaskInput);
+            item.IsEditingTask = false;
+        });
+    }
+
+    /// <summary>✎: o nome gravado volta a ser um campo, preenchido com ele.</summary>
+    [RelayCommand]
+    private static void BeginEditTask(TodayGoalViewModel? item)
+    {
+        if (item is not { ShowsTaskLabel: true })
+            return;
+        item.TaskInput = item.TimerTask;
+        item.IsEditingTask = true;
+    }
+
+    /// <summary>✕ ou Esc: desiste da edição e volta ao nome gravado.</summary>
+    [RelayCommand]
+    private static void CancelEditTask(TodayGoalViewModel? item)
+    {
+        if (item is not { IsEditingTask: true })
+            return;
+        item.IsEditingTask = false;
+        item.TaskInput = item.TimerTask;
     }
 
     [RelayCommand]
