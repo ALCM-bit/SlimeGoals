@@ -246,8 +246,9 @@ Se a resposta 1 ou 2 for "não", parar e voltar ao autor: o desenho do Linux mud
 2. Sair do app e travar a tela: o tempo segue na tela de bloqueio.
 3. Tocar em "Parar": o app abre em Hoje, com o cronômetro parado esperando o registro, e a notificação some.
 4. Iniciar pelo botão "Iniciar" de um lembrete, com o app fechado: a notificação aparece.
-5. Forçar a parada do app nas configurações do Android e tocar em "Parar": o app abre com o cronômetro parado (Review Focus 5).
+5. Com o app em segundo plano, matar o processo (`adb shell am kill dev.alcm.slimegoals`) e tocar em "Parar": o app abre com o cronômetro parado (Review Focus 5). "Forçar parada" nas configurações não serve: ela também apaga as notificações do app.
 6. Reiniciar o celular com um cronômetro rodando: a notificação volta depois do boot.
+7. Dispensar a notificação (Android 14+) e voltar ao app: ela aparece de novo.
 
 ### Task 6: Documentos e verificação final
 

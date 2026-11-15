@@ -21,31 +21,15 @@ public partial class MiniTimerWindow : Window
     /// <summary>Quanto o ponteiro anda, em DIPs, antes de um clique virar arrasto.</summary>
     private const double DragThreshold = 4;
 
-    // O gerenciador de janelas move a janela sozinho, sem avisar o fim: a posição para de mudar e vale como soltura.
-    private static readonly TimeSpan DropDelay = TimeSpan.FromMilliseconds(400);
-
-    private readonly DispatcherTimer _drop;
+    private readonly MiniTimerDrop _drop;
     private PointerPressedEventArgs? _press;
     private Point _pressPoint;
-    private bool _dragging;
 
     public MiniTimerWindow()
     {
         InitializeComponent();
-        _drop = new DispatcherTimer { Interval = DropDelay };
-        _drop.Tick += (_, _) =>
-        {
-            _drop.Stop();
-            _dragging = false;
-            Moved?.Invoke(this, (Position.X, Position.Y));
-        };
-        PositionChanged += (_, _) =>
-        {
-            if (!_dragging)
-                return;
-            _drop.Stop();
-            _drop.Start();
-        };
+        _drop = new MiniTimerDrop(TimeProvider.System, p => Dispatcher.UIThread.Post(() => Moved?.Invoke(this, p)));
+        PositionChanged += (_, e) => _drop.Moved((e.Point.X, e.Point.Y));
     }
 
     /// <summary>A pessoa arrastou e soltou a janela; a posição nova, em pixels.</summary>
@@ -62,6 +46,8 @@ public partial class MiniTimerWindow : Window
         var pixels = ((int)Math.Ceiling(size.Width * scaling), (int)Math.Ceiling(size.Height * scaling));
         var screens = Screens.All.Select(s => new MiniTimerScreen(s.WorkingArea, s.IsPrimary)).ToList();
         var (x, y) = PlaceWithin(saved, pixels, screens);
+        // A posição que o app mesmo define não é um arrasto da pessoa.
+        _drop.Reset();
         Position = new PixelPoint(x, y);
         Show();
     }
@@ -108,7 +94,7 @@ public partial class MiniTimerWindow : Window
         if (Math.Abs(delta.X) < DragThreshold && Math.Abs(delta.Y) < DragThreshold)
             return;
         _press = null;
-        _dragging = true;
+        _drop.Begin();
         BeginMoveDrag(press);
     }
 
@@ -121,6 +107,23 @@ public partial class MiniTimerWindow : Window
         if (DataContext is MiniTimerViewModel vm)
             vm.OpenCommand.Execute(null);
     }
+
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        if (HidesInsteadOfClosing(e.CloseReason, e.IsProgrammatic))
+        {
+            e.Cancel = true;
+            Hide();
+        }
+        base.OnClosing(e);
+    }
+
+    /// <summary>
+    /// Alt+F4 ou o menu da janela: a janelinha se esconde em vez de fechar, para poder aparecer de novo. Só o
+    /// encerramento do app ou do sistema, ou um fechamento pelo código, fecha de verdade.
+    /// </summary>
+    public static bool HidesInsteadOfClosing(WindowCloseReason reason, bool isProgrammatic) =>
+        !isProgrammatic && reason is not (WindowCloseReason.ApplicationShutdown or WindowCloseReason.OSShutdown);
 
     private static long Area(PixelRect rect) => (long)rect.Width * rect.Height;
 

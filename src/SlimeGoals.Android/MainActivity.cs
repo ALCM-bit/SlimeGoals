@@ -85,12 +85,16 @@ public class MainActivity : AvaloniaMainActivity
     }
 
     /// <summary>
-    /// Ao voltar ao app (inclusive no dia seguinte, com o processo vivo) as telas recarregam.
+    /// Ao voltar ao app (inclusive no dia seguinte, com o processo vivo) a notificação do cronômetro é reposta e as
+    /// telas recarregam.
     /// A primeira retomada é a da abertura: as páginas já carregam sozinhas.
     /// </summary>
     protected override void OnResume()
     {
         base.OnResume();
+        // A notificação do cronômetro pode ter sido dispensada (Android 14+): ao voltar ao app, ela volta.
+        if (AndroidApplication.Services?.GetService<TimerNotificationSync>() is { } timerNotification)
+            _ = Task.Run(() => timerNotification.SyncAsync());
         if (_resumedBefore)
             (Application as AndroidApplication)?.NotifyDataChanged();
         _resumedBefore = true;
