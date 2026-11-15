@@ -49,18 +49,21 @@ internal sealed class AndroidKeystoreVault(Context context) : ISecretVault
             var blob = File.ReadAllBytes(path);
             if (!SealedSecretFormat.TryUnpack(blob, out var nonce, out var cipherAndTag))
                 throw new InvalidDataException("O segredo do cofre está em formato desconhecido.");
-            var key = LoadKeyStore().GetKey(KeyAlias, null)
-                ?? throw new InvalidDataException("A chave do cofre não existe mais.");
+            var store = LoadKeyStore();
             try
             {
+                var key = store.GetKey(KeyAlias, null)
+                    ?? throw new InvalidDataException("A chave do cofre não existe mais.");
                 using var cipher = Cipher.GetInstance(Transformation)!;
                 cipher.Init(CipherMode.DecryptMode, key, new GCMParameterSpec(TagBits, nonce));
                 cipher.UpdateAAD(SealedSecretFormat.AssociatedData(name));
                 return (byte[]?)cipher.DoFinal(cipherAndTag)!;
             }
-            catch (GeneralSecurityException)
+            catch (Java.Lang.Throwable)
             {
-                // Tag inválida, chave invalidada ou recusada: a mensagem do Java não vai adiante.
+                // Tag inválida, chave invalidada, irrecuperável ou recusada pelo Keystore (GeneralSecurityException,
+                // ProviderException, IllegalStateException...): o segredo não abre, e a pessoa pode sair. A mensagem
+                // do Java não vai adiante.
                 throw new InvalidDataException("O segredo do cofre não abre.");
             }
         }
