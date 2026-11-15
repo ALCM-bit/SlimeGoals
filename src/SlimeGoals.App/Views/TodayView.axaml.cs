@@ -17,6 +17,38 @@ public partial class TodayView : UserControl
         // Depois do AutoCompleteBox: o Enter que escolhe uma sugestão já pôs o texto no campo quando chega aqui.
         AddHandler(KeyDownEvent, OnTaskKeyDown, RoutingStrategies.Bubble, handledEventsToo: true);
         AddHandler(LostFocusEvent, OnTaskLostFocus, RoutingStrategies.Bubble, handledEventsToo: true);
+        AddHandler(PointerPressedEvent, (_, _) => _pointerDown = true, RoutingStrategies.Tunnel, handledEventsToo: true);
+        // Depois do Click do botão solto (que roda na bolha, antes de chegar aqui).
+        AddHandler(PointerReleasedEvent, OnPointerReleasedAfterClick, RoutingStrategies.Bubble, handledEventsToo: true);
+    }
+
+    private bool _pointerDown;
+    private readonly List<Action> _afterRelease = [];
+
+    /// <summary>
+    /// Roda <paramref name="action"/> agora ou, com o dedo (ou o botão do mouse) ainda pressionado, só depois de soltar.
+    /// Recarregar os cartões ou devolver o destaque no meio do toque tira o botão de baixo do dedo, e o toque se perde.
+    /// </summary>
+    private void AfterRelease(Action action)
+    {
+        if (_pointerDown)
+            _afterRelease.Add(action);
+        else
+            action();
+    }
+
+    private void OnPointerReleasedAfterClick(object? sender, PointerReleasedEventArgs e)
+    {
+        _pointerDown = false;
+        if (_afterRelease.Count == 0)
+            return;
+        var pending = _afterRelease.ToArray();
+        _afterRelease.Clear();
+        Dispatcher.UIThread.Post(() =>
+        {
+            foreach (var action in pending)
+                action();
+        }, DispatcherPriority.Background);
     }
 
     private IInputPane? _inputPane;
@@ -44,8 +76,14 @@ public partial class TodayView : UserControl
     private void OnInputPaneChanged(object? sender, InputPaneStateEventArgs e)
     {
         var open = e.NewState == InputPaneState.Open;
-        PageRoot.Classes.Set("keyboard", open);
-        if (open && TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is Control focused)
+        if (!open)
+        {
+            // O teclado fecha no toque que tira o foco do campo (■, ⇄): o destaque só volta depois de soltar.
+            AfterRelease(() => PageRoot.Classes.Set("keyboard", _inputPane?.State == InputPaneState.Open));
+            return;
+        }
+        PageRoot.Classes.Set("keyboard", true);
+        if (TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is Control focused)
             Dispatcher.UIThread.Post(() => focused.BringIntoView(), DispatcherPriority.Loaded);
     }
 
@@ -69,17 +107,30 @@ public partial class TodayView : UserControl
             page.SaveTaskCommand.Execute(item);
     }
 
-    /// <summary>Sair do campo grava o nome (fora do modo de troca, que tem os próprios botões).</summary>
+    /// <summary>
+    /// Sair do campo grava o nome (fora do modo de troca, que tem os próprios botões). Se foi um toque, grava depois de
+    /// soltar, no cartão que estiver na tela: ■ e ⇄ já gravam o texto digitado eles mesmos.
+    /// </summary>
     private void OnTaskLostFocus(object? sender, RoutedEventArgs e)
     {
-        if (TaskField(e.Source) is var (page, item))
-            page.SaveTaskCommand.Execute(item);
+        if (TaskField(e.Source) is not var (page, item))
+            return;
+        var goalId = item.Goal.Id;
+        AfterRelease(() =>
+        {
+            if (page.Goals.FirstOrDefault(g => g.Goal.Id == goalId) is { } current)
+                page.SaveTaskCommand.Execute(current);
+        });
     }
 
-    /// <summary>Escolher uma sugestão grava na hora, como o Enter.</summary>
+    /// <summary>
+    /// Escolher uma sugestão na lista grava na hora, como o Enter. A escolha fecha a lista antes de mudar a seleção; com
+    /// a lista aberta, a seleção mudou porque o texto digitado passou por uma sugestão ("Ler" a caminho de "Ler
+    /// capítulo 2"), e gravar ali tiraria o foco no meio da digitação.
+    /// </summary>
     private void OnTaskSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (e.AddedItems.Count > 0 && TaskField(sender) is var (page, item))
+        if (e.AddedItems.Count > 0 && sender is AutoCompleteBox { IsDropDownOpen: false } && TaskField(sender) is var (page, item))
             page.SaveTaskCommand.Execute(item);
     }
 }

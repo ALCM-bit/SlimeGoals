@@ -735,8 +735,35 @@ public class TodayPageViewModelTests
 
         await page.ConfirmSwitchTaskCommand.ExecuteAsync(card);
 
-        page.ErrorMessage.Should().Be("Nenhum cronômetro rodando.");
+        page.ErrorMessage.Should().Be("O cronômetro mudou. Confira em Hoje.");
         _checkins.All.Should().BeEmpty();
         (await _timers.GetAsync()).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Stop_keeps_the_task_typed_but_not_saved()
+    {
+        // Tocar ■ com o campo em edição: o toque não pode depender de o campo ter gravado antes.
+        var page = await RunningStudyAsync("Inglês");
+        Card(page, "Estudar").TaskInput = "Gramática";
+
+        await page.StopTimerCommand.ExecuteAsync(Card(page, "Estudar"));
+
+        (await _timers.GetAsync())!.Task.Should().Be("Gramática");
+        Card(page, "Estudar").PanelNote.Should().Be("Gramática");
+    }
+
+    [Fact]
+    public async Task Begin_switch_saves_the_task_typed_first()
+    {
+        var page = await RunningStudyAsync("Inglês");
+        Card(page, "Estudar").TaskInput = "Gramática";
+
+        page.BeginSwitchTaskCommand.Execute(Card(page, "Estudar"));
+
+        (await _timers.GetAsync())!.Task.Should().Be("Gramática");
+        var card = Card(page, "Estudar");
+        card.IsSwitchingTask.Should().BeTrue();
+        card.TaskInput.Should().BeNullOrEmpty();
     }
 }

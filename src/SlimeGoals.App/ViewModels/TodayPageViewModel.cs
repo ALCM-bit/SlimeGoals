@@ -302,7 +302,12 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     private Task StartTimerAsync(TodayGoalViewModel? item) => RunAsync(item, id => timers.StartAsync(id));
 
     [RelayCommand]
-    private Task StopTimerAsync(TodayGoalViewModel? item) => RunAsync(item, _ => timers.StopAsync());
+    private Task StopTimerAsync(TodayGoalViewModel? item) => RunAsync(item, async _ =>
+    {
+        // ■ tocado com o campo em edição: o nome digitado vale para o trecho que para (e vira a nota do painel).
+        await SaveTypedTaskAsync(item!);
+        await timers.StopAsync();
+    });
 
     [RelayCommand]
     private Task RegisterTimerAsync(TodayGoalViewModel? item)
@@ -329,13 +334,23 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     }
 
     [RelayCommand]
-    private static void BeginSwitchTask(TodayGoalViewModel? item)
+    private Task BeginSwitchTaskAsync(TodayGoalViewModel? item)
     {
         if (item is not { IsTimerRunning: true })
-            return;
+            return Task.CompletedTask;
+        // ⇄ tocado com o campo em edição: o nome digitado é o da tarefa atual, e grava antes de abrir a troca.
+        var pending = item is { IsSwitchingTask: false } && TodayGoalViewModel.NormalizeTask(item.TaskInput) != item.TimerTask;
+        var typed = item.TaskInput;
         item.TaskInput = null;
         item.IsSwitchingTask = true;
+        return pending ? RunAsync(item, _ => timers.SetTaskAsync(typed)) : Task.CompletedTask;
     }
+
+    /// <summary>Grava o nome digitado e ainda não gravado, se houver (fora do modo de troca).</summary>
+    private Task SaveTypedTaskAsync(TodayGoalViewModel item) =>
+        item is { IsTimerRunning: true, IsSwitchingTask: false } && TodayGoalViewModel.NormalizeTask(item.TaskInput) != item.TimerTask
+            ? timers.SetTaskAsync(item.TaskInput)
+            : Task.CompletedTask;
 
     [RelayCommand]
     private static void CancelSwitchTask(TodayGoalViewModel? item)
