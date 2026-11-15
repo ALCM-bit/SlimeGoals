@@ -102,6 +102,7 @@ O autor escolheu a janela no Linux e a notificação no Android em 13/11/2026.
 **Android**
 - `AndroidTimerNotification`, ao lado do serviço de notificações dos lembretes: cria o canal "Cronômetro", publica a notificação com `SetUsesChronometer` e a retira.
 - O "Parar" não passa por um receptor: desde o Android 12, um receptor não pode abrir uma atividade a partir de uma notificação. O botão abre a `MainActivity` direto, por um `PendingIntent` de atividade com o extra `stopTimer`, e é ela que para o cronômetro e mostra Hoje. Tocar no corpo abre a mesma atividade sem o extra.
+- A `MainActivity` é exportada (o launcher a abre), então qualquer app poderia mandar o mesmo extra. Desde 15/11/2026 o extra leva um código aleatório de 256 bits, criado uma vez por instalação e guardado nas preferências privadas do app, fora do banco que sincroniza (`StopRequestSecret`, `StopTimerSecretStore`). Sem o código certo, o pedido é ignorado e o app só abre. Um app com acesso às notificações, concedido pela pessoa, ainda consegue tocar o próprio botão: isso vale para qualquer notificação.
 - O `SystemEventReceiver` repõe a notificação no boot.
 
 **Testes**
