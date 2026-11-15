@@ -212,27 +212,42 @@
   <!-- Janelinha do cronômetro (desktop): cartão de 280 px, nome em cima e o tempo em destaque -->
   <Style Selector="Border.card.mini-timer">
     <Setter Property="Width" Value="280" />
+    <!-- Metade do "×": o centro dele cai no canto do cartão -->
+    <Setter Property="Margin" Value="10" />
     <Setter Property="Padding" Value="12,10" />
   </Style>
-  <!-- "−" da janelinha: pequeno e discreto no canto, como os controles de janela do desktop -->
+  <!-- "×" da janelinha: redondo, sobre o canto do cartão; invisível até o mouse entrar na janelinha, acende com o
+       mouse em cima dele -->
   <Style Selector="Button.mini-timer-hide">
-    <Setter Property="Width" Value="24" />
-    <Setter Property="Height" Value="24" />
-    <Setter Property="MinWidth" Value="24" />
-    <Setter Property="MinHeight" Value="24" />
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="MinWidth" Value="20" />
+    <Setter Property="MinHeight" Value="20" />
     <Setter Property="Padding" Value="0" />
-    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="CornerRadius" Value="10" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
-    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
     <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.15" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="Window.mini-timer-window:pointerover Button.mini-timer-hide">
+    <Setter Property="Opacity" Value="1" />
   </Style>
   <Style Selector="Button.mini-timer-hide:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource Selected}" />
-    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    <Setter Property="Background" Value="{DynamicResource Primary}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Primary}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnPrimary}" />
   </Style>
   <Style Selector="Button.mini-timer-hide Path.btn-icon">
-    <Setter Property="RenderTransform" Value="scale(0.6)" />
+    <Setter Property="RenderTransform" Value="scale(0.5)" />
   </Style>
   <Style Selector="TextBlock.mini-timer-title">
     <Setter Property="FontSize" Value="13" />

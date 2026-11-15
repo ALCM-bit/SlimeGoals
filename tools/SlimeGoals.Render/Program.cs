@@ -49,6 +49,7 @@ if (which == "mini")
 {
     RenderMini("mini-timer", "Leitura");
     RenderMini("mini-timer-long", "Aula de inglês com a professora particular às terças");
+    RenderMini("mini-timer-hover", "Leitura", hover: true);
 }
 if (which == "account")
 {
@@ -186,15 +187,18 @@ void RenderMascot()
 }
 
 // A janelinha do cronômetro de verdade, sobre um fundo neutro com folga, para ver os cantos arredondados.
-void RenderMini(string name, string title)
+// Com hover, o "×" aparece como com o mouse sobre a janelinha (a captura não tem ponteiro).
+void RenderMini(string name, string title, bool hover = false)
 {
     var window = new MiniTimerWindow
     {
         DataContext = sample.CreateMiniTimer(title),
         Background = new SolidColorBrush(Color.Parse("#3B4250")),
-        Padding = new Thickness(24),
+        Padding = new Thickness(14),
     };
     window.Show();
+    if (hover)
+        window.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("mini-timer-hide")).Opacity = 1;
     Pump();
     var path = Path.Combine(outDir, $"{name}.png");
     var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para capturar.");
