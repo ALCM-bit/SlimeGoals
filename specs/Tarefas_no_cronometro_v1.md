@@ -1,0 +1,69 @@
+# Tarefas no cronômetro (v1)
+
+> Desenho curto, conversado com o autor em 15/11/2026. Aguarda aprovação. O Pomodoro (intervalos de foco e pausa) vem num desenho seguinte e reaproveita a tarefa como o foco de cada ciclo.
+
+## 1. Para que serve
+
+Nas palavras do autor, falta "a possibilidade de gerenciar intervalos ou quebrar em várias tarefas menores para o tempo ser alocado na principal". As tarefas **nascem na hora em que o trabalho começa**: não são uma lista cadastrada na meta.
+
+Este desenho cobre as tarefas. Numa meta de tempo, a pessoa diz no que está trabalhando ("Revisar capítulo 3"), e o tempo de cada tarefa soma na meta, como hoje.
+
+## 2. Objetivos, o que fica de fora e o que seria um fracasso
+
+**Objetivos**
+- Dar um nome opcional ao trabalho do cronômetro.
+- Ver esse nome no Hoje, na janelinha do Linux e na notificação do Android.
+- Trocar de tarefa sem parar o cronômetro: o trecho feito é registrado, e a contagem continua com o novo nome.
+- Somar o tempo de toda tarefa na meta, sem regra nova de progresso.
+
+**Fica de fora nesta versão**
+- **Tela de histórico por tarefa** ("Inglês 2 h, Capítulo 3 50 min"). *Decisão minha:* o autor disse "ajustamos conforme o necessário". O nome fica gravado em cada registro, então a tela pode vir depois sem perder nada.
+- Tarefas cadastradas na meta.
+- Pomodoro e intervalos (próximo desenho).
+- Trocar de tarefa pela janelinha ou pela notificação: só pelo Hoje.
+- Sincronizar o cronômetro em andamento entre aparelhos (ele continua local).
+
+**Seria um fracasso se**
+- começar o cronômetro ficasse mais lento que hoje;
+- o mesmo tempo fosse contado duas vezes, ou algum tempo se perdesse, ao trocar de tarefa.
+
+## 3. Como construir
+
+- **A (escolhida): o nome da tarefa é a nota do registro.** `Checkin.Note` já existe, já é sincronizada (`SyncCodec`), já tem limite de 200 caracteres (`CheckinService.MaxNoteLength`) e já é preenchível no painel de registro do Hoje. O cronômetro ganha um campo local com o nome. Custo: as notas dos registros manuais também viram sugestões de tarefa, o que deve ser útil.
+- **B: um campo "tarefa" separado da nota.** Exige uma migração em `checkins` e uma mudança no formato da sincronização, e todos os aparelhos teriam de atualizar juntos. Recusada: custo alto para separar duas coisas que o autor usa do mesmo jeito.
+- **C: tarefas cadastradas na meta.** Recusada: contraria "nasce na hora".
+
+## 4. Como funciona
+
+1. **Onde o nome fica.** `ActiveTimer` ganha `Task` (`string?`). Uma migração nova faz `ALTER TABLE active_timer ADD COLUMN task TEXT`. O cronômetro continua local, sem sincronização.
+2. **Começar continua com um toque.** ▶ começa na hora, como hoje. O "Iniciar" do lembrete também começa sem nome.
+   - *Decisão minha, diferente do que mostrei na conversa:* o campo não aparece antes de começar. Ele aparece no cartão do cronômetro rodando, porque um cronômetro iniciado pela notificação também precisa receber um nome depois, e assim o ▶ não ganha um passo a mais.
+3. **O campo no cartão: "No que está trabalhando?"**
+   - Fica vazio por padrão e mostra até 5 sugestões: as notas distintas mais recentes dos registros ativos daquela meta.
+   - O nome é gravado ao confirmar (Enter), ao escolher uma sugestão ou ao sair do campo.
+   - O nome passa por trim; vazio vira `null`. O limite é de 200 caracteres, como o da nota.
+   - Core: `TimerService.SetTaskAsync(string? task)`, que vale para o cronômetro rodando ou parado.
+4. **Parar.** O painel de conferência já vem com a nota preenchida com o nome da tarefa, e a pessoa pode editar. Registrar funciona como hoje.
+5. **Trocar de tarefa (⇄), só com o cronômetro rodando.**
+   - ⇄ abre o mesmo campo, vazio e com as sugestões, e um botão "Trocar".
+   - Ao confirmar, o trecho até agora é registrado sem conferência, com a nota igual à tarefa atual. Na mesma operação, o cronômetro recomeça agora com o novo nome.
+   - Um trecho que arredonda para 0 min não gera registro.
+   - Core: `TimerService.SwitchTaskAsync(string? newTask)`, que devolve o novo total do período.
+   - Requisito: nenhum instante é contado duas vezes nem perdido. O novo início é o mesmo instante usado para medir o trecho registrado.
+6. **Fora do app.** A janelinha e a notificação mostram o nome da tarefa junto ao da meta, cortado com reticências se for longo. Sem tarefa, mostram o que mostram hoje.
+7. **Texto do Hoje.** Com o cronômetro rodando e uma tarefa definida, o cartão mostra o nome da tarefa abaixo do título da meta.
+
+```
+┌─────────────────────────────────────┐
+│ 📖 Estudar           3 h 20 / 10 h  │
+│    Revisar capítulo 3               │
+│    0:23:51                  [⇄] [■] │
+└─────────────────────────────────────┘
+```
+
+## 5. O que fica para quem constrói
+
+- A disposição exata do campo e das sugestões no cartão, no desktop e no celular, conferida com `tools/SlimeGoals.Render` em várias larguras, com simetria visual.
+- Como a janelinha e a notificação encaixam a segunda linha.
+- A consulta das sugestões: no repositório de registros, filtrando por meta, `note` não nula e não excluídos, por `done_at` decrescente.
+- Testes: unitários no `TimerService` (definir, limpar, trocar, trecho de 0 min, nada contado duas vezes), integração no SQLite (migração e sugestões) e ViewModels do Hoje.
