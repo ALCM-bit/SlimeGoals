@@ -16,6 +16,7 @@ com os dados guardados localmente em SQLite.
 - **Três medidas por meta:** conclusão, quantidade ou tempo (com cronômetro)
 - **Lembretes** dentro de uma janela de horário, com a ação da medida (**Feito**, **+1** ou **Iniciar**), **Adiar** e **Ignorar** direto na notificação do sistema
 - **Tela Hoje** com o progresso do período atual e registro rápido
+- **Cronômetro à vista fora do app:** numa janela pequena por cima das outras no Linux e numa notificação fixa no Android, com o botão de parar
 - **Slime** no Hoje, que muda de pose e de frase conforme o andamento do dia
 - **Relatórios** semanais e mensais, com sequências em dias ou semanas
 - **Arquivamento** sem perda de histórico; tema escuro roxo

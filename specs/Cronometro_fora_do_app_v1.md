@@ -68,7 +68,7 @@ Estudar inglês                       0:23:51
 
 ## 4. Restrições
 
-- **Linux:** o app roda pelo X11 (XWayland no GNOME). "Sempre por cima", "sem foco ao aparecer" e posição livre dependem do gerenciador de janelas. **Isso ainda não foi testado na máquina do autor** e é o primeiro passo do plano.
+- **Linux:** o app roda pelo X11 (XWayland no GNOME). "Sempre por cima", "sem foco ao aparecer" e posição livre dependem do gerenciador de janelas. Testado na máquina do autor em 14/11/2026 (seção 9).
 - **Fechar encerra o app:** se a opção "Ao fechar a janela" for "encerrar", não há processo para mostrar a janelinha. O cronômetro continua valendo, porque só o instante de início fica gravado.
 - **Android:** a notificação fixa pode ser dispensada pela pessoa (Android 14+). Ela volta quando o app abre de novo com o cronômetro rodando.
 - **Reinício do celular:** notificações somem. O receptor de eventos do sistema, que já reagenda os lembretes no boot, repõe a notificação se houver cronômetro rodando.
@@ -100,7 +100,7 @@ O autor escolheu a janela no Linux e a notificação no Android em 13/11/2026.
 
 **Android**
 - `AndroidTimerNotification`, ao lado do serviço de notificações dos lembretes: cria o canal "Cronômetro", publica a notificação com `SetUsesChronometer` e a retira.
-- Um receptor não exportado trata o "Parar": chama `TimerService.StopAsync`. A notificação abre a `MainActivity` por um `PendingIntent` de atividade, sem trampolim.
+- O "Parar" não passa por um receptor: desde o Android 12, um receptor não pode abrir uma atividade a partir de uma notificação. O botão abre a `MainActivity` direto, por um `PendingIntent` de atividade com o extra `stopTimer`, e é ela que para o cronômetro e mostra Hoje. Tocar no corpo abre a mesma atividade sem o extra.
 - O `SystemEventReceiver` repõe a notificação no boot.
 
 **Testes**
@@ -124,3 +124,12 @@ O autor escolheu os dois caminhos, mas não disse o que quer fazer pela janelinh
 1. **Teste descartável no Linux** (meia hora): uma janela pequena, sem borda, por cima, sem foco, numa posição escolhida. O autor confere no GNOME. Se "sempre por cima" não funcionar, o desenho do Linux volta para discussão antes de qualquer código definitivo.
 2. Núcleo comum e janelinha do Linux.
 3. Notificação do Android, junto com o APK novo que já está pendente.
+
+## 9. Como ficou
+
+Implementado em 14/11/2026 (plano `specs/plans/2026-11-14-cronometro-fora-do-app.md`).
+
+- **Spike no GNOME:** a janelinha ficou por cima, não tomou o foco, apareceu na posição pedida, arrastou e manteve os cantos arredondados, sem aviso de "janela pronta" (`specs/spikes/janelinha-cronometro.md`).
+- **Notificação fora da tela:** `TimerNotificationSync` é ligado no `AndroidApplication.OnCreate`, não como serviço da tela, para a notificação aparecer também quando o cronômetro começa pelo "Iniciar" de um lembrete com o app fechado.
+- **Posição:** gravada em `settings` quando o arrasto para; ao mostrar, uma posição fora de todas as telas volta ao canto inferior direito da tela principal, com 24 px de margem, e uma posição meio para fora é puxada para dentro da tela que ela mais cobre.
+- **Meta sumida ou arquivada:** o cronômetro dela não conta como rodando; nem a janelinha nem a notificação aparecem.
