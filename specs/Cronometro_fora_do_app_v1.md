@@ -31,6 +31,7 @@ O desenho acima é só a disposição. A aparência, com os estilos do app, est�
 - **Some** quando a janela principal volta, ou quando o cronômetro para.
 - **Clicar** nela abre a janela principal. **Arrastar** muda de lugar; a posição fica gravada.
 - **Parar (■)** congela o cronômetro e abre a janela principal em Hoje, onde já existe o passo de conferir os minutos e registrar.
+- **Esconder (−)**, no canto de cima à direita, como os controles de janela do desktop: esconde a janelinha até o próximo cronômetro, sem mudar a opção de Configurações. Pedido do autor em 14/11/2026.
 - Não rouba o foco ao aparecer, não entra na barra de tarefas e não tem borda nem botões de janela.
 - Posição inicial: canto inferior direito da tela principal.
 - Uma opção em Configurações › Janela, "Mostrar o cronômetro numa janela pequena", ligada por padrão.

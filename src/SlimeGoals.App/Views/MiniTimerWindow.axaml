@@ -9,7 +9,7 @@
         Background="Transparent" TransparencyLevelHint="Transparent">
   <!-- Opção A do protótipo (specs/design/cronometro-janelinha-prototipo.png): nome em cima, tempo embaixo em destaque -->
   <Border Classes="card mini-timer" ToolTip.Tip="Abrir o SlimeGoals">
-    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
       <Border Classes="icon-tile" VerticalAlignment="Center"
               Background="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Bg}">
         <Viewbox Width="22" Height="22">
@@ -26,6 +26,12 @@
       <Button Grid.Column="2" Classes="danger-solid icon" VerticalAlignment="Center"
               AutomationProperties.Name="Parar cronômetro" ToolTip.Tip="Parar cronômetro" Command="{Binding StopCommand}">
         <Path Classes="btn-icon" Data="{StaticResource IconStop}" />
+      </Button>
+      <!-- Esconde só até o próximo cronômetro; a opção em Configurações › Janela continua como está -->
+      <Button Grid.Column="3" Classes="mini-timer-hide" VerticalAlignment="Top" Margin="-6,-4,-4,0"
+              AutomationProperties.Name="Esconder até o próximo cronômetro"
+              ToolTip.Tip="Esconder até o próximo cronômetro" Click="OnHideClick">
+        <Path Classes="btn-icon" Data="{StaticResource IconMinus}" />
       </Button>
     </Grid>
   </Border>

@@ -128,6 +128,48 @@ public sealed class MiniTimerControllerTests : IDisposable
         _window.Calls.Should().Equal("show default", "hide");
     }
 
+    [Fact]
+    public async Task Hiding_from_the_window_keeps_it_hidden_for_this_timer()
+    {
+        var goal = await _f.StudyAsync();
+        await _f.Timers.StartAsync(goal.Id);
+        await StartedAsync();
+
+        _window.Dismiss();
+        _main.Set(onScreen: true);
+        _main.Set(onScreen: false);
+
+        _window.Calls.Should().Equal("show default", "hide");
+    }
+
+    [Fact]
+    public async Task The_next_timer_shows_the_window_again()
+    {
+        var goal = await _f.StudyAsync();
+        await _f.Timers.StartAsync(goal.Id);
+        await StartedAsync();
+        _window.Dismiss();
+
+        await _f.Timers.StopAsync();
+        await _f.Timers.DiscardAsync();
+        _f.Time.Advance(TimeSpan.FromMinutes(1));
+        await _f.Timers.StartAsync(goal.Id);
+
+        _window.Calls.Should().Equal("show default", "hide", "show default");
+    }
+
+    [Fact]
+    public async Task Hiding_from_the_window_keeps_the_option_on()
+    {
+        var goal = await _f.StudyAsync();
+        await _f.Timers.StartAsync(goal.Id);
+        await StartedAsync();
+
+        _window.Dismiss();
+
+        (await _f.Settings.GetMiniTimerEnabledAsync()).Should().BeTrue();
+    }
+
     private sealed class FakePresence : IMainWindowPresence
     {
         public bool IsOnScreen { get; private set; }
@@ -150,6 +192,10 @@ public sealed class MiniTimerControllerTests : IDisposable
 
         public void Hide() => Calls.Add("hide");
 
+        public event EventHandler? HideRequested;
+
         public void Drop(int x, int y) => Moved?.Invoke(this, (x, y));
+
+        public void Dismiss() => HideRequested?.Invoke(this, EventArgs.Empty);
     }
 }

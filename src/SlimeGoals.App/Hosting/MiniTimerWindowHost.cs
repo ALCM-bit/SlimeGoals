@@ -13,12 +13,15 @@ public sealed class MiniTimerWindowHost(Func<MiniTimerViewModel> viewModel) : IM
 
     public event EventHandler<(int X, int Y)>? Moved;
 
+    public event EventHandler? HideRequested;
+
     public void Show((int X, int Y)? position)
     {
         if (_window is null)
         {
             _window = new MiniTimerWindow { DataContext = viewModel() };
             _window.Moved += (_, p) => Moved?.Invoke(this, p);
+            _window.HideRequested += (_, _) => HideRequested?.Invoke(this, EventArgs.Empty);
         }
         _window.ShowAt(position);
     }

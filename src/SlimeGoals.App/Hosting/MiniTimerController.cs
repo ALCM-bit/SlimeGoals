@@ -7,7 +7,8 @@ namespace SlimeGoals.App.Hosting;
 /// <summary>
 /// Regra da janelinha do cronômetro: ela fica à mostra quando a opção está ligada, há cronômetro rodando e a janela
 /// principal não está à vista. Qualquer mudança num dos três reaplica a regra na thread da interface
-/// (<paramref name="dispatch"/>). Sem cronômetro rodando, a janela nunca é pedida.
+/// (<paramref name="dispatch"/>). Sem cronômetro rodando, a janela nunca é pedida. O "−" da janela a esconde só
+/// para o cronômetro atual, sem mudar a opção: o próximo cronômetro volta a mostrá-la.
 /// </summary>
 public sealed class MiniTimerController(RunningTimerWatcher watcher, IMainWindowPresence main, IMiniTimerWindow window,
     AppSettings settings, DataChangeNotifier changes, Action<Action> dispatch) : IAppHostedService
@@ -16,6 +17,7 @@ public sealed class MiniTimerController(RunningTimerWatcher watcher, IMainWindow
     private (int X, int Y)? _position;
     private volatile bool _enabled = true;
     private bool _shown; // só na thread da interface
+    private (Guid GoalId, DateTimeOffset StartedAt)? _dismissed; // só na thread da interface
     private int _started;
 
     public async Task StartAsync()
@@ -26,6 +28,7 @@ public sealed class MiniTimerController(RunningTimerWatcher watcher, IMainWindow
         main.Changed += OnInputChanged;
         changes.Changed += OnSettingsChanged;
         window.Moved += OnMoved;
+        window.HideRequested += OnHideRequested;
         try
         {
             var position = await settings.GetMiniTimerPositionAsync();
@@ -49,6 +52,7 @@ public sealed class MiniTimerController(RunningTimerWatcher watcher, IMainWindow
         main.Changed -= OnInputChanged;
         changes.Changed -= OnSettingsChanged;
         window.Moved -= OnMoved;
+        window.HideRequested -= OnHideRequested;
         dispatch(() =>
         {
             if (_shown)
@@ -58,6 +62,13 @@ public sealed class MiniTimerController(RunningTimerWatcher watcher, IMainWindow
     }
 
     private void OnInputChanged(object? sender, EventArgs e) => dispatch(Apply);
+
+    private void OnHideRequested(object? sender, EventArgs e) => dispatch(() =>
+    {
+        if (watcher.Current is { } timer)
+            _dismissed = (timer.GoalId, timer.StartedAt);
+        Apply();
+    });
 
     private void OnSettingsChanged(object? sender, EventArgs e) => _ = ReloadEnabledAsync();
 
@@ -97,7 +108,8 @@ public sealed class MiniTimerController(RunningTimerWatcher watcher, IMainWindow
     {
         if (Volatile.Read(ref _started) != 1)
             return;
-        var show = _enabled && watcher.Current is not null && !main.IsOnScreen;
+        var show = _enabled && watcher.Current is { } timer && _dismissed != (timer.GoalId, timer.StartedAt)
+            && !main.IsOnScreen;
         if (show != _shown)
             Set(show);
     }

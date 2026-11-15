@@ -10,4 +10,7 @@ public interface IMiniTimerWindow
 
     /// <summary>A pessoa arrastou a janela para outro lugar e soltou.</summary>
     event EventHandler<(int X, int Y)>? Moved;
+
+    /// <summary>A pessoa pediu para esconder a janela (botão "−").</summary>
+    event EventHandler? HideRequested;
 }

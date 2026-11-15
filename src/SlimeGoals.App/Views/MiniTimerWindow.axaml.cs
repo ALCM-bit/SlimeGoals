@@ -32,6 +32,12 @@ public partial class MiniTimerWindow : Window
         PositionChanged += (_, e) => _drop.Moved((e.Point.X, e.Point.Y));
     }
 
+    /// <summary>A pessoa clicou em "−": esconder até o próximo cronômetro.</summary>
+    public event EventHandler? HideRequested;
+
+    private void OnHideClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+        HideRequested?.Invoke(this, EventArgs.Empty);
+
     /// <summary>A pessoa arrastou e soltou a janela; a posição nova, em pixels.</summary>
     public event EventHandler<(int X, int Y)>? Moved;
 
