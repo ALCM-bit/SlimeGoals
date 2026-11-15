@@ -1131,4 +1131,27 @@ public sealed class ConvergenceTests : IDisposable
             group.Where(c => c.Superseded).Select(c => c.Id).Should().BeEquivalentTo(superseded);
         }
     }
+
+    [Fact]
+    public async Task Edited_and_deleted_checkins_converge()
+    {
+        var a = await DeviceAsync();
+        var b = await DeviceAsync();
+        var goal = await a.CreateGoal("Estudo", Measure.Duration, target: 60);
+        await a.Adjust(goal.Id, 25, "Inglês");
+        Tick(Minute);
+        await a.Adjust(goal.Id, 12, "Leitura");
+        await ConvergeAsync();
+
+        var today = await a.Today();
+        await a.Replace(goal.Id, today.Single(c => c.Note == "Inglês").Id, 20, "Inglês");
+        await a.DeleteCheckin(goal.Id, today.Single(c => c.Note == "Leitura").Id);
+        await a.SyncAsync();
+        await b.SyncAsync();
+
+        (await b.ShownTotal(goal.Id)).Should().Be(20);
+        b.Snapshot().Lines.Should().Equal(a.Snapshot().Lines);
+        a.Snapshot().Checkins.Should().ContainSingle().Which.Amount.Should().Be(20);
+        (a.Pending, b.Pending).Should().Be((0, 0));
+    }
 }

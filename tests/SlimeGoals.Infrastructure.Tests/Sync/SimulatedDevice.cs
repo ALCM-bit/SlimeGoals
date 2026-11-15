@@ -120,6 +120,13 @@ internal sealed class SimulatedDevice : IDisposable
 
     public Task<int> Adjust(Guid goalId, int amount, string? note = null) => _checkins.AdjustAsync(goalId, amount, note);
 
+    public Task<IReadOnlyList<Checkin>> Today() => _checkins.TodayAsync();
+
+    public Task<int> Replace(Guid goalId, Guid checkinId, int minutes, string? note) =>
+        _checkins.ReplaceAsync(goalId, checkinId, minutes, note);
+
+    public Task<int> DeleteCheckin(Guid goalId, Guid checkinId) => _checkins.DeleteAsync(goalId, checkinId);
+
     public Task DeleteGoal(Guid id) => _goals.DeleteAsync(id);
 
     /// <summary>O motor trata exceção como falha de rede: a ação do teste que falhou com o envio no ar tem de aparecer aqui.</summary>
