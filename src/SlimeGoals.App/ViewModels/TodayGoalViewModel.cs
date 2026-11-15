@@ -26,7 +26,11 @@ public sealed partial class TodayGoalViewModel : ObservableObject
         _time = time;
         Elapsed = "";
         if (_timer is { StoppedAt: not null })
+        {
             StoppedMinutesInput = TimerService.Minutes(_timer, time.GetUtcNow());
+            PanelNote = _timer.Task; // a tarefa vira a nota do registro, e a pessoa pode editar
+        }
+        TaskInput = TimerTask;
         UpdateElapsed();
     }
 
@@ -92,6 +96,20 @@ public sealed partial class TodayGoalViewModel : ObservableObject
                 : $"Cronômetro parado em {stopped.ToString("dd/MM, HH:mm", CultureInfo.InvariantCulture)}. {check}";
         }
     }
+
+    // ---- Tarefa do cronômetro (specs/Tarefas_no_cronometro_v1.md) ----
+    public string? TimerTask => _timer?.Task;
+
+    /// <summary>
+    /// O que a pessoa está digitando no campo da tarefa difere do que está gravado (ou ela está trocando de tarefa):
+    /// a tela guarda isso ao recarregar, para não apagar o texto no meio da digitação.
+    /// </summary>
+    public bool HasTaskDraft => IsTimerRunning && (IsSwitchingTask || NormalizeTask(TaskInput) != TimerTask);
+
+    internal static string? NormalizeTask(string? task) => string.IsNullOrWhiteSpace(task) ? null : task.Trim();
+    [ObservableProperty] public partial string? TaskInput { get; set; }
+    [ObservableProperty] public partial bool IsSwitchingTask { get; set; }
+    [ObservableProperty] public partial IReadOnlyList<string> TaskSuggestions { get; set; } = [];
 
     [ObservableProperty] public partial string Elapsed { get; set; }
     [ObservableProperty] public partial decimal? StoppedMinutesInput { get; set; }

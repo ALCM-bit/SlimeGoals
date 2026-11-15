@@ -41,8 +41,12 @@ public sealed class InMemoryTimerRepository(InMemoryCheckinRepository? checkins 
         return Task.CompletedTask;
     }
 
+    /// <summary>Quantas vezes o nome da tarefa foi gravado.</summary>
+    public int SetTaskCalls { get; private set; }
+
     public Task<bool> SetTaskAsync(string? task, CancellationToken ct = default)
     {
+        SetTaskCalls++;
         if (_timer is null) return Task.FromResult(false);
         _timer = _timer with { Task = task };
         return Task.FromResult(true);

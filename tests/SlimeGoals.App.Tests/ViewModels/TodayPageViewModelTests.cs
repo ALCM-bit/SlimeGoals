@@ -15,13 +15,19 @@ public class TodayPageViewModelTests
     private readonly FakeTimeProvider _time = new(Now);
     private readonly InMemoryGoalRepository _goals = new();
     private readonly InMemoryCheckinRepository _checkins = new();
-    private readonly InMemoryTimerRepository _timers = new();
+    private readonly InMemoryTimerRepository _timers;
     private readonly InMemoryReminderLogRepository _log = new();
     private readonly FakeNotificationService _notifications = new();
     private readonly DataChangeNotifier _changes = new();
     private readonly InMemorySettingsRepository _settings = new();
 
-    public TodayPageViewModelTests() => _time.SetLocalTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
+    public TodayPageViewModelTests()
+    {
+        _timers = new(_checkins);
+        _time.SetLocalTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
+    }
+
+    private TimerService Timers => new(_goals, _timers, CheckinService, _time);
 
     private GoalService GoalService => new(_goals, _checkins, _timers, _time);
     private CheckinService CheckinService => new(_goals, _checkins, _time);
@@ -597,5 +603,140 @@ public class TodayPageViewModelTests
         await page.LoadCommand.ExecuteAsync(null);
 
         (page.ErrorMessage, page.Mascot.Pose).Should().Be(("Não foi possível carregar o dia.", MascotPose.Celebrating));
+    }
+
+    // ---- Tarefa do cronômetro (specs/Tarefas_no_cronometro_v1.md) ----
+
+    private async Task<TodayPageViewModel> RunningStudyAsync(string? task = null)
+    {
+        var goal = await Create("Estudar", Measure.Duration, 60, unit: null);
+        await Timers.StartAsync(goal.Id);
+        if (task is not null)
+            await Timers.SetTaskAsync(task);
+        return await Loaded();
+    }
+
+    [Fact]
+    public async Task Running_item_shows_the_task_and_suggestions()
+    {
+        var goal = await Create("Estudar", Measure.Duration, 60, unit: null);
+        await CheckinService.AdjustAsync(goal.Id, 10, "Inglês");
+        await Timers.StartAsync(goal.Id);
+        await Timers.SetTaskAsync("Capítulo 3");
+
+        var page = await Loaded();
+
+        var card = Card(page, "Estudar");
+        (card.TimerTask, card.TaskInput).Should().Be(("Capítulo 3", "Capítulo 3"));
+        card.TaskSuggestions.Should().Contain("Inglês");
+    }
+
+    [Fact]
+    public async Task Timer_started_from_a_reminder_has_an_empty_task_field()
+    {
+        var page = await RunningStudyAsync();
+        var card = Card(page, "Estudar");
+        card.TaskInput.Should().BeNull();
+
+        card.TaskInput = " Ler ";
+        await page.SaveTaskCommand.ExecuteAsync(card);
+
+        (await _timers.GetAsync())!.Task.Should().Be("Ler");
+        Card(page, "Estudar").TaskInput.Should().Be("Ler");
+    }
+
+    [Fact]
+    public async Task Save_task_unchanged_does_not_write()
+    {
+        var page = await RunningStudyAsync("Ler");
+        var calls = _timers.SetTaskCalls;
+        var card = Card(page, "Estudar");
+
+        card.TaskInput = "Ler ";
+        await page.SaveTaskCommand.ExecuteAsync(card);
+
+        _timers.SetTaskCalls.Should().Be(calls);
+    }
+
+    [Fact]
+    public async Task Confirm_switch_registers_and_renames()
+    {
+        var page = await RunningStudyAsync("Inglês");
+        _time.Advance(TimeSpan.FromMinutes(25));
+        var card = Card(page, "Estudar");
+
+        page.BeginSwitchTaskCommand.Execute(card);
+        (card.IsSwitchingTask, card.TaskInput).Should().Be((true, null));
+        card.TaskInput = "Capítulo 3";
+        await page.ConfirmSwitchTaskCommand.ExecuteAsync(card);
+
+        _checkins.All.Should().ContainSingle().Which.Should().Match<Checkin>(c => c.Amount == 25 && c.Note == "Inglês");
+        var after = Card(page, "Estudar");
+        (after.TimerTask, after.TaskInput, after.IsSwitchingTask).Should().Be(("Capítulo 3", "Capítulo 3", false));
+    }
+
+    [Fact]
+    public async Task Cancel_switch_restores_the_current_name()
+    {
+        var page = await RunningStudyAsync("Inglês");
+        var card = Card(page, "Estudar");
+        page.BeginSwitchTaskCommand.Execute(card);
+        card.TaskInput = "Outra";
+
+        page.CancelSwitchTaskCommand.Execute(card);
+
+        (card.IsSwitchingTask, card.TaskInput).Should().Be((false, "Inglês"));
+    }
+
+    [Fact]
+    public async Task Stopped_timer_panel_starts_with_the_task_as_note()
+    {
+        var page = await RunningStudyAsync("Inglês");
+        _time.Advance(TimeSpan.FromMinutes(10));
+
+        await page.StopTimerCommand.ExecuteAsync(Card(page, "Estudar"));
+
+        Card(page, "Estudar").PanelNote.Should().Be("Inglês");
+    }
+
+    [Fact]
+    public async Task Typing_survives_a_reload()
+    {
+        var page = await RunningStudyAsync("Inglês");
+        var card = Card(page, "Estudar");
+        page.BeginSwitchTaskCommand.Execute(card);
+        card.TaskInput = "Rev";
+
+        _changes.NotifyChanged(); // como uma sincronização ou outro processo faria
+
+        var reloaded = Card(page, "Estudar");
+        reloaded.Should().NotBeSameAs(card);
+        (reloaded.TaskInput, reloaded.IsSwitchingTask).Should().Be(("Rev", true));
+
+        await Timers.StopAsync();
+        await page.LoadCommand.ExecuteAsync(null);
+        await Timers.DiscardAsync();
+        var goal = (await GoalService.ListAsync()).Single();
+        await Timers.StartAsync(goal.Id);
+        await page.LoadCommand.ExecuteAsync(null);
+
+        (Card(page, "Estudar").TaskInput, Card(page, "Estudar").IsSwitchingTask).Should().Be((null, false));
+    }
+
+    [Fact]
+    public async Task Switch_race_shows_the_error()
+    {
+        var page = await RunningStudyAsync("Inglês");
+        _time.Advance(TimeSpan.FromMinutes(5));
+        var card = Card(page, "Estudar");
+        page.BeginSwitchTaskCommand.Execute(card);
+        card.TaskInput = "B";
+        await Timers.DiscardAsync(); // o "Parar" ou o "Descartar" de outro processo
+
+        await page.ConfirmSwitchTaskCommand.ExecuteAsync(card);
+
+        page.ErrorMessage.Should().Be("Nenhum cronômetro rodando.");
+        _checkins.All.Should().BeEmpty();
+        (await _timers.GetAsync()).Should().BeNull();
     }
 }

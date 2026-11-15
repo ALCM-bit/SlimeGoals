@@ -250,16 +250,32 @@ void RenderTodayWithTimer(int width)
         today.StartTimerCommand.Execute(timed);
         Pump();
     }
-    var path = Path.Combine(outDir, $"today-timer-{width}.png");
-    var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para capturar.");
-    using (var stream = File.Create(path))
-    {
-#pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
-        frame.Save(stream);
-#pragma warning restore CS0618
-    }
-    Console.WriteLine(path);
+    var running = today.Goals.Single(g => g.IsTimerRunning);
+    running.TaskInput = "Revisar o capítulo 3 do livro de arquitetura";
+    today.SaveTaskCommand.Execute(running);
+    Pump();
+    Capture($"today-timer-{width}.png");
+    // Modo de troca: o campo vazio com Cancelar e Trocar
+    running = today.Goals.Single(g => g.IsTimerRunning);
+    today.BeginSwitchTaskCommand.Execute(running);
+    Pump();
+    Capture($"today-timer-switch-{width}.png");
+    today.CancelSwitchTaskCommand.Execute(running);
+    Pump();
     window.Close();
+
+    void Capture(string name)
+    {
+        var path = Path.Combine(outDir, name);
+        var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para capturar.");
+        using (var stream = File.Create(path))
+        {
+#pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
+            frame.Save(stream);
+#pragma warning restore CS0618
+        }
+        Console.WriteLine(path);
+    }
 }
 
 void Render(bool phone, string suffix, int width, int height)

@@ -137,9 +137,18 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
                 return;
 
             StopTicker();
+            // O texto do campo da tarefa sobrevive à recarga (sincronização, outro processo) enquanto for o mesmo cronômetro.
+            var draft = Goals.FirstOrDefault(g => g.HasTaskDraft);
             Goals.Clear();
             foreach (var item in snapshot.Goals)
                 Goals.Add(new TodayGoalViewModel(item, snapshot.Timer, time) { CanStartTimer = snapshot.Timer is null });
+            var running = Goals.FirstOrDefault(g => g.IsTimerRunning);
+            if (draft is not null && running is not null && running.Goal.Id == draft.Goal.Id
+                && (draft.IsSwitchingTask || TodayGoalViewModel.NormalizeTask(draft.TaskInput) != running.TimerTask))
+            {
+                running.TaskInput = draft.TaskInput;
+                running.IsSwitchingTask = draft.IsSwitchingTask;
+            }
             var shownInCard = Goals.Any(g => g.IsTimerRunning || g.IsTimerStopped);
             _offscreenTimer = shownInCard ? null : snapshot.Timer;
             _offscreenTitle = snapshot.TimerGoal?.Title ?? "meta removida";
@@ -149,6 +158,8 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             (WeekPercent, InProgress, Completed) = (snapshot.Week.Percent, snapshot.Week.InProgress, snapshot.Week.Completed);
             if (snapshot.Timer is { StoppedAt: null })
                 _ticker = time.CreateTimer(_ => OnUi(Tick), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+            if (running is not null)
+                await LoadTaskSuggestionsAsync(running, version);
             await LoadStreakAsync(version);
             await LoadUpcomingAsync(version);
             if (version == _loadVersion)
@@ -164,6 +175,21 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         finally
         {
             OnPropertyChanged(nameof(IsEmpty));
+        }
+    }
+
+    /// <summary>Sem sugestões se a leitura falhar: o campo continua aceitando texto livre.</summary>
+    private async Task LoadTaskSuggestionsAsync(TodayGoalViewModel running, int version)
+    {
+        try
+        {
+            var suggestions = await timers.TaskSuggestionsAsync(running.Goal.Id);
+            if (version == _loadVersion)
+                running.TaskSuggestions = suggestions;
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            Trace.TraceWarning($"Sugestões de tarefa indisponíveis: {TraceText.Types(e)}");
         }
     }
 
@@ -290,6 +316,49 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         }
         var value = (int)Math.Round(minutes, MidpointRounding.AwayFromZero);
         return RunAsync(item, _ => timers.RegisterAsync(value, item.PanelNote), panel: true);
+    }
+
+    /// <summary>Grava o nome digitado no campo da tarefa, se mudou (Enter, perda de foco ou sugestão escolhida).</summary>
+    [RelayCommand]
+    private Task SaveTaskAsync(TodayGoalViewModel? item)
+    {
+        if (item is not { IsTimerRunning: true, IsSwitchingTask: false }
+            || TodayGoalViewModel.NormalizeTask(item.TaskInput) == item.TimerTask)
+            return Task.CompletedTask;
+        return RunAsync(item, _ => timers.SetTaskAsync(item.TaskInput));
+    }
+
+    [RelayCommand]
+    private static void BeginSwitchTask(TodayGoalViewModel? item)
+    {
+        if (item is not { IsTimerRunning: true })
+            return;
+        item.TaskInput = null;
+        item.IsSwitchingTask = true;
+    }
+
+    [RelayCommand]
+    private static void CancelSwitchTask(TodayGoalViewModel? item)
+    {
+        if (item is null)
+            return;
+        item.IsSwitchingTask = false;
+        item.TaskInput = item.TimerTask;
+    }
+
+    /// <summary>Registra o trecho da tarefa atual e segue com a nova (ver <see cref="TimerService.SwitchTaskAsync"/>).</summary>
+    [RelayCommand]
+    private Task ConfirmSwitchTaskAsync(TodayGoalViewModel? item)
+    {
+        if (item is not { IsTimerRunning: true, IsSwitchingTask: true })
+            return Task.CompletedTask;
+        return RunAsync(item, async _ =>
+        {
+            await timers.SwitchTaskAsync(item.TaskInput);
+            // Trocou: o modo de troca acaba, e o recarregamento não o devolve como rascunho.
+            item.IsSwitchingTask = false;
+            item.TaskInput = TodayGoalViewModel.NormalizeTask(item.TaskInput);
+        });
     }
 
     [RelayCommand]

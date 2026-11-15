@@ -187,10 +187,16 @@
                         </Button.IsVisible>
                         <Path Classes="btn-icon" Data="{StaticResource IconPlay}" />
                       </Button>
+                      <!-- No modo de troca, Trocar e Cancelar ocupam o lugar de ⇄ e ■ (abaixo do campo) -->
                       <Button Classes="danger-solid icon" AutomationProperties.Name="Parar cronômetro" ToolTip.Tip="Parar cronômetro"
-                              IsVisible="{Binding IsTimerRunning}"
                               Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).StopTimerCommand}"
                               CommandParameter="{Binding}">
+                        <Button.IsVisible>
+                          <MultiBinding Converter="{x:Static BoolConverters.And}">
+                            <Binding Path="IsTimerRunning" />
+                            <Binding Path="!IsSwitchingTask" />
+                          </MultiBinding>
+                        </Button.IsVisible>
                         <Path Classes="btn-icon" Data="{StaticResource IconStop}" />
                       </Button>
                       <!-- Mais opções (só tempo) -->
@@ -202,6 +208,37 @@
                       </Button>
                     </StackPanel>
                   </Grid>
+
+                  <!-- Tarefa do cronômetro rodando: na largura do cartão, para não espremer o título na tela estreita -->
+                  <StackPanel Spacing="8" IsVisible="{Binding IsTimerRunning}">
+                    <!-- ⇄ ao lado do campo, e não junto do ■: a 320 px, três botões no cabeçalho cortavam o título e o tempo -->
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                      <AutoCompleteBox Classes="timer-task" Text="{Binding TaskInput, Mode=TwoWay}" ItemsSource="{Binding TaskSuggestions}"
+                                       PlaceholderText="No que está trabalhando?" FilterMode="Contains" MinimumPrefixLength="0"
+                                       MaxLength="{x:Static services:CheckinService.MaxNoteLength}"
+                                       AutomationProperties.Name="Tarefa" SelectionChanged="OnTaskSelectionChanged" />
+                      <Button Grid.Column="1" Classes="ghost icon" AutomationProperties.Name="Trocar de tarefa" ToolTip.Tip="Trocar de tarefa"
+                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).BeginSwitchTaskCommand}"
+                              CommandParameter="{Binding}">
+                        <Button.IsVisible>
+                          <MultiBinding Converter="{x:Static BoolConverters.And}">
+                            <Binding Path="IsTimerRunning" />
+                            <Binding Path="!IsSwitchingTask" />
+                          </MultiBinding>
+                        </Button.IsVisible>
+                        <Path Classes="btn-icon" Data="{StaticResource IconSwap}" />
+                      </Button>
+                    </Grid>
+                    <!-- Trocar de tarefa: os botões abaixo do campo, como no painel de registro, para não espremê-lo no celular -->
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" IsVisible="{Binding IsSwitchingTask}">
+                      <Button Classes="ghost" Content="Cancelar"
+                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).CancelSwitchTaskCommand}"
+                              CommandParameter="{Binding}" />
+                      <Button Classes="primary" Content="Trocar"
+                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).ConfirmSwitchTaskCommand}"
+                              CommandParameter="{Binding}" />
+                    </StackPanel>
+                  </StackPanel>
 
                   <!-- Barra na largura do cartão: igual em todos, sem depender dos botões ao lado do texto -->
                   <ProgressBar Classes="goal" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
