@@ -14,6 +14,12 @@
     <AndroidPackageFormat>apk</AndroidPackageFormat>
   </PropertyGroup>
 
+  <!-- Conta e sincronização só no build de desenvolvimento (9.5b), como no Linux: Debug, ou Release com
+       a propriedade SyncDev=true (packaging/android/build.sh com a opção dev). O APK de distribuição fica sem rede, cofre e seção. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug' Or '$(SyncDev)' == 'true'">
+    <DefineConstants>$(DefineConstants);SYNC_DEV</DefineConstants>
+  </PropertyGroup>
+
   <!-- APK de distribuição: só arm64 (aparelhos) e x64 (emulador). Fica no Release para o Debug do dia a dia não mudar. -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>

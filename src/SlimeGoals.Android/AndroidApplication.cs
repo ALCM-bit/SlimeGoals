@@ -18,7 +18,11 @@ namespace SlimeGoals.Android;
 /// A <c>App</c> não tem construtor sem parâmetros, e <c>AvaloniaAndroidApplication&lt;TApp&gt;</c> exige <c>new()</c>:
 /// <see cref="AppConstraintStub"/> só satisfaz a restrição; o builder real é criado em <see cref="CreateAppBuilder"/>.
 /// </summary>
-[Application]
+#if SYNC_DEV
+[Application(NetworkSecurityConfig = "@xml/network_security_config_dev")]
+#else
+[Application(NetworkSecurityConfig = "@xml/network_security_config")]
+#endif
 public class AndroidApplication : AvaloniaAndroidApplication<AndroidApplication.AppConstraintStub>
 {
     /// <summary>
