@@ -415,6 +415,10 @@ Conta e sincronização no Android, só no APK de desenvolvimento. Onde diferem 
 - Com o arquivo da sessão trocado por `01` e 63 bytes aleatórios, e também com a chave trocada, a tela mostra "sessão ilegível". "Sair" funciona, e depois dá para entrar de novo.
 - Com o servidor `http://example.com:8080` ou `http://10.0.2.2:8080`, "Entrar" mostra o erro de conexão, e o Trace grava só o tipo (`AccountApiException`). O mesmo servidor atende em `10.0.2.2` e aceita a entrada por `127.0.0.1`, então quem recusa é a config de rede.
 
+**Release no emulador, 15/11/2026.** O APK Release com `-p:SyncDev=true` (trimming ligado, sem `DEBUGGABLE`), assinado com a chave de depuração, também confere os 5 vetores e a ida e volta no cofre. Ele entra na conta e recebe uma meta criada do lado Linux.
+
+**Falha inesperada do cofre.** Uma exceção do Keystore ao ler a sessão (chave irrecuperável, `ProviderException`, `IllegalStateException`) vira "sessão ilegível", como a tag inválida. Se outra falha que o cofre não traduziu chegar ao coordenador, "Sair" ainda limpa a conta localmente, sem rede. Só o cofre indisponível (trancado) impede sair.
+
 Falta o celular (arm64, APK Release com `--dev`), que depende do autor.
 
 ## 7. Interface e Android
