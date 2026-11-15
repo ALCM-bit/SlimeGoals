@@ -1,5 +1,8 @@
 using Android.App;
 using Android.Content;
+using Android.OS;
+using Android.Widget;
+using SlimeGoals.App.Hosting;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Services;
 
@@ -33,13 +36,15 @@ internal sealed class AndroidTimerNotification(Context context, StopTimerSecretS
         var builder = new Notification.Builder(context, ChannelId)
             .SetSmallIcon(Resource.Drawable.ic_notification)
             .SetColor(AndroidNotificationService.Accent)
-            .SetContentTitle(timer.Title)
+            .SetContentTitle(timer.Title) // leitor de tela e lugares que não mostram o layout próprio
             .SetCategory(OperatingSystem.IsAndroidVersionAtLeast(31) ? Notification.CategoryStopwatch : Notification.CategoryProgress)
             .SetOngoing(true)
             .SetOnlyAlertOnce(true)
-            .SetShowWhen(true)
-            .SetUsesChronometer(true)
-            .SetWhen(timer.StartedAt.ToUnixTimeMilliseconds())
+            // O tempo vai grande no corpo; o do cabeçalho (pequeno, ao lado do nome do app) sai para não repetir.
+            .SetShowWhen(false)
+            .SetStyle(new Notification.DecoratedCustomViewStyle())
+            .SetCustomContentView(Body(Resource.Layout.notification_timer, timer))
+            .SetCustomBigContentView(Body(Resource.Layout.notification_timer_big, timer))
             .SetContentIntent(ActivityIntent(OpenRequestCode, secret: null));
         // Sem o código (preferências com falha), o botão não funcionaria: a notificação fica só com o toque.
         if (secrets.Get() is { } secret)
@@ -49,6 +54,16 @@ internal sealed class AndroidTimerNotification(Context context, StopTimerSecretS
     }
 
     public void Cancel() => Manager.Cancel(NotificationId);
+
+    // O Chronometer conta no relógio desde o boot; ao mudar a hora do aparelho, o SystemEventReceiver repõe a notificação.
+    private RemoteViews Body(int layout, RunningTimer timer)
+    {
+        var views = new RemoteViews(context.PackageName, layout);
+        views.SetTextViewText(Resource.Id.timer_title, timer.Title);
+        views.SetChronometer(Resource.Id.timer_elapsed,
+            ChronometerBase.Of(timer.StartedAt, DateTimeOffset.UtcNow, SystemClock.ElapsedRealtime()), null, true);
+        return views;
+    }
 
     // Códigos de pedido diferentes: os dois intents só diferem no extra, que não conta para o PendingIntent ser outro.
     // Imutável: quem recebe a notificação não troca o extra.

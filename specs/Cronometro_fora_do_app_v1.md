@@ -44,7 +44,7 @@ Estudar inglês                       0:23:51
 [ Parar ]
 ```
 
-- Notificação fixa, silenciosa, com o cronômetro do próprio sistema. Aparece na barra de status e na tela de bloqueio.
+- Notificação fixa, silenciosa, com o cronômetro do próprio sistema em letras grandes no corpo (ver a seção 9). Aparece na barra de status e na tela de bloqueio.
 - **Aparece** quando um cronômetro começa (pelo app ou pelo "Iniciar" de um lembrete) e fica enquanto ele roda, mesmo com o app aberto.
 - **Some** quando o cronômetro para, é registrado ou descartado.
 - **Tocar** abre o app. **Parar** congela o cronômetro e abre o app em Hoje, para registrar.
@@ -100,7 +100,7 @@ O autor escolheu a janela no Linux e a notificação no Android em 13/11/2026.
 - Parar chama `TimerService.StopAsync` e depois `IWindowActivator.Activate`.
 
 **Android**
-- `AndroidTimerNotification`, ao lado do serviço de notificações dos lembretes: cria o canal "Cronômetro", publica a notificação com `SetUsesChronometer` e a retira.
+- `AndroidTimerNotification`, ao lado do serviço de notificações dos lembretes: cria o canal "Cronômetro", publica a notificação com um layout próprio (um `Chronometer` no corpo) e a retira.
 - O "Parar" não passa por um receptor: desde o Android 12, um receptor não pode abrir uma atividade a partir de uma notificação. O botão abre a `MainActivity` direto, por um `PendingIntent` de atividade com o extra `stopTimer`, e é ela que para o cronômetro e mostra Hoje. Tocar no corpo abre a mesma atividade sem o extra.
 - A `MainActivity` é exportada (o launcher a abre), então qualquer app poderia mandar o mesmo extra. Desde 15/11/2026 o extra leva um código aleatório de 256 bits, criado uma vez por instalação e guardado nas preferências privadas do app, fora do banco que sincroniza (`StopRequestSecret`, `StopTimerSecretStore`). Sem o código certo, o pedido é ignorado e o app só abre. Um app com acesso às notificações, concedido pela pessoa, ainda consegue tocar o próprio botão: isso vale para qualquer notificação.
 - O `SystemEventReceiver` repõe a notificação no boot.
@@ -135,3 +135,4 @@ Implementado em 14/11/2026 (plano `specs/plans/2026-11-14-cronometro-fora-do-app
 - **Notificação fora da tela:** `TimerNotificationSync` é ligado no `AndroidApplication.OnCreate`, não como serviço da tela, para a notificação aparecer também quando o cronômetro começa pelo "Iniciar" de um lembrete com o app fechado.
 - **Posição:** gravada em `settings` quando o arrasto para; ao mostrar, uma posição fora de todas as telas volta ao canto inferior direito da tela principal, com 24 px de margem, e uma posição meio para fora é puxada para dentro da tela que ela mais cobre.
 - **Meta sumida ou arquivada:** o cronômetro dela não conta como rodando; nem a janelinha nem a notificação aparecem.
+- **Tempo grande na notificação (15/11/2026):** no Galaxy do autor, o tempo do `SetUsesChronometer` ficava pequeno e cinza no cabeçalho, ao lado do nome do app. A notificação passou a usar `DecoratedCustomViewStyle` com dois layouts (`Resources/layout/notification_timer*.xml`): recolhida, o nome da meta e o tempo lado a lado, a 24 sp; aberta, o nome em cima e o tempo embaixo, a 36 sp. O `Chronometer` conta sozinho, no relógio desde o boot; `ChronometerBase` converte o início gravado (hora do dia) para esse relógio, e um início no futuro conta de zero. O tempo do cabeçalho saiu, para não repetir; o título continua no `SetContentTitle`, para o leitor de tela. Cores e fontes vêm do tema de notificação do sistema, no claro e no escuro.
