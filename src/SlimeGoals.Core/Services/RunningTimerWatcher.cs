@@ -6,7 +6,11 @@ using SlimeGoals.Core.Domain;
 namespace SlimeGoals.Core.Services;
 
 /// <summary>Cronômetro rodando, com o que é preciso para mostrá-lo fora do app.</summary>
-public sealed record RunningTimer(Guid GoalId, string Title, string Icon, GoalColor Color, DateTimeOffset StartedAt);
+public sealed record RunningTimer(Guid GoalId, string Title, string Icon, GoalColor Color, DateTimeOffset StartedAt, string? Task = null)
+{
+    /// <summary>O que a janelinha e a notificação mostram: a meta, e a tarefa depois de um ponto médio.</summary>
+    public string Label => Task is null ? Title : $"{Title} · {Task}";
+}
 
 /// <summary>
 /// Acompanha o cronômetro rodando para a janelinha do Linux e a notificação do Android. "Rodando" é um
@@ -83,6 +87,6 @@ public sealed class RunningTimerWatcher(TimerService timers, IGoalRepository goa
             return null;
         if (await goals.GetAsync(timer.GoalId, ct) is not { ArchivedAt: null } goal)
             return null;
-        return new RunningTimer(goal.Id, goal.Title, goal.Icon, goal.Color, timer.StartedAt);
+        return new RunningTimer(goal.Id, goal.Title, goal.Icon, goal.Color, timer.StartedAt, timer.Task);
     }
 }

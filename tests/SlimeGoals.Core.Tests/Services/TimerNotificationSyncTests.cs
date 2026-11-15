@@ -129,4 +129,19 @@ public sealed class TimerNotificationSyncTests : IDisposable
                 _calls.Add("cancel");
         }
     }
+
+    [Fact]
+    public async Task Task_change_republishes_with_the_new_label()
+    {
+        var goal = await Study();
+        var sync = new TimerNotificationSync(_watcher, _notification);
+        await sync.StartAsync();
+        await _timerService.StartAsync(goal.Id);
+        await sync.SyncAsync();
+
+        await _timerService.SetTaskAsync("Capítulo 3");
+        await sync.SyncAsync();
+
+        _notification.Shown!.Label.Should().Be($"{goal.Title} · Capítulo 3");
+    }
 }

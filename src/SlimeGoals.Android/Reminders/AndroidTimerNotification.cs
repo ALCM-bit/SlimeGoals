@@ -36,7 +36,7 @@ internal sealed class AndroidTimerNotification(Context context, StopTimerSecretS
         var builder = new Notification.Builder(context, ChannelId)
             .SetSmallIcon(Resource.Drawable.ic_notification)
             .SetColor(AndroidNotificationService.Accent)
-            .SetContentTitle(timer.Title) // leitor de tela e lugares que não mostram o layout próprio
+            .SetContentTitle(timer.Label) // leitor de tela e lugares que não mostram o layout próprio
             .SetCategory(OperatingSystem.IsAndroidVersionAtLeast(31) ? Notification.CategoryStopwatch : Notification.CategoryProgress)
             .SetOngoing(true)
             .SetOnlyAlertOnce(true)
@@ -59,7 +59,7 @@ internal sealed class AndroidTimerNotification(Context context, StopTimerSecretS
     private RemoteViews Body(int layout, RunningTimer timer)
     {
         var views = new RemoteViews(context.PackageName, layout);
-        views.SetTextViewText(Resource.Id.timer_title, timer.Title);
+        views.SetTextViewText(Resource.Id.timer_title, timer.Label);
         views.SetChronometer(Resource.Id.timer_elapsed,
             ChronometerBase.Of(timer.StartedAt, DateTimeOffset.UtcNow, SystemClock.ElapsedRealtime()), null, true);
         return views;
