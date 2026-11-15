@@ -29,15 +29,15 @@
 
 ## Review Focus
 
-1. **O Keystore perdeu a chave, mas o arquivo continua** (backup restaurado em outro aparelho, dados do Keystore apagados): espera-se `SessionUnreadable`, com "Sair" funcionando, e nunca um travamento ou um laço de "Tentar de novo". Coberto pelo teste do coordenador na Tarefa 1 e pelo passo manual 6 da Tarefa 6.
-2. **Gravação interrompida** (app morto no meio do `SetAsync`): o arquivo antigo ou o novo, inteiro, nunca pela metade. Coberto pela gravação em arquivo temporário seguida de `File.Move` com sobrescrita (Tarefa 4) e pelo `TryUnpack`, que recusa arquivo curto (Tarefa 1).
-3. **O APK de distribuição ganhar rede sem querer:** a Tarefa 4 confere com `aapt2` que o Release sem `SyncDev` não tem `INTERNET` nem o receptor, e que o de desenvolvimento tem os dois.
-4. **Release com trimming quebrar Konscious ou JSON no aparelho:** o APK de desenvolvimento é Release. O `CryptoSelfCheck` roda nele, no emulador e no celular (Tarefa 6), e o teste de ponta a ponta usa o mesmo APK.
-5. **Servidor apontado para um host remoto em `http`:** deve falhar com o texto de erro de conexão, sem sair nada em claro. Coberto pelo passo manual 7 da Tarefa 6.
+1. **O Keystore perdeu a chave, mas o arquivo continua** (backup restaurado em outro aparelho, dados do Keystore apagados): espera-se `SessionUnreadable`, com "Sair" funcionando, e nunca um travamento ou um laço de "Tentar de novo". Coberto pelo teste do coordenador na Task 1 e pelo passo manual 6 da Task 6.
+2. **Gravação interrompida** (app morto no meio do `SetAsync`): o arquivo antigo ou o novo, inteiro, nunca pela metade. Coberto pela gravação em arquivo temporário seguida de `File.Move` com sobrescrita (Task 4) e pelo `TryUnpack`, que recusa arquivo curto (Task 1).
+3. **O APK de distribuição ganhar rede sem querer:** a Task 4 confere com `aapt2` que o Release sem `SyncDev` não tem `INTERNET` nem o receptor, e que o de desenvolvimento tem os dois.
+4. **Release com trimming quebrar Konscious ou JSON no aparelho:** o APK de desenvolvimento é Release. O `CryptoSelfCheck` roda nele, no emulador e no celular (Task 6), e o teste de ponta a ponta usa o mesmo APK.
+5. **Servidor apontado para um host remoto em `http`:** deve falhar com o texto de erro de conexão, sem sair nada em claro. Coberto pelo passo manual 7 da Task 6.
 
 ---
 
-### Tarefa 1: Formato do arquivo do cofre e contrato do segredo ilegível
+### Task 1: Formato do arquivo do cofre e contrato do segredo ilegível
 
 **Files:**
 - Create: `src/SlimeGoals.Sync/Vault/SealedSecretFormat.cs`
@@ -76,7 +76,7 @@ O GCM do Java devolve cifra e tag juntas. Por isso o formato guarda `cipherAndTa
 - [ ] **Passo 6: Rodar** `dotnet test --project tests/SlimeGoals.Server.Tests -- --filter-class "*SyncCoordinatorTests"` (precisa do Docker). Esperado: todos passam.
 - [ ] **Passo 7: Commit.** `feat(core): formato do arquivo do cofre e segredo ilegível vindo do cofre`. O escopo `core` cobre a mudança de contrato; o formato fica em `Sync`.
 
-### Tarefa 2: Conferência dos vetores fixos
+### Task 2: Conferência dos vetores fixos
 
 **Files:**
 - Create: `src/SlimeGoals.Sync/Crypto/CryptoSelfCheck.cs`
@@ -97,7 +97,7 @@ Os valores esperados são os da tabela "Vetores fixos" da spec. `Run` usa as cla
 - [ ] **Passo 5: Rodar.** Esperado: passa.
 - [ ] **Passo 6: Commit.** `feat(core): conferência dos vetores fixos da criptografia`, com os arquivos de `Sync`.
 
-### Tarefa 3: Área de transferência da plataforma no "Copiar"
+### Task 3: Área de transferência da plataforma no "Copiar"
 
 **Files:**
 - Modify: `src/SlimeGoals.App/Account/AccountViewModel.cs`
@@ -113,9 +113,9 @@ Os valores esperados são os da tabela "Vetores fixos" da spec. `Run` usa as cla
 - [ ] **Passo 4: Rodar.** Esperado: passa. Rodar também `dotnet build SlimeGoals.slnx`, que precisa terminar sem avisos.
 - [ ] **Passo 5: Commit.** `feat(app): área de transferência da plataforma no código de recuperação`.
 
-### Tarefa 4: Head Android com a conta (só `SYNC_DEV`)
+### Task 4: Head Android com a conta (só `SYNC_DEV`)
 
-Nada aqui roda no xUnit. A prova é o build, a inspeção do APK com `aapt2` e a Tarefa 6.
+Nada aqui roda no xUnit. A prova é o build, a inspeção do APK com `aapt2` e a Task 6.
 
 **Files:**
 - Modify: `src/SlimeGoals.Android/SlimeGoals.Android.csproj` (`SYNC_DEV` em Debug ou com `SyncDev=true`)
@@ -130,7 +130,7 @@ Nada aqui roda no xUnit. A prova é o build, a inspeção do APK com `aapt2` e a
 - Modify: `src/SlimeGoals.Android/MainActivity.cs` (`OnResume`)
 
 **Interfaces:**
-- Consumes: `SealedSecretFormat` (Tarefa 1), `CryptoSelfCheck` (Tarefa 2), o parâmetro `platformClipboard` (Tarefa 3), `SyncCoordinator`, `ISyncAccount.SyncNow()`, `SyncHost`, `AccountDefaults`, `AccountViewModel`.
+- Consumes: `SealedSecretFormat` (Task 1), `CryptoSelfCheck` (Task 2), o parâmetro `platformClipboard` (Task 3), `SyncCoordinator`, `ISyncAccount.SyncNow()`, `SyncHost`, `AccountDefaults`, `AccountViewModel`.
 - Produces: `internal sealed class AndroidKeystoreVault(Context context) : ISecretVault`.
 
 **Decisões fixas:**
@@ -172,7 +172,7 @@ Nada aqui roda no xUnit. A prova é o build, a inspeção do APK com `aapt2` e a
 - [ ] **Passo 4: Suite e builds do Linux.** `dotnet test --solution SlimeGoals.slnx` e `dotnet build SlimeGoals.slnx -c Release`. Esperado: tudo verde, 0 avisos.
 - [ ] **Passo 5: Commit.** `feat(android): conta e sincronização no build de desenvolvimento`.
 
-### Tarefa 5: APK de desenvolvimento no `build.sh` e README
+### Task 5: APK de desenvolvimento no `build.sh` e README
 
 **Files:**
 - Modify: `packaging/android/build.sh`
@@ -190,7 +190,7 @@ Nada aqui roda no xUnit. A prova é o build, a inspeção do APK com `aapt2` e a
 - [ ] **Passo 1: Implementar.** Para conferir o argumento sem a senha: `packaging/android/build.sh --xyz` precisa sair com o texto de uso e código 2 **antes** de pedir a senha.
 - [ ] **Passo 2: Commit.** `build(android): APK de desenvolvimento com a sincronização`.
 
-### Tarefa 6: Verificação no emulador e no celular, e decisões na spec
+### Task 6: Verificação no emulador e no celular, e decisões na spec
 
 **Files:**
 - Modify: `specs/Sincronizacao_v1.md` (nova seção "Decisões da fase 9.5b", depois de "Decisões depois do teste manual da 9.5a")
