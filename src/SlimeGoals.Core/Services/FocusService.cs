@@ -91,9 +91,10 @@ public sealed class FocusService(IGoalRepository goals, IFocusSessionRepository 
         if (session.IsLastStep)
             return await FinishAsync(session, reviewedMinutes, now, ct);
 
-        // Depois de uma pausa nada é cortado: o resto de minuto segue para o próximo foco.
+        // Depois de uma pausa nada é cortado: o resto de minuto segue para o próximo foco. O fim do último foco é o
+        // último corte mesmo quando a sessão ainda tem pausas depois dele: arredonda e não deixa resto.
         var cut = session.Block.Kind == FocusBlockKind.Focus
-            ? await CutAsync(session, reviewedMinutes, last: false, now, ct)
+            ? await CutAsync(session, reviewedMinutes, last: IsLastFocus(session), now, ct)
             : new Cut(null, null, session.GoalId, session.Carry);
         await SaveAsync(session, session with
         {
@@ -245,6 +246,11 @@ public sealed class FocusService(IGoalRepository goals, IFocusSessionRepository 
             return new Cut(chunk, null, null, carry);
         }
     }
+
+    /// <summary>Se nenhum passo depois do atual é de foco.</summary>
+    private static bool IsLastFocus(FocusSession session) =>
+        Enumerable.Range(session.Step + 1, session.Plan.TotalSteps - session.Step - 1)
+            .All(step => session.Plan.BlockAt(step).Kind != FocusBlockKind.Focus);
 
     private async Task SaveAsync(FocusSession current, FocusSession? next, Cut? cut, CancellationToken ct)
     {

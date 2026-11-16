@@ -171,18 +171,26 @@ public class FocusServiceTests
     }
 
     [Fact]
-    public async Task Session_ending_on_a_break_rounds_the_carry()
+    public async Task Last_focus_rounds_even_when_the_session_ends_on_a_break()
     {
         var goal = await Study();
-        await Service.StartAsync(new FocusPlan([Focus(10), Break(5)], 1), goal.Id);
-        _time.Advance(TimeSpan.FromSeconds(10 * 60 + 40));
+        await Service.StartAsync(new FocusPlan([Focus(10), Break(5)], 2), goal.Id);
+        _time.Advance(TimeSpan.FromSeconds(10 * 60 + 20));
+        await Service.AdvanceAsync(); // foco do meio: trunca e guarda 20 s
+        _time.Advance(TimeSpan.FromMinutes(5));
         await Service.AdvanceAsync();
+        _time.Advance(TimeSpan.FromSeconds(10 * 60 + 20));
+        await Service.AdvanceAsync(); // último foco: 10 min 40 s arredondam para 11
+
+        _checkins.All.Select(c => c.Amount).Should().Equal(10, 11);
+        (await SessionAsync()).Carry.Should().Be(TimeSpan.Zero);
         _time.Advance(TimeSpan.FromMinutes(5));
 
         var summary = await Service.AdvanceAsync();
 
-        _checkins.All.Select(c => c.Amount).Should().Equal(10, 1);
-        summary!.Minutes.Should().Be(11);
+        _checkins.All.Select(c => c.Amount).Should().Equal(10, 11);
+        summary.Should().BeEquivalentTo(new FocusSummary(21, [new FocusSummaryLine(null, 21)], Assigned: true));
+        (await _sessions.GetAsync()).Should().BeNull();
     }
 
     [Fact]
