@@ -39,6 +39,7 @@ internal static class CompositionRoot
         services.AddSingleton<GoalService>();
         services.AddSingleton<CheckinService>();
         services.AddSingleton<TimerService>();
+        services.AddSingleton<FocusService>();
         services.AddSingleton<AppSettings>();
         services.AddSingleton<ProgressService>();
         services.AddSingleton<ReportService>();
@@ -84,9 +85,14 @@ internal static class CompositionRoot
         AddSync(services, databasePath);
 #endif
 
+        // Pedidos de troca de página feitos por dentro das páginas (ex.: Tempo → Hoje); o shell assina
+        services.AddSingleton<PageNavigator>();
+
         // UI — ordem de registro = ordem na navegação (spec §7)
         services.AddSingleton<PageViewModel, TodayPageViewModel>();
         services.AddSingleton<PageViewModel, GoalsPageViewModel>();
+        services.AddSingleton<PomodoroViewModel>();
+        services.AddSingleton<PageViewModel, TimePageViewModel>();
         services.AddSingleton<PageViewModel, ReportsPageViewModel>();
         services.AddSingleton<PageViewModel, SettingsPageViewModel>();
         services.AddSingleton<ShellViewModel>();

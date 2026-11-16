@@ -24,7 +24,7 @@ public sealed record UpcomingReminderViewModel(string Time, string Title);
 public sealed partial class TodayPageViewModel(ProgressService progress, CheckinService checkins, TimerService timers,
     GoalService goals, TimeProvider time, ReminderService reminders, DataChangeNotifier changes,
     ReminderPause? pause = null, ReportService? reports = null, PlatformCapabilities? capabilities = null,
-    IReminderPermissions? permissions = null) : PageViewModel
+    IReminderPermissions? permissions = null, FocusService? focus = null, PageNavigator? navigator = null) : PageViewModel
 {
     private readonly bool _reminders = (capabilities ?? PlatformCapabilities.Desktop).Reminders;
 
@@ -103,6 +103,19 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     [ObservableProperty] public partial bool IsOffscreenTimerRunning { get; set; }
     [ObservableProperty] public partial string? OffscreenTimerText { get; set; }
 
+    /// <summary>
+    /// Faixa da sessão de Pomodoro: enquanto ela existe (rodando, pausada, à espera do toque ou do destino do tempo), o ▶
+    /// dos cartões fica desligado e a faixa leva à aba Tempo (spec Pomodoro §4.1).
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasFocusBand))]
+    public partial string? FocusBandText { get; set; }
+
+    public bool HasFocusBand => FocusBandText is not null;
+
+    [RelayCommand]
+    private void OpenTimePage() => navigator?.Show<TimePageViewModel>();
+
     /// <summary>Pose e frase do slime, conforme o progresso de hoje e a pausa dos lembretes.</summary>
     [ObservableProperty] public partial MascotState Mascot { get; set; } = MascotState.For(0, 0, false);
 
@@ -134,6 +147,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             await goals.ArchiveExpiredAsync();
             var snapshot = await progress.GetTodayAsync();
             var todayCheckins = await checkins.TodayAsync();
+            var session = focus is null ? null : await focus.GetAsync();
             if (version != _loadVersion)
                 return;
 
@@ -149,7 +163,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
                 var card = new TodayGoalViewModel(item, snapshot.Timer, time,
                     todayCheckins.Where(c => c.GoalId == item.Goal.Id).ToList())
                 {
-                    CanStartTimer = snapshot.Timer is null,
+                    CanStartTimer = snapshot.Timer is null && session is null,
                 };
                 card.IsChunksOpen = card.HasChunks && openChunks.Contains(card.Goal.Id);
                 if (chunkDraft is not null && card.Chunks.FirstOrDefault(c => c.CheckinId == chunkDraft.CheckinId) is { } same)
@@ -174,6 +188,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             _offscreenTimer = shownInCard ? null : snapshot.Timer;
             _offscreenTitle = snapshot.TimerGoal?.Title ?? "meta removida";
             HasOffscreenTimer = _offscreenTimer is not null;
+            FocusBandText = session is null ? null : "Sessão de Pomodoro em andamento.";
             IsOffscreenTimerRunning = _offscreenTimer is { StoppedAt: null };
             UpdateOffscreenText();
             (WeekPercent, InProgress, Completed) = (snapshot.Week.Percent, snapshot.Week.InProgress, snapshot.Week.Completed);

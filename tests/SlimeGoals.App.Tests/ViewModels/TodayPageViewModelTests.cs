@@ -389,6 +389,40 @@ public class TodayPageViewModelTests
     }
 
     [Fact]
+    public async Task Today_disables_play_and_shows_the_band_during_a_session()
+    {
+        var sessions = new InMemoryFocusSessionRepository(_checkins, _timers);
+        var focus = new FocusService(_goals, sessions, _timers, CheckinService, new AppSettings(_settings), _time, _changes);
+        var navigator = new PageNavigator();
+        var shown = new List<Type>();
+        navigator.Requested += shown.Add;
+        await Create("Estudar", Measure.Duration, 60);
+        var page = new TodayPageViewModel(new ProgressService(_goals, _checkins, _timers, _time), CheckinService,
+            new TimerService(_goals, _timers, CheckinService, _time, _changes, sessions), GoalService, _time,
+            new ReminderService(_goals, _checkins, _timers, _log, _notifications, new ReminderFormatter(), _time, Pause),
+            _changes, Pause, focus: focus, navigator: navigator);
+        await page.LoadCommand.ExecuteAsync(null);
+        (Card(page, "Estudar").CanStartTimer, page.FocusBandText).Should().Be((true, null));
+
+        await focus.StartAsync(FocusPlan.Default, null);
+        await page.LoadCommand.ExecutionTask!;
+
+        (Card(page, "Estudar").CanStartTimer, page.FocusBandText, page.HasFocusBand)
+            .Should().Be((false, "Sessão de Pomodoro em andamento.", true));
+        page.OpenTimePageCommand.Execute(null);
+        shown.Should().Equal(typeof(TimePageViewModel));
+
+        _time.Advance(TimeSpan.FromMinutes(1));
+        await focus.EndAsync(); // sem meta, terminada à espera de destino: ainda é uma sessão
+        await page.LoadCommand.ExecutionTask!;
+        (Card(page, "Estudar").CanStartTimer, page.FocusBandText).Should().Be((false, "Sessão de Pomodoro em andamento."));
+
+        await focus.DiscardAsync();
+        await page.LoadCommand.ExecutionTask!;
+        (Card(page, "Estudar").CanStartTimer, page.FocusBandText, page.HasFocusBand).Should().Be((true, null, false));
+    }
+
+    [Fact]
     public async Task Archived_goal_with_timer_disappears_without_error()
     {
         var study = await Create("Estudar", Measure.Duration, 60);

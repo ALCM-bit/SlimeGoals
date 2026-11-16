@@ -7,6 +7,9 @@ public abstract class PageViewModel : ObservableObject
 {
     public abstract string Title { get; }
 
+    /// <summary>Nome na barra de baixo do celular, onde o título inteiro não cabe.</summary>
+    public virtual string ShortTitle => Title;
+
     /// <summary>Chave do ícone da navegação inferior (recurso <c>Icon{IconKey}</c> do tema); vazio = sem ícone.</summary>
     public virtual string IconKey => "";
 

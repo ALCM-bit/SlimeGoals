@@ -14,8 +14,9 @@ public sealed partial class ShellViewModel : ObservableObject
 
     private readonly PlatformCapabilities _capabilities;
 
+    /// <param name="navigator">Pedidos de troca de página feitos por dentro das páginas.</param>
     public ShellViewModel(IEnumerable<PageViewModel> pages, IAppLifetime? lifetime = null,
-        PlatformCapabilities? capabilities = null)
+        PlatformCapabilities? capabilities = null, PageNavigator? navigator = null)
     {
         _lifetime = lifetime;
         _capabilities = capabilities ?? PlatformCapabilities.Desktop;
@@ -24,6 +25,14 @@ public sealed partial class ShellViewModel : ObservableObject
             throw new ArgumentException("O shell precisa de ao menos uma página.", nameof(pages));
         _currentPage = Pages[0];
         _currentPage.Activate();
+        navigator?.Requested += Show;
+    }
+
+    /// <summary>Vai para a primeira página do tipo pedido; um tipo que o shell não tem não muda nada.</summary>
+    private void Show(Type type)
+    {
+        if (Pages.FirstOrDefault(type.IsInstanceOfType) is { } page)
+            CurrentPage = page;
     }
 
     public IReadOnlyList<PageViewModel> Pages { get; }

@@ -46,6 +46,8 @@ public sealed partial class SettingsPageViewModel : PageViewModel
 
     public override string Title => "Configurações";
 
+    public override string ShortTitle => "Config.";
+
     /// <summary>Versão do app: a informada, ou a do assembly sem o sufixo depois de "+".</summary>
     /// <param name="account">Seção "Conta e sincronização"; só aparece com <see cref="PlatformCapabilities.Sync"/>.</param>
     public SettingsPageViewModel(AppSettings settings, IAutostart? autostart = null,
