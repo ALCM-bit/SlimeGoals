@@ -6,7 +6,7 @@ namespace SlimeGoals.Infrastructure.Tests.Data;
 
 public class MigrationRunnerTests
 {
-    private const int Latest = 7;
+    private const int Latest = 8;
 
     private const string GoalColumns =
         "id, title, recurrence, target, icon, color, reminder_every_min, active_from, active_until, active_days, created_at, updated_at";
@@ -22,7 +22,7 @@ public class MigrationRunnerTests
         MigrationRunner.Migrate(db.Anchor).Should().Be(Latest);
 
         db.Anchor.Query<string>("SELECT name FROM sqlite_master WHERE type = 'table'")
-            .Should().Contain(["goals", "checkins", "reminder_log", "settings"]);
+            .Should().Contain(["goals", "checkins", "reminder_log", "settings", "focus_session", "focus_chunk"]);
         db.Anchor.ExecuteScalar<long>("PRAGMA user_version").Should().Be(Latest);
     }
 
@@ -220,7 +220,7 @@ public class MigrationRunnerConcurrencyTests
                     return MigrationRunner.Migrate(c);
                 }));
 
-                (await Task.WhenAll(runs)).Should().AllBeEquivalentTo(7);
+                (await Task.WhenAll(runs)).Should().AllBeEquivalentTo(8);
             }
             finally
             {

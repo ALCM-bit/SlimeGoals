@@ -16,7 +16,8 @@ public interface IFocusSessionRepository
     /// <summary>
     /// Numa transação só: grava o registro <paramref name="checkin"/> (com a fila da sincronização), o trecho
     /// <paramref name="chunk"/> e a sessão <paramref name="next"/> com a revisão <c>expectedRevision + 1</c> (a
-    /// <see cref="FocusSession.Revision"/> de <paramref name="next"/> não é usada). <paramref name="next"/> nulo apaga a
+    /// <see cref="FocusSession.Revision"/> de <paramref name="next"/> não é usada; no mesmo passo, a
+    /// <see cref="FocusSession.AlertedStep"/> gravada fica, para o aviso não tocar de novo). <paramref name="next"/> nulo apaga a
     /// sessão e os trechos. Falso, sem gravar nada, se a revisão gravada não é <paramref name="expectedRevision"/>.
     /// </summary>
     Task<bool> UpdateAsync(int expectedRevision, FocusSession? next, FocusChunk? chunk, Checkin? checkin,

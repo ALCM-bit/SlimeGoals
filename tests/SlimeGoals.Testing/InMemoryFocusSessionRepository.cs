@@ -68,7 +68,12 @@ public sealed class InMemoryFocusSessionRepository(InMemoryCheckinRepository che
             }
             else
             {
-                _session = next with { Revision = expectedRevision + 1 };
+                // No mesmo passo, a marca do aviso gravada fica: quem leu antes do aviso não o faz tocar de novo.
+                _session = next with
+                {
+                    Revision = expectedRevision + 1,
+                    AlertedStep = _session.Step == next.Step ? _session.AlertedStep : next.AlertedStep,
+                };
                 if (chunk is not null) _chunks.Add(chunk);
             }
             return Task.FromResult(true);

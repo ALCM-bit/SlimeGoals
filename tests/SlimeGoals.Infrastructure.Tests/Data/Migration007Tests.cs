@@ -23,7 +23,7 @@ public class Migration007Tests
             """, new { Id = goal.ToString("D"), Now });
         c.Execute("INSERT INTO active_timer (id, goal_id, started_at) VALUES (1, @Id, @Now)", new { Id = goal.ToString("D"), Now });
 
-        MigrationRunner.Migrate(c).Should().Be(7);
+        MigrationRunner.Migrate(c).Should().Be(8);
 
         (await new TimerRepository(db.Factory).GetAsync())
             .Should().Be(new ActiveTimer(goal, DateTimeOffset.Parse(Now)));
