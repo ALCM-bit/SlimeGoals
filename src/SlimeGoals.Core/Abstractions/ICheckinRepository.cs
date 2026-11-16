@@ -19,8 +19,11 @@ public interface ICheckinRepository
     /// <summary>Ids de todas as compensações da meta no período que o aparelho tem, inclusive as que deixaram de contar.</summary>
     Task<IReadOnlyList<Guid>> CompensationIdsAsync(Guid goalId, DateOnly period, CancellationToken ct = default);
 
-    /// <summary>Notas distintas dos registros não excluídos da meta, da mais recente para a mais antiga, até <paramref name="limit"/>.</summary>
-    Task<IReadOnlyList<string>> RecentNotesAsync(Guid goalId, int limit, CancellationToken ct = default);
+    /// <summary>
+    /// Notas distintas dos registros não excluídos da meta (ou de todas, com <paramref name="goalId"/> nulo), da mais
+    /// recente para a mais antiga, até <paramref name="limit"/>.
+    /// </summary>
+    Task<IReadOnlyList<string>> RecentNotesAsync(Guid? goalId, int limit, CancellationToken ct = default);
 
     /// <summary>O registro não excluído com esse id, ou null.</summary>
     Task<Checkin?> GetAsync(Guid id, CancellationToken ct = default);

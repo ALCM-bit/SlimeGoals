@@ -171,6 +171,18 @@ public class CheckinRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task Recent_notes_without_a_goal_come_from_every_goal()
+    {
+        await Repo.AddAsync(At(_goal, T0, 1, "a"));
+        await Repo.AddAsync(At(_other, T0.AddMinutes(1), 1, "b"));
+        await Repo.AddAsync(At(_goal, T0.AddMinutes(2), 1, "b"));
+        await Repo.AddAsync(At(_other, T0.AddMinutes(3), 1, "excluída") with { DeletedAt = T0.AddMinutes(4) });
+        await Repo.AddAsync(At(_other, T0.AddMinutes(5), 1, "c"));
+
+        (await Repo.RecentNotesAsync(null, 5)).Should().Equal("c", "b", "a");
+    }
+
+    [Fact]
     public async Task Get_returns_the_checkin_or_null()
     {
         var checkin = At(_goal, T0, 25, "Inglês");

@@ -33,6 +33,13 @@ public sealed class FocusService(IGoalRepository goals, IFocusSessionRepository 
         return await goals.GetAsync(timer.GoalId, ct) is { ArchivedAt: null } owner ? TimerConflict(owner.Title) : null;
     }
 
+    /// <summary>
+    /// Sugestões para a subatividade: as notas recentes da meta da sessão, ou de todas as metas na sessão sem meta
+    /// (spec Pomodoro §4.2). Sem sessão, nenhuma.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> TaskSuggestionsAsync(CancellationToken ct = default) =>
+        await sessions.GetAsync(ct) is { } session ? await checkins.RecentNotesAsync(session.GoalId, ct) : [];
+
     private static string TimerConflict(string title) =>
         $"Já há um cronômetro em \"{title}\". Registre ou descarte no Hoje antes de começar o Pomodoro.";
 

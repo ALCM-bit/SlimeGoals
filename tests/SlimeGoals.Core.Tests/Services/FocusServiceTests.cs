@@ -101,6 +101,24 @@ public class FocusServiceTests
     }
 
     [Fact]
+    public async Task Task_suggestions_come_from_the_session_goal_or_from_every_goal()
+    {
+        var study = await Study();
+        var english = await Study("Inglês");
+        await Checkins.AdjustAsync(study.Id, 10, "Capítulo 3");
+        _time.Advance(TimeSpan.FromMinutes(1));
+        await Checkins.AdjustAsync(english.Id, 10, "Listening");
+        (await Service.TaskSuggestionsAsync()).Should().BeEmpty();
+
+        await Service.StartAsync(FocusPlan.Default, study.Id);
+        (await Service.TaskSuggestionsAsync()).Should().Equal("Capítulo 3");
+
+        await _sessions.ClearAsync();
+        await Service.StartAsync(FocusPlan.Default, null);
+        (await Service.TaskSuggestionsAsync()).Should().Equal("Listening", "Capítulo 3");
+    }
+
+    [Fact]
     public async Task Orphan_timer_gives_way_to_the_session()
     {
         await _timers.TryStartAsync(new ActiveTimer(Guid.NewGuid(), T0.AddHours(-1)));
