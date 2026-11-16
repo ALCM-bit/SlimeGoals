@@ -21,4 +21,7 @@ public sealed class TimePageViewModel(PomodoroViewModel pomodoro, FocusAlerts? a
         pomodoro.LoadCommand.Execute(null);
         alerts?.Silence();
     }
+
+    /// <summary>Voltar do sistema: fecha o editor de meta, a conferência ou a confirmação abertos no Pomodoro.</summary>
+    public override bool TryGoBack() => pomodoro.TryGoBack();
 }

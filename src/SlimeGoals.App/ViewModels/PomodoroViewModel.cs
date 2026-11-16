@@ -18,9 +18,10 @@ namespace SlimeGoals.App.ViewModels;
 public sealed record FocusGoalOption(Guid? Id, string Title);
 
 /// <summary>
-/// Subaba Pomodoro da aba Tempo (spec Pomodoro §4.1): o preparo da sessão (sequência de blocos, "Repetir", meta
-/// opcional e "Começar") e o estado da sessão guardada. A sugestão (a última sequência começada, ou 25/5 4×) entra
-/// na primeira carga e de novo depois de cada sessão; recargas no meio do preparo não mexem no que a pessoa montou.
+/// Subaba Pomodoro da aba Tempo (spec Pomodoro §4): o preparo da sessão (sequência de blocos, "Repetir", meta opcional e
+/// "Começar"), a sessão rodando (<c>PomodoroViewModel.Running.cs</c>) e a tela de fim (<c>PomodoroViewModel.End.cs</c>).
+/// A sugestão (a última sequência começada, ou 25/5 4×) entra na primeira carga e de novo depois de cada sessão;
+/// recargas no meio do preparo não mexem no que a pessoa montou.
 /// </summary>
 public sealed partial class PomodoroViewModel : ObservableObject
 {
@@ -41,6 +42,7 @@ public sealed partial class PomodoroViewModel : ObservableObject
     private int _loadVersion;
     private SynchronizationContext? _ui;
     private FocusSession? _session;
+    private string? _sessionGoalTitle;
 
     public PomodoroViewModel(FocusService focus, GoalService goals, TimeProvider time, DataChangeNotifier changes,
         PageNavigator? navigator = null)
@@ -97,9 +99,12 @@ public sealed partial class PomodoroViewModel : ObservableObject
 
     [ObservableProperty] public partial string? Error { get; set; }
 
-    public bool IsPreparing => _session is null;
+    /// <summary>Sem sessão e sem resumo na tela.</summary>
+    public bool IsPreparing => _session is null && _summary is null;
     public bool IsRunning => _session is { FinishedAt: null };
-    public bool IsFinished => _session is { FinishedAt: not null };
+
+    /// <summary>A tela de fim: uma sessão terminada à espera de destino, ou o resumo guardado até "Nova sessão".</summary>
+    public bool IsFinished => !IsRunning && _summary is not null;
 
     public bool CanStart => IsPreparing && StartBlockedReason is null;
 
@@ -120,11 +125,17 @@ public sealed partial class PomodoroViewModel : ObservableObject
             var session = await _focus.GetAsync();
             var conflict = session is null ? await _focus.TimerConflictAsync() : null;
             var today = DateOnly.FromDateTime(_time.GetLocalNow().DateTime);
-            var goals = (await _goals.ListAsync())
+            var all = await _goals.ListAsync();
+            var goals = all
                 .Where(g => g.Measure == Measure.Duration && GoalPeriod.IsShownOn(g, today))
                 .Select(g => new FocusGoalOption(g.Id, g.Title))
                 .ToList();
             var suggestion = session is null && !_seeded ? await _focus.SuggestedPlanAsync() : null;
+            // A sessão terminada sem meta mostra o que está guardado, inclusive com o app reaberto.
+            var held = session is { FinishedAt: not null }
+                ? (await _focus.ChunksAsync()).Where(c => c.CheckinId is null).ToList()
+                : null;
+            var suggestions = session is { FinishedAt: null } ? await TaskSuggestionsAsync() : [];
             if (version != _loadVersion)
                 return;
 
@@ -132,6 +143,7 @@ public sealed partial class PomodoroViewModel : ObservableObject
                 Error = null;
             GoalOptions = [NoGoal, .. goals];
             SelectedGoal = goals.FirstOrDefault(o => o.Id == SelectedGoal.Id) ?? NoGoal;
+            SetAssignOptions(goals);
             if (suggestion is not null)
                 Seed(suggestion);
             // Depois de uma sessão, o preparo volta com a sugestão nova (a sequência dela) e sem meta.
@@ -140,7 +152,12 @@ public sealed partial class PomodoroViewModel : ObservableObject
                 _seeded = false;
                 Error = null;
             }
+            _sessionGoalTitle = session?.GoalId is { } goalId ? all.FirstOrDefault(g => g.Id == goalId)?.Title : null;
+            HoldSummary(session, held);
+            var draft = TaskDraft();
             SetSession(session);
+            RestoreTaskDraft(draft);
+            TaskSuggestions = suggestions;
             StartBlockedReason = conflict;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -244,10 +261,28 @@ public sealed partial class PomodoroViewModel : ObservableObject
     private void SetSession(FocusSession? session)
     {
         _session = session;
+        StopTicker();
+        if (session is { FinishedAt: null, PausedAt: null })
+            _ticker = _time.CreateTimer(_ => OnUi(Tick), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        if (!IsRunning)
+            (IsReviewing, IsConfirmingEnd, IsEditingTask, IsSwitchingTask) = (false, false, false, false);
+        if (!IsAwaitingDestination)
+            IsConfirmingDiscard = false;
+        Dots = BuildDots();
+        RaiseStates();
+    }
+
+    /// <summary>Avisa a tela de tudo que muda com a sessão ou o resumo.</summary>
+    private void RaiseStates()
+    {
         OnPropertyChanged(nameof(IsPreparing));
         OnPropertyChanged(nameof(IsRunning));
         OnPropertyChanged(nameof(IsFinished));
         OnPropertyChanged(nameof(CanStart));
+        OnPropertyChanged(nameof(RoundText));
+        OnPropertyChanged(nameof(GoalText));
+        RaiseSummary();
+        RaiseClock();
         StartCommand.NotifyCanExecuteChanged();
     }
 

@@ -243,6 +243,356 @@ public class PomodoroViewModelTests
         alert.Silenced.Should().Be(1);
     }
 
+    // ---- Sessão rodando, conferência e tela de fim (spec Pomodoro §4.2–§4.4) ----
+
+    private static FocusBlock F(int minutes) => new(FocusBlockKind.Focus, minutes);
+    private static FocusBlock B(int minutes) => new(FocusBlockKind.Break, minutes);
+
+    private async Task<PomodoroViewModel> Running(FocusPlan plan, Guid? goalId = null)
+    {
+        await Focus.StartAsync(plan, goalId);
+        return await Loaded();
+    }
+
+    private async Task Reloaded(PomodoroViewModel vm)
+    {
+        _changes.NotifyChanged();
+        await vm.LoadCommand.ExecutionTask!;
+    }
+
+    [Fact]
+    public async Task Running_focus_counts_down_in_minutes_and_seconds()
+    {
+        await Focus.StartAsync(new FocusPlan([F(40), B(10)], 1), null);
+        _time.Advance(TimeSpan.FromMinutes(12) + TimeSpan.FromSeconds(48));
+        var vm = await Loaded();
+
+        (vm.IsRunning, vm.IsPreparing, vm.IsFinished).Should().Be((true, false, false));
+        (vm.MinutesText, vm.SecondsText).Should().Be(("27", "12"));
+        (vm.PhaseText, vm.IsPaused, vm.IsWaiting, vm.OvertimeText, vm.GoalText).Should()
+            .Be(("Foco · 1 de 1", false, false, (string?)null, (string?)null));
+
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        _time.Advance(TimeSpan.FromSeconds(1)); // o relógio de 1 s
+
+        (vm.MinutesText, vm.SecondsText).Should().Be(("27", "11"));
+        changed.Should().Contain(nameof(PomodoroViewModel.SecondsText));
+    }
+
+    [Fact]
+    public async Task Long_block_shows_total_minutes_on_top()
+    {
+        var vm = await Running(new FocusPlan([F(75), B(5)], 1));
+
+        (vm.MinutesText, vm.SecondsText).Should().Be(("75", "00"));
+    }
+
+    [Fact]
+    public async Task Dots_show_the_current_round_and_round_text_appears_with_repeat()
+    {
+        var study = await Create("Estudar");
+        await Focus.StartAsync(new FocusPlan([F(25), B(5), F(25), B(15)], 2), study.Id);
+        foreach (var minutes in new[] { 25, 5, 25, 15, 25 })
+        {
+            _time.Advance(TimeSpan.FromMinutes(minutes));
+            await Focus.AdvanceAsync();
+        }
+        var vm = await Loaded(); // passo 5: a primeira pausa da segunda rodada
+
+        vm.Dots.Select(d => (d.IsFocus, d.IsDone, d.IsCurrent)).Should().Equal(
+            (true, true, false), (false, false, true), (true, false, false), (false, false, false));
+        (vm.PhaseText, vm.RoundText, vm.GoalText).Should().Be(("Pausa", "Rodada 2 de 2", "Estudar"));
+
+        _time.Advance(TimeSpan.FromMinutes(5));
+        await vm.AdvanceCommand.ExecuteAsync(null);
+        vm.PhaseText.Should().Be("Foco · 2 de 2");
+        vm.Dots.Select(d => (d.IsDone, d.IsCurrent)).Should().Equal((true, false), (true, false), (false, true), (false, false));
+
+        await Focus.EndAsync();
+        var single = await Running(new FocusPlan([F(25), B(5)], 1));
+        single.RoundText.Should().BeNull();
+        single.Dots.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Waiting_shows_overtime_and_the_next_action()
+    {
+        var vm = await Running(new FocusPlan([F(25), B(5)], 1));
+        (vm.NextActionText, vm.BeginSwitchTaskCommand.CanExecute(null)).Should().Be(("Começar pausa", true));
+
+        _time.Advance(TimeSpan.FromMinutes(27)); // o relógio vê o fim do bloco e conta o extra
+
+        (vm.IsWaiting, vm.PhaseText, vm.OvertimeText, vm.NextActionText).Should()
+            .Be((true, "Foco concluído", "+2 min", "Começar pausa"));
+        (vm.MinutesText, vm.SecondsText).Should().Be(("00", "00"));
+        // O ⇄ não tem conferência: esperando o toque, ele some; o ⏸ também.
+        (vm.CanSwitchTask, vm.BeginSwitchTaskCommand.CanExecute(null), vm.PauseResumeCommand.CanExecute(null)).Should()
+            .Be((false, false, false));
+
+        await vm.AdvanceCommand.ExecuteAsync(null);
+
+        (await _sessions.ChunksAsync()).Single().Minutes.Should().Be(27); // o extra de um foco conta como foco
+        (vm.IsWaiting, vm.PhaseText, vm.MinutesText, vm.OvertimeText).Should().Be((false, "Pausa", "05", (string?)null));
+        vm.ShowsTaskField.Should().BeFalse(); // a subatividade só aparece no foco
+
+        _time.Advance(TimeSpan.FromMinutes(6));
+        (vm.PhaseText, vm.OvertimeText, vm.NextActionText).Should().Be(("Pausa concluída", "+1 min", "Encerrar"));
+
+        await vm.AdvanceCommand.ExecuteAsync(null);
+        (vm.IsFinished, vm.IsAwaitingDestination, vm.SummaryText).Should().Be((true, true, "27 min"));
+    }
+
+    [Fact]
+    public async Task Forgotten_focus_opens_the_review_prefilled_in_hours_and_minutes()
+    {
+        var study = await Create("Estudar");
+        var vm = await Running(new FocusPlan([F(25), B(5)], 1), study.Id);
+        _time.Advance(TimeSpan.FromMinutes(95) + TimeSpan.FromSeconds(40)); // 1 h 10 de extra
+
+        await vm.AdvanceCommand.ExecuteAsync(null);
+
+        (vm.IsReviewing, vm.ReviewHoursInput, vm.ReviewMinutesInput).Should().Be((true, 1m, 36m));
+        _checkins.All.Should().BeEmpty();
+        (await _sessions.GetAsync())!.Step.Should().Be(0);
+
+        vm.CancelReviewCommand.Execute(null);
+        vm.IsReviewing.Should().BeFalse();
+        vm.AskEndCommand.Execute(null);
+        await vm.ConfirmEndCommand.ExecuteAsync(null); // o Encerrar passa pela mesma conferência
+        (vm.IsReviewing, vm.IsConfirmingEnd).Should().Be((true, false));
+        vm.CancelReviewCommand.Execute(null);
+        await vm.SkipCommand.ExecuteAsync(null); // e o ⏭ também
+        vm.IsReviewing.Should().BeTrue();
+
+        vm.ReviewHoursInput = 25;
+        await vm.ConfirmReviewCommand.ExecuteAsync(null);
+        (vm.IsReviewing, vm.Error).Should().Be((true, "Valor fora do limite."));
+        _checkins.All.Should().BeEmpty();
+
+        (vm.ReviewHoursInput, vm.ReviewMinutesInput) = (0, 30);
+        await vm.ConfirmReviewCommand.ExecuteAsync(null);
+
+        (vm.IsReviewing, vm.Error, vm.PhaseText).Should().Be((false, null, "Pausa"));
+        _checkins.All.Single().Should().Match<Checkin>(c => c.GoalId == study.Id && c.Amount == 30);
+        (vm.MinutesText, vm.SecondsText).Should().Be(("05", "00")); // a pausa começa na confirmação
+    }
+
+    [Fact]
+    public async Task Pause_freezes_the_countdown()
+    {
+        var vm = await Running(new FocusPlan([F(25), B(5)], 1));
+        _time.Advance(TimeSpan.FromMinutes(10));
+
+        await vm.PauseResumeCommand.ExecuteAsync(null);
+        (vm.IsPaused, vm.PhaseText, vm.MinutesText, vm.SecondsText).Should().Be((true, "Pausado", "15", "00"));
+
+        var ticks = 0;
+        vm.PropertyChanged += (_, e) => ticks += e.PropertyName == nameof(PomodoroViewModel.SecondsText) ? 1 : 0;
+        _time.Advance(TimeSpan.FromMinutes(20));
+        (vm.IsPaused, vm.IsWaiting, vm.MinutesText).Should().Be((true, false, "15"));
+        ticks.Should().Be(0); // pausado, o relógio de 1 s não anda
+
+        await vm.PauseResumeCommand.ExecuteAsync(null);
+        _time.Advance(TimeSpan.FromMinutes(1));
+        (vm.IsPaused, vm.PhaseText, vm.MinutesText, vm.SecondsText).Should().Be((false, "Foco · 1 de 1", "14", "00"));
+    }
+
+    [Fact]
+    public async Task Switch_task_records_the_chunk_like_the_timer_card()
+    {
+        var study = await Create("Estudar");
+        await Checkins.AdjustAsync(study.Id, 10, "Capítulo 2");
+        var vm = await Running(new FocusPlan([F(50), B(10)], 1), study.Id);
+        (vm.TaskSuggestions, vm.ShowsTaskField, vm.ShowsTaskLabel).Should().BeEquivalentTo((new[] { "Capítulo 2" }, true, false));
+
+        vm.TaskInput = "  Capítulo 3 ";
+        await vm.SaveTaskCommand.ExecuteAsync(null);
+        (await _sessions.GetAsync())!.Task.Should().Be("Capítulo 3");
+        (vm.ShowsTaskLabel, vm.TaskLabel, vm.IsEditingTask).Should().Be((true, "▸ Capítulo 3", false));
+
+        vm.BeginEditTaskCommand.Execute(null);
+        (vm.IsEditingTask, vm.TaskInput, vm.ShowsTaskField).Should().Be((true, "Capítulo 3", true));
+        vm.CancelEditTaskCommand.Execute(null);
+        vm.ShowsTaskLabel.Should().BeTrue();
+
+        _time.Advance(TimeSpan.FromMinutes(12) + TimeSpan.FromSeconds(30));
+        await vm.BeginSwitchTaskCommand.ExecuteAsync(null);
+        (vm.IsSwitchingTask, vm.ShowsTaskField, vm.ShowsConfirmTask).Should().Be((true, true, false));
+        vm.TaskInput.Should().BeNull();
+        vm.CancelSwitchTaskCommand.Execute(null);
+        (vm.IsSwitchingTask, vm.TaskInput).Should().Be((false, "Capítulo 3"));
+
+        await vm.BeginSwitchTaskCommand.ExecuteAsync(null);
+        vm.TaskInput = "Revisão";
+        await vm.SwitchTaskCommand.ExecuteAsync(null);
+
+        _checkins.All.Where(c => c.Note == "Capítulo 3").Should().ContainSingle()
+            .Which.Should().Match<Checkin>(c => c.GoalId == study.Id && c.Amount == 12);
+        (vm.IsSwitchingTask, vm.TaskLabel, vm.Error).Should().Be((false, "▸ Revisão", null));
+        (await _sessions.GetAsync())!.Carry.Should().Be(TimeSpan.FromSeconds(30));
+    }
+
+    [Fact]
+    public async Task Typing_survives_a_background_reload()
+    {
+        var vm = await Loaded();
+        vm.EditBlockCommand.Execute(vm.Blocks[0]);
+        vm.Blocks[0].MinutesInput = 40;
+        await Reloaded(vm);
+        (vm.Blocks[0].IsEditing, vm.Blocks[0].Minutes()).Should().Be((true, 40));
+
+        await vm.StartCommand.ExecuteAsync(null);
+        vm.TaskInput = "Capít";
+        await Reloaded(vm);
+        vm.TaskInput.Should().Be("Capít");
+
+        await Focus.SetTaskAsync("Outro"); // outro processo dá um nome: o rascunho fica, em edição
+        await vm.LoadCommand.ExecutionTask!;
+        (vm.TaskInput, vm.IsEditingTask, vm.TaskLabel).Should().Be(("Capít", true, "▸ Outro"));
+
+        _time.Advance(TimeSpan.FromMinutes(75));
+        vm.AskEndCommand.Execute(null);
+        await vm.ConfirmEndCommand.ExecuteAsync(null);
+        (vm.IsReviewing, vm.ReviewHoursInput, vm.ReviewMinutesInput).Should().Be((true, 1m, 15m));
+        vm.ReviewMinutesInput = 10;
+        await Reloaded(vm);
+        (vm.IsReviewing, vm.ReviewHoursInput, vm.ReviewMinutesInput).Should().Be((true, 1m, 10m));
+    }
+
+    [Fact]
+    public async Task Unassigned_end_offers_assign_create_and_discard()
+    {
+        var study = await Create("Estudar");
+        await Create("Inglês");
+        await Focus.StartAsync(new FocusPlan([F(25), B(5)], 1), null);
+        await Focus.SetTaskAsync("Capítulo 3");
+        _time.Advance(TimeSpan.FromMinutes(20));
+        await Focus.SwitchTaskAsync("Revisão");
+        _time.Advance(TimeSpan.FromMinutes(18));
+        var vm = await Loaded();
+
+        vm.AskEndCommand.Execute(null);
+        vm.IsConfirmingEnd.Should().BeTrue();
+        await vm.ConfirmEndCommand.ExecuteAsync(null);
+
+        (vm.IsFinished, vm.IsRunning, vm.IsPreparing, vm.IsAwaitingDestination).Should().Be((true, false, false, true));
+        (vm.SummaryText, vm.GoalText).Should().Be(("38 min", null));
+        vm.SummaryLines.Should().Equal("Capítulo 3 · 20 min", "Revisão · 18 min");
+        vm.AssignOptions.Select(o => o.Title).Should().Equal("Estudar", "Inglês");
+        vm.AssignCommand.CanExecute(null).Should().BeFalse();
+
+        var reopened = await Loaded(); // o app reaberto mostra o mesmo fim, dos trechos guardados
+        (reopened.IsAwaitingDestination, reopened.SummaryText).Should().Be((true, "38 min"));
+        reopened.SummaryLines.Should().Equal("Capítulo 3 · 20 min", "Revisão · 18 min");
+
+        vm.AskDiscardCommand.Execute(null);
+        vm.IsConfirmingDiscard.Should().BeTrue();
+        vm.CancelDiscardCommand.Execute(null);
+        vm.IsConfirmingDiscard.Should().BeFalse();
+
+        vm.AssignGoal = vm.AssignOptions.Single(o => o.Id == study.Id);
+        await vm.AssignCommand.ExecuteAsync(null);
+
+        _checkins.All.Select(c => (c.GoalId, c.Amount, c.Note)).Should()
+            .BeEquivalentTo([(study.Id, 20, "Capítulo 3"), (study.Id, 18, "Revisão")]);
+        (await _sessions.GetAsync()).Should().BeNull();
+        (vm.IsFinished, vm.IsAwaitingDestination, vm.GoalText, vm.SummaryText).Should().Be((true, false, "Estudar", "38 min"));
+        vm.NewSessionCommand.Execute(null);
+        vm.IsPreparing.Should().BeTrue();
+
+        // Descartar: pede confirmação e apaga os trechos.
+        await Focus.StartAsync(new FocusPlan([F(25)], 1), null);
+        _time.Advance(TimeSpan.FromMinutes(25));
+        await Focus.AdvanceAsync();
+        await vm.LoadCommand.ExecutionTask!;
+        vm.IsAwaitingDestination.Should().BeTrue();
+        vm.AskDiscardCommand.Execute(null);
+        await vm.ConfirmDiscardCommand.ExecuteAsync(null);
+
+        (await _sessions.GetAsync()).Should().BeNull();
+        _checkins.All.Should().HaveCount(2);
+        (vm.IsPreparing, vm.IsFinished, vm.IsConfirmingDiscard).Should().Be((true, false, false));
+    }
+
+    [Fact]
+    public async Task Create_goal_assigns_the_time_on_save_and_returns_on_cancel()
+    {
+        await Focus.StartAsync(new FocusPlan([F(25)], 1), null);
+        _time.Advance(TimeSpan.FromMinutes(25));
+        await Focus.AdvanceAsync();
+        var vm = await Loaded();
+
+        vm.CreateGoalCommand.Execute(null);
+        vm.Editor.Should().NotBeNull();
+        (vm.Editor!.IsNew, vm.Editor.IsDuration, vm.Editor.IsMeasureLocked).Should().Be((true, true, true));
+        vm.Editor.CancelCommand.Execute(null);
+        vm.Editor.Should().BeNull();
+        (vm.IsAwaitingDestination, vm.SummaryText).Should().Be((true, "25 min"));
+
+        vm.CreateGoalCommand.Execute(null);
+        var editor = vm.Editor!;
+        editor.Title = "Ler";
+        editor.DurationHoursInput = 1;
+        await editor.SaveCommand.ExecuteAsync(null);
+        await vm.AssignCommand.ExecutionTask!;
+
+        var created = (await _goals.ListAsync(includeArchived: false)).Single();
+        (created.Title, created.Measure).Should().Be(("Ler", Measure.Duration));
+        _checkins.All.Single().Should().Match<Checkin>(c => c.GoalId == created.Id && c.Amount == 25);
+        vm.Editor.Should().BeNull();
+        (vm.IsAwaitingDestination, vm.GoalText, vm.Error).Should().Be((false, "Ler", null));
+    }
+
+    [Fact]
+    public async Task Back_closes_what_is_open_over_the_session()
+    {
+        var vm = await Running(new FocusPlan([F(25), B(5)], 1));
+        var page = new TimePageViewModel(vm);
+        page.TryGoBack().Should().BeFalse();
+
+        vm.AskEndCommand.Execute(null);
+        page.TryGoBack().Should().BeTrue();
+        vm.IsConfirmingEnd.Should().BeFalse();
+
+        _time.Advance(TimeSpan.FromMinutes(25));
+        await vm.AdvanceCommand.ExecuteAsync(null);
+        _time.Advance(TimeSpan.FromMinutes(5));
+        await vm.AdvanceCommand.ExecuteAsync(null);
+        vm.CreateGoalCommand.Execute(null);
+        page.TryGoBack().Should().BeTrue();
+        (vm.Editor, vm.IsAwaitingDestination).Should().Be((null, true));
+    }
+
+    [Fact]
+    public async Task Linked_end_keeps_the_summary_until_new_session()
+    {
+        var study = await Create("Estudar");
+        var vm = await Running(new FocusPlan([F(25), B(5)], 1), study.Id);
+        vm.TaskInput = "Capítulo 3"; // digitado e não confirmado: o fim do foco usa o texto, como o ■ do cronômetro
+        _time.Advance(TimeSpan.FromMinutes(25));
+        await vm.AdvanceCommand.ExecuteAsync(null);
+        _time.Advance(TimeSpan.FromMinutes(5));
+        vm.NextActionText.Should().Be("Encerrar");
+
+        await vm.AdvanceCommand.ExecuteAsync(null);
+
+        (await _sessions.GetAsync()).Should().BeNull();
+        (vm.IsFinished, vm.IsPreparing, vm.IsAwaitingDestination).Should().Be((true, false, false));
+        (vm.SummaryText, vm.GoalText).Should().Be(("25 min", "Estudar"));
+        vm.SummaryLines.Should().Equal("Capítulo 3 · 25 min");
+        _checkins.All.Single().Should().Match<Checkin>(c => c.GoalId == study.Id && c.Amount == 25 && c.Note == "Capítulo 3");
+
+        await Reloaded(vm);
+        (vm.IsFinished, vm.IsPreparing, vm.SummaryText).Should().Be((true, false, "25 min"));
+
+        vm.NewSessionCommand.Execute(null);
+        await vm.LoadCommand.ExecutionTask!;
+        (vm.IsPreparing, vm.IsFinished, vm.SummaryText).Should().Be((true, false, null));
+        Plan(vm).Should().Equal((FocusBlockKind.Focus, 25), (FocusBlockKind.Break, 5));
+        vm.RepeatInput.Should().Be(1);
+    }
+
     private sealed class NoAlarm : IFocusAlarm
     {
         public void Set(DateTimeOffset at) { }
