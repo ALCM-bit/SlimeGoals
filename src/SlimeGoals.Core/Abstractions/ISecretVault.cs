@@ -11,6 +11,10 @@ public interface ISecretVault
 
     /// <summary>Lê o segredo, ou <c>null</c> se não houver nenhum com esse nome.</summary>
     /// <exception cref="SecretVaultUnavailableException">Cofre ausente ou desbloqueio recusado.</exception>
+    /// <exception cref="InvalidDataException">
+    /// O segredo existe mas não pode ser aberto (chave do cofre perdida ou arquivo corrompido). Quem lê trata como
+    /// sessão ilegível: só sair funciona.
+    /// </exception>
     Task<byte[]?> GetAsync(string name, CancellationToken ct = default);
 
     /// <summary>Grava o segredo, substituindo o que houver com o mesmo nome.</summary>

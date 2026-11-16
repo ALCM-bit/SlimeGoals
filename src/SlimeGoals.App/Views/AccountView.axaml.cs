@@ -38,11 +38,15 @@ public partial class AccountView : UserControl
     /// </summary>
     private async void OnCopyRecoveryCode(object? sender, RoutedEventArgs e)
     {
-        if (_vm?.ShownRecoveryCode is not { } code || TopLevel.GetTopLevel(this)?.Clipboard is not { } clipboard)
+        if (_vm?.ShownRecoveryCode is not { } code)
+            return;
+        var target = _vm.PlatformClipboard
+            ?? (TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard ? new AvaloniaTextClipboard(clipboard) : null);
+        if (target is null)
             return;
         try
         {
-            await _copier.CopyAsync(new AvaloniaTextClipboard(clipboard), code);
+            await _copier.CopyAsync(target, code);
         }
         catch (Exception ex)
         {

@@ -89,10 +89,17 @@ public sealed partial class AccountViewModel : ObservableObject
     private string _savedServer = ServerAddress.Display(AppSettings.DefaultSyncServer);
     private int _refreshVersion;
 
+    /// <summary>
+    /// Área de transferência da plataforma para o "Copiar" do código de recuperação (no Android, a que marca o conteúdo
+    /// como sensível). Sem ela, a View usa a do Avalonia.
+    /// </summary>
+    public ITextClipboard? PlatformClipboard { get; }
+
     /// <param name="dispatch">Leva o recarregar do status à thread da interface; padrão, o <see cref="Dispatcher"/> do Avalonia.</param>
     public AccountViewModel(ISyncAccount account, AppSettings settings, AccountDefaults defaults,
-        Action<Action>? dispatch = null, TimeProvider? time = null)
+        Action<Action>? dispatch = null, TimeProvider? time = null, ITextClipboard? platformClipboard = null)
     {
+        PlatformClipboard = platformClipboard;
         _account = account;
         _settings = settings;
         _dispatch = dispatch ?? (a => Dispatcher.UIThread.Post(a));

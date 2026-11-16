@@ -308,8 +308,8 @@ Falha de rede ou da API no passo 1 não impede os outros dois. Cofre indisponív
 **Privacidade provada.** `EncryptedSyncEndToEndTests` varre todas as colunas de texto e binárias de `accounts`, `devices` e `records`, achadas pelo `information_schema`. Procura título, unidade, nota, senha e código de recuperação em UTF-8, UTF-16, base64 e na forma escapada do JSON (`á`), além de um pedaço só ASCII de cada valor, porque o JSON do registro escapa o acento. Com a cripto trocada por texto puro, o teste falha.
 
 **Obrigações para a 9.5.**
-- **Cofre do Android**, sobre o Keystore, com o mesmo segredo `sync-session`.
-- **Vetores no Android:** os da tabela acima, no emulador e no aparelho, com o Konscious no arm64.
+- **Cofre do Android**, sobre o Keystore, com o mesmo segredo `sync-session`. *Cumprida na 9.5b (ver "Decisões da fase 9.5b").*
+- **Vetores no Android:** os da tabela acima, no emulador e no aparelho, com o Konscious no arm64. *Emulador conferido na 9.5b; falta o celular.*
 - **Sair com envio da fila e aviso** (§7): tentar enviar antes de `SignOutAsync`, avisar do que se perde e deixar a pessoa escolher.
 - **`DisableAsync` com o ciclo cancelado:** cancelar e esperar o ciclo do motor antes de desligar, e descartar a `SyncSession` (o provedor de token passa a devolver nulo).
 - **Serializar as operações de conta:** o serviço não impede duas ao mesmo tempo. Dois `login` juntos deixam um aparelho órfão no servidor.
@@ -378,6 +378,48 @@ O custo é investigar sem a mensagem: o tipo e a pilha dizem onde falhou, mas à
 - **Nome do aparelho:** de 1 a 100 caracteres, sem caracteres de controle.
 - **Tela:** os campos de texto limitam o tamanho com as mesmas constantes do código. Os campos de senha não limitam, porque cortar em silêncio o que foi colado num campo mascarado trocaria a senha sem a pessoa ver; o tamanho (10 a 1024) é conferido no envio. Os botões de enviar só ligam com os campos obrigatórios preenchidos.
 - **Banco do servidor:** a migração `002_limits` repete os tamanhos em restrições `CHECK` (e-mail, parâmetros de derivação, chaves, nome do aparelho, chave do registro), como segunda barreira.
+
+### Decisões da fase 9.5b
+
+Conta e sincronização no Android, só no APK de desenvolvimento. Onde diferem do texto acima, valem estes.
+
+**Build de desenvolvimento.** Como no Linux, tudo entra com `SYNC_DEV`: Debug, ou Release com `-p:SyncDev=true` (`packaging/android/build.sh --dev`, que gera `slimegoals-<versão>-android-dev.apk` com a mesma chave de assinatura). Só esse APK declara `INTERNET`, registra cofre, coordenador e tela, e tem o receptor de conferência. O APK de distribuição continua sem `INTERNET` e sem o receptor, conferido no manifesto com `aapt2`.
+
+**Rede.** O APK de desenvolvimento usa `network_security_config_dev.xml`: texto puro só para `127.0.0.1` e `localhost`, sem subdomínios. O de distribuição usa `network_security_config.xml`, sem texto puro. O servidor continua preso ao `127.0.0.1` do computador, e o aparelho chega a ele por `adb reverse tcp:8080 tcp:8080`. O cliente HTTP é o do Linux: 30 s de prazo e sem seguir redirecionamento.
+
+**Cofre do Android** (`AndroidKeystoreVault`).
+- Uma chave AES-256 criada no Android Keystore com o alias `slimegoals-cofre`, para GCM sem preenchimento e sem exigir autenticação da pessoa. A chave nunca sai do Keystore, e é criada na primeira gravação.
+- Cada segredo fica em `no_backup/cofre/<nome>.bin`, pasta privada do app e fora do backup, gravado num arquivo temporário e depois renomeado.
+- Formato do arquivo (`SealedSecretFormat`, em `SlimeGoals.Sync/Vault`, testado no xUnit): `versão 1 (1 byte) ‖ nonce (12) ‖ cifra ‖ tag (16)`. O dado autenticado é `slimegoals/v1/vault/<nome>`, então um arquivo copiado para outro nome não abre. Os nomes aceitos são letras minúsculas, dígitos e hífen, de 1 a 64 caracteres.
+- O nonce é escolhido pelo Keystore, que exige cifra aleatória.
+- `GetAsync` devolve nulo sem arquivo e lança `InvalidDataException` quando o segredo existe mas não abre: versão desconhecida, arquivo curto, chave apagada ou tag que não confere. A pessoa cai em "sessão ilegível", com "Sair", e não num "Tentar de novo" que nunca funcionaria. Só a falha ao carregar o Keystore é `SecretVaultUnavailableException`.
+- Apagar um segredo mantém a chave.
+- `KeyStore.GetKey` devolve um `IKey` cujo wrapper não implementa `ISecretKey`, porque a classe Java da chave do Keystore é oculta. Por isso o código trata a chave como `IKey`. O teste no emulador pegou o erro: com `is ISecretKey`, a leitura falhava logo depois de entrar, e cada gravação criava outra chave por cima.
+
+**Conferência no aparelho.** O APK de desenvolvimento tem o receptor `dev.alcm.slimegoals.CryptoSelfCheckReceiver` (ação `dev.alcm.slimegoals.VERIFICAR_CRIPTO`), exportado mas protegido pela permissão `android.permission.DUMP`, que só o shell do `adb` e o sistema têm. Ele calcula os 5 vetores fixos (`CryptoSelfCheck`) e faz uma ida e volta no cofre com o segredo `autoteste`. No logcat, com a tag `SlimeGoals`, registra só quantos vetores conferem, o nome dos que falharam e, se o cofre falhar, o tipo da exceção.
+
+**Código de recuperação na área de transferência.** O "Copiar" usa a área de transferência da plataforma, quando o head fornece uma. No Android, o clipe leva `android.content.extra.IS_SENSITIVE`, e o Android 13+ mostra a prévia oculta. A limpeza depois de 60 s continua, mas no Android 10+ ler e limpar o clipe só funciona com o app em foco: fora dele, o código fica até outro app copiar algo.
+
+**Nome do aparelho.** O sugerido é o de `Settings.Global.DEVICE_NAME`, depois `Build.MODEL`, depois "Android", cortado em 100 caracteres. No emulador, sai `sdk_gphone64_x86_64`.
+
+**Ciclo de vida.** O motor sincroniza ao voltar ao app (`SyncNow` no `OnResume`) e continua enquanto o processo viver. Não há pausa explícita ao sair: o Android corta a rede em segundo plano por conta própria, e esta spec deixa o segundo plano de fora.
+
+**Textos.** "Chaveiro do sistema" serve também para o Android. O estado travado só aparece se o Keystore não carregar.
+
+**Teste no emulador, 15/11/2026** (API 36, x86-64, APK Debug). O papel do Linux foi feito por um cliente sem interface com o `SyncCoordinator` de produção, num banco temporário.
+- Os 5 vetores conferem, e a ida e volta no cofre confere.
+- Uma meta criada do lado Linux aparece no emulador. A meta e o registro criados no emulador aparecem do lado Linux.
+- Com o app em segundo plano, dois registros feitos do lado Linux aparecem 3 s depois de voltar ao app.
+- Depois de reiniciar o emulador, o app abre já na conta e recebe uma meta nova.
+- Cadastro inteiro pelo emulador: criar, guardar o código e confirmar. Ao copiar o código, a prévia do sistema mostra `••••••`.
+- Com o arquivo da sessão trocado por `01` e 63 bytes aleatórios, e também com a chave trocada, a tela mostra "sessão ilegível". "Sair" funciona, e depois dá para entrar de novo.
+- Com o servidor `http://example.com:8080` ou `http://10.0.2.2:8080`, "Entrar" mostra o erro de conexão, e o Trace grava só o tipo (`AccountApiException`). O mesmo servidor atende em `10.0.2.2` e aceita a entrada por `127.0.0.1`, então quem recusa é a config de rede.
+
+**Release no emulador, 15/11/2026.** O APK Release com `-p:SyncDev=true` (trimming ligado, sem `DEBUGGABLE`), assinado com a chave de depuração, também confere os 5 vetores e a ida e volta no cofre. Ele entra na conta e recebe uma meta criada do lado Linux.
+
+**Falha inesperada do cofre.** Uma exceção do Keystore ao ler a sessão (chave irrecuperável, `ProviderException`, `IllegalStateException`) vira "sessão ilegível", como a tag inválida. Se outra falha que o cofre não traduziu chegar ao coordenador, "Sair" ainda limpa a conta localmente, sem rede. Só o cofre indisponível (trancado) impede sair.
+
+Falta o celular (arm64, APK Release com `--dev`), que depende do autor.
 
 ## 7. Interface e Android
 
