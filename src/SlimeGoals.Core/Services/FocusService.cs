@@ -22,6 +22,20 @@ public sealed class FocusService(IGoalRepository goals, IFocusSessionRepository 
     /// <summary>A sequência da última sessão começada, ou a da primeira vez. A meta nunca é sugerida.</summary>
     public Task<FocusPlan> SuggestedPlanAsync(CancellationToken ct = default) => settings.GetFocusPlanAsync(ct);
 
+    /// <summary>
+    /// O motivo de "Começar" estar desligado: um cronômetro rodando ou parado à espera de registro. O de meta que sumiu
+    /// ou foi arquivada não conta, porque dá lugar à sessão. Nulo quando nada impede.
+    /// </summary>
+    public async Task<string?> TimerConflictAsync(CancellationToken ct = default)
+    {
+        if (await timers.GetAsync(ct) is not { } timer)
+            return null;
+        return await goals.GetAsync(timer.GoalId, ct) is { ArchivedAt: null } owner ? TimerConflict(owner.Title) : null;
+    }
+
+    private static string TimerConflict(string title) =>
+        $"Já há um cronômetro em \"{title}\". Registre ou descarte no Hoje antes de começar o Pomodoro.";
+
     public async Task StartAsync(FocusPlan plan, Guid? goalId, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(plan);
@@ -38,8 +52,7 @@ public sealed class FocusService(IGoalRepository goals, IFocusSessionRepository 
             // Cronômetro de meta que sumiu ou foi arquivada é órfão: dá lugar à sessão, como no TimerService.
             var owner = await goals.GetAsync(timer.GoalId, ct);
             if (owner is { ArchivedAt: null })
-                throw new GoalStateException(timer.GoalId,
-                    $"Já há um cronômetro em \"{owner.Title}\". Registre ou descarte no Hoje antes de começar o Pomodoro.");
+                throw new GoalStateException(timer.GoalId, TimerConflict(owner.Title));
             await timers.ClearAsync(ct);
         }
 

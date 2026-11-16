@@ -83,6 +83,24 @@ public class FocusServiceTests
     }
 
     [Fact]
+    public async Task Timer_conflict_names_a_live_or_stopped_timer_and_ignores_orphans()
+    {
+        const string message = "Já há um cronômetro em \"Inglês\". Registre ou descarte no Hoje antes de começar o Pomodoro.";
+        (await Service.TimerConflictAsync()).Should().BeNull();
+
+        var english = await Study("Inglês");
+        var timers = new TimerService(_goals, _timers, Checkins, _time);
+        await timers.StartAsync(english.Id);
+        (await Service.TimerConflictAsync()).Should().Be(message);
+        await timers.StopAsync();
+        (await Service.TimerConflictAsync()).Should().Be(message);
+
+        await Goals.ArchiveAsync(english.Id);
+        await _timers.TryStartAsync(new ActiveTimer(english.Id, T0));
+        (await Service.TimerConflictAsync()).Should().BeNull();
+    }
+
+    [Fact]
     public async Task Orphan_timer_gives_way_to_the_session()
     {
         await _timers.TryStartAsync(new ActiveTimer(Guid.NewGuid(), T0.AddHours(-1)));
