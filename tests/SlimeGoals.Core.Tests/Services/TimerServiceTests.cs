@@ -24,10 +24,29 @@ public class TimerServiceTests
 
     private GoalService Goals => new(_goals, _checkins, _timers, _time);
     private CheckinService Checkins => new(_goals, _checkins, _time);
-    private TimerService Service => new(_goals, _timers, Checkins, _time);
+    private InMemoryFocusSessionRepository? _focus;
+    private TimerService Service => new(_goals, _timers, Checkins, _time, focus: _focus);
 
     private Task<Goal> Study(string title = "Estudar") => Goals.CreateAsync(GoalValidatorTests.Valid() with
         { Title = title, Measure = Measure.Duration, Unit = null, Recurrence = Recurrence.Daily, Target = 60, ActiveDays = WeekDays.All });
+
+    [Theory]
+    [InlineData(false, false)] // rodando
+    [InlineData(true, false)] // pausada
+    [InlineData(false, true)] // terminada sem destino
+    public async Task Timer_start_is_refused_while_a_focus_session_exists(bool paused, bool finished)
+    {
+        var goal = await Study();
+        _focus = new InMemoryFocusSessionRepository(_checkins, _timers);
+        await _focus.TryStartAsync(new FocusSession(FocusPlan.Default, null, T0, 0, T0, T0, TimeSpan.Zero,
+            paused ? T0 : null, null, finished ? T0 : null, null, 0));
+
+        var act = () => Service.StartAsync(goal.Id);
+
+        (await act.Should().ThrowAsync<GoalStateException>())
+            .WithMessage("Há uma sessão de Pomodoro aberta. Termine-a na aba Tempo.");
+        (await Service.GetAsync()).Should().BeNull();
+    }
 
     [Theory]
     [InlineData(29, 0)]

@@ -9,7 +9,7 @@ namespace SlimeGoals.Core.Services;
 /// do app. Parar congela os minutos; o registro só acontece quando o usuário confirma.
 /// </summary>
 public sealed class TimerService(IGoalRepository goals, ITimerRepository timers, CheckinService checkins, TimeProvider time,
-    DataChangeNotifier? changes = null)
+    DataChangeNotifier? changes = null, IFocusSessionRepository? focus = null)
 {
     public Task<ActiveTimer?> GetAsync(CancellationToken ct = default) => timers.GetAsync(ct);
 
@@ -23,6 +23,8 @@ public sealed class TimerService(IGoalRepository goals, ITimerRepository timers,
         if (!GoalPeriod.IsShownOn(goal, DateOnly.FromDateTime(time.GetLocalNow().DateTime)))
             throw new GoalStateException(goalId, "Esta meta não está ativa hoje.");
 
+        await EnsureNoFocusSessionAsync(goalId, ct);
+
         if (await timers.GetAsync(ct) is { } existing)
         {
             // Cronômetro de meta que sumiu ou foi arquivada é órfão: dá lugar ao novo.
@@ -33,8 +35,19 @@ public sealed class TimerService(IGoalRepository goals, ITimerRepository timers,
         }
 
         if (!await timers.TryStartAsync(new ActiveTimer(goalId, time.GetUtcNow()), ct))
+        {
+            // A sessão pode ter nascido entre a checagem e a gravação: a mensagem certa é a dela.
+            await EnsureNoFocusSessionAsync(goalId, ct);
             throw Conflict(goalId, "outra meta");
+        }
         changes?.NotifyChanged();
+    }
+
+    /// <summary>Um relógio por vez: qualquer sessão de Pomodoro, até a terminada sem destino, recusa o cronômetro.</summary>
+    private async Task EnsureNoFocusSessionAsync(Guid goalId, CancellationToken ct)
+    {
+        if (focus is not null && await focus.GetAsync(ct) is not null)
+            throw new GoalStateException(goalId, "Há uma sessão de Pomodoro aberta. Termine-a na aba Tempo.");
     }
 
     /// <summary>Congela o cronômetro (idempotente) e devolve os minutos.</summary>

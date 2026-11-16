@@ -26,8 +26,9 @@ public class ReminderResponseHandlerTests
 
     private GoalService Goals => new(_goals, _checkins, _timers, _time, _changes);
     private CheckinService Checkins => new(_goals, _checkins, _time, _changes);
-    private TimerService Timers => new(_goals, _timers, Checkins, _time, _changes);
-    private ReminderResponseHandler Handler => new(_log, _goals, Checkins, Timers, _time, _changes);
+    private InMemoryFocusSessionRepository? _focus;
+    private TimerService Timers => new(_goals, _timers, Checkins, _time, _changes, _focus);
+    private ReminderResponseHandler Handler => new(_log, _goals, Checkins, Timers, _time, _changes, _focus);
 
     private Task<Goal> Create(Measure measure, string title = "Meta") => Goals.CreateAsync(GoalValidatorTests.Valid() with
     {
@@ -84,6 +85,21 @@ public class ReminderResponseHandlerTests
 
         (await _log.GetAsync(entry.Id))!.Response.Should().BeNull();
         (await Timers.GetAsync())!.StoppedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Reminder_start_opens_the_app_while_a_session_exists()
+    {
+        var goal = await Create(Measure.Duration, "Estudar");
+        _focus = new InMemoryFocusSessionRepository(_checkins, _timers);
+        await _focus.TryStartAsync(new FocusSession(FocusPlan.Default, null, T0, 0, T0, T0, TimeSpan.Zero, null, null,
+            null, null, 0));
+        var entry = await Fire(goal);
+
+        (await Handler.HandleAsync(entry.Id, ReminderAction.Primary)).Should().Be(ReminderOutcome.OpenApp);
+
+        (await _log.GetAsync(entry.Id))!.Response.Should().BeNull();
+        (await Timers.GetAsync()).Should().BeNull();
     }
 
     [Fact]
