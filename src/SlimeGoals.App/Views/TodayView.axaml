@@ -309,15 +309,26 @@
                             <!-- Editor no lugar da linha -->
                             <Border Classes="inline-panel" IsVisible="{Binding IsEditing}">
                               <StackPanel Spacing="10">
-                                <!-- Apagar na linha dos minutos: na de baixo, com Cancelar e Salvar, não cabia a 320 px -->
-                                <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="10">
-                                  <NumericUpDown Value="{Binding MinutesInput}" Minimum="1" Maximum="1440"
-                                                 Increment="1" FormatString="0" Width="110" AutomationProperties.Name="Minutos" />
-                                  <TextBlock Grid.Column="1" Text="min" VerticalAlignment="Center" />
-                                  <Button Grid.Column="3" Classes="danger" Content="Apagar"
+                                <!-- Título com Apagar à direita: na linha de Cancelar e Salvar ele não cabia a 320 px -->
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                  <TextBlock Text="Ajustar trecho" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
+                                  <Button Grid.Column="1" Classes="danger" Content="Apagar"
                                           Command="{Binding $parent[UserControl].((vm:TodayPageViewModel)DataContext).DeleteChunkCommand}"
                                           CommandParameter="{Binding}" />
                                 </Grid>
+                                <!-- Horas e minutos, como no painel de registro, quebrando linha quando não cabem -->
+                                <WrapPanel ItemSpacing="16" LineSpacing="10">
+                                  <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <NumericUpDown Value="{Binding HoursInput}" Minimum="0" Maximum="24" Increment="1"
+                                                   FormatString="0" Width="110" AutomationProperties.Name="Horas" />
+                                    <TextBlock Text="h" VerticalAlignment="Center" />
+                                  </StackPanel>
+                                  <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <NumericUpDown Value="{Binding MinutesInput}" Minimum="0" Maximum="59" Increment="1"
+                                                   FormatString="0" Width="110" AutomationProperties.Name="Minutos" />
+                                    <TextBlock Text="min" VerticalAlignment="Center" />
+                                  </StackPanel>
+                                </WrapPanel>
                                 <TextBox Text="{Binding NoteInput}" MaxLength="{x:Static services:CheckinService.MaxNoteLength}"
                                          PlaceholderText="Nome (opcional)" AutomationProperties.Name="Nome do trecho" />
                                 <TextBlock Classes="field-error" Text="{Binding Error}" TextWrapping="Wrap"
@@ -347,14 +358,19 @@
                           <RadioButton Classes="segment" Content="Remover" IsChecked="{Binding PanelRemoves}" />
                         </StackPanel>
                       </Border>
-                      <StackPanel Orientation="Horizontal" Spacing="10">
-                        <NumericUpDown Value="{Binding PanelHoursInput}" Minimum="0" Maximum="24" Increment="1"
-                                       FormatString="0" Width="110" AutomationProperties.Name="Horas" />
-                        <TextBlock Text="h" VerticalAlignment="Center" />
-                        <NumericUpDown Value="{Binding PanelMinutesInput}" Minimum="0" Maximum="59" Increment="1"
-                                       FormatString="0" Width="110" AutomationProperties.Name="Minutos" />
-                        <TextBlock Text="min" VerticalAlignment="Center" />
-                      </StackPanel>
+                      <!-- Horas e minutos quebram linha quando não cabem lado a lado (320 e 360 px) -->
+                      <WrapPanel ItemSpacing="16" LineSpacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <NumericUpDown Value="{Binding PanelHoursInput}" Minimum="0" Maximum="24" Increment="1"
+                                         FormatString="0" Width="110" AutomationProperties.Name="Horas" />
+                          <TextBlock Text="h" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <NumericUpDown Value="{Binding PanelMinutesInput}" Minimum="0" Maximum="59" Increment="1"
+                                         FormatString="0" Width="110" AutomationProperties.Name="Minutos" />
+                          <TextBlock Text="min" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </WrapPanel>
                       <TextBox Text="{Binding PanelNote}" MaxLength="{x:Static services:CheckinService.MaxNoteLength}" PlaceholderText="Nota (opcional)"
                                AutomationProperties.Name="Nota" />
                       <TextBlock Classes="field-error" Text="{Binding PanelError}"

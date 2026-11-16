@@ -155,7 +155,8 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
                 if (chunkDraft is not null && card.Chunks.FirstOrDefault(c => c.CheckinId == chunkDraft.CheckinId) is { } same)
                 {
                     same.OpenEditor();
-                    (same.MinutesInput, same.NoteInput, same.Error) = (chunkDraft.MinutesInput, chunkDraft.NoteInput, chunkDraft.Error);
+                    (same.HoursInput, same.MinutesInput, same.NoteInput, same.Error) =
+                        (chunkDraft.HoursInput, chunkDraft.MinutesInput, chunkDraft.NoteInput, chunkDraft.Error);
                 }
                 Goals.Add(card);
             }

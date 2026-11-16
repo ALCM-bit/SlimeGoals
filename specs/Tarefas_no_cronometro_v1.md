@@ -123,7 +123,7 @@ O autor escolheu ver e ajustar os trechos de hoje dentro do cartão (caminho A).
 
 - **Onde aparece:** só em metas de tempo, com pelo menos um registro no dia de hoje, rodando ou não. Abaixo do cartão vem uma linha recolhível, "Hoje · 37 min ▾", fechada por padrão.
 - **Ao abrir:** os registros do dia, do mais recente para o mais antigo, com o nome (a nota, ou "Sem nome") e os minutos. O trecho em andamento entra no topo, só para ver, com o tempo correndo.
-- **Ajustar:** o ✎ de um registro abre, no lugar dele, os minutos, o nome e os botões Apagar, Cancelar e Salvar.
+- **Ajustar:** o ✎ de um registro abre, no lugar dele, horas e minutos (como no painel de lançar tempo), o nome e os botões Apagar, Cancelar e Salvar. *Revisto em 16/11 a pedido do autor:* a primeira versão só tinha minutos, e um trecho de horas aparecia como "150".
   - **Salvar substitui o registro.** Numa transação só, o antigo é apagado e um novo é gravado com o mesmo horário (`done_at`), os novos minutos e o novo nome. A sincronização não altera registros, mas leva exclusões e registros novos, então isso chega aos outros aparelhos sem mudar o formato.
   - **Apagar** exclui o registro, na mesma transação da fila da sincronização.
   - **Validação:** os minutos vão de 1 a 24 h, o nome segue o limite de 200 caracteres, e o total do período não pode ficar negativo. As mensagens ficam no próprio editor.
@@ -146,7 +146,8 @@ O autor escolheu ver e ajustar os trechos de hoje dentro do cartão (caminho A).
 
 - **Testes automatizados:** `dotnet test --solution SlimeGoals.slnx` (1600 testes), `dotnet build SlimeGoals.slnx -c Release` e o build de `SlimeGoals.Android.slnx` passam sem warnings. O único aviso do Android é o XA0033, que vem do ambiente.
 - **Telas:** `tools/SlimeGoals.Render` grava o campo em edição, a lista aberta e o editor de um trecho a 320, 360 e 1100 px.
-  - A 320 px, "Apagar" não cabia na linha de Cancelar e Salvar e foi para a linha dos minutos.
+  - A 320 px, "Apagar" não cabia na linha de Cancelar e Salvar e foi para uma linha de título no topo do editor ("Ajustar trecho").
+  - Horas e minutos quebram linha a 320 e 360 px, no editor do trecho e no painel de lançar tempo, que antes cortava o "min" nessas larguras.
   - A coluna do ✎ fica reservada em toda linha, para o tempo do trecho em andamento e o das compensações ficarem alinhados com os outros.
 - **Android (emulador, API 36, conta de teste, meta "Estudo teste"):**
   - o nome gravado aparece como "▸ Ingles", com ✎ e ⇄;

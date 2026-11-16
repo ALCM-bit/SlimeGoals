@@ -48,18 +48,19 @@ public sealed partial class TodayChunkViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ShowsEditButton))]
     public partial bool IsEditing { get; set; }
 
+    [ObservableProperty] public partial decimal? HoursInput { get; set; }
     [ObservableProperty] public partial decimal? MinutesInput { get; set; }
     [ObservableProperty] public partial string? NoteInput { get; set; }
     [ObservableProperty] public partial string? Error { get; set; }
 
     public bool ShowsEditButton => CanEdit && !IsEditing;
 
-    /// <summary>Abre o editor com os minutos (sem sinal: o sinal do registro se mantém) e o nome atuais.</summary>
+    /// <summary>Abre o editor com o tempo atual em horas e minutos (sem sinal: o sinal do registro se mantém) e o nome.</summary>
     public void OpenEditor()
     {
         if (!CanEdit)
             return;
-        MinutesInput = Math.Abs(Amount);
+        (HoursInput, MinutesInput) = (Math.Abs(Amount) / 60, Math.Abs(Amount) % 60);
         NoteInput = Note;
         Error = null;
         IsEditing = true;
@@ -71,7 +72,9 @@ public sealed partial class TodayChunkViewModel : ObservableObject
         Error = null;
     }
 
-    /// <summary>Minutos digitados, arredondados como no painel de registro, ou null se o campo está vazio.</summary>
+    /// <summary>Total em minutos, com a mesma conta do painel de registro, ou null se horas e minutos estão vazios.</summary>
     public int? Minutes() =>
-        MinutesInput is { } v ? (int)Math.Round(v, MidpointRounding.AwayFromZero) : null;
+        HoursInput is null && MinutesInput is null
+            ? null
+            : (int)Math.Round((HoursInput ?? 0) * 60 + (MinutesInput ?? 0), MidpointRounding.AwayFromZero);
 }

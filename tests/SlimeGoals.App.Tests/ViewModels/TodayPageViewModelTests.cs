@@ -972,7 +972,7 @@ public class TodayPageViewModelTests
         page.EditChunkCommand.Execute(english);
 
         unnamed.IsEditing.Should().BeFalse();
-        (english.IsEditing, english.MinutesInput, english.NoteInput).Should().Be((true, 25m, "Inglês"));
+        (english.IsEditing, english.HoursInput, english.MinutesInput, english.NoteInput).Should().Be((true, 0m, 25m, "Inglês"));
         page.CancelChunkEditCommand.Execute(english);
         english.IsEditing.Should().BeFalse();
     }
@@ -1029,13 +1029,13 @@ public class TodayPageViewModelTests
         var page = await Loaded();
         var english = Card(page, "Estudar").Chunks[1];
         page.EditChunkCommand.Execute(english);
-        english.MinutesInput = 18;
+        (english.HoursInput, english.MinutesInput) = (1, 18);
 
         _changes.NotifyChanged();
 
         var reloaded = Card(page, "Estudar").Chunks[1];
         reloaded.Should().NotBeSameAs(english);
-        (reloaded.IsEditing, reloaded.MinutesInput, reloaded.NoteInput).Should().Be((true, 18m, "Inglês"));
+        (reloaded.IsEditing, reloaded.HoursInput, reloaded.MinutesInput, reloaded.NoteInput).Should().Be((true, 1m, 18m, "Inglês"));
     }
 
     [Fact]
@@ -1045,7 +1045,7 @@ public class TodayPageViewModelTests
         var page = await Loaded();
         var english = Card(page, "Estudar").Chunks[1];
         page.EditChunkCommand.Execute(english);
-        english.MinutesInput = null;
+        (english.HoursInput, english.MinutesInput) = (null, null);
 
         await page.SaveChunkCommand.ExecuteAsync(english);
 
@@ -1053,4 +1053,20 @@ public class TodayPageViewModelTests
         _checkins.All.Should().HaveCount(2);
     }
 
+    [Fact]
+    public async Task Chunk_editor_works_in_hours_and_minutes()
+    {
+        var goal = await Create("Estudar", Measure.Duration, 300, unit: null);
+        await CheckinService.AdjustAsync(goal.Id, 150, "Projeto");
+        var page = await Loaded();
+        var chunk = Card(page, "Estudar").Chunks.Single();
+        chunk.Text.Should().Be("2 h 30");
+
+        page.EditChunkCommand.Execute(chunk);
+        (chunk.HoursInput, chunk.MinutesInput).Should().Be((2m, 30m));
+        (chunk.HoursInput, chunk.MinutesInput) = (3, null);
+        await page.SaveChunkCommand.ExecuteAsync(chunk);
+
+        Rows(Card(page, "Estudar")).Should().Equal(("Projeto", "3 h"));
+    }
 }

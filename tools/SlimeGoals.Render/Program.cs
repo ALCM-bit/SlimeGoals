@@ -288,6 +288,18 @@ void RenderTodayWithTimer(int width)
     Capture($"today-chunk-edit-{width}.png");
     today.CancelChunkEditCommand.Execute(running.Chunks.First(c => c.CanEdit));
     today.ToggleChunksCommand.Execute(running);
+    // Painel de lançar tempo, para comparar com o editor do trecho na mesma largura
+    var idle = today.Goals.First(g => g.IsDuration && !g.IsTimerRunning);
+    today.OpenPanelCommand.Execute(idle);
+    Pump();
+    window.GetVisualDescendants().OfType<TodayView>().Single()
+        .GetVisualDescendants().OfType<ScrollViewer>().First().ScrollToHome();
+    Pump();
+    window.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("inline-panel") && b.IsEffectivelyVisible)
+        .BringIntoView();
+    Pump();
+    Capture($"today-panel-{width}.png");
+    today.CancelPanelCommand.Execute(idle);
     window.GetVisualDescendants().OfType<TodayView>().Single()
         .GetVisualDescendants().OfType<ScrollViewer>().First().ScrollToHome();
     Pump();
