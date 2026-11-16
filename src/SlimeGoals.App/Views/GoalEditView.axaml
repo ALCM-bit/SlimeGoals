@@ -39,7 +39,7 @@
   <DockPanel Classes="page">
     <!-- Cabeçalho: voltar = cancelar -->
     <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,16">
-      <Button Classes="ghost back" Content="← Metas" Command="{Binding CancelCommand}" HorizontalAlignment="Left" />
+      <Button Classes="ghost back" Content="{Binding BackText}" Command="{Binding CancelCommand}" HorizontalAlignment="Left" />
       <TextBlock Classes="page-title" Text="{Binding PageTitle}" />
     </StackPanel>
 

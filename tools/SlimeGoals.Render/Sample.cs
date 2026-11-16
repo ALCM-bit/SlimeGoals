@@ -52,6 +52,15 @@ public sealed class Sample : IDisposable
     /// <summary>Para as cenas que precisam de registros além dos da amostra (trechos de hoje).</summary>
     public CheckinService Checkins => _services.GetRequiredService<CheckinService>();
 
+    /// <summary>
+    /// O relógio do Pomodoro nas cenas: parado, e só anda quando a cena manda (os números grandes saem sempre iguais).
+    /// O resto do app segue o relógio do sistema.
+    /// </summary>
+    public SceneClock Clock { get; } = new();
+
+    /// <summary>Apaga a sessão de Pomodoro e os trechos guardados, para a próxima largura começar do preparo.</summary>
+    public void ClearFocus() => _services.GetRequiredService<IFocusSessionRepository>().ClearAsync().GetAwaiter().GetResult();
+
     public ShellViewModel CreateShell(bool phone, AccountViewModel? account = null)
     {
         var capabilities = phone ? new PlatformCapabilities(true, false, false, false) : PlatformCapabilities.Desktop;
@@ -59,19 +68,26 @@ public sealed class Sample : IDisposable
             capabilities = capabilities with { Sync = true };
         IReminderPermissions? permissions = phone ? new DeniedPermissions() : null;
         var s = _services;
+        var navigator = new PageNavigator();
+        var focus = new FocusService(s.GetRequiredService<IGoalRepository>(), s.GetRequiredService<IFocusSessionRepository>(),
+            s.GetRequiredService<ITimerRepository>(), s.GetRequiredService<CheckinService>(), s.GetRequiredService<AppSettings>(),
+            Clock, s.GetRequiredService<DataChangeNotifier>());
         PageViewModel[] pages =
         [
             new TodayPageViewModel(s.GetRequiredService<ProgressService>(), s.GetRequiredService<CheckinService>(),
                 s.GetRequiredService<TimerService>(), s.GetRequiredService<GoalService>(), TimeProvider.System,
                 s.GetRequiredService<ReminderService>(), s.GetRequiredService<DataChangeNotifier>(),
-                s.GetRequiredService<ReminderPause>(), s.GetRequiredService<ReportService>(), capabilities, permissions),
+                s.GetRequiredService<ReminderPause>(), s.GetRequiredService<ReportService>(), capabilities, permissions,
+                focus, navigator),
             new GoalsPageViewModel(s.GetRequiredService<GoalService>(), TimeProvider.System),
+            new TimePageViewModel(new PomodoroViewModel(focus, s.GetRequiredService<GoalService>(), Clock,
+                s.GetRequiredService<DataChangeNotifier>(), navigator)),
             new ReportsPageViewModel(s.GetRequiredService<ReportService>(), TimeProvider.System,
                 s.GetRequiredService<DataChangeNotifier>()),
             new SettingsPageViewModel(s.GetRequiredService<AppSettings>(), capabilities: capabilities, permissions: permissions,
                 changes: s.GetRequiredService<DataChangeNotifier>(), account: account),
         ];
-        return new ShellViewModel(pages, capabilities: capabilities);
+        return new ShellViewModel(pages, capabilities: capabilities, navigator: navigator);
     }
 
     private async Task SeedAsync()
@@ -155,6 +171,16 @@ public sealed class Sample : IDisposable
         public Task ShowAsync(Reminder reminder, CancellationToken ct = default) => Task.CompletedTask;
         public Task WithdrawAsync(Guid logId, CancellationToken ct = default) => Task.CompletedTask;
     }
+}
+
+/// <summary>Relógio parado que só anda com <see cref="Advance"/>; os timers (o relógio de 1 s da tela) são os do sistema.</summary>
+public sealed class SceneClock : TimeProvider
+{
+    private DateTimeOffset _now = DateTimeOffset.UtcNow;
+
+    public override DateTimeOffset GetUtcNow() => _now;
+
+    public void Advance(TimeSpan by) => _now += by;
 }
 
 /// <summary>Porta falsa do celular: as duas permissões negadas, para o aviso aparecer nas imagens.</summary>

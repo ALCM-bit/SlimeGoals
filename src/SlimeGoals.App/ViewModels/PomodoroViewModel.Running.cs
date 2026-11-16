@@ -45,6 +45,12 @@ public sealed partial class PomodoroViewModel
 
     private bool IsFocusBlock => Live is { } s && s.Block.Kind == FocusBlockKind.Focus;
 
+    /// <summary>O bloco atual é uma pausa: a tela troca o roxo do foco pelo verde.</summary>
+    public bool IsBreak => Live is { } s && s.Block.Kind == FocusBlockKind.Break;
+
+    /// <summary>Há um bloco depois deste. No último, o toque do fim já é o "Encerrar", e a tela não repete o botão.</summary>
+    public bool HasNextBlock => Live is { IsLastStep: false };
+
     /// <summary>"Foco · 1 de 2", "Pausa", "Pausado", "Foco concluído" ou "Pausa concluída".</summary>
     public string? PhaseText => Live switch
     {
@@ -479,6 +485,8 @@ public sealed partial class PomodoroViewModel
         OnPropertyChanged(nameof(OvertimeText));
         OnPropertyChanged(nameof(IsPaused));
         OnPropertyChanged(nameof(IsWaiting));
+        OnPropertyChanged(nameof(IsBreak));
+        OnPropertyChanged(nameof(HasNextBlock));
         OnPropertyChanged(nameof(NextActionText));
         OnPropertyChanged(nameof(TaskLabel));
         OnPropertyChanged(nameof(ShowsTaskLabel));

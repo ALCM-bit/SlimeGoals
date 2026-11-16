@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SlimeGoals.App.ViewModels"
+             xmlns:views="using:SlimeGoals.App.Views"
+             x:Class="SlimeGoals.App.Views.TimeView"
+             x:DataType="vm:TimePageViewModel">
+  <!-- Aba Tempo (spec Pomodoro §4 e §6): título, subabas e o Pomodoro, numa coluna só. No desktop a coluna fica
+       centrada, com 560 px no máximo (estilo focus-column); o título vem junto, para a página ter uma margem esquerda só. -->
+  <Panel>
+    <!-- "Criar uma meta com ele": o editor de meta no lugar da página, como em Metas -->
+    <ContentControl Content="{Binding Pomodoro.Editor}"
+                    IsVisible="{Binding Pomodoro.Editor, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <DockPanel Classes="page" IsVisible="{Binding Pomodoro.Editor, Converter={x:Static ObjectConverters.IsNull}}">
+      <StackPanel DockPanel.Dock="Top" Classes="focus-column" Spacing="16" Margin="0,0,0,16">
+        <TextBlock Classes="page-title" Text="{Binding Title}" />
+        <!-- Subabas no segmento do app; por enquanto só o Pomodoro. Com a sessão aberta não há o que trocar, e a
+             altura vai para o relógio (no celular de 320 px, a sessão inteira cabe sem rolar) -->
+        <Border Classes="segment" HorizontalAlignment="Left" IsVisible="{Binding Pomodoro.IsPreparing}">
+          <ItemsControl ItemsSource="{Binding Tabs}" AutomationProperties.Name="Métodos">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <RadioButton Classes="segment" GroupName="time-tabs" Content="{Binding}" IsChecked="True" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Border>
+      </StackPanel>
+
+      <views:PomodoroView DataContext="{Binding Pomodoro}" />
+    </DockPanel>
+  </Panel>
+</UserControl>

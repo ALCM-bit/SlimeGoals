@@ -618,6 +618,160 @@
     <Setter Property="Foreground" Value="{DynamicResource Muted}" />
   </Style>
 
+  <!-- ===== Pomodoro (aba Tempo, spec Pomodoro §6): grade de 4 px, foco em Primary e pausa em GoalGreen ===== -->
+  <!-- Coluna única: no desktop, centrada e com 560 px no máximo (Stretch com MaxWidth centra); no celular, a largura toda -->
+  <Style Selector=":is(Control).focus-column">
+    <Setter Property="MaxWidth" Value="560" />
+  </Style>
+  <!-- Bloco da sequência: a barra inteira abre o editor do tempo; marca, nome e tempo ficam por cima, sem receber o toque -->
+  <Style Selector="Button.focus-block">
+    <Setter Property="MinHeight" Value="44" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="VerticalAlignment" Value="Stretch" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.focus-block.break">
+    <Setter Property="Background" Value="{DynamicResource GoalGreenBg}" />
+  </Style>
+  <Style Selector="Button.focus-block:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimarySoft}" />
+  </Style>
+  <Style Selector="Button.focus-block.break:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource GoalGreenBg}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource GoalGreenFg}" />
+  </Style>
+  <!-- O bloco em edição fica marcado: o editor logo abaixo é dele -->
+  <Style Selector="Button.focus-block.editing">
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimarySoft}" />
+  </Style>
+  <Style Selector="Button.focus-block.break.editing">
+    <Setter Property="BorderBrush" Value="{DynamicResource GoalGreenFg}" />
+  </Style>
+  <Style Selector="TextBlock.focus-block-text">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="FontFeatures" Value="+tnum" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+    <Setter Property="Foreground" Value="{DynamicResource PrimaryTint}" />
+  </Style>
+  <Style Selector="TextBlock.focus-block-text.break">
+    <Setter Property="Foreground" Value="{DynamicResource GoalGreenFg}" />
+  </Style>
+  <!-- Marca do bloco: bolinha no foco, quadrado na pausa (a mesma forma das bolinhas da sessão) -->
+  <Style Selector="Border.focus-marker">
+    <Setter Property="Width" Value="10" />
+    <Setter Property="Height" Value="10" />
+    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+    <Setter Property="Background" Value="{DynamicResource Primary}" />
+  </Style>
+  <Style Selector="Border.focus-marker.break">
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="Background" Value="{DynamicResource GoalGreenFg}" />
+  </Style>
+  <!-- Bolinhas da rodada: célula fixa de 20 px (o anel do bloco atual não mexe no espaçamento) e o ponto de 10 px -->
+  <Style Selector="Border.focus-dot">
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="BorderThickness" Value="2" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Border.focus-dot.break">
+    <Setter Property="CornerRadius" Value="6" />
+  </Style>
+  <Style Selector="Border.focus-dot.current">
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimarySoft}" />
+  </Style>
+  <Style Selector="Border.focus-dot.break.current">
+    <Setter Property="BorderBrush" Value="{DynamicResource GoalGreenFg}" />
+  </Style>
+  <Style Selector="Border.focus-dot > Border">
+    <Setter Property="Width" Value="10" />
+    <Setter Property="Height" Value="10" />
+    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Background" Value="{DynamicResource SelectedStrong}" />
+  </Style>
+  <Style Selector="Border.focus-dot.done > Border">
+    <Setter Property="Background" Value="{DynamicResource Primary}" />
+  </Style>
+  <Style Selector="Border.focus-dot.current > Border">
+    <Setter Property="Background" Value="{DynamicResource PrimaryTint}" />
+  </Style>
+  <Style Selector="Border.focus-dot.break > Border">
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="Background" Value="{DynamicResource GoalGreenBg}" />
+  </Style>
+  <Style Selector="Border.focus-dot.break.done > Border, Border.focus-dot.break.current > Border">
+    <Setter Property="Background" Value="{DynamicResource GoalGreenFg}" />
+  </Style>
+  <!-- Selo da fase: roxo no foco, verde na pausa e no fim da sessão, neutro com o relógio pausado -->
+  <Style Selector="Border.focus-chip">
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="Padding" Value="12,4" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+  </Style>
+  <Style Selector="Border.focus-chip TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="FontFeatures" Value="+tnum" />
+    <Setter Property="Foreground" Value="{DynamicResource PrimaryTint}" />
+  </Style>
+  <Style Selector="Border.focus-chip.break, Border.focus-chip.done">
+    <Setter Property="Background" Value="{DynamicResource GoalGreenBg}" />
+  </Style>
+  <Style Selector="Border.focus-chip.break TextBlock, Border.focus-chip.done TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource GoalGreenFg}" />
+  </Style>
+  <Style Selector="Border.focus-chip.paused">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+  </Style>
+  <Style Selector="Border.focus-chip.paused TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <!-- Tempo que falta: minutos sobre segundos, algarismos de largura fixa (o número não treme a cada segundo) -->
+  <Style Selector="TextBlock.focus-digits">
+    <Setter Property="FontSize" Value="96" />
+    <Setter Property="FontWeight" Value="ExtraBold" />
+    <Setter Property="FontFeatures" Value="+tnum" />
+    <Setter Property="LineHeight" Value="96" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource PrimaryTint}" />
+  </Style>
+  <Style Selector="TextBlock.focus-digits.break">
+    <Setter Property="Foreground" Value="{DynamicResource GoalGreenFg}" />
+  </Style>
+  <Style Selector="TextBlock.focus-digits.paused">
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <!-- Controles da sessão: três de 44 px de altura; ✕ e ⏭ do mesmo tamanho, o principal mais largo -->
+  <Style Selector="Button.focus-control">
+    <Setter Property="Width" Value="64" />
+    <Setter Property="Height" Value="44" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.focus-control.main">
+    <Setter Property="Width" Value="96" />
+  </Style>
+  <!-- Botões na largura do espaço (Começar, os pares que dividem a largura) -->
+  <Style Selector="Button.wide">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+
   <!-- Classes das telas que o layout estreito ajusta; aqui, os valores do layout largo -->
   <Style Selector="DockPanel.page">
     <Setter Property="Margin" Value="8,4,22,0" />

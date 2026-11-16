@@ -90,6 +90,14 @@
       <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
     </Border>
 
+    <!-- Sessão de Pomodoro aberta: o ▶ dos cartões fica desligado, e a faixa leva à aba Tempo (spec Pomodoro §4.1) -->
+    <Border DockPanel.Dock="Top" Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasFocusBand}">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+        <TextBlock Text="{Binding FocusBandText}" VerticalAlignment="Center" TextWrapping="Wrap" />
+        <Button Grid.Column="1" Classes="ghost" Content="Abrir Tempo" Command="{Binding OpenTimePageCommand}" />
+      </Grid>
+    </Border>
+
     <!-- Cronômetro de meta fora da lista de hoje (ex.: dia inativo): ainda dá para parar ou descartar -->
     <Border DockPanel.Dock="Top" Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasOffscreenTimer}">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">

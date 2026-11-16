@@ -316,6 +316,23 @@ public class PomodoroViewModelTests
     }
 
     [Fact]
+    public async Task Break_and_next_block_flags_follow_the_block()
+    {
+        var vm = await Running(new FocusPlan([F(25), B(5)], 1));
+        (vm.IsBreak, vm.HasNextBlock).Should().Be((false, true));
+
+        _time.Advance(TimeSpan.FromMinutes(25));
+        await vm.AdvanceCommand.ExecuteAsync(null);
+
+        // Na pausa, que é o último bloco: a tela pinta de verde e não oferece um "Encerrar" repetido.
+        (vm.IsBreak, vm.HasNextBlock).Should().Be((true, false));
+
+        _time.Advance(TimeSpan.FromMinutes(5));
+        await vm.AdvanceCommand.ExecuteAsync(null);
+        (vm.IsBreak, vm.HasNextBlock).Should().Be((false, false));
+    }
+
+    [Fact]
     public async Task Waiting_shows_overtime_and_the_next_action()
     {
         var vm = await Running(new FocusPlan([F(25), B(5)], 1));
@@ -526,6 +543,7 @@ public class PomodoroViewModelTests
         vm.CreateGoalCommand.Execute(null);
         vm.Editor.Should().NotBeNull();
         (vm.Editor!.IsNew, vm.Editor.IsDuration, vm.Editor.IsMeasureLocked).Should().Be((true, true, true));
+        vm.Editor.BackText.Should().Be("← Tempo"); // o voltar do editor leva de volta à aba Tempo, não a Metas
         vm.Editor.CancelCommand.Execute(null);
         vm.Editor.Should().BeNull();
         (vm.IsAwaitingDestination, vm.SummaryText).Should().Be((true, "25 min"));

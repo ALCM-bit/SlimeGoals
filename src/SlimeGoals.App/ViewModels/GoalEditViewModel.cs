@@ -30,6 +30,9 @@ public sealed partial class GoalEditViewModel : ObservableObject
     private bool _submitted;
     private bool _targetMissing;
 
+    /// <summary>O "voltar" do cabeçalho (é o Cancelar): diz para onde volta, Metas ou a aba que abriu o editor.</summary>
+    public string BackText { get; init; } = "← Metas";
+
     /// <param name="measureLocked">A meta já tem registros: a medida não pode mudar (spec §5.2).</param>
     /// <param name="initialMeasure">Medida de uma meta nova (ex.: tempo, para receber o foco de um Pomodoro).</param>
     public GoalEditViewModel(GoalService service, Goal? existing, bool measureLocked, Action<bool> close,
