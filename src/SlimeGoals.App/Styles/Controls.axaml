@@ -325,7 +325,7 @@
     <Setter Property="FontSize" Value="12" />
     <Setter Property="Foreground" Value="{DynamicResource Warning}" />
   </Style>
-  <Style Selector="TextBox, NumericUpDown, ComboBox, TimePicker, CalendarDatePicker">
+  <Style Selector="TextBox, NumericUpDown, ComboBox, TimePicker, CalendarDatePicker, AutoCompleteBox">
     <Setter Property="MinHeight" Value="44" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
   </Style>

@@ -81,6 +81,30 @@ public sealed class RunningTimerWatcherTests : IDisposable
     }
 
     [Fact]
+    public async Task Current_carries_the_task()
+    {
+        var goal = await Study();
+        await _timers.StartAsync(goal.Id);
+        await _timers.SetTaskAsync("Capítulo 3");
+
+        await _watcher.StartAsync();
+
+        _watcher.Current!.Task.Should().Be("Capítulo 3");
+    }
+
+    [Fact]
+    public async Task Changing_the_task_raises_Changed()
+    {
+        var goal = await Study();
+        await _timers.StartAsync(goal.Id);
+        await _watcher.StartAsync();
+
+        (await ChangesDuring(() => _timers.SetTaskAsync("B"))).Should().Be(1);
+
+        _watcher.Current!.Task.Should().Be("B");
+    }
+
+    [Fact]
     public async Task Without_a_timer_current_is_null()
     {
         await Study();

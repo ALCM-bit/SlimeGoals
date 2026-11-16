@@ -15,7 +15,8 @@ public sealed partial class TodayGoalViewModel : ObservableObject
     private readonly ActiveTimer? _timer;
     private readonly TimeProvider _time;
 
-    public TodayGoalViewModel(GoalProgress progress, ActiveTimer? timer, TimeProvider time)
+    public TodayGoalViewModel(GoalProgress progress, ActiveTimer? timer, TimeProvider time,
+        IReadOnlyList<Checkin>? todayCheckins = null)
     {
         Goal = progress.Goal;
         ProgressText = GoalFormatting.Progress(progress);
@@ -26,9 +27,31 @@ public sealed partial class TodayGoalViewModel : ObservableObject
         _time = time;
         Elapsed = "";
         if (_timer is { StoppedAt: not null })
-            StoppedMinutesInput = TimerService.Minutes(_timer, time.GetUtcNow());
+        {
+            var minutes = TimerService.Minutes(_timer, time.GetUtcNow());
+            (StoppedHoursInput, StoppedMinutesInput) = (minutes / 60, minutes % 60);
+            PanelNote = _timer.Task; // a tarefa vira a nota do registro, e a pessoa pode editar
+        }
+        TaskInput = TimerTask;
+        var records = IsDuration ? todayCheckins ?? [] : [];
+        HasChunks = records.Count > 0;
+        ChunksHeader = $"Hoje · {GoalFormatting.Duration(Math.Max(0, records.Sum(c => c.Amount)))}";
+        if (IsTimerRunning)
+            _runningChunk = TodayChunkViewModel.Running(Goal.Id, _timer!.Task);
+        Chunks = [.. _runningChunk is null ? [] : new[] { _runningChunk }, .. records.Select(TodayChunkViewModel.Of)];
         UpdateElapsed();
     }
+
+    private readonly TodayChunkViewModel? _runningChunk;
+
+    // ---- Trechos de hoje (specs/Tarefas_no_cronometro_v1.md §7.2) ----
+    /// <summary>Registros do dia, do mais recente para o mais antigo; com o cronômetro rodando, o trecho dele vem antes.</summary>
+    public IReadOnlyList<TodayChunkViewModel> Chunks { get; }
+    /// <summary>Só meta de tempo com algum registro hoje.</summary>
+    public bool HasChunks { get; }
+    /// <summary>Soma só dos registros gravados, limitada a 0; o trecho em andamento fica de fora.</summary>
+    public string ChunksHeader { get; }
+    [ObservableProperty] public partial bool IsChunksOpen { get; set; }
 
     public Goal Goal { get; }
     public string Title => Goal.Title;
@@ -93,8 +116,43 @@ public sealed partial class TodayGoalViewModel : ObservableObject
         }
     }
 
+    // ---- Tarefa do cronômetro (specs/Tarefas_no_cronometro_v1.md) ----
+    public string? TimerTask => _timer?.Task;
+
+    /// <summary>
+    /// O que a pessoa está digitando no campo da tarefa difere do que está gravado (ou ela está trocando de tarefa):
+    /// a tela guarda isso ao recarregar, para não apagar o texto no meio da digitação.
+    /// </summary>
+    public bool HasTaskDraft => IsTimerRunning && (IsSwitchingTask || IsEditingTask || NormalizeTask(TaskInput) != TimerTask);
+
+    internal static string? NormalizeTask(string? task) => string.IsNullOrWhiteSpace(task) ? null : task.Trim();
+    [ObservableProperty] public partial string? TaskInput { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsTaskLabel), nameof(ShowsTaskField), nameof(ShowsConfirmTask))]
+    public partial bool IsSwitchingTask { get; set; }
+
+    /// <summary>A pessoa tocou ✎ para mudar o nome gravado: o campo volta, com ✓ e ✕.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsTaskLabel), nameof(ShowsTaskField), nameof(ShowsConfirmTask))]
+    public partial bool IsEditingTask { get; set; }
+
+    /// <summary>O nome gravado aparece como texto: é a confirmação de que ele está valendo (spec §7.1).</summary>
+    public bool ShowsTaskLabel => IsTimerRunning && TimerTask is not null && !IsEditingTask && !IsSwitchingTask;
+    public bool ShowsTaskField => IsTimerRunning && !ShowsTaskLabel;
+    public bool ShowsConfirmTask => ShowsTaskField && !IsSwitchingTask;
+    public string TaskLabel => $"▸ {TimerTask}";
+    [ObservableProperty] public partial IReadOnlyList<string> TaskSuggestions { get; set; } = [];
+
     [ObservableProperty] public partial string Elapsed { get; set; }
+    [ObservableProperty] public partial decimal? StoppedHoursInput { get; set; }
     [ObservableProperty] public partial decimal? StoppedMinutesInput { get; set; }
+
+    /// <summary>Tempo conferido do cronômetro parado, em minutos, com a conta do painel, ou null se horas e minutos estão vazios.</summary>
+    public int? StoppedAmount() =>
+        StoppedHoursInput is null && StoppedMinutesInput is null
+            ? null
+            : (int)Math.Round((StoppedHoursInput ?? 0) * 60 + (StoppedMinutesInput ?? 0), MidpointRounding.AwayFromZero);
     [ObservableProperty] public partial bool CanStartTimer { get; set; }
 
     /// <summary>Atualiza o tempo exibido do cronômetro rodando (chamado a cada segundo pela página).</summary>
@@ -102,5 +160,6 @@ public sealed partial class TodayGoalViewModel : ObservableObject
     {
         if (_timer is not null)
             Elapsed = GoalFormatting.Elapsed((_timer.StoppedAt ?? _time.GetUtcNow()) - _timer.StartedAt);
+        _runningChunk?.Text = Elapsed;
     }
 }

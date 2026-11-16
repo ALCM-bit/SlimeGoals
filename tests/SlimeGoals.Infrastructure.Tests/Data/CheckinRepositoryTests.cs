@@ -154,4 +154,65 @@ public class CheckinRepositoryTests : IDisposable
 
         (await Repo.CompensationIdsAsync(_goal.Id, Monday)).Should().BeEquivalentTo([mine.Id, superseded.Id]);
     }
+
+    [Fact]
+    public async Task Recent_notes_skip_deleted_and_null_and_are_distinct_newest_first()
+    {
+        await Repo.AddAsync(At(_goal, T0, 1, "a"));
+        await Repo.AddAsync(At(_goal, T0.AddMinutes(1), 1, "b"));
+        await Repo.AddAsync(At(_goal, T0.AddMinutes(2), 1));
+        await Repo.AddAsync(At(_goal, T0.AddMinutes(3), 1, "a"));
+        await Repo.AddAsync(At(_other, T0.AddMinutes(4), 1, "outra meta"));
+        await Repo.AddAsync(At(_goal, T0.AddMinutes(5), 1, "excluída") with { DeletedAt = T0.AddMinutes(6) });
+        await Repo.AddAsync(At(_goal, T0.AddMinutes(7), 1, "c"));
+
+        (await Repo.RecentNotesAsync(_goal.Id, 5)).Should().Equal("c", "a", "b");
+        (await Repo.RecentNotesAsync(_goal.Id, 2)).Should().Equal("c", "a");
+    }
+
+    [Fact]
+    public async Task Get_returns_the_checkin_or_null()
+    {
+        var checkin = At(_goal, T0, 25, "Inglês");
+        await Repo.AddAsync(checkin);
+
+        (await Repo.GetAsync(checkin.Id)).Should().BeEquivalentTo(checkin);
+        (await Repo.GetAsync(Guid.CreateVersion7())).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Delete_removes_the_row_and_reports_whether_it_existed()
+    {
+        var kept = At(_goal, T0, 5);
+        var removed = At(_goal, T0.AddMinutes(1), 3);
+        await Repo.AddAsync(kept);
+        await Repo.AddAsync(removed);
+
+        (await Repo.DeleteAsync(removed.Id)).Should().BeTrue();
+        (await Repo.DeleteAsync(removed.Id)).Should().BeFalse();
+        (await Repo.SumAsync(_goal.Id, T0.AddDays(-1), T0.AddDays(1))).Should().Be(5);
+    }
+
+    [Fact]
+    public async Task Replace_swaps_the_row_in_one_step()
+    {
+        var old = At(_goal, T0, 25, "Inglês");
+        await Repo.AddAsync(old);
+        var replacement = At(_goal, T0, 20, "Leitura") with { UpdatedAt = T0.AddHours(1) };
+
+        (await Repo.ReplaceAsync(old.Id, replacement)).Should().BeTrue();
+
+        var list = await Repo.ListAsync(T0.AddDays(-1), T0.AddDays(1));
+        list.Should().ContainSingle().Which.Should().BeEquivalentTo(replacement);
+    }
+
+    [Fact]
+    public async Task Replace_of_a_missing_checkin_writes_nothing()
+    {
+        await Repo.AddAsync(At(_goal, T0, 25));
+
+        (await Repo.ReplaceAsync(Guid.CreateVersion7(), At(_goal, T0, 20))).Should().BeFalse();
+
+        _db.Anchor.ExecuteScalar<int>("SELECT COUNT(*) FROM checkins").Should().Be(1);
+    }
 }

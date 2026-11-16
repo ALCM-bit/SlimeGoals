@@ -53,6 +53,16 @@ public sealed class MiniTimerViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Title_shows_the_task_after_the_goal()
+    {
+        var vm = await RunningAsync();
+
+        await _f.Timers.SetTaskAsync("Capítulo 3");
+
+        vm.Title.Should().Be("Estudar inglês · Capítulo 3");
+    }
+
+    [Fact]
     public async Task Title_follows_a_rename()
     {
         var vm = await RunningAsync();

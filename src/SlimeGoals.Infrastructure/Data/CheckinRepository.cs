@@ -1,3 +1,4 @@
+using System.Data;
 using Dapper;
 using Microsoft.Data.Sqlite;
 using SlimeGoals.Core;
@@ -15,11 +16,7 @@ public sealed class CheckinRepository(SqliteConnectionFactory db) : ICheckinRepo
         await using var tx = await c.BeginTransactionAsync(ct);
         try
         {
-            await c.ExecuteAsync(new CommandDefinition("""
-                INSERT INTO checkins (id, goal_id, done_at, amount, note, updated_at, deleted_at, compensation_period, compensation_seen)
-                VALUES (@Id, @GoalId, @DoneAt, @Amount, @Note, @UpdatedAt, @DeletedAt, @CompensationPeriod, @CompensationSeen)
-                """, Row.FromDomain(checkin), tx, cancellationToken: ct));
-            await SyncOutbox.EnqueueAsync(c, tx, checkin.Id, SyncOutbox.Checkin, ct);
+            await InsertAsync(c, tx, checkin, ct);
             await tx.CommitAsync(ct);
         }
         catch (SqliteException e) when (e.SqliteExtendedErrorCode == SqlText.ForeignKeyViolation)
@@ -28,15 +25,82 @@ public sealed class CheckinRepository(SqliteConnectionFactory db) : ICheckinRepo
         }
     }
 
+    /// <summary>Grava o registro e o põe na fila da sincronização, dentro da transação de quem chama.</summary>
+    internal static async Task InsertAsync(SqliteConnection c, IDbTransaction tx, Checkin checkin, CancellationToken ct)
+    {
+        await c.ExecuteAsync(new CommandDefinition("""
+            INSERT INTO checkins (id, goal_id, done_at, amount, note, updated_at, deleted_at, compensation_period, compensation_seen)
+            VALUES (@Id, @GoalId, @DoneAt, @Amount, @Note, @UpdatedAt, @DeletedAt, @CompensationPeriod, @CompensationSeen)
+            """, Row.FromDomain(checkin), tx, cancellationToken: ct));
+        await SyncOutbox.EnqueueAsync(c, tx, checkin.Id, SyncOutbox.Checkin, ct);
+    }
+
+    public async Task<Checkin?> GetAsync(Guid id, CancellationToken ct = default)
+    {
+        await using var c = db.Open();
+        var rows = await RowReader.ReadValidAsync<Row, Checkin>(c, new CommandDefinition(
+            SelectColumns + " WHERE id = @Id AND deleted_at IS NULL", new { Id = SqlText.Id(id) }, cancellationToken: ct),
+            "checkins", r => r.ToDomain());
+        return rows.SingleOrDefault();
+    }
+
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        await using var c = db.Open();
+        await using var tx = await c.BeginTransactionAsync(ct);
+        if (!await DeleteRowAsync(c, tx, id, ct))
+            return false;
+        await tx.CommitAsync(ct);
+        return true;
+    }
+
+    public async Task<bool> ReplaceAsync(Guid id, Checkin replacement, CancellationToken ct = default)
+    {
+        await using var c = db.Open();
+        await using var tx = await c.BeginTransactionAsync(ct);
+        try
+        {
+            if (!await DeleteRowAsync(c, tx, id, ct))
+                return false;
+            await InsertAsync(c, tx, replacement, ct);
+            await tx.CommitAsync(ct);
+            return true;
+        }
+        catch (SqliteException e) when (e.SqliteExtendedErrorCode == SqlText.ForeignKeyViolation)
+        {
+            throw new GoalNotFoundException(replacement.GoalId);
+        }
+    }
+
+    /// <summary>Apaga a linha e põe a exclusão na fila, na transação de quem chama. false se a linha não existia.</summary>
+    private static async Task<bool> DeleteRowAsync(SqliteConnection c, IDbTransaction tx, Guid id, CancellationToken ct)
+    {
+        var removed = await c.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM checkins WHERE id = @Id", new { Id = SqlText.Id(id) }, tx, cancellationToken: ct));
+        if (removed == 0)
+            return false;
+        await SyncOutbox.EnqueueDeletionAsync(c, tx, id, SyncOutbox.Checkin, ct);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<string>> RecentNotesAsync(Guid goalId, int limit, CancellationToken ct = default)
+    {
+        await using var c = db.Open();
+        var notes = await c.QueryAsync<string>(new CommandDefinition("""
+            SELECT note FROM checkins
+            WHERE goal_id = @GoalId AND note IS NOT NULL AND deleted_at IS NULL
+            GROUP BY note
+            ORDER BY MAX(done_at) DESC
+            LIMIT @Limit
+            """, new { GoalId = SqlText.Id(goalId), Limit = limit }, cancellationToken: ct));
+        return notes.ToList();
+    }
+
     public async Task<IReadOnlyList<Checkin>> ListAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken ct = default)
     {
         await using var c = db.Open();
-        return await RowReader.ReadValidAsync<Row, Checkin>(c, new CommandDefinition("""
-            SELECT id AS Id, goal_id AS GoalId, done_at AS DoneAt, amount AS Amount, note AS Note,
-                   updated_at AS UpdatedAt, deleted_at AS DeletedAt,
-                   compensation_period AS CompensationPeriod, compensation_seen AS CompensationSeen
-            FROM checkins
-            WHERE deleted_at IS NULL AND superseded = 0 AND done_at >= @From AND done_at < @To
+        return await RowReader.ReadValidAsync<Row, Checkin>(c, new CommandDefinition(SelectColumns + """
+             WHERE deleted_at IS NULL AND superseded = 0 AND done_at >= @From AND done_at < @To
             ORDER BY done_at
             """, Range(fromUtc, toUtc), cancellationToken: ct), "checkins", r => r.ToDomain());
     }
@@ -69,6 +133,13 @@ public sealed class CheckinRepository(SqliteConnectionFactory db) : ICheckinRepo
             """, new { GoalId = SqlText.Id(goalId), Period = SqlText.Date(period) }, cancellationToken: ct));
         return ids.Select(i => Guid.ParseExact(i, "D")).ToList();
     }
+
+    private const string SelectColumns = """
+        SELECT id AS Id, goal_id AS GoalId, done_at AS DoneAt, amount AS Amount, note AS Note,
+               updated_at AS UpdatedAt, deleted_at AS DeletedAt,
+               compensation_period AS CompensationPeriod, compensation_seen AS CompensationSeen
+        FROM checkins
+        """;
 
     private static object Range(DateTimeOffset fromUtc, DateTimeOffset toUtc) =>
         new { From = SqlText.Instant(fromUtc), To = SqlText.Instant(toUtc) };

@@ -76,7 +76,7 @@ public sealed partial class MiniTimerViewModel : ObservableObject, IDisposable
             _tick = null;
             return;
         }
-        Title = _timer.Title;
+        Title = _timer.Label;
         IconKey = _timer.Icon;
         Color = _timer.Color;
         RefreshElapsed();

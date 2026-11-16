@@ -133,13 +133,43 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         {
             await goals.ArchiveExpiredAsync();
             var snapshot = await progress.GetTodayAsync();
+            var todayCheckins = await checkins.TodayAsync();
             if (version != _loadVersion)
                 return;
 
             StopTicker();
+            // O texto do campo da tarefa sobrevive à recarga (sincronização, outro processo) enquanto for o mesmo cronômetro.
+            var draft = Goals.FirstOrDefault(g => g.HasTaskDraft);
+            // A lista aberta e o editor de um trecho também sobrevivem à recarga, se o registro ainda existir.
+            var openChunks = Goals.Where(g => g.IsChunksOpen).Select(g => g.Goal.Id).ToHashSet();
+            var chunkDraft = Goals.SelectMany(g => g.Chunks).FirstOrDefault(c => c.IsEditing);
             Goals.Clear();
             foreach (var item in snapshot.Goals)
-                Goals.Add(new TodayGoalViewModel(item, snapshot.Timer, time) { CanStartTimer = snapshot.Timer is null });
+            {
+                var card = new TodayGoalViewModel(item, snapshot.Timer, time,
+                    todayCheckins.Where(c => c.GoalId == item.Goal.Id).ToList())
+                {
+                    CanStartTimer = snapshot.Timer is null,
+                };
+                card.IsChunksOpen = card.HasChunks && openChunks.Contains(card.Goal.Id);
+                if (chunkDraft is not null && card.Chunks.FirstOrDefault(c => c.CheckinId == chunkDraft.CheckinId) is { } same)
+                {
+                    same.OpenEditor();
+                    (same.HoursInput, same.MinutesInput, same.NoteInput, same.Error) =
+                        (chunkDraft.HoursInput, chunkDraft.MinutesInput, chunkDraft.NoteInput, chunkDraft.Error);
+                }
+                Goals.Add(card);
+            }
+            var running = Goals.FirstOrDefault(g => g.IsTimerRunning);
+            if (draft is not null && running is not null && running.Goal.Id == draft.Goal.Id
+                && (draft.IsSwitchingTask || draft.IsEditingTask
+                    || TodayGoalViewModel.NormalizeTask(draft.TaskInput) != running.TimerTask))
+            {
+                running.TaskInput = draft.TaskInput;
+                running.IsSwitchingTask = draft.IsSwitchingTask;
+                // Com nome gravado, o rascunho só fica à vista no modo de edição.
+                running.IsEditingTask = !draft.IsSwitchingTask && running.TimerTask is not null;
+            }
             var shownInCard = Goals.Any(g => g.IsTimerRunning || g.IsTimerStopped);
             _offscreenTimer = shownInCard ? null : snapshot.Timer;
             _offscreenTitle = snapshot.TimerGoal?.Title ?? "meta removida";
@@ -149,6 +179,8 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             (WeekPercent, InProgress, Completed) = (snapshot.Week.Percent, snapshot.Week.InProgress, snapshot.Week.Completed);
             if (snapshot.Timer is { StoppedAt: null })
                 _ticker = time.CreateTimer(_ => OnUi(Tick), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+            if (running is not null)
+                await LoadTaskSuggestionsAsync(running, version);
             await LoadStreakAsync(version);
             await LoadUpcomingAsync(version);
             if (version == _loadVersion)
@@ -164,6 +196,21 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         finally
         {
             OnPropertyChanged(nameof(IsEmpty));
+        }
+    }
+
+    /// <summary>Sem sugestões se a leitura falhar: o campo continua aceitando texto livre.</summary>
+    private async Task LoadTaskSuggestionsAsync(TodayGoalViewModel running, int version)
+    {
+        try
+        {
+            var suggestions = await timers.TaskSuggestionsAsync(running.Goal.Id);
+            if (version == _loadVersion)
+                running.TaskSuggestions = suggestions;
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            Trace.TraceWarning($"Sugestões de tarefa indisponíveis: {TraceText.Types(e)}");
         }
     }
 
@@ -276,20 +323,188 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     private Task StartTimerAsync(TodayGoalViewModel? item) => RunAsync(item, id => timers.StartAsync(id));
 
     [RelayCommand]
-    private Task StopTimerAsync(TodayGoalViewModel? item) => RunAsync(item, _ => timers.StopAsync());
+    private Task StopTimerAsync(TodayGoalViewModel? item) => RunAsync(item, async _ =>
+    {
+        // ■ tocado com o campo em edição: o nome digitado vale para o trecho que para (e vira a nota do painel).
+        await SaveTypedTaskAsync(item!);
+        await timers.StopAsync();
+    });
 
     [RelayCommand]
     private Task RegisterTimerAsync(TodayGoalViewModel? item)
     {
         if (item is null)
             return Task.CompletedTask;
-        if (item.StoppedMinutesInput is not { } minutes)
+        if (item.StoppedAmount() is not { } value)
         {
             item.PanelError = "Informe um valor.";
             return Task.CompletedTask;
         }
-        var value = (int)Math.Round(minutes, MidpointRounding.AwayFromZero);
         return RunAsync(item, _ => timers.RegisterAsync(value, item.PanelNote), panel: true);
+    }
+
+    /// <summary>✓, Enter ou sugestão escolhida: grava o nome digitado e fecha a edição. Sem mudança, só fecha.</summary>
+    [RelayCommand]
+    private Task SaveTaskAsync(TodayGoalViewModel? item)
+    {
+        if (item is not { IsTimerRunning: true, IsSwitchingTask: false })
+            return Task.CompletedTask;
+        if (TodayGoalViewModel.NormalizeTask(item.TaskInput) == item.TimerTask)
+        {
+            item.IsEditingTask = false;
+            item.TaskInput = item.TimerTask;
+            return Task.CompletedTask;
+        }
+        // Fecha só se gravou: se falhar, o texto digitado continua no campo depois da recarga.
+        return RunAsync(item, async _ =>
+        {
+            await timers.SetTaskAsync(item.TaskInput);
+            item.IsEditingTask = false;
+        });
+    }
+
+    /// <summary>✎: o nome gravado volta a ser um campo, preenchido com ele.</summary>
+    [RelayCommand]
+    private static void BeginEditTask(TodayGoalViewModel? item)
+    {
+        if (item is not { ShowsTaskLabel: true })
+            return;
+        item.TaskInput = item.TimerTask;
+        item.IsEditingTask = true;
+    }
+
+    /// <summary>✕ ou Esc: desiste da edição e volta ao nome gravado.</summary>
+    [RelayCommand]
+    private static void CancelEditTask(TodayGoalViewModel? item)
+    {
+        if (item is not { IsEditingTask: true })
+            return;
+        item.IsEditingTask = false;
+        item.TaskInput = item.TimerTask;
+    }
+
+    [RelayCommand]
+    private Task BeginSwitchTaskAsync(TodayGoalViewModel? item)
+    {
+        if (item is not { IsTimerRunning: true })
+            return Task.CompletedTask;
+        // ⇄ tocado com o campo em edição: o nome digitado é o da tarefa atual, e grava antes de abrir a troca.
+        var pending = item is { IsSwitchingTask: false } && TodayGoalViewModel.NormalizeTask(item.TaskInput) != item.TimerTask;
+        var typed = item.TaskInput;
+        item.TaskInput = null;
+        item.IsSwitchingTask = true;
+        return pending ? RunAsync(item, _ => timers.SetTaskAsync(typed)) : Task.CompletedTask;
+    }
+
+    /// <summary>Grava o nome digitado e ainda não gravado, se houver (fora do modo de troca).</summary>
+    private Task SaveTypedTaskAsync(TodayGoalViewModel item) =>
+        item is { IsTimerRunning: true, IsSwitchingTask: false } && TodayGoalViewModel.NormalizeTask(item.TaskInput) != item.TimerTask
+            ? timers.SetTaskAsync(item.TaskInput)
+            : Task.CompletedTask;
+
+    [RelayCommand]
+    private static void CancelSwitchTask(TodayGoalViewModel? item)
+    {
+        if (item is null)
+            return;
+        item.IsSwitchingTask = false;
+        item.TaskInput = item.TimerTask;
+    }
+
+    /// <summary>Registra o trecho da tarefa atual e segue com a nova (ver <see cref="TimerService.SwitchTaskAsync"/>).</summary>
+    [RelayCommand]
+    private Task ConfirmSwitchTaskAsync(TodayGoalViewModel? item)
+    {
+        if (item is not { IsTimerRunning: true, IsSwitchingTask: true })
+            return Task.CompletedTask;
+        return RunAsync(item, async _ =>
+        {
+            await timers.SwitchTaskAsync(item.TaskInput);
+            // Trocou: o modo de troca acaba, e o recarregamento não o devolve como rascunho.
+            item.IsSwitchingTask = false;
+            item.TaskInput = TodayGoalViewModel.NormalizeTask(item.TaskInput);
+        });
+    }
+
+    // ---- Trechos de hoje (specs/Tarefas_no_cronometro_v1.md §7.2) ----
+
+    [RelayCommand]
+    private static void ToggleChunks(TodayGoalViewModel? item)
+    {
+        if (item is { HasChunks: true })
+            item.IsChunksOpen = !item.IsChunksOpen;
+    }
+
+    /// <summary>Abre o editor do trecho; só um editor fica aberto na página.</summary>
+    [RelayCommand]
+    private void EditChunk(TodayChunkViewModel? chunk)
+    {
+        if (chunk is not { CanEdit: true })
+            return;
+        foreach (var other in Goals.SelectMany(g => g.Chunks).Where(c => c != chunk && c.IsEditing))
+            other.CloseEditor();
+        chunk.OpenEditor();
+    }
+
+    [RelayCommand]
+    private static void CancelChunkEdit(TodayChunkViewModel? chunk) => chunk?.CloseEditor();
+
+    [RelayCommand]
+    private Task SaveChunkAsync(TodayChunkViewModel? chunk)
+    {
+        if (chunk is not { IsEditing: true, CheckinId: { } id })
+            return Task.CompletedTask;
+        if (chunk.Minutes() is not { } minutes)
+        {
+            chunk.Error = "Informe um valor.";
+            return Task.CompletedTask;
+        }
+        return RunChunkAsync(chunk, () => checkins.ReplaceAsync(chunk.GoalId, id, minutes, chunk.NoteInput));
+    }
+
+    [RelayCommand]
+    private Task DeleteChunkAsync(TodayChunkViewModel? chunk) =>
+        chunk is { IsEditing: true, CheckinId: { } id }
+            ? RunChunkAsync(chunk, () => checkins.DeleteAsync(chunk.GoalId, id))
+            : Task.CompletedTask;
+
+    /// <summary>
+    /// Os erros ficam no editor, que continua aberto; só a meta excluída vai para a faixa da página. Depois de gravar,
+    /// fecha o editor antes de recarregar, para a recarga não reabri-lo.
+    /// </summary>
+    private async Task RunChunkAsync(TodayChunkViewModel chunk, Func<Task> action)
+    {
+        ErrorMessage = null;
+        chunk.Error = null;
+        try
+        {
+            await action();
+        }
+        catch (GoalValidationException ex)
+        {
+            chunk.Error = ex.Errors[0].Message;
+            return;
+        }
+        catch (GoalStateException ex)
+        {
+            chunk.Error = ex.Message;
+            return;
+        }
+        catch (GoalNotFoundException)
+        {
+            chunk.CloseEditor();
+            await LoadCommand.ExecuteAsync(null);
+            ErrorMessage ??= "Esta meta não existe mais.";
+            return;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Trace.TraceError($"Falha ao ajustar um trecho de hoje: {TraceText.Of(ex)}");
+            chunk.Error = "Não foi possível salvar.";
+            return;
+        }
+        chunk.CloseEditor();
+        await LoadCommand.ExecuteAsync(null);
     }
 
     [RelayCommand]

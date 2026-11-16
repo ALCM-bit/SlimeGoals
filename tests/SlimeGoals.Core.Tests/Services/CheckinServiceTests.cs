@@ -250,4 +250,200 @@ public class CheckinServiceTests
 
         _checkins.All.Single().Compensation.Should().BeNull();
     }
+
+    [Fact]
+    public async Task Recent_notes_are_distinct_newest_first_and_limited_to_5()
+    {
+        var goal = await Create();
+        foreach (var note in new[] { "a", "b", "c", null, "d", "b", "e", "f" })
+        {
+            await Service.AdjustAsync(goal.Id, 1, note);
+            _time.Advance(TimeSpan.FromMinutes(1));
+        }
+
+        (await Service.RecentNotesAsync(goal.Id)).Should().Equal("f", "e", "b", "d", "c");
+    }
+
+    // ---- Registros de hoje: ver, ajustar e apagar (specs/Tarefas_no_cronometro_v1.md §7.2) ----
+
+    private async Task<Checkin> Record(Goal goal, int amount, string? note = null, DateTimeOffset? at = null,
+        Compensation? compensation = null)
+    {
+        var checkin = new Checkin
+        {
+            Id = Guid.CreateVersion7(), GoalId = goal.Id, DoneAt = at ?? T0, Amount = amount, Note = note, UpdatedAt = T0,
+            Compensation = compensation,
+        };
+        await _checkins.AddAsync(checkin);
+        return checkin;
+    }
+
+    private Task<Goal> Timed() => Create(Measure.Duration, target: 60);
+
+    private IEnumerable<Checkin> Live => _checkins.All.Where(c => c.DeletedAt is null);
+
+    [Fact]
+    public async Task Today_lists_todays_checkins_newest_first()
+    {
+        var goal = await Timed();
+        var early = await Record(goal, 10, at: T0.AddHours(-2)); // 07:00 local
+        var later = await Record(goal, 15, at: T0.AddMinutes(-30)); // 08:30 local
+        await Record(goal, 20, at: T0.AddDays(-1));
+
+        (await Service.TodayAsync()).Select(c => c.Id).Should().Equal(later.Id, early.Id);
+    }
+
+    [Fact]
+    public async Task Replace_changes_minutes_and_name_keeping_the_time()
+    {
+        var goal = await Timed();
+        var old = await Record(goal, 25, "Inglês", T0.AddMinutes(-40));
+
+        (await Service.ReplaceAsync(goal.Id, old.Id, 20, " Leitura ")).Should().Be(20);
+
+        var now = Live.Should().ContainSingle().Which;
+        (now.Id == old.Id).Should().BeFalse();
+        (now.DoneAt, now.Amount, now.Note, now.UpdatedAt, now.Compensation).Should().Be((old.DoneAt, 20, "Leitura", T0, null));
+    }
+
+    [Fact]
+    public async Task Replace_keeps_a_negative_record_negative()
+    {
+        var goal = await Timed();
+        await Record(goal, 30);
+        var removed = await Record(goal, -5);
+
+        (await Service.ReplaceAsync(goal.Id, removed.Id, 10, null)).Should().Be(20);
+    }
+
+    [Fact]
+    public async Task Delete_removes_the_record_from_the_total()
+    {
+        var goal = await Timed();
+        await Record(goal, 25);
+        var chunk = await Record(goal, 12);
+
+        (await Service.DeleteAsync(goal.Id, chunk.Id)).Should().Be(25);
+    }
+
+    [Fact]
+    public async Task Delete_of_a_negative_record_raises_the_total()
+    {
+        var goal = await Timed();
+        await Record(goal, 30);
+        var removed = await Record(goal, -5);
+
+        (await Service.DeleteAsync(goal.Id, removed.Id)).Should().Be(30);
+    }
+
+    [Fact]
+    public async Task Change_that_would_leave_the_total_negative_is_refused()
+    {
+        var goal = await Timed();
+        var added = await Record(goal, 10);
+        await Record(goal, -10);
+
+        var delete = () => Service.DeleteAsync(goal.Id, added.Id);
+        await delete.Should().ThrowAsync<GoalStateException>().WithMessage("O total do período ficaria negativo.");
+        var shrink = () => Service.ReplaceAsync(goal.Id, added.Id, 5, null);
+        await shrink.Should().ThrowAsync<GoalStateException>().WithMessage("O total do período ficaria negativo.");
+        Live.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Change_that_raises_a_negative_raw_total_is_allowed()
+    {
+        var goal = await Timed();
+        await Record(goal, 10);
+        var removed = await Record(goal, -30);
+
+        (await Service.DeleteAsync(goal.Id, removed.Id)).Should().Be(10);
+    }
+
+    [Fact]
+    public async Task Yesterday_checkin_cannot_be_changed()
+    {
+        var goal = await Timed();
+        var old = await Record(goal, 25, at: T0.AddDays(-1));
+
+        var act = () => Service.ReplaceAsync(goal.Id, old.Id, 20, null);
+        await act.Should().ThrowAsync<GoalStateException>().WithMessage("Só dá para ajustar registros de hoje.");
+    }
+
+    [Fact]
+    public async Task Compensation_cannot_be_changed()
+    {
+        var goal = await Timed();
+        var merged = await Record(goal, 5, compensation: new Compensation(new DateOnly(2026, 11, 2), []));
+        const string message = "Este registro vem da junção de aparelhos e não pode ser ajustado.";
+
+        var replace = () => Service.ReplaceAsync(goal.Id, merged.Id, 3, null);
+        await replace.Should().ThrowAsync<GoalStateException>().WithMessage(message);
+        var delete = () => Service.DeleteAsync(goal.Id, merged.Id);
+        await delete.Should().ThrowAsync<GoalStateException>().WithMessage(message);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(24 * 60 + 1)]
+    public async Task Minutes_out_of_range_are_refused(int minutes)
+    {
+        var goal = await Timed();
+        var old = await Record(goal, 25);
+
+        var act = () => Service.ReplaceAsync(goal.Id, old.Id, minutes, null);
+        var error = (await act.Should().ThrowAsync<GoalValidationException>()).Which.Errors.Should().ContainSingle().Which;
+        (error.Field, error.Message).Should().Be(("Amount", "Informe de 1 min a 24 h."));
+    }
+
+    [Fact]
+    public async Task Missing_checkin_reports_that_it_changed()
+    {
+        var goal = await Timed();
+        var other = await Timed();
+        var foreign = await Record(other, 10);
+
+        var missing = () => Service.DeleteAsync(goal.Id, Guid.CreateVersion7());
+        await missing.Should().ThrowAsync<GoalStateException>().WithMessage("O registro mudou. Confira em Hoje.");
+        var wrongGoal = () => Service.ReplaceAsync(goal.Id, foreign.Id, 5, null);
+        await wrongGoal.Should().ThrowAsync<GoalStateException>().WithMessage("O registro mudou. Confira em Hoje.");
+    }
+
+    [Fact]
+    public async Task Replace_only_for_duration_goals()
+    {
+        var goal = await Create(Measure.Quantity);
+        var old = await Record(goal, 2);
+
+        var act = () => Service.ReplaceAsync(goal.Id, old.Id, 1, null);
+        await act.Should().ThrowAsync<GoalStateException>().WithMessage("Só dá para ajustar registros de metas de tempo.");
+    }
+
+    [Fact]
+    public async Task Unchanged_replace_writes_nothing()
+    {
+        var goal = await Timed();
+        var old = await Record(goal, 25, "Inglês");
+
+        (await Service.ReplaceAsync(goal.Id, old.Id, 25, "Inglês ")).Should().Be(25);
+
+        _checkins.All.Should().ContainSingle().Which.Id.Should().Be(old.Id);
+    }
+
+    [Fact]
+    public async Task Replace_and_delete_notify_changes()
+    {
+        var goal = await Timed();
+        var first = await Record(goal, 25);
+        var second = await Record(goal, 12);
+        var changes = new DataChangeNotifier();
+        var count = 0;
+        changes.Changed += (_, _) => count++;
+        var service = new CheckinService(_goals, _checkins, _time, changes);
+
+        await service.ReplaceAsync(goal.Id, first.Id, 20, null);
+        await service.DeleteAsync(goal.Id, second.Id);
+
+        count.Should().Be(2);
+    }
 }

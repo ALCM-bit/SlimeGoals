@@ -5,7 +5,22 @@
              xmlns:services="using:SlimeGoals.Core.Services"
              x:Class="SlimeGoals.App.Views.TodayView"
              x:DataType="vm:TodayPageViewModel">
-  <DockPanel Classes="page">
+  <UserControl.Styles>
+    <!-- Teclado aberto (celular): some o destaque e os blocos, senão a lista fica sem altura e o campo em edição some -->
+    <Style Selector="DockPanel.keyboard > Border.hero, DockPanel.keyboard > UniformGrid.tiles">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <!-- Trechos de hoje: o chevron aponta para cima com a lista aberta -->
+    <Style Selector="Path.chunks-chevron.open">
+      <Setter Property="RenderTransform" Value="rotate(180deg)" />
+    </Style>
+    <Style Selector="Button.chunks-toggle">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel x:Name="PageRoot" Classes="page">
     <TextBlock DockPanel.Dock="Top" Classes="page-title" Text="{Binding Title}" Margin="0,0,0,16" />
 
     <!-- Cartão de destaque: progresso da semana e mascote -->
@@ -187,10 +202,16 @@
                         </Button.IsVisible>
                         <Path Classes="btn-icon" Data="{StaticResource IconPlay}" />
                       </Button>
+                      <!-- No modo de troca, Trocar e Cancelar ocupam o lugar de ⇄ e ■ (abaixo do campo) -->
                       <Button Classes="danger-solid icon" AutomationProperties.Name="Parar cronômetro" ToolTip.Tip="Parar cronômetro"
-                              IsVisible="{Binding IsTimerRunning}"
                               Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).StopTimerCommand}"
                               CommandParameter="{Binding}">
+                        <Button.IsVisible>
+                          <MultiBinding Converter="{x:Static BoolConverters.And}">
+                            <Binding Path="IsTimerRunning" />
+                            <Binding Path="!IsSwitchingTask" />
+                          </MultiBinding>
+                        </Button.IsVisible>
                         <Path Classes="btn-icon" Data="{StaticResource IconStop}" />
                       </Button>
                       <!-- Mais opções (só tempo) -->
@@ -203,8 +224,130 @@
                     </StackPanel>
                   </Grid>
 
+                  <!-- Tarefa do cronômetro rodando: na largura do cartão, para não espremer o título na tela estreita -->
+                  <StackPanel Spacing="8" IsVisible="{Binding IsTimerRunning}">
+                    <!-- Nome gravado: texto, e não campo, é a confirmação de que ele está valendo (spec §7.1).
+                         ✎ e ⇄ aqui, e não junto do ■: a 320 px, três botões no cabeçalho cortavam o título e o tempo -->
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding ShowsTaskLabel}">
+                      <TextBlock Text="{Binding TaskLabel}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"
+                                 TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding TimerTask}" />
+                      <Button Grid.Column="1" Classes="ghost icon" AutomationProperties.Name="Editar tarefa" ToolTip.Tip="Editar tarefa"
+                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).BeginEditTaskCommand}"
+                              CommandParameter="{Binding}" Click="OnEditTaskClick">
+                        <Path Classes="btn-icon" Data="{StaticResource IconPencil}" />
+                      </Button>
+                      <Button Grid.Column="2" Classes="ghost icon" AutomationProperties.Name="Trocar de tarefa" ToolTip.Tip="Trocar de tarefa"
+                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).BeginSwitchTaskCommand}"
+                              CommandParameter="{Binding}">
+                        <Path Classes="btn-icon" Data="{StaticResource IconSwap}" />
+                      </Button>
+                    </Grid>
+                    <!-- Sem nome, editando ou trocando: o campo, com ✓ (e ✕ ao editar um nome que já existe) -->
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding ShowsTaskField}">
+                      <AutoCompleteBox Classes="timer-task" Text="{Binding TaskInput, Mode=TwoWay}" ItemsSource="{Binding TaskSuggestions}"
+                                       PlaceholderText="No que está trabalhando?" FilterMode="Contains" MinimumPrefixLength="0"
+                                       MaxLength="{x:Static services:CheckinService.MaxNoteLength}"
+                                       AutomationProperties.Name="Tarefa" SelectionChanged="OnTaskSelectionChanged" />
+                      <Button Grid.Column="1" Classes="primary icon" AutomationProperties.Name="Confirmar tarefa" ToolTip.Tip="Confirmar tarefa"
+                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).SaveTaskCommand}"
+                              CommandParameter="{Binding}" IsVisible="{Binding ShowsConfirmTask}">
+                        <Path Classes="btn-icon" Data="{StaticResource IconCheck}" />
+                      </Button>
+                      <Button Grid.Column="2" Classes="ghost icon" AutomationProperties.Name="Cancelar edição" ToolTip.Tip="Cancelar edição"
+                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).CancelEditTaskCommand}"
+                              CommandParameter="{Binding}" IsVisible="{Binding IsEditingTask}">
+                        <Path Classes="btn-icon" Data="{StaticResource IconX}" />
+                      </Button>
+                    </Grid>
+                    <!-- Trocar de tarefa: os botões abaixo do campo, como no painel de registro, para não espremê-lo no celular -->
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" IsVisible="{Binding IsSwitchingTask}">
+                      <Button Classes="ghost" Content="Cancelar"
+                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).CancelSwitchTaskCommand}"
+                              CommandParameter="{Binding}" />
+                      <Button Classes="primary" Content="Trocar"
+                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).ConfirmSwitchTaskCommand}"
+                              CommandParameter="{Binding}" />
+                    </StackPanel>
+                  </StackPanel>
+
                   <!-- Barra na largura do cartão: igual em todos, sem depender dos botões ao lado do texto -->
                   <ProgressBar Classes="goal" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
+
+                  <!-- Trechos de hoje (spec §7.2): recolhível, fechado por padrão; o editor abre no lugar da linha -->
+                  <StackPanel Spacing="6" IsVisible="{Binding HasChunks}">
+                    <Button Classes="ghost chunks-toggle" AutomationProperties.Name="Trechos de hoje"
+                            Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).ToggleChunksCommand}"
+                            CommandParameter="{Binding}">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBlock Text="{Binding ChunksHeader}" VerticalAlignment="Center" />
+                        <Path Grid.Column="1" Classes="btn-icon chunks-chevron" Classes.open="{Binding IsChunksOpen}"
+                              Data="{StaticResource IconChevronDown}" />
+                      </Grid>
+                    </Button>
+                    <ItemsControl ItemsSource="{Binding Chunks}" IsVisible="{Binding IsChunksOpen}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <StackPanel Spacing="6" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TodayChunkViewModel">
+                          <StackPanel>
+                            <!-- Linha: nome, tempo e ✎; a coluna do ✎ fica reservada (44, a largura do Button.icon) para o
+                                 tempo do trecho em andamento e o da compensação ficarem alinhados com os outros -->
+                            <Grid ColumnDefinitions="*,Auto,44" ColumnSpacing="8" MinHeight="44" IsVisible="{Binding !IsEditing}">
+                              <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                         ToolTip.Tip="{Binding Name}" />
+                              <TextBlock Grid.Column="1" Classes.running="{Binding IsRunning}" Text="{Binding Text}"
+                                         VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
+                              <Button Grid.Column="2" Classes="ghost icon" AutomationProperties.Name="Ajustar trecho" ToolTip.Tip="Ajustar trecho"
+                                      Command="{Binding $parent[UserControl].((vm:TodayPageViewModel)DataContext).EditChunkCommand}" CommandParameter="{Binding}"
+                                      IsVisible="{Binding ShowsEditButton}">
+                                <Path Classes="btn-icon" Data="{StaticResource IconPencil}" />
+                              </Button>
+                            </Grid>
+                            <!-- Editor no lugar da linha -->
+                            <Border Classes="inline-panel" IsVisible="{Binding IsEditing}">
+                              <StackPanel Spacing="10">
+                                <!-- Título com Apagar à direita: na linha de Cancelar e Salvar ele não cabia a 320 px -->
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                  <TextBlock Text="Ajustar trecho" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
+                                  <Button Grid.Column="1" Classes="danger" Content="Apagar"
+                                          Command="{Binding $parent[UserControl].((vm:TodayPageViewModel)DataContext).DeleteChunkCommand}"
+                                          CommandParameter="{Binding}" />
+                                </Grid>
+                                <!-- Horas e minutos, como no painel de registro, quebrando linha quando não cabem -->
+                                <WrapPanel ItemSpacing="16" LineSpacing="10">
+                                  <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <NumericUpDown Value="{Binding HoursInput}" Minimum="0" Maximum="24" Increment="1"
+                                                   FormatString="0" Width="110" AutomationProperties.Name="Horas" />
+                                    <TextBlock Text="h" VerticalAlignment="Center" />
+                                  </StackPanel>
+                                  <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <NumericUpDown Value="{Binding MinutesInput}" Minimum="0" Maximum="59" Increment="1"
+                                                   FormatString="0" Width="110" AutomationProperties.Name="Minutos" />
+                                    <TextBlock Text="min" VerticalAlignment="Center" />
+                                  </StackPanel>
+                                </WrapPanel>
+                                <TextBox Text="{Binding NoteInput}" MaxLength="{x:Static services:CheckinService.MaxNoteLength}"
+                                         PlaceholderText="Nome (opcional)" AutomationProperties.Name="Nome do trecho" />
+                                <TextBlock Classes="field-error" Text="{Binding Error}" TextWrapping="Wrap"
+                                           IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                  <Button Classes="ghost" Content="Cancelar"
+                                          Command="{Binding $parent[UserControl].((vm:TodayPageViewModel)DataContext).CancelChunkEditCommand}"
+                                          CommandParameter="{Binding}" />
+                                  <Button Classes="primary" Content="Salvar"
+                                          Command="{Binding $parent[UserControl].((vm:TodayPageViewModel)DataContext).SaveChunkCommand}"
+                                          CommandParameter="{Binding}" />
+                                </StackPanel>
+                              </StackPanel>
+                            </Border>
+                          </StackPanel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
 
                   <!-- Painel de valor -->
                   <Border Classes="inline-panel" IsVisible="{Binding IsPanelOpen}">
@@ -215,14 +358,19 @@
                           <RadioButton Classes="segment" Content="Remover" IsChecked="{Binding PanelRemoves}" />
                         </StackPanel>
                       </Border>
-                      <StackPanel Orientation="Horizontal" Spacing="10">
-                        <NumericUpDown Value="{Binding PanelHoursInput}" Minimum="0" Maximum="24" Increment="1"
-                                       FormatString="0" Width="110" AutomationProperties.Name="Horas" />
-                        <TextBlock Text="h" VerticalAlignment="Center" />
-                        <NumericUpDown Value="{Binding PanelMinutesInput}" Minimum="0" Maximum="59" Increment="1"
-                                       FormatString="0" Width="110" AutomationProperties.Name="Minutos" />
-                        <TextBlock Text="min" VerticalAlignment="Center" />
-                      </StackPanel>
+                      <!-- Horas e minutos quebram linha quando não cabem lado a lado (320 e 360 px) -->
+                      <WrapPanel ItemSpacing="16" LineSpacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <NumericUpDown Value="{Binding PanelHoursInput}" Minimum="0" Maximum="24" Increment="1"
+                                         FormatString="0" Width="110" AutomationProperties.Name="Horas" />
+                          <TextBlock Text="h" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <NumericUpDown Value="{Binding PanelMinutesInput}" Minimum="0" Maximum="59" Increment="1"
+                                         FormatString="0" Width="110" AutomationProperties.Name="Minutos" />
+                          <TextBlock Text="min" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </WrapPanel>
                       <TextBox Text="{Binding PanelNote}" MaxLength="{x:Static services:CheckinService.MaxNoteLength}" PlaceholderText="Nota (opcional)"
                                AutomationProperties.Name="Nota" />
                       <TextBlock Classes="field-error" Text="{Binding PanelError}"
@@ -242,11 +390,19 @@
                   <Border Classes="inline-panel" IsVisible="{Binding IsTimerStopped}">
                     <StackPanel Spacing="10">
                       <TextBlock Text="{Binding StoppedText}" TextWrapping="Wrap" Foreground="{DynamicResource Muted}" />
-                      <StackPanel Orientation="Horizontal" Spacing="10">
-                        <NumericUpDown Value="{Binding StoppedMinutesInput}" Minimum="0" Maximum="1440" Increment="1"
-                                       FormatString="0" Width="130" AutomationProperties.Name="Minutos cronometrados" />
-                        <TextBlock Text="min" VerticalAlignment="Center" />
-                      </StackPanel>
+                      <!-- Horas e minutos, como no painel de registro, quebrando linha quando não cabem -->
+                      <WrapPanel ItemSpacing="16" LineSpacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <NumericUpDown Value="{Binding StoppedHoursInput}" Minimum="0" Maximum="24" Increment="1"
+                                         FormatString="0" Width="110" AutomationProperties.Name="Horas cronometradas" />
+                          <TextBlock Text="h" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <NumericUpDown Value="{Binding StoppedMinutesInput}" Minimum="0" Maximum="59" Increment="1"
+                                         FormatString="0" Width="110" AutomationProperties.Name="Minutos cronometrados" />
+                          <TextBlock Text="min" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </WrapPanel>
                       <TextBox Text="{Binding PanelNote}" MaxLength="{x:Static services:CheckinService.MaxNoteLength}" PlaceholderText="Nota (opcional)"
                                AutomationProperties.Name="Nota" />
                       <TextBlock Classes="field-error" Text="{Binding PanelError}"

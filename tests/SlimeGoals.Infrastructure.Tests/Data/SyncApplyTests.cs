@@ -975,4 +975,18 @@ public class SyncApplyTests : IDisposable
         (await restarted.FinishFullResyncAsync()).Should().Equal(gone.Id);
         RowExists("goals", goal.Id).Should().BeTrue();
     }
+
+    [Fact]
+    public async Task Queued_checkin_deletion_is_not_undone_by_a_full_read()
+    {
+        var goal = NewGoal();
+        var checkin = NewCheckin(goal.Id);
+        await ApplyAsync(2, In(goal, 1), In(checkin, 2));
+        (await Checkins.DeleteAsync(checkin.Id)).Should().BeTrue();
+
+        await ApplyAsync(9, In(checkin, 9));
+
+        RowExists("checkins", checkin.Id).Should().BeFalse();
+        QueueRow(checkin.Id).Should().Be(new QueueLine("delete", 9, "checkin"));
+    }
 }

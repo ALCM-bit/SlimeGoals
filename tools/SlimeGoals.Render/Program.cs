@@ -250,16 +250,96 @@ void RenderTodayWithTimer(int width)
         today.StartTimerCommand.Execute(timed);
         Pump();
     }
-    var path = Path.Combine(outDir, $"today-timer-{width}.png");
-    var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para capturar.");
-    using (var stream = File.Create(path))
+    var running = today.Goals.Single(g => g.IsTimerRunning);
+    running.TaskInput = "Revisar o capítulo 3 do livro de arquitetura";
+    today.SaveTaskCommand.Execute(running);
+    Pump();
+    Capture($"today-timer-{width}.png");
+    // Editando o nome gravado: o campo com ✓ e ✕
+    running = today.Goals.Single(g => g.IsTimerRunning);
+    today.BeginEditTaskCommand.Execute(running);
+    Pump();
+    Capture($"today-timer-edit-{width}.png");
+    today.CancelEditTaskCommand.Execute(running);
+    Pump();
+    // Trechos de hoje: a lista aberta e o editor do registro mais recente
+    running = today.Goals.Single(g => g.IsTimerRunning);
+    if (!running.HasChunks)
     {
-#pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
-        frame.Save(stream);
-#pragma warning restore CS0618
+        sample.Checkins.AdjustAsync(running.Goal.Id, 25, "Inglês").GetAwaiter().GetResult();
+        sample.Checkins.AdjustAsync(running.Goal.Id, 12).GetAwaiter().GetResult();
+        today.LoadCommand.Execute(null);
+        Pump();
+        running = today.Goals.Single(g => g.IsTimerRunning);
     }
-    Console.WriteLine(path);
+    today.ToggleChunksCommand.Execute(running);
+    Pump();
+    // O cartão do cronômetro, com a lista aberta, fica abaixo da dobra: rola até o começo da lista
+    window.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("chunks-toggle") && b.DataContext == running)
+        .BringIntoView(new Rect(0, 0, 1, 400));
+    Pump();
+    Capture($"today-chunks-{width}.png");
+    today.EditChunkCommand.Execute(running.Chunks.First(c => c.CanEdit));
+    Pump();
+    // O cartão do cronômetro, com a lista aberta, fica abaixo da dobra: rola até o começo da lista
+    window.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("chunks-toggle") && b.DataContext == running)
+        .BringIntoView(new Rect(0, 0, 1, 400));
+    Pump();
+    Capture($"today-chunk-edit-{width}.png");
+    today.CancelChunkEditCommand.Execute(running.Chunks.First(c => c.CanEdit));
+    today.ToggleChunksCommand.Execute(running);
+    // Painel de lançar tempo, para comparar com o editor do trecho na mesma largura
+    var idle = today.Goals.First(g => g.IsDuration && !g.IsTimerRunning);
+    today.OpenPanelCommand.Execute(idle);
+    Pump();
+    window.GetVisualDescendants().OfType<TodayView>().Single()
+        .GetVisualDescendants().OfType<ScrollViewer>().First().ScrollToHome();
+    Pump();
+    window.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("inline-panel") && b.IsEffectivelyVisible)
+        .BringIntoView();
+    Pump();
+    Capture($"today-panel-{width}.png");
+    today.CancelPanelCommand.Execute(idle);
+    window.GetVisualDescendants().OfType<TodayView>().Single()
+        .GetVisualDescendants().OfType<ScrollViewer>().First().ScrollToHome();
+    Pump();
+    // Modo de troca: o campo vazio com Cancelar e Trocar
+    running = today.Goals.Single(g => g.IsTimerRunning);
+    today.BeginSwitchTaskCommand.Execute(running);
+    Pump();
+    Capture($"today-timer-switch-{width}.png");
+    today.CancelSwitchTaskCommand.Execute(running);
+    Pump();
+    // Cronômetro parado: a conferência em horas e minutos. O tempo é de exemplo (o relógio aqui é o real); o cronômetro
+    // é descartado depois, e a próxima largura começa outro.
+    today.StopTimerCommand.Execute(running);
+    Pump();
+    var stopped = today.Goals.Single(g => g.IsTimerStopped);
+    (stopped.StoppedHoursInput, stopped.StoppedMinutesInput) = (1, 25);
+    window.GetVisualDescendants().OfType<TodayView>().Single()
+        .GetVisualDescendants().OfType<ScrollViewer>().First().ScrollToHome();
+    Pump();
+    window.GetVisualDescendants().OfType<Border>()
+        .Single(b => b.Classes.Contains("inline-panel") && b.IsEffectivelyVisible && b.DataContext == stopped)
+        .BringIntoView();
+    Pump();
+    Capture($"today-timer-stopped-{width}.png");
+    today.DiscardTimerCommand.Execute(stopped);
+    Pump();
     window.Close();
+
+    void Capture(string name)
+    {
+        var path = Path.Combine(outDir, name);
+        var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para capturar.");
+        using (var stream = File.Create(path))
+        {
+#pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
+            frame.Save(stream);
+#pragma warning restore CS0618
+        }
+        Console.WriteLine(path);
+    }
 }
 
 void Render(bool phone, string suffix, int width, int height)

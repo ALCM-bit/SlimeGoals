@@ -39,6 +39,31 @@ public sealed class InMemoryCheckinRepository : ICheckinRepository
             .Select(c => c.Id).ToList());
 
     /// <summary>Apaga os registros da meta (a exclusão da meta).</summary>
+    public Task<IReadOnlyList<string>> RecentNotesAsync(Guid goalId, int limit, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<string>>(_checkins
+            .Where(c => c.GoalId == goalId && c.DeletedAt is null && c.Note is not null)
+            .GroupBy(c => c.Note!)
+            .OrderByDescending(g => g.Max(c => c.DoneAt))
+            .Select(g => g.Key).Take(limit).ToList());
+
+    public Task<Checkin?> GetAsync(Guid id, CancellationToken ct = default) =>
+        Task.FromResult(_checkins.FirstOrDefault(c => c.Id == id && c.DeletedAt is null));
+
+    public Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        if (FailWritesWith is not null) throw FailWritesWith;
+        return Task.FromResult(_checkins.RemoveAll(c => c.Id == id) > 0);
+    }
+
+    public Task<bool> ReplaceAsync(Guid id, Checkin replacement, CancellationToken ct = default)
+    {
+        if (FailWritesWith is not null) throw FailWritesWith;
+        if (_checkins.RemoveAll(c => c.Id == id) == 0)
+            return Task.FromResult(false);
+        _checkins.Add(replacement);
+        return Task.FromResult(true);
+    }
+
     public void RemoveOf(Guid goalId) => _checkins.RemoveAll(c => c.GoalId == goalId);
 
     private IEnumerable<Checkin> Live(DateTimeOffset fromUtc, DateTimeOffset toUtc) =>

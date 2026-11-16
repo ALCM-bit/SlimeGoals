@@ -17,12 +17,12 @@ public sealed class TimerRepository(SqliteConnectionFactory db) : ITimerReposito
         try
         {
             var row = await c.QuerySingleOrDefaultAsync<Row>(new CommandDefinition(
-                "SELECT goal_id AS GoalId, started_at AS StartedAt, stopped_at AS StoppedAt FROM active_timer WHERE id = 1",
+                "SELECT goal_id AS GoalId, started_at AS StartedAt, stopped_at AS StoppedAt, task AS Task FROM active_timer WHERE id = 1",
                 cancellationToken: ct));
             return row is null
                 ? null
                 : new ActiveTimer(Guid.ParseExact(row.GoalId, "D"), SqlText.ParseInstant(row.StartedAt),
-                    row.StoppedAt is null ? null : SqlText.ParseInstant(row.StoppedAt));
+                    row.StoppedAt is null ? null : SqlText.ParseInstant(row.StoppedAt), row.Task);
         }
         catch (Exception e) when (RowReader.IsInvalidRow(e))
         {
@@ -40,7 +40,7 @@ public sealed class TimerRepository(SqliteConnectionFactory db) : ITimerReposito
         {
             // INSERT OR IGNORE é atômico: dois processos iniciando juntos não criam dois cronômetros.
             return await c.ExecuteAsync(new CommandDefinition(
-                "INSERT OR IGNORE INTO active_timer (id, goal_id, started_at, stopped_at) VALUES (1, @GoalId, @StartedAt, @StoppedAt)",
+                "INSERT OR IGNORE INTO active_timer (id, goal_id, started_at, stopped_at, task) VALUES (1, @GoalId, @StartedAt, @StoppedAt, @Task)",
                 Params(timer), cancellationToken: ct)) == 1;
         }
         catch (SqliteException e) when (e.SqliteExtendedErrorCode == SqlText.ForeignKeyViolation)
@@ -53,8 +53,59 @@ public sealed class TimerRepository(SqliteConnectionFactory db) : ITimerReposito
     {
         await using var c = db.Open();
         await c.ExecuteAsync(new CommandDefinition(
-            "INSERT OR REPLACE INTO active_timer (id, goal_id, started_at, stopped_at) VALUES (1, @GoalId, @StartedAt, @StoppedAt)",
+            "INSERT OR REPLACE INTO active_timer (id, goal_id, started_at, stopped_at, task) VALUES (1, @GoalId, @StartedAt, @StoppedAt, @Task)",
             Params(timer), cancellationToken: ct));
+    }
+
+    public async Task<bool> StopAsync(DateTimeOffset at, CancellationToken ct = default)
+    {
+        await using var c = db.Open();
+        // UPDATE só do fim: o início e o nome ficam como estão agora, não como estavam quando quem para os leu.
+        return await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE active_timer SET stopped_at = @At WHERE id = 1 AND stopped_at IS NULL",
+            new { At = SqlText.Instant(at) }, cancellationToken: ct)) == 1;
+    }
+
+    public async Task<bool> SetTaskAsync(string? task, CancellationToken ct = default)
+    {
+        await using var c = db.Open();
+        // UPDATE, não INSERT OR REPLACE: um cronômetro descartado por outro processo não volta.
+        return await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE active_timer SET task = @Task WHERE id = 1", new { Task = task }, cancellationToken: ct)) == 1;
+    }
+
+    public async Task<bool> SwitchAsync(DateTimeOffset expectedStartedAt, ActiveTimer next, Checkin? chunk, CancellationToken ct = default)
+    {
+        await using var c = db.Open();
+        await using var tx = await c.BeginTransactionAsync(ct);
+        try
+        {
+            // Só passa adiante o mesmo cronômetro que quem troca leu: parado, descartado ou trocado por outro processo, nada muda.
+            var moved = await c.ExecuteAsync(new CommandDefinition("""
+                UPDATE active_timer SET started_at = @NewStart, task = @Task
+                WHERE id = 1 AND goal_id = @GoalId AND started_at = @Expected AND stopped_at IS NULL
+                """, new
+                {
+                    NewStart = SqlText.Instant(next.StartedAt),
+                    next.Task,
+                    GoalId = SqlText.Id(next.GoalId),
+                    Expected = SqlText.Instant(expectedStartedAt),
+                }, tx, cancellationToken: ct));
+            if (moved != 1)
+            {
+                await tx.RollbackAsync(ct);
+                return false;
+            }
+
+            if (chunk is not null)
+                await CheckinRepository.InsertAsync(c, tx, chunk, ct);
+            await tx.CommitAsync(ct);
+            return true;
+        }
+        catch (SqliteException e) when (e.SqliteExtendedErrorCode == SqlText.ForeignKeyViolation)
+        {
+            throw new GoalNotFoundException(next.GoalId);
+        }
     }
 
     public async Task ClearAsync(CancellationToken ct = default)
@@ -68,6 +119,7 @@ public sealed class TimerRepository(SqliteConnectionFactory db) : ITimerReposito
         GoalId = SqlText.Id(t.GoalId),
         StartedAt = SqlText.Instant(t.StartedAt),
         StoppedAt = t.StoppedAt is { } s ? SqlText.Instant(s) : null,
+        t.Task,
     };
 
     private sealed class Row
@@ -75,5 +127,6 @@ public sealed class TimerRepository(SqliteConnectionFactory db) : ITimerReposito
         public required string GoalId { get; init; }
         public required string StartedAt { get; init; }
         public string? StoppedAt { get; init; }
+        public string? Task { get; init; }
     }
 }

@@ -1131,4 +1131,65 @@ public sealed class ConvergenceTests : IDisposable
             group.Where(c => c.Superseded).Select(c => c.Id).Should().BeEquivalentTo(superseded);
         }
     }
+
+    [Fact]
+    public async Task Edited_and_deleted_checkins_converge()
+    {
+        var a = await DeviceAsync();
+        var b = await DeviceAsync();
+        var goal = await a.CreateGoal("Estudo", Measure.Duration, target: 60);
+        await a.Adjust(goal.Id, 25, "Inglês");
+        Tick(Minute);
+        await a.Adjust(goal.Id, 12, "Leitura");
+        await ConvergeAsync();
+
+        var today = await a.Today();
+        await a.Replace(goal.Id, today.Single(c => c.Note == "Inglês").Id, 20, "Inglês");
+        await a.DeleteCheckin(goal.Id, today.Single(c => c.Note == "Leitura").Id);
+        await a.SyncAsync();
+        await b.SyncAsync();
+
+        (await b.ShownTotal(goal.Id)).Should().Be(20);
+        b.Snapshot().Lines.Should().Equal(a.Snapshot().Lines);
+        a.Snapshot().Checkins.Should().ContainSingle().Which.Amount.Should().Be(20);
+        (a.Pending, b.Pending).Should().Be((0, 0));
+    }
+
+    /// <summary>
+    /// Um registro apagado ou ajustado com o envio dele no ar, ou depois de um aceite perdido, pode já estar no servidor
+    /// sem estar no mapa: a fila tem de levar a exclusão, senão o <c>pull</c> o traz de volta e ele conta duas vezes.
+    /// </summary>
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Checkin_changed_before_the_server_confirms_it_does_not_come_back(bool replace, bool ackLost)
+    {
+        var a = await DeviceAsync();
+        var b = await DeviceAsync();
+        var goal = await a.CreateGoal("Estudo", Measure.Duration, target: 60);
+        await ConvergeAsync();
+        await a.Adjust(goal.Id, 25, "Inglês");
+        var id = (await a.Today()).Single().Id;
+        Task Change() => replace ? a.Replace(goal.Id, id, 10, "Inglês") : a.DeleteCheckin(goal.Id, id);
+
+        if (ackLost)
+        {
+            _server.LoseNextAck();
+            (await a.SyncAsync()).Should().Be(SyncCycleResult.Failed);
+            await Change();
+        }
+        else
+        {
+            a.DuringNextPush = Change;
+            await a.SyncAsync();
+        }
+
+        await ConvergeAsync();
+        var expected = replace ? 10 : 0;
+        ((await a.ShownTotal(goal.Id)), (await b.ShownTotal(goal.Id))).Should().Be((expected, expected));
+        b.Snapshot().Lines.Should().Equal(a.Snapshot().Lines);
+        (a.Pending, b.Pending).Should().Be((0, 0));
+    }
 }
