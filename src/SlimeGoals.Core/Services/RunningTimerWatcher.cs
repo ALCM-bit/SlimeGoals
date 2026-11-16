@@ -5,20 +5,43 @@ using SlimeGoals.Core.Domain;
 
 namespace SlimeGoals.Core.Services;
 
-/// <summary>Cronômetro rodando, com o que é preciso para mostrá-lo fora do app.</summary>
-public sealed record RunningTimer(Guid GoalId, string Title, string Icon, GoalColor Color, DateTimeOffset StartedAt, string? Task = null)
+/// <summary>
+/// Cronômetro rodando, com o que é preciso para mostrá-lo fora do app. Com <see cref="Focus"/>, é a sessão de Pomodoro:
+/// <see cref="StartedAt"/> é o início do bloco, <see cref="GoalId"/> é <see cref="Guid.Empty"/> sem meta e
+/// <see cref="Task"/> só vem num bloco de foco.
+/// </summary>
+public sealed record RunningTimer(Guid GoalId, string Title, string Icon, GoalColor Color, DateTimeOffset StartedAt,
+    string? Task = null, FocusDisplay? Focus = null)
 {
-    /// <summary>O que a janelinha e a notificação mostram: a meta, e a tarefa depois de um ponto médio.</summary>
-    public string Label => Task is null ? Title : $"{Title} · {Task}";
+    /// <summary>
+    /// O que a janelinha e a notificação mostram: a meta, e a tarefa depois de um ponto médio. Na sessão, a fase, a meta
+    /// (se há) e a tarefa (se há), por exemplo "Foco · Estudar · Revisar capítulo 3".
+    /// </summary>
+    public string Label => Focus is null
+        ? Task is null ? Title : $"{Title} · {Task}"
+        : string.Join(" · ", new[] { Focus.Phase, GoalId == Guid.Empty ? null : Title, Task }.OfType<string>());
 }
 
 /// <summary>
-/// Acompanha o cronômetro rodando para a janelinha do Linux e a notificação do Android. "Rodando" é um
-/// <see cref="ActiveTimer"/> sem parada cuja meta existe e não está arquivada; qualquer outro caso é nulo.
-/// Relê a cada aviso do <see cref="DataChangeNotifier"/>.
+/// O bloco da sessão de Pomodoro fora do app: a fase ("Foco", "Pausa", "Pausado", "Foco concluído", "Pausa concluída"),
+/// o fim do bloco para a contagem regressiva, o tempo que falta congelado quando pausado, e o início da sessão.
 /// </summary>
-public sealed class RunningTimerWatcher(TimerService timers, IGoalRepository goals, DataChangeNotifier changes) : IDisposable
+public sealed record FocusDisplay(string Phase, DateTimeOffset EndsAt, TimeSpan? PausedRemaining, DateTimeOffset SessionStartedAt);
+
+/// <summary>
+/// Acompanha o cronômetro rodando para a janelinha do Linux e a notificação do Android. "Rodando" é um
+/// <see cref="ActiveTimer"/> sem parada cuja meta existe e não está arquivada; sem ele, com <paramref name="focus"/>, é a
+/// sessão de Pomodoro que ainda não terminou. Qualquer outro caso é nulo. Relê a cada aviso do
+/// <see cref="DataChangeNotifier"/>.
+/// </summary>
+public sealed class RunningTimerWatcher(TimerService timers, IGoalRepository goals, DataChangeNotifier changes,
+    FocusService? focus = null) : IDisposable
 {
+    /// <summary>Como a sessão sem meta aparece.</summary>
+    public const string SessionTitle = "Pomodoro";
+    public const string SessionIcon = "NavTime";
+    public const GoalColor SessionColor = GoalColor.Purple;
+
     private readonly Lock _lock = new();
     private RunningTimer? _current;
     private long _started;
@@ -83,10 +106,47 @@ public sealed class RunningTimerWatcher(TimerService timers, IGoalRepository goa
 
     private async Task<RunningTimer?> ReadAsync(CancellationToken ct)
     {
+        if (await ReadTimerAsync(ct) is { } running)
+            return running;
+        return focus is null ? null : await ReadSessionAsync(focus, ct);
+    }
+
+    private async Task<RunningTimer?> ReadTimerAsync(CancellationToken ct)
+    {
         if (await timers.GetAsync(ct) is not { StoppedAt: null } timer)
             return null;
         if (await goals.GetAsync(timer.GoalId, ct) is not { ArchivedAt: null } goal)
             return null;
         return new RunningTimer(goal.Id, goal.Title, goal.Icon, goal.Color, timer.StartedAt, timer.Task);
+    }
+
+    private async Task<RunningTimer?> ReadSessionAsync(FocusService service, CancellationToken ct)
+    {
+        if (await service.GetAsync(ct) is not { FinishedAt: null } session)
+            return null;
+        // Meta que sumiu ou foi arquivada: a sessão segue como sem meta (spec Pomodoro §4.4).
+        var goal = session.GoalId is { } id && await goals.GetAsync(id, ct) is { ArchivedAt: null } found ? found : null;
+        var isFocus = session.Block.Kind == FocusBlockKind.Focus;
+        var display = new FocusDisplay(PhaseOf(session), FocusClock.EndsAt(session),
+            session.PausedAt is { } pausedAt ? FocusClock.Remaining(session, pausedAt) : null, session.StartedAt);
+        return goal is null
+            ? new RunningTimer(Guid.Empty, SessionTitle, SessionIcon, SessionColor, session.BlockStartedAt,
+                isFocus ? session.Task : null, display)
+            : new RunningTimer(goal.Id, goal.Title, goal.Icon, goal.Color, session.BlockStartedAt,
+                isFocus ? session.Task : null, display);
+    }
+
+    /// <summary>
+    /// A fase do bloco. O bloco espera o toque desde que o aviso do fim dele foi dado: o <see cref="FocusAlerts"/> marca o
+    /// passo e avisa a mudança, e assim a janelinha troca de fase sem relógio próprio.
+    /// </summary>
+    private static string PhaseOf(FocusSession session)
+    {
+        var isFocus = session.Block.Kind == FocusBlockKind.Focus;
+        if (session.PausedAt is not null)
+            return "Pausado";
+        if (session.AlertedStep == session.Step)
+            return isFocus ? "Foco concluído" : "Pausa concluída";
+        return isFocus ? "Foco" : "Pausa";
     }
 }
