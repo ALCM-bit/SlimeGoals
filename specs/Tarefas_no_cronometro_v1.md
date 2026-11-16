@@ -148,6 +148,7 @@ O autor escolheu ver e ajustar os trechos de hoje dentro do cartão (caminho A).
 - **Telas:** `tools/SlimeGoals.Render` grava o campo em edição, a lista aberta e o editor de um trecho a 320, 360 e 1100 px.
   - A 320 px, "Apagar" não cabia na linha de Cancelar e Salvar e foi para uma linha de título no topo do editor ("Ajustar trecho").
   - Horas e minutos quebram linha a 320 e 360 px, no editor do trecho e no painel de lançar tempo, que antes cortava o "min" nessas larguras.
+  - *16/11, a pedido do autor:* a conferência do cronômetro parado também passou a horas e minutos (antes, uma caixa só de minutos, com 2 h aparecendo como "120"), com a mesma quebra de linha.
   - A coluna do ✎ fica reservada em toda linha, para o tempo do trecho em andamento e o das compensações ficarem alinhados com os outros.
 - **Android (emulador, API 36, conta de teste, meta "Estudo teste"):**
   - o nome gravado aparece como "▸ Ingles", com ✎ e ⇄;

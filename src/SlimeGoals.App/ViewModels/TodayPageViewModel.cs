@@ -335,16 +335,14 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     {
         if (item is null)
             return Task.CompletedTask;
-        if (item.StoppedMinutesInput is not { } minutes)
+        if (item.StoppedAmount() is not { } value)
         {
             item.PanelError = "Informe um valor.";
             return Task.CompletedTask;
         }
-        var value = (int)Math.Round(minutes, MidpointRounding.AwayFromZero);
         return RunAsync(item, _ => timers.RegisterAsync(value, item.PanelNote), panel: true);
     }
 
-    /// <summary>Grava o nome digitado no campo da tarefa, se mudou (Enter, perda de foco ou sugestão escolhida).</summary>
     /// <summary>✓, Enter ou sugestão escolhida: grava o nome digitado e fecha a edição. Sem mudança, só fecha.</summary>
     [RelayCommand]
     private Task SaveTaskAsync(TodayGoalViewModel? item)

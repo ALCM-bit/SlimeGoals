@@ -310,7 +310,7 @@ public class TodayPageViewModelTests
 
         await page.StopTimerCommand.ExecuteAsync(Card(page, "Estudar"));
         var stopped = Card(page, "Estudar");
-        (stopped.IsTimerRunning, stopped.IsTimerStopped, stopped.StoppedMinutesInput).Should().Be((false, true, 26m));
+        (stopped.IsTimerRunning, stopped.IsTimerStopped, stopped.StoppedHoursInput, stopped.StoppedMinutesInput).Should().Be((false, true, 0m, 26m));
 
         await page.RegisterTimerCommand.ExecuteAsync(stopped);
 
@@ -343,7 +343,8 @@ public class TodayPageViewModelTests
 
         var reopened = await Loaded();
 
-        (Card(reopened, "Estudar").IsTimerStopped, Card(reopened, "Estudar").StoppedMinutesInput).Should().Be((true, 10m));
+        var card = Card(reopened, "Estudar");
+        (card.IsTimerStopped, card.StoppedHoursInput, card.StoppedMinutesInput).Should().Be((true, 0m, 10m));
     }
 
     [Fact]
@@ -1068,5 +1069,38 @@ public class TodayPageViewModelTests
         await page.SaveChunkCommand.ExecuteAsync(chunk);
 
         Rows(Card(page, "Estudar")).Should().Equal(("Projeto", "3 h"));
+    }
+
+    [Fact]
+    public async Task Stopped_timer_is_reviewed_in_hours_and_minutes()
+    {
+        await Create("Estudar", Measure.Duration, 300, unit: null);
+        var page = await Loaded();
+        await page.StartTimerCommand.ExecuteAsync(Card(page, "Estudar"));
+        _time.Advance(TimeSpan.FromMinutes(125));
+        await page.StopTimerCommand.ExecuteAsync(Card(page, "Estudar"));
+
+        var stopped = Card(page, "Estudar");
+        (stopped.StoppedHoursInput, stopped.StoppedMinutesInput).Should().Be((2m, 5m));
+        (stopped.StoppedHoursInput, stopped.StoppedMinutesInput) = (1, null);
+        await page.RegisterTimerCommand.ExecuteAsync(stopped);
+
+        Card(page, "Estudar").ProgressText.Should().Be("1 h de 5 h hoje");
+    }
+
+    [Fact]
+    public async Task Stopped_timer_without_time_asks_for_a_value()
+    {
+        await Create("Estudar", Measure.Duration, 60, unit: null);
+        var page = await Loaded();
+        await page.StartTimerCommand.ExecuteAsync(Card(page, "Estudar"));
+        _time.Advance(TimeSpan.FromMinutes(10));
+        await page.StopTimerCommand.ExecuteAsync(Card(page, "Estudar"));
+        var stopped = Card(page, "Estudar");
+        (stopped.StoppedHoursInput, stopped.StoppedMinutesInput) = (null, null);
+
+        await page.RegisterTimerCommand.ExecuteAsync(stopped);
+
+        (stopped.PanelError, Card(page, "Estudar").IsTimerStopped).Should().Be(("Informe um valor.", true));
     }
 }

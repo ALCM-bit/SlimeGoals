@@ -28,7 +28,8 @@ public sealed partial class TodayGoalViewModel : ObservableObject
         Elapsed = "";
         if (_timer is { StoppedAt: not null })
         {
-            StoppedMinutesInput = TimerService.Minutes(_timer, time.GetUtcNow());
+            var minutes = TimerService.Minutes(_timer, time.GetUtcNow());
+            (StoppedHoursInput, StoppedMinutesInput) = (minutes / 60, minutes % 60);
             PanelNote = _timer.Task; // a tarefa vira a nota do registro, e a pessoa pode editar
         }
         TaskInput = TimerTask;
@@ -144,7 +145,14 @@ public sealed partial class TodayGoalViewModel : ObservableObject
     [ObservableProperty] public partial IReadOnlyList<string> TaskSuggestions { get; set; } = [];
 
     [ObservableProperty] public partial string Elapsed { get; set; }
+    [ObservableProperty] public partial decimal? StoppedHoursInput { get; set; }
     [ObservableProperty] public partial decimal? StoppedMinutesInput { get; set; }
+
+    /// <summary>Tempo conferido do cronômetro parado, em minutos, com a conta do painel, ou null se horas e minutos estão vazios.</summary>
+    public int? StoppedAmount() =>
+        StoppedHoursInput is null && StoppedMinutesInput is null
+            ? null
+            : (int)Math.Round((StoppedHoursInput ?? 0) * 60 + (StoppedMinutesInput ?? 0), MidpointRounding.AwayFromZero);
     [ObservableProperty] public partial bool CanStartTimer { get; set; }
 
     /// <summary>Atualiza o tempo exibido do cronômetro rodando (chamado a cada segundo pela página).</summary>

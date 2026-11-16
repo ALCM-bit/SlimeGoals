@@ -275,14 +275,14 @@ void RenderTodayWithTimer(int width)
     today.ToggleChunksCommand.Execute(running);
     Pump();
     // O cartão do cronômetro, com a lista aberta, fica abaixo da dobra: rola até o começo da lista
-    window.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("chunks-toggle") && b.IsEffectivelyVisible)
+    window.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("chunks-toggle") && b.DataContext == running)
         .BringIntoView(new Rect(0, 0, 1, 400));
     Pump();
     Capture($"today-chunks-{width}.png");
     today.EditChunkCommand.Execute(running.Chunks.First(c => c.CanEdit));
     Pump();
     // O cartão do cronômetro, com a lista aberta, fica abaixo da dobra: rola até o começo da lista
-    window.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("chunks-toggle") && b.IsEffectivelyVisible)
+    window.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("chunks-toggle") && b.DataContext == running)
         .BringIntoView(new Rect(0, 0, 1, 400));
     Pump();
     Capture($"today-chunk-edit-{width}.png");
@@ -309,6 +309,22 @@ void RenderTodayWithTimer(int width)
     Pump();
     Capture($"today-timer-switch-{width}.png");
     today.CancelSwitchTaskCommand.Execute(running);
+    Pump();
+    // Cronômetro parado: a conferência em horas e minutos. O tempo é de exemplo (o relógio aqui é o real); o cronômetro
+    // é descartado depois, e a próxima largura começa outro.
+    today.StopTimerCommand.Execute(running);
+    Pump();
+    var stopped = today.Goals.Single(g => g.IsTimerStopped);
+    (stopped.StoppedHoursInput, stopped.StoppedMinutesInput) = (1, 25);
+    window.GetVisualDescendants().OfType<TodayView>().Single()
+        .GetVisualDescendants().OfType<ScrollViewer>().First().ScrollToHome();
+    Pump();
+    window.GetVisualDescendants().OfType<Border>()
+        .Single(b => b.Classes.Contains("inline-panel") && b.IsEffectivelyVisible && b.DataContext == stopped)
+        .BringIntoView();
+    Pump();
+    Capture($"today-timer-stopped-{width}.png");
+    today.DiscardTimerCommand.Execute(stopped);
     Pump();
     window.Close();
 

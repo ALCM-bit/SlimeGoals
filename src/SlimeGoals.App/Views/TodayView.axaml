@@ -390,11 +390,19 @@
                   <Border Classes="inline-panel" IsVisible="{Binding IsTimerStopped}">
                     <StackPanel Spacing="10">
                       <TextBlock Text="{Binding StoppedText}" TextWrapping="Wrap" Foreground="{DynamicResource Muted}" />
-                      <StackPanel Orientation="Horizontal" Spacing="10">
-                        <NumericUpDown Value="{Binding StoppedMinutesInput}" Minimum="0" Maximum="1440" Increment="1"
-                                       FormatString="0" Width="130" AutomationProperties.Name="Minutos cronometrados" />
-                        <TextBlock Text="min" VerticalAlignment="Center" />
-                      </StackPanel>
+                      <!-- Horas e minutos, como no painel de registro, quebrando linha quando não cabem -->
+                      <WrapPanel ItemSpacing="16" LineSpacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <NumericUpDown Value="{Binding StoppedHoursInput}" Minimum="0" Maximum="24" Increment="1"
+                                         FormatString="0" Width="110" AutomationProperties.Name="Horas cronometradas" />
+                          <TextBlock Text="h" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <NumericUpDown Value="{Binding StoppedMinutesInput}" Minimum="0" Maximum="59" Increment="1"
+                                         FormatString="0" Width="110" AutomationProperties.Name="Minutos cronometrados" />
+                          <TextBlock Text="min" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </WrapPanel>
                       <TextBox Text="{Binding PanelNote}" MaxLength="{x:Static services:CheckinService.MaxNoteLength}" PlaceholderText="Nota (opcional)"
                                AutomationProperties.Name="Nota" />
                       <TextBlock Classes="field-error" Text="{Binding PanelError}"
