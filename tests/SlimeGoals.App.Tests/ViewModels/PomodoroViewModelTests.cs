@@ -565,6 +565,57 @@ public class PomodoroViewModelTests
     }
 
     [Fact]
+    public async Task One_tap_at_a_time_while_the_session_is_saving()
+    {
+        var held = new HeldSessions(_sessions);
+        var focus = new FocusService(_goals, held, _timers, Checkins, new AppSettings(_settings), _time, _changes);
+        await focus.StartAsync(new FocusPlan([F(25), B(5), F(25)], 1), null);
+        var vm = new PomodoroViewModel(focus, GoalService, _time, _changes, _navigator);
+        await vm.LoadAsync();
+        _time.Advance(TimeSpan.FromMinutes(25));
+
+        held.Gate = new TaskCompletionSource();
+        var advancing = vm.AdvanceCommand.ExecuteAsync(null); // "Começar pausa", ainda gravando
+        advancing.IsCompleted.Should().BeFalse();
+
+        new[]
+        {
+            vm.AdvanceCommand.CanExecute(null), vm.SkipCommand.CanExecute(null), vm.ConfirmEndCommand.CanExecute(null),
+            vm.ConfirmReviewCommand.CanExecute(null), vm.PauseResumeCommand.CanExecute(null),
+            vm.SwitchTaskCommand.CanExecute(null),
+        }.Should().AllBeEquivalentTo(false);
+        var skipping = vm.SkipCommand.ExecuteAsync(null); // o ⏭ tocado logo depois não corta de novo
+        held.Gate.SetResult();
+        held.Gate = null;
+        await advancing;
+        await skipping;
+
+        (await _sessions.GetAsync())!.Step.Should().Be(1);
+        (vm.PhaseText, vm.Error).Should().Be(("Pausa", null));
+        (vm.SkipCommand.CanExecute(null), vm.PauseResumeCommand.CanExecute(null)).Should().Be((true, true));
+    }
+
+    [Fact]
+    public async Task Errors_survive_a_background_reload_while_the_session_runs()
+    {
+        var vm = await Running(new FocusPlan([F(25), B(5)], 1));
+        _time.Advance(TimeSpan.FromMinutes(60));
+        await vm.AdvanceCommand.ExecuteAsync(null);
+        vm.ReviewHoursInput = 25;
+        await vm.ConfirmReviewCommand.ExecuteAsync(null);
+        vm.Error.Should().Be("Valor fora do limite.");
+
+        await Reloaded(vm); // sincronização ou a recarga que o próprio toque postou
+        (vm.IsReviewing, vm.Error).Should().Be((true, "Valor fora do limite."));
+
+        vm.CancelReviewCommand.Execute(null);
+        vm.TaskInput = new string('a', 201);
+        await vm.SaveTaskCommand.ExecuteAsync(null);
+        await Reloaded(vm);
+        vm.Error.Should().Be("A nota deve ter até 200 caracteres.");
+    }
+
+    [Fact]
     public async Task Linked_end_keeps_the_summary_until_new_session()
     {
         var study = await Create("Estudar");
@@ -591,6 +642,29 @@ public class PomodoroViewModelTests
         (vm.IsPreparing, vm.IsFinished, vm.SummaryText).Should().Be((true, false, null));
         Plan(vm).Should().Equal((FocusBlockKind.Focus, 25), (FocusBlockKind.Break, 5));
         vm.RepeatInput.Should().Be(1);
+    }
+
+    /// <summary>Segura as gravações da sessão enquanto <see cref="Gate"/> estiver aberto: o toque fica "gravando".</summary>
+    private sealed class HeldSessions(IFocusSessionRepository inner) : IFocusSessionRepository
+    {
+        public TaskCompletionSource? Gate { get; set; }
+
+        public Task<FocusSession?> GetAsync(CancellationToken ct = default) => inner.GetAsync(ct);
+        public Task<IReadOnlyList<FocusChunk>> ChunksAsync(CancellationToken ct = default) => inner.ChunksAsync(ct);
+        public Task<bool> TryStartAsync(FocusSession session, CancellationToken ct = default) => inner.TryStartAsync(session, ct);
+
+        public async Task<bool> UpdateAsync(int expectedRevision, FocusSession? next, FocusChunk? chunk, Checkin? checkin,
+            CancellationToken ct = default)
+        {
+            if (Gate is { } gate)
+                await gate.Task;
+            return await inner.UpdateAsync(expectedRevision, next, chunk, checkin, ct);
+        }
+
+        public Task<bool> AssignChunkAsync(Guid chunkId, Checkin checkin, CancellationToken ct = default) =>
+            inner.AssignChunkAsync(chunkId, checkin, ct);
+        public Task<bool> MarkAlertedAsync(int step, CancellationToken ct = default) => inner.MarkAlertedAsync(step, ct);
+        public Task ClearAsync(CancellationToken ct = default) => inner.ClearAsync(ct);
     }
 
     private sealed class NoAlarm : IFocusAlarm

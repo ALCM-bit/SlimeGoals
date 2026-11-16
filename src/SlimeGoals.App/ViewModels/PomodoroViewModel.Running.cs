@@ -26,6 +26,7 @@ public sealed partial class PomodoroViewModel
 
     private ITimer? _ticker;
     private PendingCut _pendingCut;
+    private bool _acting;
 
     /// <summary>O que fecha o foco aberto: o toque no fim do bloco e o ⏭ avançam; o ✕ encerra.</summary>
     private enum PendingCut { Advance, End }
@@ -124,20 +125,31 @@ public sealed partial class PomodoroViewModel
     /// <summary>O ⇄ não leva conferência: esperando o toque (com extra), ele some até o próximo foco.</summary>
     public bool CanSwitchTask => IsFocusBlock && !IsWaiting;
 
+    /// <summary>
+    /// Nenhum toque que muda a sessão está gravando. O serviço relê a sessão a cada chamada, então "Começar pausa" e ⏭
+    /// tocados antes da recarga avançariam duas vezes: um toque por vez (⏸, ⏭, o toque do fim, ✕, a conferência e o ⇄).
+    /// </summary>
+    public bool CanAct => !_acting;
+
     /// <summary>Pausar e retomar; esperando o toque, não há relógio a pausar.</summary>
-    public bool CanPauseResume => IsRunning && !IsWaiting;
+    public bool CanPauseResume => IsRunning && !IsWaiting && CanAct;
+
+    /// <summary>"Trocar" do ⇄: como o ⇄, e sem outro toque gravando.</summary>
+    private bool CanConfirmSwitch => CanSwitchTask && CanAct;
 
     [RelayCommand(CanExecute = nameof(CanPauseResume))]
     private Task PauseResumeAsync() =>
-        Live is null ? Task.CompletedTask : RunAsync(IsPaused ? () => _focus.ResumeAsync() : () => _focus.PauseAsync());
+        Live is null
+            ? Task.CompletedTask
+            : ActAsync(() => RunAsync(IsPaused ? () => _focus.ResumeAsync() : () => _focus.PauseAsync()));
 
     /// <summary>⏭: fecha o bloco agora e começa o próximo (ou encerra, no último).</summary>
-    [RelayCommand]
-    private Task SkipAsync() => CutAsync(PendingCut.Advance);
+    [RelayCommand(CanExecute = nameof(CanAct))]
+    private Task SkipAsync() => ActAsync(() => CutAsync(PendingCut.Advance));
 
     /// <summary>O toque no fim do bloco: "Começar pausa", "Voltar ao foco" ou "Encerrar".</summary>
-    [RelayCommand]
-    private Task AdvanceAsync() => CutAsync(PendingCut.Advance);
+    [RelayCommand(CanExecute = nameof(CanAct))]
+    private Task AdvanceAsync() => ActAsync(() => CutAsync(PendingCut.Advance));
 
     [RelayCommand]
     private void AskEnd()
@@ -149,18 +161,20 @@ public sealed partial class PomodoroViewModel
     [RelayCommand]
     private void CancelEnd() => IsConfirmingEnd = false;
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanAct))]
     private Task ConfirmEndAsync()
     {
+        if (!CanAct)
+            return Task.CompletedTask;
         IsConfirmingEnd = false;
-        return CutAsync(PendingCut.End);
+        return ActAsync(() => CutAsync(PendingCut.End));
     }
 
     /// <summary>Grava o trecho conferido e segue com o que a pessoa tinha pedido (avançar ou encerrar).</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanAct))]
     private Task ConfirmReviewAsync()
     {
-        if (!IsReviewing)
+        if (!IsReviewing || !CanAct)
             return Task.CompletedTask;
         if (ReviewHoursInput is null && ReviewMinutesInput is null)
         {
@@ -170,7 +184,7 @@ public sealed partial class PomodoroViewModel
         var minutes = (int)Math.Round(
             Math.Clamp((ReviewHoursInput ?? 0) * 60 + (ReviewMinutesInput ?? 0), -MaxReviewInput, MaxReviewInput),
             MidpointRounding.AwayFromZero);
-        return RunCutAsync(_pendingCut, minutes);
+        return ActAsync(() => RunCutAsync(_pendingCut, minutes));
     }
 
     [RelayCommand]
@@ -234,18 +248,18 @@ public sealed partial class PomodoroViewModel
     }
 
     /// <summary>Fecha o trecho com o nome atual e segue o mesmo foco com o novo (ver <see cref="FocusService.SwitchTaskAsync"/>).</summary>
-    [RelayCommand(CanExecute = nameof(CanSwitchTask))]
+    [RelayCommand(CanExecute = nameof(CanConfirmSwitch))]
     private Task SwitchTaskAsync()
     {
-        if (!IsSwitchingTask || !CanSwitchTask)
+        if (!IsSwitchingTask || !CanConfirmSwitch)
             return Task.CompletedTask;
-        return RunAsync(async () =>
+        return ActAsync(() => RunAsync(async () =>
         {
             await _focus.SwitchTaskAsync(TaskInput);
             // Trocou: o modo de troca acaba, e a recarga não o devolve como rascunho.
             IsSwitchingTask = false;
             TaskInput = TodayGoalViewModel.NormalizeTask(TaskInput);
-        });
+        }));
     }
 
     [RelayCommand]
@@ -273,6 +287,36 @@ public sealed partial class PomodoroViewModel
         else
             return false;
         return true;
+    }
+
+    /// <summary>Um toque que muda a sessão: os outros ficam desligados até ele terminar (com a recarga).</summary>
+    private async Task ActAsync(Func<Task> work)
+    {
+        if (_acting)
+            return;
+        _acting = true;
+        RaiseActions();
+        try
+        {
+            await work();
+        }
+        finally
+        {
+            _acting = false;
+            RaiseActions();
+        }
+    }
+
+    private void RaiseActions()
+    {
+        OnPropertyChanged(nameof(CanAct));
+        OnPropertyChanged(nameof(CanPauseResume));
+        AdvanceCommand.NotifyCanExecuteChanged();
+        SkipCommand.NotifyCanExecuteChanged();
+        ConfirmEndCommand.NotifyCanExecuteChanged();
+        ConfirmReviewCommand.NotifyCanExecuteChanged();
+        PauseResumeCommand.NotifyCanExecuteChanged();
+        SwitchTaskCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Fecha o foco aberto, passando antes pela conferência quando o extra pede.</summary>

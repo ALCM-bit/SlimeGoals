@@ -148,10 +148,11 @@ public sealed partial class PomodoroViewModel : ObservableObject
                 Seed(suggestion);
             // Depois de uma sessão, o preparo volta com a sugestão nova (a sequência dela) e sem meta.
             if (session is not null)
-            {
                 _seeded = false;
+            // O erro de um toque sobrevive às recargas de fundo (sincronização, a recarga que o próprio toque postou);
+            // só some quando a tela muda: a sessão aparece, termina ou some.
+            if (IsRunning != session is { FinishedAt: null } || (_session is null) != (session is null))
                 Error = null;
-            }
             _sessionGoalTitle = session?.GoalId is { } goalId ? all.FirstOrDefault(g => g.Id == goalId)?.Title : null;
             HoldSummary(session, held);
             var draft = TaskDraft();
