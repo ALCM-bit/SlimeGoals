@@ -103,13 +103,16 @@
 
           <StackPanel Classes="field" IsVisible="{Binding IsDuration}">
             <TextBlock Classes="field-label" Text="Alvo" />
-            <StackPanel Orientation="Horizontal" Spacing="10">
-              <NumericUpDown Value="{Binding DurationHoursInput}" Minimum="0" Maximum="168" Increment="1" FormatString="0"
-                             Width="110" AutomationProperties.Name="Horas" />
-              <TextBlock Text="h" VerticalAlignment="Center" />
-              <NumericUpDown Value="{Binding DurationMinutesInput}" Minimum="0" Maximum="59" Increment="1" FormatString="0"
-                             Width="110" AutomationProperties.Name="Minutos" />
-              <TextBlock Text="min" VerticalAlignment="Center" />
+            <!-- Como o alvo de quantidade: no layout estreito o "por dia" desce para a linha de baixo -->
+            <StackPanel Classes="field-row">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <NumericUpDown Value="{Binding DurationHoursInput}" Minimum="0" Maximum="168" Increment="1" FormatString="0"
+                               Width="110" AutomationProperties.Name="Horas" />
+                <TextBlock Text="h" VerticalAlignment="Center" />
+                <NumericUpDown Value="{Binding DurationMinutesInput}" Minimum="0" Maximum="59" Increment="1" FormatString="0"
+                               Width="110" AutomationProperties.Name="Minutos" />
+                <TextBlock Text="min" VerticalAlignment="Center" />
+              </StackPanel>
               <TextBlock Text="{Binding TargetSuffix}" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
             </StackPanel>
             <TextBlock Classes="field-error" Text="{Binding TargetError}"

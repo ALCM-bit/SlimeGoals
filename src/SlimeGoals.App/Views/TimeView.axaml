@@ -4,30 +4,31 @@
              xmlns:views="using:SlimeGoals.App.Views"
              x:Class="SlimeGoals.App.Views.TimeView"
              x:DataType="vm:TimePageViewModel">
-  <!-- Aba Tempo (spec Pomodoro §4 e §6): título, subabas e o Pomodoro, numa coluna só. No desktop a coluna fica
-       centrada, com 560 px no máximo (estilo focus-column); o título vem junto, para a página ter uma margem esquerda só. -->
+  <!-- Aba Tempo (spec Pomodoro §4 e §6): o título no lugar do das outras páginas; as subabas e o Pomodoro numa coluna
+       que, no desktop, fica centrada, com 560 px no máximo (estilo focus-column). -->
   <Panel>
     <!-- "Criar uma meta com ele": o editor de meta no lugar da página, como em Metas -->
     <ContentControl Content="{Binding Pomodoro.Editor}"
                     IsVisible="{Binding Pomodoro.Editor, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
     <DockPanel Classes="page" IsVisible="{Binding Pomodoro.Editor, Converter={x:Static ObjectConverters.IsNull}}">
-      <StackPanel DockPanel.Dock="Top" Classes="focus-column" Spacing="16" Margin="0,0,0,16">
+      <StackPanel DockPanel.Dock="Top" Spacing="16" Margin="0,0,0,16">
         <TextBlock Classes="page-title" Text="{Binding Title}" />
-        <!-- Subabas no segmento do app; por enquanto só o Pomodoro. Com a sessão aberta não há o que trocar, e a
-             altura vai para o relógio (no celular de 320 px, a sessão inteira cabe sem rolar) -->
-        <Border Classes="segment" HorizontalAlignment="Left" IsVisible="{Binding Pomodoro.IsPreparing}">
-          <ItemsControl ItemsSource="{Binding Tabs}" AutomationProperties.Name="Métodos">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="x:String">
-                <RadioButton Classes="segment" GroupName="time-tabs" Content="{Binding}" IsChecked="True" />
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </Border>
+        <!-- Subabas: por enquanto só o Pomodoro, num selo sozinho (um segmento de uma opção pareceria um botão). Com a
+             sessão aberta não há o que trocar, e a altura vai para o relógio -->
+        <ItemsControl Classes="focus-column" ItemsSource="{Binding Tabs}" AutomationProperties.Name="Métodos"
+                      IsVisible="{Binding Pomodoro.IsPreparing}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <Border Classes="method-tab">
+                <TextBlock Text="{Binding}" />
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
       </StackPanel>
 
       <views:PomodoroView DataContext="{Binding Pomodoro}" />

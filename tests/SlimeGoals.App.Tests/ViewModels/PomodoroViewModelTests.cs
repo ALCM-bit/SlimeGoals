@@ -134,6 +134,17 @@ public class PomodoroViewModelTests
         vm.StartText.Should().Be("Começar · 2 h");
     }
 
+    [Theory]
+    [InlineData(1, "vez")]
+    [InlineData(2, "vezes")]
+    [InlineData(null, "vezes")]
+    public async Task Repeat_unit_agrees_with_the_number(int? repeat, string unit)
+    {
+        var vm = await Loaded();
+        vm.RepeatInput = repeat;
+        vm.RepeatUnitText.Should().Be(unit); // "Repetir [1] vez", "Repetir [2] vezes"
+    }
+
     [Fact]
     public async Task Invalid_plan_shows_the_validation_message_and_starts_nothing()
     {

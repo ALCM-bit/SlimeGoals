@@ -1,3 +1,4 @@
+using System.Windows.Input;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -28,9 +29,9 @@ public partial class PomodoroView : UserControl
         if (e.Key == Key.Escape)
         {
             if (vm.IsSwitchingTask)
-                vm.CancelSwitchTaskCommand.Execute(null);
+                Run(vm.CancelSwitchTaskCommand);
             else if (vm.IsEditingTask)
-                vm.CancelEditTaskCommand.Execute(null);
+                Run(vm.CancelEditTaskCommand);
             else
                 return;
             e.Handled = true;
@@ -38,9 +39,9 @@ public partial class PomodoroView : UserControl
         }
         e.Handled = true;
         if (vm.IsSwitchingTask)
-            vm.SwitchTaskCommand.Execute(null);
+            Run(vm.SwitchTaskCommand);
         else
-            vm.SaveTaskCommand.Execute(null);
+            Run(vm.SaveTaskCommand);
     }
 
     /// <summary>
@@ -50,7 +51,14 @@ public partial class PomodoroView : UserControl
     private void OnTaskSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (e.AddedItems.Count > 0 && sender is AutoCompleteBox { IsDropDownOpen: false } && Session is { IsSwitchingTask: false } vm)
-            vm.SaveTaskCommand.Execute(null);
+            Run(vm.SaveTaskCommand);
+    }
+
+    /// <summary>Como um botão: o comando só roda se puder agora (ex.: nada a gravar, ou a sessão ocupada).</summary>
+    private static void Run(ICommand command)
+    {
+        if (command.CanExecute(null))
+            command.Execute(null);
     }
 
     /// <summary>✎ põe o foco no campo que aparece no lugar do nome, depois de ele ficar visível.</summary>

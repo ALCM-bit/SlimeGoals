@@ -6,8 +6,9 @@
              x:Class="SlimeGoals.App.Views.PomodoroView"
              x:DataType="vm:PomodoroViewModel">
   <!-- Subaba Pomodoro (spec Pomodoro §4 e §6). Três momentos: o preparo, a sessão rodando e a tela de fim. O conteúdo rola;
-       as ações ficam presas embaixo, na mesma coluna. Espaçamentos só de 4, 8, 12, 16 e 24. -->
-  <DockPanel>
+       as ações ficam presas embaixo no celular e logo abaixo do conteúdo no desktop (estilo focus-page), na mesma coluna.
+       Espaçamentos só de 4, 8, 12, 16 e 24. -->
+  <DockPanel Classes="focus-page">
     <StackPanel DockPanel.Dock="Bottom" Classes="focus-column" Spacing="12" Margin="0,16,0,0">
       <!-- O erro de um toque. Se for o mesmo motivo de "Começar" desligado, a faixa do motivo já diz -->
       <Border Classes="warning-band">
@@ -33,7 +34,8 @@
         <Button Classes="primary wide" Content="{Binding StartText}" Command="{Binding StartCommand}" />
       </StackPanel>
 
-      <!-- Rodando: ✕ encerrar, ⏸/▶ e ⏭, centrados no eixo da coluna -->
+      <!-- Rodando: ✕ encerrar, ⏸/▶ e ⏭, centrados no eixo da coluna. Saem enquanto o campo da subatividade está aberto
+           (ele tem o próprio ✓/✕ ou Cancelar/Trocar), para o campo e o teclado do celular terem a altura -->
       <StackPanel Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center">
         <StackPanel.IsVisible>
           <MultiBinding Converter="{x:Static BoolConverters.And}">
@@ -41,6 +43,8 @@
             <Binding Path="!IsWaiting" />
             <Binding Path="!IsConfirmingEnd" />
             <Binding Path="!IsReviewing" />
+            <Binding Path="!IsEditingTask" />
+            <Binding Path="!IsSwitchingTask" />
           </MultiBinding>
         </StackPanel.IsVisible>
         <Button Classes="ghost focus-control" AutomationProperties.Name="Encerrar" ToolTip.Tip="Encerrar a sessão"
@@ -192,14 +196,15 @@
                   <Button Classes="ghost wide" Content="+ Pausa" Command="{Binding AddBreakCommand}" />
                 </UniformGrid>
               </Grid>
-              <Grid ColumnDefinitions="*,Auto,44" ColumnSpacing="12">
+              <!-- "Repetir [N] vez(es)" lido de uma vez, junto da margem esquerda das barras -->
+              <StackPanel Orientation="Horizontal" Spacing="12">
                 <TextBlock Text="Repetir" VerticalAlignment="Center" />
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="8">
                   <NumericUpDown Value="{Binding RepeatInput}" Minimum="1" Maximum="10" Increment="1"
-                                 FormatString="0" Width="110" AutomationProperties.Name="Repetir" />
-                  <TextBlock Text="×" VerticalAlignment="Center" />
+                                 FormatString="0" Width="110" AutomationProperties.Name="Repetir quantas vezes" />
+                  <TextBlock Text="{Binding RepeatUnitText}" VerticalAlignment="Center" />
                 </StackPanel>
-              </Grid>
+              </StackPanel>
             </StackPanel>
           </Border>
 
@@ -244,9 +249,36 @@
 
           <!-- Sem margem em cima: a folga do próprio texto (acima dos algarismos) já dá o respiro sob o selo -->
           <StackPanel AutomationProperties.Name="Tempo que falta">
+            <StackPanel.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="!IsEditingTask" />
+                <Binding Path="!IsSwitchingTask" />
+                <Binding Path="!IsReviewing" />
+                <Binding Path="!IsConfirmingEnd" />
+              </MultiBinding>
+            </StackPanel.IsVisible>
             <TextBlock Classes="focus-digits" Classes.break="{Binding IsBreak}" Classes.paused="{Binding IsPaused}"
                        Text="{Binding MinutesText}" />
             <TextBlock Classes="focus-digits" Classes.break="{Binding IsBreak}" Classes.paused="{Binding IsPaused}"
+                       Text="{Binding SecondsText}" />
+          </StackPanel>
+          <!-- O mesmo tempo numa linha (47:12), enquanto o campo da subatividade ou um painel de baixo precisa da altura:
+               nada fica cortado a 320 px -->
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0"
+                      AutomationProperties.Name="Tempo que falta">
+            <StackPanel.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                <Binding Path="IsEditingTask" />
+                <Binding Path="IsSwitchingTask" />
+                <Binding Path="IsReviewing" />
+                <Binding Path="IsConfirmingEnd" />
+              </MultiBinding>
+            </StackPanel.IsVisible>
+            <TextBlock Classes="focus-digits small" Classes.break="{Binding IsBreak}" Classes.paused="{Binding IsPaused}"
+                       Text="{Binding MinutesText}" />
+            <TextBlock Classes="focus-digits small" Classes.break="{Binding IsBreak}" Classes.paused="{Binding IsPaused}"
+                       Text=":" />
+            <TextBlock Classes="focus-digits small" Classes.break="{Binding IsBreak}" Classes.paused="{Binding IsPaused}"
                        Text="{Binding SecondsText}" />
           </StackPanel>
 
@@ -266,11 +298,16 @@
           </StackPanel>
 
           <!-- Subatividade, só no foco: como no cartão do cronômetro (nome gravado com ✎ e ⇄, ou o campo com ✓) -->
+          <!-- Sai durante a conferência e o "Encerrar a sessão?": o painel de baixo é o assunto, e o resto termina inteiro -->
           <Border x:Name="TaskArea" Classes="card" Padding="12" Margin="0,24,0,0">
             <Border.IsVisible>
-              <MultiBinding Converter="{x:Static BoolConverters.Or}">
-                <Binding Path="ShowsTaskLabel" />
-                <Binding Path="ShowsTaskField" />
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                  <Binding Path="ShowsTaskLabel" />
+                  <Binding Path="ShowsTaskField" />
+                </MultiBinding>
+                <Binding Path="!IsReviewing" />
+                <Binding Path="!IsConfirmingEnd" />
               </MultiBinding>
             </Border.IsVisible>
             <StackPanel Spacing="8">

@@ -59,8 +59,11 @@ public sealed partial class PomodoroViewModel : ObservableObject
     public ObservableCollection<FocusBlockViewModel> Blocks { get; } = [];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StartText))]
+    [NotifyPropertyChangedFor(nameof(StartText), nameof(RepeatUnitText))]
     public partial decimal? RepeatInput { get; set; }
+
+    /// <summary>A palavra depois do campo: "Repetir [1] vez", "Repetir [2] vezes".</summary>
+    public string RepeatUnitText => Repeat() == 1 ? "vez" : "vezes";
 
     /// <summary>"Sem meta" e as metas de tempo ativas hoje.</summary>
     [ObservableProperty] public partial IReadOnlyList<FocusGoalOption> GoalOptions { get; set; } = [NoGoal];

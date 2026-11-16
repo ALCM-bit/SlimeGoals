@@ -620,6 +620,29 @@
 
   <!-- ===== Pomodoro (aba Tempo, spec Pomodoro §6): grade de 4 px, foco em Primary e pausa em GoalGreen ===== -->
   <!-- Coluna única: no desktop, centrada e com 560 px no máximo (Stretch com MaxWidth centra); no celular, a largura toda -->
+  <!-- No desktop, as ações vêm logo abaixo do conteúdo; no celular (compact), ficam presas embaixo, ao alcance do polegar -->
+  <Style Selector="DockPanel.focus-page">
+    <Setter Property="VerticalAlignment" Value="Top" />
+  </Style>
+  <Style Selector=".compact DockPanel.focus-page">
+    <Setter Property="VerticalAlignment" Value="Stretch" />
+  </Style>
+  <!-- Subaba única da aba Tempo: um selo, não um segmento -->
+  <Style Selector="Border.method-tab">
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="MinHeight" Value="32" />
+    <Setter Property="Padding" Value="16,4" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimarySoft}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="Border.method-tab > TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
   <Style Selector=":is(Control).focus-column">
     <Setter Property="MaxWidth" Value="560" />
   </Style>
@@ -749,6 +772,11 @@
     <Setter Property="LineHeight" Value="96" />
     <Setter Property="HorizontalAlignment" Value="Center" />
     <Setter Property="Foreground" Value="{DynamicResource PrimaryTint}" />
+  </Style>
+  <!-- O relógio numa linha só (47:12), quando o campo da subatividade ou um painel de baixo precisa da altura -->
+  <Style Selector="TextBlock.focus-digits.small">
+    <Setter Property="FontSize" Value="48" />
+    <Setter Property="LineHeight" Value="56" />
   </Style>
   <Style Selector="TextBlock.focus-digits.break">
     <Setter Property="Foreground" Value="{DynamicResource GoalGreenFg}" />
