@@ -75,9 +75,10 @@ public sealed partial class PomodoroViewModel
         ? (total % 60).ToString("00", CultureInfo.InvariantCulture)
         : null;
 
-    /// <summary>"+2 min": o extra desde o fim do bloco, enquanto a sessão espera o toque.</summary>
+    /// <summary>"+2 min": o extra desde o fim do bloco, enquanto a sessão espera o toque. No primeiro minuto, nada.</summary>
     public string? OvertimeText => Live is { } s && FocusClock.IsWaiting(s, Now)
-        ? $"+{GoalFormatting.Duration((int)FocusClock.Overtime(s, Now).TotalMinutes)}"
+        && (int)FocusClock.Overtime(s, Now).TotalMinutes is var minutes and > 0
+        ? $"+{GoalFormatting.Duration(minutes)}"
         : null;
 
     /// <summary>A meta da sessão rodando, ou a do resumo na tela de fim.</summary>

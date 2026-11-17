@@ -401,6 +401,18 @@ public class PomodoroViewModelTests
     }
 
     [Fact]
+    public async Task Overtime_shows_from_the_first_whole_minute()
+    {
+        var vm = await Running(new FocusPlan([F(25), B(5)], 1));
+
+        _time.Advance(TimeSpan.FromMinutes(25) + TimeSpan.FromSeconds(59));
+        (vm.IsWaiting, vm.PhaseText, vm.OvertimeText).Should().Be((true, "Foco concluído", (string?)null)); // sem "+0 min"
+
+        _time.Advance(TimeSpan.FromSeconds(1));
+        vm.OvertimeText.Should().Be("+1 min");
+    }
+
+    [Fact]
     public async Task Forgotten_focus_opens_the_review_prefilled_in_hours_and_minutes()
     {
         var study = await Create("Estudar");
