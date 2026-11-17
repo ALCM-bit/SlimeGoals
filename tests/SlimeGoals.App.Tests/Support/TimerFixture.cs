@@ -5,7 +5,10 @@ using SlimeGoals.Testing;
 
 namespace SlimeGoals.App.Tests.Support;
 
-/// <summary>Cronômetro de verdade sobre repositórios em memória, com relógio falso e o aviso de mudanças ligado.</summary>
+/// <summary>
+/// Cronômetro e sessão de Pomodoro de verdade sobre repositórios em memória, com relógio falso e o aviso de mudanças
+/// ligado. O <see cref="Watcher"/> mostra o cronômetro e, sem ele, a sessão.
+/// </summary>
 internal sealed class TimerFixture : IDisposable
 {
     public static readonly DateTimeOffset T0 = new(2026, 11, 14, 15, 0, 0, TimeSpan.Zero);
@@ -17,10 +20,13 @@ internal sealed class TimerFixture : IDisposable
     {
         Time.SetLocalTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
         Goals = new InMemoryGoalRepository(_checkins, timers: _timerRepository);
+        Sessions = new InMemoryFocusSessionRepository(_checkins, _timerRepository);
         GoalService = new GoalService(Goals, _checkins, _timerRepository, Time, Changes);
-        Timers = new TimerService(Goals, _timerRepository, new CheckinService(Goals, _checkins, Time, Changes), Time, Changes);
-        Watcher = new RunningTimerWatcher(Timers, Goals, Changes);
+        var checkins = new CheckinService(Goals, _checkins, Time, Changes);
+        Timers = new TimerService(Goals, _timerRepository, checkins, Time, Changes, Sessions);
         Settings = new AppSettings(SettingsRepository, Changes);
+        Focus = new FocusService(Goals, Sessions, _timerRepository, checkins, Settings, Time, Changes);
+        Watcher = new RunningTimerWatcher(Timers, Goals, Changes, Focus);
     }
 
     public FakeTimeProvider Time { get; } = new(T0);
@@ -28,6 +34,8 @@ internal sealed class TimerFixture : IDisposable
     public InMemoryGoalRepository Goals { get; }
     public GoalService GoalService { get; }
     public TimerService Timers { get; }
+    public InMemoryFocusSessionRepository Sessions { get; }
+    public FocusService Focus { get; }
     public RunningTimerWatcher Watcher { get; }
     public InMemorySettingsRepository SettingsRepository { get; } = new();
     public AppSettings Settings { get; }

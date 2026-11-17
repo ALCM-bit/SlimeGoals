@@ -40,7 +40,7 @@ public sealed class DbusNotificationService : INotificationService, IDisposable
             ("default", "Abrir"),
         ];
         var body = await BodyMarkupAsync(ct).ConfigureAwait(false) ? Escape(reminder.Text.Body) : reminder.Text.Body;
-        var id = await _bus.NotifyAsync(reminder.Text.Title, body, actions, ct).ConfigureAwait(false);
+        var id = await _bus.NotifyAsync(reminder.Text.Title, body, actions, ct: ct).ConfigureAwait(false);
         lock (_lock)
         {
             _byId[id] = new Entry(reminder.LogId);

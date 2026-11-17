@@ -41,12 +41,14 @@ public partial class App(IServiceProvider services) : Application
             // Fechar a janela só a oculta: o processo segue para os lembretes até o "Sair" (Shutdown).
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             var lifetime = services.GetService<DesktopAppLifetime>();
+            // O "Sair" do head (no Linux, com o aviso do Pomodoro guardado), o mesmo da bandeja e do Ctrl+Q
+            var quit = services.GetService<IAppLifetime>();
             var closeBehavior = services.GetService<WindowCloseBehavior>();
             var window = new MainWindow
             {
                 DataContext = shell,
                 QuitOnClose = () => closeBehavior?.Current == CloseAction.Quit,
-                Quit = () => lifetime?.Quit(),
+                Quit = () => quit?.Quit(),
             };
             // Em segundo plano a janela não vai para desktop.MainWindow (que a abriria sozinha):
             // o MainWindowActivator a mostra no primeiro pedido.

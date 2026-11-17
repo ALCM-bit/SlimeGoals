@@ -144,7 +144,35 @@ public sealed class Sample : IDisposable
             s.GetRequiredService<DataChangeNotifier>());
         watcher.StartAsync().GetAwaiter().GetResult();
         return new MiniTimerViewModel(watcher, s.GetRequiredService<TimerService>(), new NoWindow(), CreateShell(false),
-            TimeProvider.System);
+            new PageNavigator(), TimeProvider.System);
+    }
+
+    /// <summary>
+    /// A janelinha com uma sessão de Pomodoro no primeiro foco de 25 min, com 1 min 1 s feito (falta "23:59"). Com
+    /// <paramref name="goalTitle"/>, a sessão conta nessa meta; com <paramref name="paused"/>, fica pausada.
+    /// </summary>
+    public MiniTimerViewModel CreateMiniFocus(string? goalTitle, string? task, bool paused = false)
+    {
+        var s = _services;
+        s.GetRequiredService<ITimerRepository>().ClearAsync().GetAwaiter().GetResult();
+        ClearFocus();
+        var goals = s.GetRequiredService<IGoalRepository>();
+        var goalId = goalTitle is null ? (Guid?)null
+            : s.GetRequiredService<GoalService>().ListAsync().GetAwaiter().GetResult().Single(g => g.Title == goalTitle).Id;
+        var focus = new FocusService(goals, s.GetRequiredService<IFocusSessionRepository>(),
+            s.GetRequiredService<ITimerRepository>(), s.GetRequiredService<CheckinService>(), s.GetRequiredService<AppSettings>(),
+            Clock, s.GetRequiredService<DataChangeNotifier>());
+        focus.StartAsync(FocusPlan.Default, goalId).GetAwaiter().GetResult();
+        if (task is not null)
+            focus.SetTaskAsync(task).GetAwaiter().GetResult();
+        Clock.Advance(new TimeSpan(0, 1, 1));
+        if (paused)
+            focus.PauseAsync().GetAwaiter().GetResult();
+        var watcher = new RunningTimerWatcher(s.GetRequiredService<TimerService>(), goals,
+            s.GetRequiredService<DataChangeNotifier>(), focus);
+        watcher.StartAsync().GetAwaiter().GetResult();
+        return new MiniTimerViewModel(watcher, s.GetRequiredService<TimerService>(), new NoWindow(), CreateShell(false),
+            new PageNavigator(), Clock);
     }
 
     private sealed class NoWindow : IWindowActivator

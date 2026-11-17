@@ -8,7 +8,8 @@ namespace SlimeGoals.App.Hosting;
 /// Regra da janelinha do cronômetro: ela fica à mostra quando a opção está ligada, há cronômetro rodando e a janela
 /// principal não está à vista. Qualquer mudança num dos três reaplica a regra na thread da interface
 /// (<paramref name="dispatch"/>). Sem cronômetro rodando, a janela nunca é pedida. O "−" da janela a esconde só
-/// para o cronômetro atual, sem mudar a opção: o próximo cronômetro volta a mostrá-la.
+/// para o cronômetro atual, sem mudar a opção: o próximo cronômetro volta a mostrá-la. Na sessão de Pomodoro, o "−" vale
+/// para a sessão inteira, e não só para o bloco.
 /// </summary>
 public sealed class MiniTimerController(RunningTimerWatcher watcher, IMainWindowPresence main, IMiniTimerWindow window,
     AppSettings settings, DataChangeNotifier changes, Action<Action> dispatch) : IAppHostedService
@@ -17,7 +18,7 @@ public sealed class MiniTimerController(RunningTimerWatcher watcher, IMainWindow
     private (int X, int Y)? _position;
     private volatile bool _enabled = true;
     private bool _shown; // só na thread da interface
-    private (Guid GoalId, DateTimeOffset StartedAt)? _dismissed; // só na thread da interface
+    private (Guid GoalId, DateTimeOffset StartedAt)? _dismissed; // só na thread da interface; ver KeyOf
     private int _started;
 
     public async Task StartAsync()
@@ -66,7 +67,7 @@ public sealed class MiniTimerController(RunningTimerWatcher watcher, IMainWindow
     private void OnHideRequested(object? sender, EventArgs e) => dispatch(() =>
     {
         if (watcher.Current is { } timer)
-            _dismissed = (timer.GoalId, timer.StartedAt);
+            _dismissed = KeyOf(timer);
         Apply();
     });
 
@@ -108,11 +109,17 @@ public sealed class MiniTimerController(RunningTimerWatcher watcher, IMainWindow
     {
         if (Volatile.Read(ref _started) != 1)
             return;
-        var show = _enabled && watcher.Current is { } timer && _dismissed != (timer.GoalId, timer.StartedAt)
-            && !main.IsOnScreen;
+        var show = _enabled && watcher.Current is { } timer && _dismissed != KeyOf(timer) && !main.IsOnScreen;
         if (show != _shown)
             Set(show);
     }
+
+    /// <summary>
+    /// O que o "−" esconde: o cronômetro (meta e início), ou a sessão pelo início dela. A meta da sessão fica de fora
+    /// (<see cref="Guid.Empty"/>), porque ela pode sumir no meio da sessão.
+    /// </summary>
+    private static (Guid GoalId, DateTimeOffset StartedAt) KeyOf(RunningTimer timer) =>
+        timer.Focus is { } focus ? (Guid.Empty, focus.SessionStartedAt) : (timer.GoalId, timer.StartedAt);
 
     private void Set(bool show)
     {

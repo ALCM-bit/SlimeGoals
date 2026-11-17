@@ -57,6 +57,17 @@ public static class GoalFormatting
         $"{(int)elapsed.TotalHours}:{elapsed.Minutes:00}:{elapsed.Seconds:00}";
 
     /// <summary>
+    /// Contagem regressiva: "24:59", e "1:15:00" com 1 h ou mais. Arredonda o segundo para cima, como o relógio grande
+    /// do Pomodoro: o bloco começa em "25:00" e só mostra "0:00" quando venceu. Negativo vira zero.
+    /// </summary>
+    public static string Countdown(TimeSpan remaining)
+    {
+        var total = Math.Max(0, (long)Math.Ceiling(remaining.TotalSeconds));
+        var (hours, minutes, seconds) = (total / 3600, total / 60 % 60, total % 60);
+        return hours > 0 ? $"{hours}:{minutes:00}:{seconds:00}" : $"{minutes}:{seconds:00}";
+    }
+
+    /// <summary>
     /// Singular só para a unidade padrão: 1 → "vez". A unidade é texto livre ("copos", "páginas"),
     /// e flexionar texto livre em pt-BR exigiria regras que erram mais do que acertam.
     /// </summary>

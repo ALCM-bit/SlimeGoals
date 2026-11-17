@@ -55,9 +55,14 @@ if (which == "mascot")
     RenderMascot();
 if (which == "mini")
 {
-    RenderMini("mini-timer", "Leitura");
-    RenderMini("mini-timer-long", "Aula de inglês com a professora particular às terças");
-    RenderMini("mini-timer-hover", "Leitura", hover: true);
+    RenderMini("mini-timer", () => sample.CreateMiniTimer("Leitura"));
+    RenderMini("mini-timer-long", () => sample.CreateMiniTimer("Aula de inglês com a professora particular às terças"));
+    RenderMini("mini-timer-hover", () => sample.CreateMiniTimer("Leitura"), hover: true);
+    // Sessão de Pomodoro: sem o "Parar", contando para baixo
+    RenderMini("mini-focus", () => sample.CreateMiniFocus(null, null));
+    RenderMini("mini-focus-goal-task", () => sample.CreateMiniFocus("Leitura", "Revisar capítulo 3"));
+    RenderMini("mini-focus-paused-hover", () => sample.CreateMiniFocus("Leitura", null, paused: true), hover: true);
+    sample.ClearFocus();
 }
 if (which == "account")
 {
@@ -196,11 +201,11 @@ void RenderMascot()
 
 // A janelinha do cronômetro de verdade, sobre um fundo neutro com folga, para ver os cantos arredondados.
 // Com hover, o "×" aparece como com o mouse sobre a janelinha (a captura não tem ponteiro).
-void RenderMini(string name, string title, bool hover = false)
+void RenderMini(string name, Func<MiniTimerViewModel> viewModel, bool hover = false)
 {
     var window = new MiniTimerWindow
     {
-        DataContext = sample.CreateMiniTimer(title),
+        DataContext = viewModel(),
         Background = new SolidColorBrush(Color.Parse("#3B4250")),
         Padding = new Thickness(14),
     };
