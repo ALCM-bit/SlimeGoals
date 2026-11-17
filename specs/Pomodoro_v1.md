@@ -1,6 +1,6 @@
 # Pomodoro e a página Tempo (v1)
 
-> Desenho completo, em revisão com o autor (16/11/2026). O esboço aprovado ("Gostei. Achei ótimo") ficou em `.superpowers/brainstorm/` (fora do repositório). Caminho escolhido: A, a sessão de foco separada do cronômetro. Um revisor leu o desenho como quem vai construir. Das seis dúvidas dele, uma foi ao autor (o som do aviso: "Como despertador") e cinco foram decididas aqui, marcadas como *Decisão minha*.
+> Desenho completo, aprovado pelo autor em 16/11/2026. O esboço aprovado ("Gostei. Achei ótimo") ficou em `.superpowers/brainstorm/` (fora do repositório). Caminho escolhido: A, a sessão de foco separada do cronômetro. Um revisor leu o desenho como quem vai construir. Das seis dúvidas dele, uma foi ao autor (o som do aviso: "Como despertador") e cinco foram decididas aqui, marcadas como *Decisão minha*.
 
 ## 1. Para que serve
 
@@ -181,3 +181,26 @@ O autor perguntou se não bastava avisar ao fechar, em vez de guardar a sessão.
   3. Linux (aviso e janelinha);
   4. Android (alarme, canal e notificação);
   5. conferência no desktop, no emulador e no Render.
+
+## 8. Verificação (16/11/2026)
+
+**Conferido**
+- **Automatizado:** `dotnet test --solution SlimeGoals.slnx` passa com 1794 testes, nenhum ignorado. `dotnet build SlimeGoals.slnx -c Release` fecha com 0 avisos, e o build de `SlimeGoals.Android.slnx` fecha sem erros (só o aviso XA0033 do JDK).
+- **Telas (Render):** as cenas da aba Tempo (preparo, edição de bloco, rodando, trocar tarefa, pausa, espera, conferência, encerrar, fim, janelinha) foram geradas em 320, 360 e 1100 px de largura e lidas uma a uma. Nada cortado em 320. Os painéis de conferência e de encerrar cobrem parte dos dígitos, de propósito.
+- **Android (emulador, API 36):**
+  - o aviso de fim de bloco toca como despertador e abre a tela de alarme, com "Parar som" e "Abrir";
+  - o som para ao voltar para a aba Tempo e ao voltar com a tela de bloqueio;
+  - a notificação conta para baixo e mostra o tempo parado na pausa;
+  - o plano da sessão grava e lê o mesmo JSON, em Debug e em Release.
+- **Linux (D-Bus, dados isolados):** uma sessão com bloco de 1 min, gravada no SQLite, foi retomada pelo app. Ao fim do bloco saiu uma notificação "Hora da pausa" com urgência 2 (crítica), `sound-name` `alarm-clock-elapsed`, ação "Abrir" e `desktop-entry` `slimegoals`.
+
+**Falta o autor ver**
+- No celular:
+  - o som e a vibração reais do despertador, com o aparelho bloqueado;
+  - o aviso depois de reiniciar o aparelho (com PIN);
+  - a permissão de alarme exato.
+- No GNOME:
+  - o banner crítico e o som, e o comportamento com "Não perturbe";
+  - a janelinha contando para baixo (o Wayland não deixa automatizar);
+  - o "Sair" com a sessão aberta: o aviso "Pomodoro guardado" aparece e continua visível depois que o app fecha;
+  - uma sessão de 1 min do começo ao fim, na mão.
