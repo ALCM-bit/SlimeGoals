@@ -254,7 +254,7 @@ public class FocusSessionRepositoryTests : IDisposable
         var good = Chunk(25);
         await Repo.UpdateAsync(0, Session(), good, checkin: null);
         await Repo.UpdateAsync(1, Session(), Chunk(30), checkin: null);
-        _db.Anchor.Execute("UPDATE focus_chunk SET ended_at = 'ontem' WHERE minutes = 30");
+        _db.Anchor.Execute("UPDATE focus_chunk SET ended_at = 'ontem' WHERE seconds = 30");
 
         (await Repo.ChunksAsync()).Should().Equal(good);
     }

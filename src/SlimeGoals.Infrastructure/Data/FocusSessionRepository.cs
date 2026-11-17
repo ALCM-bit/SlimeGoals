@@ -46,7 +46,7 @@ public sealed class FocusSessionRepository(SqliteConnectionFactory db) : IFocusS
     {
         await using var c = db.Open();
         return await RowReader.ReadValidAsync<ChunkRow, FocusChunk>(c, new CommandDefinition("""
-            SELECT id AS Id, minutes AS Seconds, task AS Task, ended_at AS EndedAt, checkin_id AS CheckinId
+            SELECT id AS Id, seconds AS Seconds, task AS Task, ended_at AS EndedAt, checkin_id AS CheckinId
             FROM focus_chunk ORDER BY ended_at, id
             """, cancellationToken: ct), "focus_chunk", r => r.ToDomain());
     }
@@ -103,7 +103,7 @@ public sealed class FocusSessionRepository(SqliteConnectionFactory db) : IFocusS
                     return false;
                 if (chunk is not null)
                     await c.ExecuteAsync(new CommandDefinition("""
-                        INSERT INTO focus_chunk (id, minutes, task, ended_at, checkin_id)
+                        INSERT INTO focus_chunk (id, seconds, task, ended_at, checkin_id)
                         VALUES (@Id, @Seconds, @Task, @EndedAt, @CheckinId)
                         """, ChunkParams(chunk), tx, cancellationToken: ct));
             }
