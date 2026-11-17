@@ -79,7 +79,7 @@ O autor perguntou se não bastava avisar ao fechar, em vez de guardar a sessão.
 - **Controles:**
   - **✕ Encerrar** pede confirmação.
   - **⏸/▶ Pausar e retomar o relógio.** Pausado, o tempo não corre e não conta.
-  - **⏭ Pular para o próximo bloco.**
+  - **⏭ Pular para o próximo bloco.** No último bloco, ele encerraria a sessão: pede a mesma confirmação do ✕.
   - Os três ficam centrados, com o principal maior.
 - **Subatividade:** o campo, o ✎ e o ⇄ funcionam como no cartão do cronômetro (`Tarefas_no_cronometro_v1.md` §4 e §7.1):
   - o nome é opcional e nasce na hora;
@@ -185,12 +185,12 @@ O autor perguntou se não bastava avisar ao fechar, em vez de guardar a sessão.
 ## 8. Verificação (16/11/2026)
 
 **Conferido**
-- **Automatizado:** `dotnet test --solution SlimeGoals.slnx` passa com 1794 testes, nenhum ignorado. `dotnet build SlimeGoals.slnx -c Release` fecha com 0 avisos, e o build de `SlimeGoals.Android.slnx` fecha sem erros (só o aviso XA0033 do JDK).
-- **Telas (Render):** as cenas da aba Tempo (preparo, edição de bloco, rodando, trocar tarefa, pausa, espera, conferência, encerrar, fim, janelinha) foram geradas em 320, 360 e 1100 px de largura e lidas uma a uma. Nada cortado em 320. Os painéis de conferência e de encerrar cobrem parte dos dígitos, de propósito.
+- **Automatizado:** `dotnet test --solution SlimeGoals.slnx` passa com 1804 testes, nenhum ignorado. `dotnet build SlimeGoals.slnx -c Release` fecha com 0 avisos, e o build de `SlimeGoals.Android.slnx` fecha sem erros (só o aviso XA0033 do JDK).
+- **Telas (Render):** as cenas da aba Tempo (preparo, edição de bloco, rodando, trocar tarefa, pausa, espera, conferência, encerrar, fim, janelinha) foram geradas em 320, 360 e 1100 px de largura e lidas uma a uma. Nada cortado em 320.
 - **Android (emulador, API 36):**
   - o aviso de fim de bloco toca como despertador e abre a tela de alarme, com "Parar som" e "Abrir";
   - o som para ao voltar para a aba Tempo e ao voltar com a tela de bloqueio;
-  - a notificação conta para baixo e mostra o tempo parado na pausa;
+  - a notificação conta para baixo e mostra o tempo parado com a sessão pausada;
   - o plano da sessão grava e lê o mesmo JSON, em Debug e em Release.
 - **Linux (D-Bus, dados isolados):** uma sessão com bloco de 1 min, gravada no SQLite, foi retomada pelo app. Ao fim do bloco saiu uma notificação "Hora da pausa" com urgência 2 (crítica), `sound-name` `alarm-clock-elapsed`, ação "Abrir" e `desktop-entry` `slimegoals`.
 
