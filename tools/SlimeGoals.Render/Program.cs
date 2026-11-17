@@ -49,6 +49,7 @@ if (which is "narrow" or "time")
 {
     RenderTime(320, 640);
     RenderTime(360, 760);
+    RenderTime(412, 915);
     RenderTime(1100, 720);
 }
 if (which == "mascot")
