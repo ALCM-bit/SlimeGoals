@@ -17,7 +17,11 @@ public partial class ShellView : UserControl
     {
         InitializeComponent();
         SizeChanged += (_, e) => Classes.Set("compact", e.NewSize.Width < CompactBreakpoint);
+        // Android: a página volta inteira depois de mudar com o app em segundo plano.
+        LayoutUpdated += (_, _) => _layoutRepair.OnLayoutUpdated(this);
     }
+
+    private readonly StaleLayoutRepair _layoutRepair = new();
 
     private TopLevel? _topLevel;
     private bool _backSubscribed;
