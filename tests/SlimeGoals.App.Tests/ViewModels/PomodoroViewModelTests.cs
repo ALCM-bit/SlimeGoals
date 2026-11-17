@@ -419,6 +419,27 @@ public class PomodoroViewModelTests
     }
 
     [Fact]
+    public async Task Skip_on_the_last_block_asks_before_ending()
+    {
+        var vm = await Running(new FocusPlan([F(25), B(5)], 1));
+        _time.Advance(TimeSpan.FromMinutes(10));
+        await vm.SkipCommand.ExecuteAsync(null); // no foco, o ⏭ segue para a pausa sem perguntar
+        (vm.PhaseText, vm.IsConfirmingEnd).Should().Be(("Pausa", false));
+
+        _time.Advance(TimeSpan.FromMinutes(2));
+        await vm.SkipCommand.ExecuteAsync(null); // no último bloco, um toque solto não encerra a sessão
+
+        (vm.IsConfirmingEnd, vm.IsRunning).Should().Be((true, true));
+        (await _sessions.GetAsync())!.FinishedAt.Should().BeNull();
+        vm.CancelEndCommand.Execute(null);
+        (vm.IsConfirmingEnd, vm.IsRunning).Should().Be((false, true));
+
+        await vm.SkipCommand.ExecuteAsync(null);
+        await vm.ConfirmEndCommand.ExecuteAsync(null);
+        (vm.IsFinished, vm.SummaryText).Should().Be((true, "10 min"));
+    }
+
+    [Fact]
     public async Task Pause_freezes_the_countdown()
     {
         var vm = await Running(new FocusPlan([F(25), B(5)], 1));

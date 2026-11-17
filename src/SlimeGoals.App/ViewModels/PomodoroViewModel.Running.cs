@@ -155,9 +155,20 @@ public sealed partial class PomodoroViewModel
             ? Task.CompletedTask
             : ActAsync(() => RunAsync(IsPaused ? () => _focus.ResumeAsync() : () => _focus.PauseAsync()));
 
-    /// <summary>⏭: fecha o bloco agora e começa o próximo (ou encerra, no último).</summary>
+    /// <summary>
+    /// ⏭: fecha o bloco agora e começa o próximo. No último, encerraria a sessão: pede a mesma confirmação do ✕, para um
+    /// toque solto não terminar a sessão de vez.
+    /// </summary>
     [RelayCommand(CanExecute = nameof(CanAct))]
-    private Task SkipAsync() => ActAsync(() => CutAsync(PendingCut.Advance));
+    private Task SkipAsync()
+    {
+        if (Live is { IsLastStep: true })
+        {
+            AskEnd();
+            return Task.CompletedTask;
+        }
+        return ActAsync(() => CutAsync(PendingCut.Advance));
+    }
 
     /// <summary>O toque no fim do bloco: "Começar pausa", "Voltar ao foco" ou "Encerrar".</summary>
     [RelayCommand(CanExecute = nameof(CanAct))]
