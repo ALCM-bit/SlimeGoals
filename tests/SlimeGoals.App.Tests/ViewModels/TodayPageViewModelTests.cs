@@ -1122,7 +1122,7 @@ public class TodayPageViewModelTests
     }
 
     [Fact]
-    public async Task Chunk_editor_works_in_hours_and_minutes()
+    public async Task Chunk_editor_works_in_hours_minutes_and_seconds()
     {
         var goal = await Create("Estudar", Measure.Duration, 300 * 60, unit: null);
         await CheckinService.AdjustAsync(goal.Id, 150 * 60, "Projeto");
@@ -1171,6 +1171,33 @@ public class TodayPageViewModelTests
 
         chunk.Error.Should().BeNull();
         _checkins.All.Should().ContainSingle().Which.Should().Match<Checkin>(c => c.Id == id && c.Amount == 160);
+    }
+
+    [Fact]
+    public async Task Negative_chunk_editor_keeps_the_sign_and_the_seconds()
+    {
+        var goal = await StudyWithRecordsAsync();
+        _time.Advance(TimeSpan.FromMinutes(1));
+        await CheckinService.AdjustAsync(goal.Id, -160);
+        var page = await Loaded();
+        var negative = Card(page, "Estudar").Chunks[0];
+        var id = negative.CheckinId;
+
+        page.EditChunkCommand.Execute(negative);
+        (negative.HoursInput, negative.MinutesInput, negative.SecondsInput).Should().Be((0m, 2m, 40m));
+        await page.SaveChunkCommand.ExecuteAsync(negative);
+
+        negative.Error.Should().BeNull();
+        _checkins.All.Should().ContainSingle(c => c.Amount < 0).Which.Should().Match<Checkin>(c => c.Id == id && c.Amount == -160);
+
+        var reloaded = Card(page, "Estudar").Chunks[0];
+        page.EditChunkCommand.Execute(reloaded);
+        (reloaded.HoursInput, reloaded.MinutesInput, reloaded.SecondsInput) = (0, 3, 5);
+        await page.SaveChunkCommand.ExecuteAsync(reloaded);
+
+        reloaded.Error.Should().BeNull();
+        _checkins.All.Should().ContainSingle(c => c.Amount < 0).Which.Amount.Should().Be(-185);
+        Rows(Card(page, "Estudar")).First().Should().Be(("Sem nome", "-3 min 5 s"));
     }
 
     [Fact]
