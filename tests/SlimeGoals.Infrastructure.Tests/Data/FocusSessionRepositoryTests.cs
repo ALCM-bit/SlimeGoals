@@ -210,6 +210,8 @@ public class FocusSessionRepositoryTests : IDisposable
     [Theory]
     [InlineData("plan", "'nada'")]
     [InlineData("plan", """'{"blocks":[],"repeat":1}'""")]
+    [InlineData("plan", """'{"blocks":[{"kind":"focus","minutes":0}],"repeat":1}'""")]
+    [InlineData("plan", """'{"blocks":[{"kind":"focus","minutes":25}],"repeat":0}'""")]
     [InlineData("started_at", "'ontem'")]
     [InlineData("goal_id", "'meta'")]
     [InlineData("step", "6")]
@@ -224,6 +226,25 @@ public class FocusSessionRepositoryTests : IDisposable
 
         (await Repo.ChunksAsync()).Should().BeEmpty();
         (await Timers.TryStartAsync(new ActiveTimer(_goal, T0))).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(13, 25, 1)]
+    [InlineData(2, 300, 1)]
+    [InlineData(2, 25, 11)]
+    public async Task Session_whose_plan_exceeds_todays_limits_is_read_intact(int blocks, int minutes, int repeat)
+    {
+        // Uma versão futura pode apertar os limites: quem atualiza no meio da sessão não perde o tempo guardado.
+        var plan = new FocusPlan(Enumerable.Range(0, blocks)
+            .Select(i => new FocusBlock(i % 2 == 0 ? FocusBlockKind.Focus : FocusBlockKind.Break, minutes)).ToList(), repeat);
+        plan.Validate().Should().NotBeEmpty();
+        var session = Session() with { Plan = plan, Step = plan.TotalSteps - 1 };
+        await Repo.TryStartAsync(session);
+        var chunk = Chunk(25);
+        await Repo.UpdateAsync(0, session, chunk, checkin: null);
+
+        (await Repo.GetAsync()).Should().Be(session with { Revision = 1 });
+        (await Repo.ChunksAsync()).Should().Equal(chunk);
     }
 
     [Fact]

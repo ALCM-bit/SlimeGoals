@@ -203,8 +203,10 @@ public sealed class FocusSessionRepository(SqliteConnectionFactory db) : IFocusS
         public FocusSession ToDomain()
         {
             var plan = FocusPlan.FromJson(Plan) ?? throw new FormatException("Plano ilegível.");
-            if (plan.Validate().Count > 0)
-                throw new FormatException("Plano fora dos limites.");
+            // Só a forma, não os limites de hoje: uma versão que apertar um limite não descarta a sessão (e os trechos
+            // guardados) de quem atualiza no meio dela.
+            if (plan.Blocks.Count == 0 || plan.Repeat < 1 || plan.Blocks.Any(b => b.Minutes < 1))
+                throw new FormatException("Plano sem forma.");
             var step = checked((int)Step);
             if (step < 0 || step >= plan.TotalSteps)
                 throw new FormatException("Passo fora do plano.");
