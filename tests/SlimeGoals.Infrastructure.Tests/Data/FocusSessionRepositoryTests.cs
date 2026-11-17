@@ -45,7 +45,7 @@ public class FocusSessionRepositoryTests : IDisposable
     [Fact]
     public async Task Session_round_trips_every_field()
     {
-        // Instantes em fusos diferentes e um resto de minuto com milissegundos.
+        // Instantes em fusos diferentes e uma fração de segundo com milissegundos.
         var session = new FocusSession(Plan, _goal, StartedAt: new DateTimeOffset(2026, 11, 16, 9, 0, 0, TimeSpan.FromHours(-3)),
             Step: 3, BlockStartedAt: T0.AddMinutes(60), CutAt: T0.AddMinutes(61), Carry: TimeSpan.FromMilliseconds(42_517),
             PausedAt: T0.AddMinutes(70), Task: "Inglês", FinishedAt: T0.AddMinutes(80), AlertedStep: 2, Revision: 5);

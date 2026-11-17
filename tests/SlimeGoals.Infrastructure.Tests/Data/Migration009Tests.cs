@@ -67,8 +67,14 @@ public class Migration009Tests
         InsertGoal(c, completion, "completion", 1);
         var q = InsertCheckin(c, quantity, 3);
         var d = InsertCheckin(c, completion, 1);
+        var duration = Guid.CreateVersion7();
+        InsertGoal(c, duration, "duration", 30);
+        var t = InsertCheckin(c, duration, 7);
 
         MigrationRunner.Migrate(c);
+
+        c.ExecuteScalar<int>("SELECT target FROM goals WHERE id = @Id", new { Id = duration.ToString("D") }).Should().Be(1800);
+        c.ExecuteScalar<int>("SELECT amount FROM checkins WHERE id = @Id", new { Id = t.ToString("D") }).Should().Be(420);
 
         c.ExecuteScalar<int>("SELECT target FROM goals WHERE id = @Id", new { Id = quantity.ToString("D") }).Should().Be(8);
         c.ExecuteScalar<int>("SELECT target FROM goals WHERE id = @Id", new { Id = completion.ToString("D") }).Should().Be(1);
@@ -85,7 +91,7 @@ public class Migration009Tests
         var chunk = Guid.CreateVersion7();
         c.Execute("""
             INSERT INTO focus_session (id, plan, goal_id, started_at, step, block_started_at, cut_at, carry_ms, revision)
-            VALUES (1, '{"blocks":[{"kind":"focus","minutes":25}],"repeat":1}', NULL, @Now, 0, @Now, @Now, 0, 0)
+            VALUES (1, '{"blocks":[{"kind":"focus","minutes":25}],"repeat":1}', NULL, @Now, 0, @Now, @Now, 42000, 5)
             """, new { Now });
         c.Execute("INSERT INTO focus_chunk (id, minutes, task, ended_at) VALUES (@Id, 25, NULL, @Now)",
             new { Id = chunk.ToString("D"), Now });
@@ -93,7 +99,14 @@ public class Migration009Tests
         MigrationRunner.Migrate(c);
 
         var repo = new FocusSessionRepository(db.Factory);
-        (await repo.GetAsync()).Should().NotBeNull();
+        var session = await repo.GetAsync();
+        session.Should().NotBeNull();
+        session!.Carry.Should().Be(TimeSpan.FromSeconds(42));
+        session.Plan.Blocks.Should().ContainSingle().Which.Minutes.Should().Be(25);
+        session.Plan.Repeat.Should().Be(1);
+        session.Step.Should().Be(0);
+        session.Revision.Should().Be(5);
+        session.StartedAt.Should().Be(DateTimeOffset.Parse(Now));
         (await repo.ChunksAsync()).Should().ContainSingle().Which.Seconds.Should().Be(1500);
     }
 
