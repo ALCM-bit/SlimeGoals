@@ -60,7 +60,7 @@ public sealed partial class TodayChunkViewModel : ObservableObject
     {
         if (!CanEdit)
             return;
-        (HoursInput, MinutesInput) = (Math.Abs(Amount) / 60, Math.Abs(Amount) % 60);
+        (HoursInput, MinutesInput) = (Math.Abs(Amount) / 3600, Math.Abs(Amount) % 3600 / 60);
         NoteInput = Note;
         Error = null;
         IsEditing = true;

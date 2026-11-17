@@ -480,7 +480,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             chunk.Error = "Informe um valor.";
             return Task.CompletedTask;
         }
-        return RunChunkAsync(chunk, () => checkins.ReplaceAsync(chunk.GoalId, id, minutes, chunk.NoteInput));
+        return RunChunkAsync(chunk, () => checkins.ReplaceAsync(chunk.GoalId, id, minutes * 60, chunk.NoteInput));
     }
 
     [RelayCommand]

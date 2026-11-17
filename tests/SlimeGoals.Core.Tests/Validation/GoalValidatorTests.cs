@@ -51,10 +51,12 @@ public class GoalValidatorTests
         var daily = Valid() with { Measure = Measure.Duration, Unit = null, Recurrence = Recurrence.Daily };
         var weekly = daily with { Recurrence = Recurrence.Weekly };
 
-        GoalValidator.Validate(daily with { Target = 1440 }).Should().BeEmpty();
-        ShouldHaveSingleError(daily with { Target = 1441 }, nameof(GoalDraft.Target), "O tempo deve ser entre 1 min e 24 h.");
-        GoalValidator.Validate(weekly with { Target = 10080 }).Should().BeEmpty();
-        ShouldHaveSingleError(weekly with { Target = 10081 }, nameof(GoalDraft.Target), "O tempo deve ser entre 1 min e 168 h.");
+        ShouldHaveSingleError(daily with { Target = 59 }, nameof(GoalDraft.Target), "O tempo deve ser entre 1 min e 24 h.");
+        GoalValidator.Validate(daily with { Target = 60 }).Should().BeEmpty();
+        GoalValidator.Validate(daily with { Target = 86_400 }).Should().BeEmpty();
+        ShouldHaveSingleError(daily with { Target = 86_401 }, nameof(GoalDraft.Target), "O tempo deve ser entre 1 min e 24 h.");
+        GoalValidator.Validate(weekly with { Target = 604_800 }).Should().BeEmpty();
+        ShouldHaveSingleError(weekly with { Target = 604_801 }, nameof(GoalDraft.Target), "O tempo deve ser entre 1 min e 168 h.");
         ShouldHaveSingleError(weekly with { Target = 0 }, nameof(GoalDraft.Target), "O tempo deve ser entre 1 min e 168 h.");
     }
 

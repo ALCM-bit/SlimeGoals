@@ -86,12 +86,12 @@ public sealed partial class TodayGoalViewModel : ObservableObject
         IsPanelOpen = open;
     }
 
-    /// <summary>Minutos do painel (com sinal), ou null se nada foi digitado.</summary>
+    /// <summary>Segundos do painel (com sinal), ou null se nada foi digitado.</summary>
     public int? PanelAmount()
     {
         if (PanelHoursInput is null && PanelMinutesInput is null)
             return null;
-        var v = (PanelHoursInput ?? 0) * 60 + (PanelMinutesInput ?? 0);
+        var v = (PanelHoursInput ?? 0) * 3600 + (PanelMinutesInput ?? 0) * 60;
         var amount = (int)Math.Round(v, MidpointRounding.AwayFromZero);
         return PanelRemoves ? -amount : amount;
     }

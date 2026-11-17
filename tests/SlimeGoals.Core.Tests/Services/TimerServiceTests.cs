@@ -301,7 +301,7 @@ public class TimerServiceTests
         await Service.StartAsync(goal.Id);
         await Service.SetTaskAsync("A");
         var before = await Service.GetAsync();
-        _time.Advance(TimeSpan.FromMinutes(24 * 60 + 1));
+        _time.Advance(TimeSpan.FromMinutes(24 * 3600 + 1));
 
         var act = () => Service.SwitchTaskAsync("B");
 

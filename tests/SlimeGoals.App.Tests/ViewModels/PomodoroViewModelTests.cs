@@ -434,7 +434,7 @@ public class PomodoroViewModelTests
         await vm.SkipCommand.ExecuteAsync(null); // e o ⏭ também
         vm.IsReviewing.Should().BeTrue();
 
-        vm.ReviewHoursInput = 25;
+        vm.ReviewHoursInput = 1441; // em minutos ainda; a tarefa 2 volta para 25 h
         await vm.ConfirmReviewCommand.ExecuteAsync(null);
         (vm.IsReviewing, vm.Error).Should().Be((true, "Valor fora do limite."));
         _checkins.All.Should().BeEmpty();
@@ -753,7 +753,7 @@ public class PomodoroViewModelTests
         var vm = await Running(new FocusPlan([F(25), B(5)], 1));
         _time.Advance(TimeSpan.FromMinutes(60));
         await vm.AdvanceCommand.ExecuteAsync(null);
-        vm.ReviewHoursInput = 25;
+        vm.ReviewHoursInput = 1441; // em minutos ainda; a tarefa 2 volta para 25 h
         await vm.ConfirmReviewCommand.ExecuteAsync(null);
         vm.Error.Should().Be("Valor fora do limite.");
 

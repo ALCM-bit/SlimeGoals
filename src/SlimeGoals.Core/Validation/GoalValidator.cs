@@ -10,8 +10,9 @@ public static class GoalValidator
 {
     public const int MaxTitleLength = 80;
     public const int MaxQuantityTarget = 9999;
-    public const int MaxDailyMinutes = 24 * 60;
-    public const int MaxWeeklyMinutes = 7 * 24 * 60;
+    public const int MaxDailySeconds = 24 * 3600;
+    public const int MaxWeeklySeconds = 7 * 24 * 3600;
+    public const int MinDurationSeconds = 60;
     public const int MaxUnitLength = 20;
     public const int MinReminderMinutes = 5;
     public const int MaxReminderMinutes = 24 * 60;
@@ -66,8 +67,8 @@ public static class GoalValidator
                     add(nameof(GoalDraft.Unit), $"A unidade deve ter até {MaxUnitLength} caracteres.");
                 break;
             case Measure.Duration:
-                var (max, label) = draft.Recurrence == Recurrence.Daily ? (MaxDailyMinutes, "24 h") : (MaxWeeklyMinutes, "168 h");
-                if (draft.Target < 1 || draft.Target > max)
+                var (max, label) = draft.Recurrence == Recurrence.Daily ? (MaxDailySeconds, "24 h") : (MaxWeeklySeconds, "168 h");
+                if (draft.Target < MinDurationSeconds || draft.Target > max)
                     add(target, $"O tempo deve ser entre 1 min e {label}.");
                 break;
             default:

@@ -69,8 +69,8 @@ public sealed partial class GoalEditViewModel : ObservableObject
         Unit = existing?.Unit ?? "vezes";
         if (existing is { Measure: Measure.Duration })
         {
-            _durationHours = existing.Target / 60;
-            _durationMinutes = existing.Target % 60;
+            _durationHours = existing.Target / 3600;
+            _durationMinutes = existing.Target % 3600 / 60;
         }
         SelectedIcon = IconOption.From(GoalIcons.Get(existing?.Icon ?? GoalIcons.DefaultKey));
         SelectedColor = Colors.Single(c => c.Color == (existing?.Color ?? GoalColor.Purple));
@@ -311,7 +311,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
         var target = Measure switch
         {
             Measure.Completion => 1,
-            Measure.Duration => (int)Math.Round((DurationHoursInput ?? 0) * 60 + (DurationMinutesInput ?? 0), MidpointRounding.AwayFromZero),
+            Measure.Duration => (int)Math.Round((DurationHoursInput ?? 0) * 3600 + (DurationMinutesInput ?? 0) * 60, MidpointRounding.AwayFromZero),
             _ => Target,
         };
         draft = new GoalDraft(

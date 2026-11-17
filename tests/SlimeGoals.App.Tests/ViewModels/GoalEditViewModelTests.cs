@@ -366,7 +366,7 @@ public class GoalEditViewModelTests
     }
 
     [Fact]
-    public async Task Duration_hours_and_minutes_build_target_in_minutes()
+    public async Task Duration_target_is_saved_in_seconds()
     {
         var vm = New();
         vm.Title = "Estudar";
@@ -377,7 +377,7 @@ public class GoalEditViewModelTests
         await vm.SaveCommand.ExecuteAsync(null);
 
         var saved = (await _repo.ListAsync(includeArchived: false)).Single();
-        (saved.Measure, saved.Target, saved.Unit).Should().Be((Measure.Duration, 150, (string?)null));
+        (saved.Measure, saved.Target, saved.Unit).Should().Be((Measure.Duration, 9000, (string?)null));
     }
 
     [Fact]
@@ -392,7 +392,7 @@ public class GoalEditViewModelTests
         await vm.SaveCommand.ExecuteAsync(null);
 
         var saved = (await _repo.ListAsync(includeArchived: false)).Single();
-        (saved.Measure, saved.Target).Should().Be((Measure.Duration, 60));
+        (saved.Measure, saved.Target).Should().Be((Measure.Duration, 3600));
         vm.SavedGoalId.Should().Be(saved.Id);
         _closed.Should().Equal(true);
     }
@@ -400,9 +400,9 @@ public class GoalEditViewModelTests
     [Fact]
     public async Task Editing_duration_goal_splits_target()
     {
-        var goal = await Existing(d => d with { Measure = Measure.Duration, Target = 150, Unit = null });
+        var goal = await Existing(d => d with { Measure = Measure.Duration, Target = 5400, Unit = null });
         var vm = Edit(goal);
-        (vm.IsDuration, vm.DurationHoursInput, vm.DurationMinutesInput).Should().Be((true, 2m, 30m));
+        (vm.IsDuration, vm.DurationHoursInput, vm.DurationMinutesInput).Should().Be((true, 1m, 30m));
     }
 
     [Fact]

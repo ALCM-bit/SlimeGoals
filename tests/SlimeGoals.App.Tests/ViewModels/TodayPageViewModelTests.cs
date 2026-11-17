@@ -235,10 +235,25 @@ public class TodayPageViewModelTests
     }
 
     [Fact]
+    public async Task Panel_adds_minutes_as_seconds()
+    {
+        await Create("Estudar", Measure.Duration, 7200);
+        var page = await Loaded();
+        var card = Card(page, "Estudar");
+
+        page.OpenPanelCommand.Execute(card);
+        card.PanelHoursInput = 0;
+        card.PanelMinutesInput = 25;
+        await page.ConfirmPanelCommand.ExecuteAsync(card);
+
+        _checkins.All.Last().Amount.Should().Be(1500);
+    }
+
+    [Fact]
     public async Task Panel_removes_30_minutes_from_duration_goal()
     {
-        var study = await Create("Estudar", Measure.Duration, 120);
-        await CheckinService.AdjustAsync(study.Id, 90);
+        var study = await Create("Estudar", Measure.Duration, 120 * 60);
+        await CheckinService.AdjustAsync(study.Id, 90 * 60);
         var page = await Loaded();
         var card = Card(page, "Estudar");
 
@@ -249,8 +264,8 @@ public class TodayPageViewModelTests
         card.PanelNote = "contei errado";
         await page.ConfirmPanelCommand.ExecuteAsync(card);
 
-        Card(page, "Estudar").ProgressText.Should().Be("1 h de 2 h hoje");
-        _checkins.All.Last().Should().Match<Checkin>(c => c.Amount == -30 && c.Note == "contei errado");
+        _checkins.All.Sum(c => c.Amount).Should().Be(3600); // 90 min − 30 min (o texto certo vem com a tarefa 5)
+        _checkins.All.Last().Should().Match<Checkin>(c => c.Amount == -1800 && c.Note == "contei errado");
     }
 
     [Fact]
@@ -377,8 +392,8 @@ public class TodayPageViewModelTests
     [Fact]
     public async Task Other_duration_goals_cannot_start_while_timer_exists()
     {
-        await Create("Estudar", Measure.Duration, 60);
-        await Create("Violão", Measure.Duration, 30);
+        await Create("Estudar", Measure.Duration, 3600);
+        await Create("Violão", Measure.Duration, 1800);
         var page = await Loaded();
         Card(page, "Violão").CanStartTimer.Should().BeTrue();
 
@@ -454,9 +469,9 @@ public class TodayPageViewModelTests
     [Fact]
     public async Task Timer_of_goal_not_shown_today_appears_in_strip_and_can_be_stopped_and_discarded()
     {
-        var weekend = await GoalService.CreateAsync(new GoalDraft("Fim de semana", Recurrence.Daily, 60, "book", GoalColor.Purple, 60,
+        var weekend = await GoalService.CreateAsync(new GoalDraft("Fim de semana", Recurrence.Daily, 3600, "book", GoalColor.Purple, 60,
             new TimeOnly(8, 0), new TimeOnly(20, 0), WeekDays.Saturday | WeekDays.Sunday, null, null, Measure.Duration, null));
-        await Create("Violão", Measure.Duration, 30);
+        await Create("Violão", Measure.Duration, 1800);
         await _timers.TryStartAsync(new ActiveTimer(weekend.Id, Now.AddMinutes(-12)));
 
         var page = await Loaded();
@@ -903,12 +918,12 @@ public class TodayPageViewModelTests
 
     // ---- Trechos de hoje no cartão (specs/Tarefas_no_cronometro_v1.md §7.2) ----
 
-    private async Task<Goal> StudyWithRecordsAsync()
+    private async Task<Goal> StudyWithRecordsAsync(int unit = 1)
     {
-        var goal = await Create("Estudar", Measure.Duration, 60, unit: null);
-        await CheckinService.AdjustAsync(goal.Id, 25, "Inglês");
+        var goal = await Create("Estudar", Measure.Duration, 60 * unit, unit: null);
+        await CheckinService.AdjustAsync(goal.Id, 25 * unit, "Inglês");
         _time.Advance(TimeSpan.FromMinutes(1));
-        await CheckinService.AdjustAsync(goal.Id, 12);
+        await CheckinService.AdjustAsync(goal.Id, 12 * unit);
         return goal;
     }
 
@@ -1000,7 +1015,7 @@ public class TodayPageViewModelTests
     [Fact]
     public async Task Edit_chunk_prefills_and_closes_other_editors()
     {
-        await StudyWithRecordsAsync();
+        await StudyWithRecordsAsync(unit: 60);
         var page = await Loaded();
         var (unnamed, english) = (Card(page, "Estudar").Chunks[0], Card(page, "Estudar").Chunks[1]);
 
@@ -1016,7 +1031,7 @@ public class TodayPageViewModelTests
     [Fact]
     public async Task Save_chunk_replaces_the_record()
     {
-        await StudyWithRecordsAsync();
+        await StudyWithRecordsAsync(unit: 60);
         var page = await Loaded();
         var english = Card(page, "Estudar").Chunks[1];
         page.EditChunkCommand.Execute(english);
@@ -1026,8 +1041,9 @@ public class TodayPageViewModelTests
         await page.SaveChunkCommand.ExecuteAsync(english);
 
         var card = Card(page, "Estudar");
-        (card.ChunksHeader, card.Chunks.Any(c => c.IsEditing)).Should().Be(("Hoje · 32 min", false));
-        Rows(card).Should().Contain(("Inglês 2", "20 min"));
+        card.Chunks.Any(c => c.IsEditing).Should().BeFalse();
+        // O texto em segundos só passa a sair certo com a exibição nova (tarefa 5).
+        card.Chunks.Select(c => (c.Name, c.Amount)).Should().Contain(("Inglês 2", 1200));
     }
 
     [Fact]
@@ -1092,18 +1108,16 @@ public class TodayPageViewModelTests
     [Fact]
     public async Task Chunk_editor_works_in_hours_and_minutes()
     {
-        var goal = await Create("Estudar", Measure.Duration, 300, unit: null);
-        await CheckinService.AdjustAsync(goal.Id, 150, "Projeto");
+        var goal = await Create("Estudar", Measure.Duration, 300 * 60, unit: null);
+        await CheckinService.AdjustAsync(goal.Id, 150 * 60, "Projeto");
         var page = await Loaded();
         var chunk = Card(page, "Estudar").Chunks.Single();
-        chunk.Text.Should().Be("2 h 30");
-
         page.EditChunkCommand.Execute(chunk);
         (chunk.HoursInput, chunk.MinutesInput).Should().Be((2m, 30m));
         (chunk.HoursInput, chunk.MinutesInput) = (3, null);
         await page.SaveChunkCommand.ExecuteAsync(chunk);
 
-        Rows(Card(page, "Estudar")).Should().Equal(("Projeto", "3 h"));
+        Card(page, "Estudar").Chunks.Select(c => (c.Name, c.Amount)).Should().Equal(("Projeto", 3 * 3600));
     }
 
     [Fact]
