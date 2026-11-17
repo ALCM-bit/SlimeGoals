@@ -43,8 +43,7 @@
             <Binding Path="!IsWaiting" />
             <Binding Path="!IsConfirmingEnd" />
             <Binding Path="!IsReviewing" />
-            <Binding Path="!IsEditingTask" />
-            <Binding Path="!IsSwitchingTask" />
+            <Binding Path="!IsTaskFieldOpen" />
           </MultiBinding>
         </StackPanel.IsVisible>
         <Button Classes="ghost focus-control" AutomationProperties.Name="Encerrar" ToolTip.Tip="Encerrar a sessão"
@@ -251,8 +250,7 @@
           <StackPanel AutomationProperties.Name="Tempo que falta">
             <StackPanel.IsVisible>
               <MultiBinding Converter="{x:Static BoolConverters.And}">
-                <Binding Path="!IsEditingTask" />
-                <Binding Path="!IsSwitchingTask" />
+                <Binding Path="!IsTaskFieldOpen" />
                 <Binding Path="!IsReviewing" />
                 <Binding Path="!IsConfirmingEnd" />
               </MultiBinding>
@@ -268,8 +266,7 @@
                       AutomationProperties.Name="Tempo que falta">
             <StackPanel.IsVisible>
               <MultiBinding Converter="{x:Static BoolConverters.Or}">
-                <Binding Path="IsEditingTask" />
-                <Binding Path="IsSwitchingTask" />
+                <Binding Path="IsTaskFieldOpen" />
                 <Binding Path="IsReviewing" />
                 <Binding Path="IsConfirmingEnd" />
               </MultiBinding>
@@ -325,33 +322,29 @@
                   <Path Classes="btn-icon" Data="{StaticResource IconSwap}" />
                 </Button>
               </Grid>
-              <!-- O campo; no modo de troca, só enquanto a troca é possível (não fica aberto no fim do foco) -->
-              <StackPanel Spacing="8">
-                <StackPanel.IsVisible>
-                  <MultiBinding Converter="{x:Static BoolConverters.And}">
-                    <Binding Path="ShowsTaskField" />
-                    <MultiBinding Converter="{x:Static BoolConverters.Or}">
-                      <Binding Path="!IsSwitchingTask" />
-                      <Binding Path="CanSwitchTask" />
-                    </MultiBinding>
-                  </MultiBinding>
-                </StackPanel.IsVisible>
-                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+              <!-- O campo. O modo de troca fecha sozinho no fim do foco (a troca não vale mais), então não sobra cartão vazio -->
+              <StackPanel Spacing="8" IsVisible="{Binding ShowsTaskField}">
+                <!-- Os botões num grupo que some inteiro: sem ✓ nem ✕ (modo de troca), o campo vai até a borda, alinhado
+                     com o Trocar de baixo (ColumnSpacing deixaria 8 px por coluna vazia) -->
+                <Grid ColumnDefinitions="*,Auto">
                   <AutoCompleteBox x:Name="TaskField" Text="{Binding TaskInput, Mode=TwoWay}"
                                    ItemsSource="{Binding TaskSuggestions}" PlaceholderText="No que está trabalhando?"
                                    FilterMode="Contains" MinimumPrefixLength="0"
                                    MaxLength="{x:Static services:CheckinService.MaxNoteLength}"
                                    AutomationProperties.Name="Subatividade" SelectionChanged="OnTaskSelectionChanged" />
-                  <Button Grid.Column="1" Classes="primary icon" AutomationProperties.Name="Confirmar subatividade"
-                          ToolTip.Tip="Confirmar subatividade" Command="{Binding SaveTaskCommand}"
-                          IsVisible="{Binding ShowsConfirmTask}">
-                    <Path Classes="btn-icon" Data="{StaticResource IconCheck}" />
-                  </Button>
-                  <Button Grid.Column="2" Classes="ghost icon" AutomationProperties.Name="Cancelar edição"
-                          ToolTip.Tip="Cancelar edição" Command="{Binding CancelEditTaskCommand}"
-                          IsVisible="{Binding IsEditingTask}">
-                    <Path Classes="btn-icon" Data="{StaticResource IconX}" />
-                  </Button>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="8,0,0,0"
+                              IsVisible="{Binding !IsSwitchingTask}">
+                    <Button Classes="primary icon" AutomationProperties.Name="Confirmar subatividade"
+                            ToolTip.Tip="Confirmar subatividade" Command="{Binding SaveTaskCommand}"
+                            IsVisible="{Binding ShowsConfirmTask}">
+                      <Path Classes="btn-icon" Data="{StaticResource IconCheck}" />
+                    </Button>
+                    <Button Classes="ghost icon" AutomationProperties.Name="Cancelar edição"
+                            ToolTip.Tip="Cancelar edição" Command="{Binding CancelEditTaskCommand}"
+                            IsVisible="{Binding IsEditingTask}">
+                      <Path Classes="btn-icon" Data="{StaticResource IconX}" />
+                    </Button>
+                  </StackPanel>
                 </Grid>
                 <UniformGrid Rows="1" ColumnSpacing="12" IsVisible="{Binding IsSwitchingTask}">
                   <Button Classes="ghost wide" Content="Cancelar" Command="{Binding CancelSwitchTaskCommand}" />

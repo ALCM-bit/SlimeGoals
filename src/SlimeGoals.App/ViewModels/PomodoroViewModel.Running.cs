@@ -111,12 +111,12 @@ public sealed partial class PomodoroViewModel
 
     /// <summary>A pessoa tocou ⇄: o campo volta vazio, com as sugestões, e grava o trecho com o nome atual ao trocar.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsTaskLabel), nameof(ShowsTaskField), nameof(ShowsConfirmTask))]
+    [NotifyPropertyChangedFor(nameof(ShowsTaskLabel), nameof(ShowsTaskField), nameof(ShowsConfirmTask), nameof(IsTaskFieldOpen))]
     public partial bool IsSwitchingTask { get; set; }
 
     /// <summary>A pessoa tocou ✎ para mudar o nome gravado: o campo volta, com ✓ e ✕.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsTaskLabel), nameof(ShowsTaskField), nameof(ShowsConfirmTask))]
+    [NotifyPropertyChangedFor(nameof(ShowsTaskLabel), nameof(ShowsTaskField), nameof(ShowsConfirmTask), nameof(IsTaskFieldOpen))]
     public partial bool IsEditingTask { get; set; }
 
     /// <summary>Notas recentes da meta da sessão, ou de todas as metas na sessão sem meta.</summary>
@@ -126,6 +126,12 @@ public sealed partial class PomodoroViewModel
     public bool ShowsTaskLabel => IsFocusBlock && SessionTask is not null && !IsEditingTask && !IsSwitchingTask;
     public bool ShowsTaskField => IsFocusBlock && !ShowsTaskLabel;
     public bool ShowsConfirmTask => ShowsTaskField && !IsSwitchingTask;
+
+    /// <summary>
+    /// O campo está aberto por um ✎ ou ⇄ e à vista: a tela dá a altura a ele (relógio numa linha, controles fora). Só no
+    /// foco; fora dele, os controles nunca somem.
+    /// </summary>
+    public bool IsTaskFieldOpen => ShowsTaskField && (IsEditingTask || IsSwitchingTask);
     public string TaskLabel => $"▸ {SessionTask}";
 
     /// <summary>O ⇄ não leva conferência: esperando o toque (com extra), ele some até o próximo foco.</summary>
@@ -441,12 +447,13 @@ public sealed partial class PomodoroViewModel
             : null;
 
     /// <summary>
-    /// Depois da recarga, o texto digitado volta enquanto for a mesma sessão e ainda diferir do nome gravado; senão, o
-    /// campo mostra o nome gravado.
+    /// Depois da recarga, o texto digitado volta enquanto for a mesma sessão, ainda num foco, e ainda diferir do nome
+    /// gravado; senão, o campo mostra o nome gravado. Na pausa o campo não aparece, então ✎ e ⇄ abertos fecham (os
+    /// controles da sessão dependem disso), e o ⇄ fecha também quando a troca deixa de valer (esperando o toque).
     /// </summary>
     private void RestoreTaskDraft((string? Input, bool Switching, bool Editing)? draft)
     {
-        if (draft is { } d && IsRunning
+        if (draft is { } d && IsRunning && IsFocusBlock && (!d.Switching || CanSwitchTask)
             && (d.Switching || d.Editing || TodayGoalViewModel.NormalizeTask(d.Input) != SessionTask))
         {
             TaskInput = d.Input;
@@ -474,7 +481,13 @@ public sealed partial class PomodoroViewModel
     private long? RemainingSeconds() =>
         Live is { } s ? (long)Math.Ceiling(FocusClock.Remaining(s, Now).TotalSeconds) : null;
 
-    private void Tick() => RaiseClock();
+    /// <summary>A cada segundo. Se o foco chegou ao fim com o ⇄ aberto, a troca não vale mais: o modo de troca fecha.</summary>
+    private void Tick()
+    {
+        if (IsSwitchingTask && !CanSwitchTask)
+            CancelSwitchTask();
+        RaiseClock();
+    }
 
     /// <summary>Avisa a tela do que muda com o tempo: a contagem, a fase, o extra e o que pode ser tocado.</summary>
     private void RaiseClock()
@@ -492,6 +505,7 @@ public sealed partial class PomodoroViewModel
         OnPropertyChanged(nameof(ShowsTaskLabel));
         OnPropertyChanged(nameof(ShowsTaskField));
         OnPropertyChanged(nameof(ShowsConfirmTask));
+        OnPropertyChanged(nameof(IsTaskFieldOpen));
         OnPropertyChanged(nameof(CanSwitchTask));
         OnPropertyChanged(nameof(CanPauseResume));
         PauseResumeCommand.NotifyCanExecuteChanged();

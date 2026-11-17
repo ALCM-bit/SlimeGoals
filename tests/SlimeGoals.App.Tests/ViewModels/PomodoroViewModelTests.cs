@@ -462,6 +462,34 @@ public class PomodoroViewModelTests
     }
 
     [Fact]
+    public async Task Task_field_left_open_closes_when_the_focus_ends()
+    {
+        var vm = await Running(new FocusPlan([F(25), B(5), F(25), B(5)], 1));
+        vm.TaskInput = "Capítulo 3";
+        await vm.SaveTaskCommand.ExecuteAsync(null);
+
+        // ⇄ aberto quando o foco chega ao fim: a troca não vale mais, e o nome gravado volta (sem cartão vazio).
+        await vm.BeginSwitchTaskCommand.ExecuteAsync(null);
+        vm.TaskInput = "Revis";
+        vm.IsTaskFieldOpen.Should().BeTrue();
+        _time.Advance(TimeSpan.FromMinutes(25));
+        (vm.IsWaiting, vm.IsSwitchingTask, vm.IsTaskFieldOpen).Should().Be((true, false, false));
+        (vm.ShowsTaskLabel, vm.TaskInput).Should().Be((true, "Capítulo 3"));
+
+        // ✎ aberto ao começar a pausa: na pausa o campo não aparece, e os controles (⏸, ⏭, ✕) voltam.
+        vm.BeginEditTaskCommand.Execute(null);
+        vm.IsTaskFieldOpen.Should().BeTrue();
+        await vm.AdvanceCommand.ExecuteAsync(null);
+        (vm.IsBreak, vm.IsEditingTask, vm.IsSwitchingTask, vm.IsTaskFieldOpen).Should().Be((true, false, false, false));
+
+        // ⏭ com o ⇄ aberto no foco seguinte: a pausa também começa sem o modo de troca.
+        await vm.SkipCommand.ExecuteAsync(null);
+        await vm.BeginSwitchTaskCommand.ExecuteAsync(null);
+        await vm.SkipCommand.ExecuteAsync(null);
+        (vm.IsBreak, vm.IsSwitchingTask, vm.IsTaskFieldOpen).Should().Be((true, false, false));
+    }
+
+    [Fact]
     public async Task Typing_survives_a_background_reload()
     {
         var vm = await Loaded();
