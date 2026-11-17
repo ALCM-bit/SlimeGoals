@@ -108,13 +108,13 @@ Este desenho faz as metas de tempo guardarem e mostrarem o tempo até o segundo.
 - **Telas (Render, `all`, `time` e `narrow`):** lidas a Hoje com trechos em 320 px, o fim do Pomodoro em 412 px e Relatórios da semana em 360 px.
   - Hoje: "Hoje · 1 h 12 min 40 s", o trecho "2 min 40 s" e a subtarefa de 4 s em "0:00:04". Nada cortado em 320.
   - Relatórios: "1 h 12 min 40 s de 2 h 30 min".
-  - Fim do Pomodoro: a amostra tem só minutos cheios, então a tela sai sem segundos, como deve.
+  - Fim do Pomodoro (`time-end-unassigned`, 320, 412 e 1100 px): total "2 h 11 min 20 s", "Revisar capítulo 3 · 58 min 40 s" e "Revisar o capítulo 3 do livro de arquitetura · 1 h 12 min 40 s". A linha longa quebra em duas em 320 e em 412 e cabe numa só em 1100; o tempo nunca é cortado. A cena `time-end-linked` tem só minutos cheios e sai sem segundos, como deve.
 - **Migração, leitura do formato 1 e cortes:** cobertos pelos testes de Core, Infraestrutura e Sync (valores antes e depois por medida, registro do formato 1 chegando antes da meta, trecho abaixo de 1 min gravado).
 - **Não conferido aqui:** o app aberto. O ambiente de verificação não enxerga janelas (Wayland).
 
 **Falta o autor ver**
 - Os dados reais depois de atualizar, no celular e no desktop: uma meta que tinha minutos mostra o mesmo tempo.
 - No celular, a troca de subtarefa com cerca de 40 s: aparece "40 s" com o nome da tarefa.
-- O resumo do fim do Pomodoro com segundos.
+- No celular, o resumo do fim do Pomodoro com o nome de uma subtarefa real.
 - A sincronização entre dois aparelhos já na nova versão.
 - Um aparelho na 0.9.0 pausando com "atualize o app" ao receber um registro do formato 2.

@@ -300,17 +300,17 @@ void RenderTime(int width, int height)
     vm.NewSessionCommand.Execute(null);
     Pump();
 
-    // Sessão sem meta: 58 min 40 s em uma subatividade e 44 min em outra, encerrada no meio do foco
-    SetPlan([(FocusBlockKind.Focus, 120), (FocusBlockKind.Break, 20)], 1);
+    // Sessão sem meta: 58 min 40 s em uma subatividade e 1 h 12 min 40 s em outra, de nome longo, encerrada no meio do foco
+    SetPlan([(FocusBlockKind.Focus, 200), (FocusBlockKind.Break, 20)], 1);
     Run(vm.StartCommand.ExecuteAsync(null));
     vm.TaskInput = "Revisar capítulo 3";
     Run(vm.SaveTaskCommand.ExecuteAsync(null));
     clock.Advance(new TimeSpan(0, 58, 40));
     Reload();
     Run(vm.BeginSwitchTaskCommand.ExecuteAsync(null));
-    vm.TaskInput = "Exercícios";
+    vm.TaskInput = "Revisar o capítulo 3 do livro de arquitetura";
     Run(vm.SwitchTaskCommand.ExecuteAsync(null));
-    clock.Advance(TimeSpan.FromMinutes(44));
+    clock.Advance(new TimeSpan(1, 12, 40));
     Reload();
     vm.AskEndCommand.Execute(null);
     Run(vm.ConfirmEndCommand.ExecuteAsync(null));
