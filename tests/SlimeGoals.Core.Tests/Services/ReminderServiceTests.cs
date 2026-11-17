@@ -31,7 +31,17 @@ public class ReminderServiceTests
     private readonly InMemorySettingsRepository _settings = new();
     private ReminderPause Pause => new(_settings, _time);
 
-    private ReminderService Service => new(_goals, _checkins, _timers, _log, _notifications, new FakeFormatter(), _time);
+    private InMemoryFocusSessionRepository? _focus;
+
+    private ReminderService Service => new(_goals, _checkins, _timers, _log, _notifications, new FakeFormatter(), _time,
+        focus: _focus);
+
+    private async Task StartSession(Guid? goalId)
+    {
+        _focus = new InMemoryFocusSessionRepository(_checkins);
+        await _focus.TryStartAsync(new FocusSession(FocusPlan.Default, goalId, Today(7), 0, Today(7), Today(7),
+            TimeSpan.Zero, null, null, null, null, 0));
+    }
 
     private ReminderService PausableService => new(_goals, _checkins, _timers, _log, _notifications, new FakeFormatter(), _time, Pause);
 
@@ -58,6 +68,31 @@ public class ReminderServiceTests
         (await Service.SyncAsync()).Should().BeNull();
 
         _notifications.Shown.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Goal_reminders_are_silent_during_its_focus_session()
+    {
+        var goal = await Add();
+        await StartSession(goal.Id);
+        At(10);
+
+        (await Service.SyncAsync()).Should().BeNull();
+
+        _notifications.Shown.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Reminders_of_other_goals_keep_firing_during_a_session()
+    {
+        var focused = await Add("Foco");
+        var other = await Add("Outra");
+        await StartSession(focused.Id);
+        At(10);
+
+        await Service.SyncAsync();
+
+        _notifications.Shown.Should().ContainSingle().Which.GoalId.Should().Be(other.Id);
     }
 
     [Fact]

@@ -55,7 +55,10 @@ public class AndroidApplication : AvaloniaAndroidApplication<AndroidApplication.
             using (var connection = services.GetRequiredService<SqliteConnectionFactory>().Open())
                 MigrationRunner.Migrate(connection);
             Services = services;
-            _ = StartTimerNotificationAsync(services);
+            _ = StartInBackgroundAsync(() => services.GetRequiredService<TimerNotificationSync>().StartAsync(),
+                "a notificação do cronômetro");
+            _ = StartInBackgroundAsync(() => services.GetRequiredService<FocusAlertHost>().StartAsync(),
+                "o aviso do Pomodoro");
         }
         catch (Exception ex)
         {
@@ -69,18 +72,19 @@ public class AndroidApplication : AvaloniaAndroidApplication<AndroidApplication.
     }
 
     /// <summary>
-    /// A notificação do cronômetro acompanha o banco desde o início do processo: um cronômetro iniciado pelo "Iniciar"
-    /// de um lembrete, com a tela fechada, também aparece. Sem esperar, fora da thread principal.
+    /// A notificação do cronômetro e o aviso do Pomodoro acompanham o banco desde o início do processo: um cronômetro
+    /// iniciado pelo "Iniciar" de um lembrete, com a tela fechada, também aparece, e o alarme do fim de bloco fica armado
+    /// num processo acordado por um receiver. Sem esperar, fora da thread principal.
     /// </summary>
-    private static async Task StartTimerNotificationAsync(ServiceProvider services)
+    private static async Task StartInBackgroundAsync(Func<Task> start, string what)
     {
         try
         {
-            await Task.Run(() => services.GetRequiredService<TimerNotificationSync>().StartAsync()).ConfigureAwait(false);
+            await Task.Run(start).ConfigureAwait(false);
         }
         catch (Exception e)
         {
-            Trace.TraceError($"Falha ao iniciar a notificação do cronômetro: {TraceText.Of(e)}");
+            Trace.TraceError($"Falha ao iniciar {what}: {TraceText.Of(e)}");
         }
     }
 

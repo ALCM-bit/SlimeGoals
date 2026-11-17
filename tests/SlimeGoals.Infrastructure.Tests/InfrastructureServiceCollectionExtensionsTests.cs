@@ -20,6 +20,7 @@ public class InfrastructureServiceCollectionExtensionsTests
             provider.GetRequiredService<IGoalRepository>().Should().BeOfType<GoalRepository>();
             provider.GetRequiredService<ICheckinRepository>().Should().BeOfType<CheckinRepository>();
             provider.GetRequiredService<ITimerRepository>().Should().BeOfType<TimerRepository>();
+            provider.GetRequiredService<IFocusSessionRepository>().Should().BeOfType<FocusSessionRepository>();
             provider.GetRequiredService<IReminderLogRepository>().Should().BeOfType<ReminderLogRepository>();
             provider.GetRequiredService<ISettingsRepository>().Should().BeOfType<SettingsRepository>();
             provider.GetRequiredService<ISyncStateStore>().Should().BeOfType<SyncStateRepository>();

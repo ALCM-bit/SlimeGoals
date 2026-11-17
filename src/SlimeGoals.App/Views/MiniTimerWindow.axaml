@@ -11,8 +11,10 @@
   <Panel>
   <!-- Opção A do protótipo (specs/design/cronometro-janelinha-prototipo.png): nome em cima, tempo embaixo em destaque -->
   <Border Classes="card mini-timer" ToolTip.Tip="Abrir o SlimeGoals">
-    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-      <Border Classes="icon-tile" VerticalAlignment="Center"
+    <!-- Espaços por margem, não por ColumnSpacing: sem o "Parar" (sessão de Pomodoro), a coluna dele some sem deixar
+         folga à direita -->
+    <Grid ColumnDefinitions="Auto,*,Auto">
+      <Border Classes="icon-tile" VerticalAlignment="Center" Margin="0,0,12,0"
               Background="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Bg}">
         <Viewbox Width="22" Height="22">
           <Canvas Width="24" Height="24">
@@ -25,16 +27,18 @@
         <TextBlock Classes="mini-timer-title" Text="{Binding Title}" />
         <TextBlock Classes="mini-timer-elapsed" Text="{Binding Elapsed}" />
       </StackPanel>
-      <Button Grid.Column="2" Classes="danger-solid icon" VerticalAlignment="Center"
+      <Button Grid.Column="2" Classes="danger-solid icon" VerticalAlignment="Center" Margin="12,0,0,0"
+              IsVisible="{Binding IsStopVisible}"
               AutomationProperties.Name="Parar cronômetro" ToolTip.Tip="Parar cronômetro" Command="{Binding StopCommand}">
         <Path Classes="btn-icon" Data="{StaticResource IconStop}" />
       </Button>
     </Grid>
   </Border>
-  <!-- Esconde só até o próximo cronômetro; a opção em Configurações › Janela continua como está -->
+  <!-- Esconde só até o próximo cronômetro (ou até o fim da sessão de Pomodoro); a opção em Configurações › Janela
+       continua como está -->
   <Button Classes="mini-timer-hide" HorizontalAlignment="Right" VerticalAlignment="Top"
-          AutomationProperties.Name="Esconder até o próximo cronômetro"
-          ToolTip.Tip="Esconder até o próximo cronômetro" Click="OnHideClick">
+          AutomationProperties.Name="{Binding HideText}"
+          ToolTip.Tip="{Binding HideText}" Click="OnHideClick">
     <Path Classes="btn-icon" Data="{StaticResource IconX}" />
   </Button>
   </Panel>

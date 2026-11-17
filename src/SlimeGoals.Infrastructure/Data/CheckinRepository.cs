@@ -83,16 +83,16 @@ public sealed class CheckinRepository(SqliteConnectionFactory db) : ICheckinRepo
         return true;
     }
 
-    public async Task<IReadOnlyList<string>> RecentNotesAsync(Guid goalId, int limit, CancellationToken ct = default)
+    public async Task<IReadOnlyList<string>> RecentNotesAsync(Guid? goalId, int limit, CancellationToken ct = default)
     {
         await using var c = db.Open();
         var notes = await c.QueryAsync<string>(new CommandDefinition("""
             SELECT note FROM checkins
-            WHERE goal_id = @GoalId AND note IS NOT NULL AND deleted_at IS NULL
+            WHERE (@GoalId IS NULL OR goal_id = @GoalId) AND note IS NOT NULL AND deleted_at IS NULL
             GROUP BY note
             ORDER BY MAX(done_at) DESC
             LIMIT @Limit
-            """, new { GoalId = SqlText.Id(goalId), Limit = limit }, cancellationToken: ct));
+            """, new { GoalId = goalId is { } id ? SqlText.Id(id) : null, Limit = limit }, cancellationToken: ct));
         return notes.ToList();
     }
 

@@ -35,21 +35,70 @@ public class ShellViewModelTests
             new InMemoryReminderLogRepository(), time), time, new DataChangeNotifier());
     }
 
-    private static ShellViewModel Create() => new(new PageViewModel[]
-        { Today(), Goals(), Reports(), ShellViewModelTests.Settings() });
+    internal static TimePageViewModel Time()
+    {
+        var time = new FakeTimeProvider();
+        var (goals, checkins, timers) = (new InMemoryGoalRepository(), new InMemoryCheckinRepository(), new InMemoryTimerRepository());
+        var focus = new FocusService(goals, new InMemoryFocusSessionRepository(checkins, timers), timers,
+            new CheckinService(goals, checkins, time), new AppSettings(new InMemorySettingsRepository()), time);
+        return new TimePageViewModel(new PomodoroViewModel(focus, new GoalService(goals, checkins, timers, time), time,
+            new DataChangeNotifier()));
+    }
+
+    private static ShellViewModel Create(PageNavigator? navigator = null) => new(new PageViewModel[]
+        { Today(), Goals(), Time(), Reports(), ShellViewModelTests.Settings() }, navigator: navigator);
 
     [Fact]
     public void Pages_follow_spec_order_and_start_on_today()
     {
         var shell = Create();
-        shell.Pages.Select(p => p.Title).Should().Equal("Hoje", "Metas", "Relatórios", "Configurações");
+        shell.Pages.Select(p => p.Title).Should().Equal("Hoje", "Metas", "Tempo", "Relatórios", "Configurações");
         shell.CurrentPage.Should().BeOfType<TodayPageViewModel>();
     }
 
     [Fact]
     public void Pages_have_bottom_nav_icon_keys()
     {
-        Create().Pages.Select(p => p.IconKey).Should().Equal("NavToday", "NavGoals", "NavReports", "NavSettings");
+        Create().Pages.Select(p => p.IconKey).Should().Equal("NavToday", "NavGoals", "NavTime", "NavReports", "NavSettings");
+    }
+
+    [Fact]
+    public void Bottom_bar_uses_short_settings_title()
+    {
+        Create().Pages.Select(p => p.ShortTitle).Should().Equal("Hoje", "Metas", "Tempo", "Relatórios", "Config.");
+    }
+
+    [Fact]
+    public void Coming_back_to_the_app_resumes_only_the_current_page()
+    {
+        var (today, time) = (new ResumeCounter("Hoje"), new ResumeCounter("Tempo"));
+        var shell = new ShellViewModel(new PageViewModel[] { today, time }) { CurrentPage = time };
+
+        shell.Resume();
+
+        (today.Resumed, time.Resumed).Should().Be((0, 1));
+    }
+
+    private sealed class ResumeCounter(string title) : PageViewModel
+    {
+        public override string Title => title;
+        public int Resumed { get; private set; }
+        public override void Resume() => Resumed++;
+    }
+
+    [Fact]
+    public void Navigator_request_switches_the_current_page()
+    {
+        var navigator = new PageNavigator();
+        var shell = Create(navigator);
+        using var monitor = shell.Monitor();
+
+        navigator.Show<TimePageViewModel>();
+        shell.CurrentPage.Should().BeOfType<TimePageViewModel>();
+        monitor.Should().RaisePropertyChangeFor(s => s.CurrentPage);
+
+        navigator.Show<TodayPageViewModel>();
+        shell.CurrentPage.Should().BeOfType<TodayPageViewModel>();
     }
 
     [Fact]
@@ -57,7 +106,7 @@ public class ShellViewModelTests
     {
         var shell = Create();
         using var monitor = shell.Monitor();
-        shell.NavigateCommand.Execute(shell.Pages[2]);
+        shell.NavigateCommand.Execute(shell.Pages[3]);
         shell.CurrentPage.Should().BeOfType<ReportsPageViewModel>();
         monitor.Should().RaisePropertyChangeFor(s => s.CurrentPage);
     }

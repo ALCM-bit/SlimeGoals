@@ -26,4 +26,17 @@
         android:textAppearance="@android:style/TextAppearance.Material.Notification.Title"
         android:textSize="24sp"
         android:textStyle="bold" />
+
+    <!-- O tempo parado da sessão de Pomodoro (pausada ou à espera do toque), no lugar do Chronometer. -->
+    <TextView
+        android:id="@+id/timer_fixed"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:fontFeatureSettings="tnum"
+        android:singleLine="true"
+        android:textAppearance="@android:style/TextAppearance.Material.Notification.Title"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
 </LinearLayout>

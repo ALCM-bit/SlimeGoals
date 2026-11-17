@@ -9,4 +9,10 @@
     <item name="android:windowLightStatusBar">false</item>
     <item name="android:windowLightNavigationBar">false</item>
   </style>
+  <!-- Tela de alarme do Pomodoro: Activity comum (fora do Avalonia), sem barra e no fundo do app. -->
+  <style name="SlimeGoals.AlarmTheme" parent="@android:style/Theme.Material.NoActionBar">
+    <item name="android:windowBackground">@color/slime_bg</item>
+    <item name="android:statusBarColor">@color/slime_bg</item>
+    <item name="android:navigationBarColor">@color/slime_bg</item>
+  </style>
 </resources>

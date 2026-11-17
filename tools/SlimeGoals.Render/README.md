@@ -5,7 +5,7 @@ Ferramenta de desenvolvimento que renderiza as telas do app sem janela (Avalonia
 ## Uso
 
 ```
-dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|account|mini]
+dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini]
 ```
 
 Sem o segundo argumento, vale `all`. Grava um PNG por tela e tamanho, sempre o `ShellView` inteiro:
@@ -24,6 +24,13 @@ O cadastro pendente da conta falsa usa o construtor interno de `PendingRegistrat
 
 O modo `narrow` grava o editor de meta com a confirmação de exclusão a 320 e 360 px (`goal-edit-delete-<largura>.png`) e o Hoje com um cronômetro rodando a 320, 360 e 1100 px (`today-timer-<largura>.png`, com o nome gravado; `today-timer-edit-<largura>.png`, com o nome em edição; `today-timer-switch-<largura>.png`, trocando de tarefa; `today-chunks-<largura>.png`, com os trechos de hoje abertos; `today-chunk-edit-<largura>.png`, ajustando um trecho; `today-panel-<largura>.png`, o painel de lançar tempo; `today-timer-stopped-<largura>.png`, a conferência do cronômetro parado): é o cartão mais apertado, com o tempo, o botão de parar e o de mais opções.
 
+O modo `time` (também incluído no `narrow`) grava a aba Tempo (Pomodoro) a 320×640, 360×760 e 1100×720, como `<cena>-<largura>.png`, numa sessão de exemplo (plano 40/20/60/30 min, 2 rodadas, meta Leitura) que o relógio de cena (`SceneClock`, em `Sample.cs`) avança:
+
+- preparo: `time-prepare` (a sequência montada) e `time-block-edit` (o terceiro bloco aberto para editar);
+- sessão: `time-running` (foco com a subatividade), `time-switch` (trocando de subatividade), `time-paused`, `time-waiting` (foco acabou, esperando o toque), `time-waiting-break` (pausa acabou), `time-review` (conferência depois de mais de 30 min parado) e `time-confirm-end`;
+- fim: `time-end-linked` (com meta), `time-end-unassigned` (sem meta, com dois trechos), `time-discard` (confirmação de descartar) e `time-create-goal` (o editor de meta aberto pela aba Tempo);
+- `today-focus-band`: o Hoje com a faixa da sessão terminada sem meta ("Pomodoro concluído"), a 915 px de altura no celular.
+
 O modo `mini` grava a janelinha do cronômetro (a `MiniTimerWindow` de verdade, sobre um fundo cinza com 24 px de folga em volta do cartão para os cantos aparecerem), rodando há 23 min 51 s: `mini-timer.png` com a meta "Leitura", `mini-timer-long.png` com o título longo de exemplo, para ver o corte com reticências, e `mini-timer-hover.png` com o "×" de esconder à vista, como fica com o mouse sobre a janelinha. Compare com `specs/design/cronometro-janelinha-prototipo.png` (opção A).
 
 O modo `mascot` grava só `mascot.png`: as quatro poses do slime (dormindo, parado, feliz, comemorando), lado a lado em 160×160 sobre o `HeroBrush`, com o nome acessível embaixo. O quadro é capturado cerca de 0,8 s depois de montar a tela, com as animações já em andamento.
@@ -31,10 +38,10 @@ O modo `mascot` grava só `mascot.png`: as quatro poses do slime (dormindo, para
 ## Dados
 
 Um banco SQLite temporário (`slimegoals-render-<guid>.db` em `Path.GetTempPath()`), apagado ao final; nunca toca o banco do app.
-Quatro metas de exemplo (Beber água, Leitura, Treino, Aula de inglês) e registros dos últimos 10 dias. O relógio é o do sistema.
+Quatro metas de exemplo (Beber água, Leitura, Treino, Aula de inglês) e registros dos últimos 10 dias. O relógio é o do sistema, menos no Pomodoro (`FocusService` e a aba Tempo), que usa um relógio de cena parado (`SceneClock`) que só anda quando a cena manda.
 
 ## Observações
 
 - A variação `phone` monta o shell com as capacidades do Android (`PlatformCapabilities(true, false, false, false)` e uma porta de permissões falsa com tudo negado, para o aviso aparecer): lembretes em Hoje, sem as seções Geral e Janela nas Configurações e sem "Sair"; a `desktop`, com `PlatformCapabilities.Desktop`.
-- A `RenderApp` espelha os `DataTemplates` do `App.axaml`: ao criar uma página nova, registre-a nos dois lugares.
+- A `RenderApp` espelha os `DataTemplates` do `App.axaml`: ao criar uma página nova, registre-a nos dois lugares. Os modelos casam só com uma instância do tipo (como o `DataType` do XAML): um `FuncDataTemplate<T>` simples também casaria com nulo, e um ComboBox sem seleção desenharia uma página inteira dentro dele.
 - O slime sai no quadro parado da pose (partes da pose visíveis, sem movimento): a janela headless não fica ativa, então a pseudo-classe `:live` não liga. É o esperado; a captura não precisa da animação.

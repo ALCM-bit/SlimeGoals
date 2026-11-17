@@ -30,8 +30,13 @@ public sealed partial class GoalEditViewModel : ObservableObject
     private bool _submitted;
     private bool _targetMissing;
 
+    /// <summary>O "voltar" do cabeçalho (é o Cancelar): diz para onde volta, Metas ou a aba que abriu o editor.</summary>
+    public string BackText { get; init; } = "← Metas";
+
     /// <param name="measureLocked">A meta já tem registros: a medida não pode mudar (spec §5.2).</param>
-    public GoalEditViewModel(GoalService service, Goal? existing, bool measureLocked, Action<bool> close)
+    /// <param name="initialMeasure">Medida de uma meta nova (ex.: tempo, para receber o foco de um Pomodoro).</param>
+    public GoalEditViewModel(GoalService service, Goal? existing, bool measureLocked, Action<bool> close,
+        Measure? initialMeasure = null)
     {
         _service = service;
         _existing = existing;
@@ -58,7 +63,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
 
         Title = existing?.Title ?? "";
         Recurrence = existing?.Recurrence ?? Recurrence.Daily;
-        Measure = existing?.Measure ?? Measure.Quantity;
+        Measure = existing?.Measure ?? initialMeasure ?? Measure.Quantity;
         // Cada medida guarda o próprio alvo: trocar e voltar no formulário não perde o que foi digitado.
         Target = existing is { Measure: Measure.Quantity } ? existing.Target : 1;
         Unit = existing?.Unit ?? "vezes";
@@ -84,6 +89,10 @@ public sealed partial class GoalEditViewModel : ObservableObject
     }
 
     public bool IsNew => _existing is null;
+
+    /// <summary>Id da meta nova depois de salvar; preenchido antes do <c>close(true)</c>.</summary>
+    public Guid? SavedGoalId { get; private set; }
+
     public string PageTitle => IsNew ? "Nova meta" : "Editar meta";
 
     public IReadOnlyList<IconOption> Icons { get; }
@@ -217,7 +226,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
         try
         {
             if (_existing is null)
-                await _service.CreateAsync(draft);
+                SavedGoalId = (await _service.CreateAsync(draft)).Id;
             else
                 await _service.UpdateAsync(_existing.Id, draft);
             _close(true);

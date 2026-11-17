@@ -25,17 +25,26 @@ public sealed class TmdsNotificationBus : INotificationBus
 
     /// <inheritdoc />
     public async Task<uint> NotifyAsync(string summary, string body, IReadOnlyList<(string Key, string Label)> actions,
-        CancellationToken ct = default)
+        bool critical = false, string? soundName = null, CancellationToken ct = default)
     {
         var connection = await GetConnectionAsync(ct).ConfigureAwait(false);
-        var message = BuildNotify(connection, summary, body, actions);
+        var message = BuildNotify(connection, summary, body, actions, critical, soundName);
         return await connection.CallMethodAsync(message, (m, _) => m.GetBodyReader().ReadUInt32(), null)
             .ConfigureAwait(false);
     }
 
     private static MessageBuffer BuildNotify(DBusConnection connection, string summary, string body,
-        IReadOnlyList<(string Key, string Label)> actions)
+        IReadOnlyList<(string Key, string Label)> actions, bool critical, string? soundName)
     {
+        // Urgência: 1 (normal) ou 2 (crítica), como byte, pela especificação de notificações do freedesktop.
+        var hints = new Dictionary<string, VariantValue>
+        {
+            ["desktop-entry"] = VariantValue.String("slimegoals"),
+            ["urgency"] = VariantValue.Byte(critical ? (byte)2 : (byte)1),
+        };
+        if (soundName is not null)
+            hints["sound-name"] = VariantValue.String(soundName);
+
         using var w = connection.GetMessageWriter();
         w.WriteMethodCallHeader(Service, Path, Service, "Notify", "susssasa{sv}i", MessageFlags.None);
         w.WriteString("SlimeGoals");
@@ -44,11 +53,7 @@ public sealed class TmdsNotificationBus : INotificationBus
         w.WriteString(summary);
         w.WriteString(body);
         w.WriteArray(actions.SelectMany(a => new[] { a.Key, a.Label }).ToArray());
-        w.WriteDictionary(new Dictionary<string, VariantValue>
-        {
-            ["desktop-entry"] = VariantValue.String("slimegoals"),
-            ["urgency"] = VariantValue.Byte(1),
-        });
+        w.WriteDictionary(hints);
         w.WriteInt32(-1);
         return w.CreateMessage();
     }

@@ -13,7 +13,8 @@ public sealed class ReminderResponseHandler(
     CheckinService checkins,
     TimerService timers,
     TimeProvider time,
-    DataChangeNotifier? changes = null)
+    DataChangeNotifier? changes = null,
+    IFocusSessionRepository? focus = null)
 {
     // Serializa as respostas: verificação de "já respondido", ação e gravação ficam atômicas no processo.
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -94,6 +95,8 @@ public sealed class ReminderResponseHandler(
     /// </summary>
     private async Task<bool> NeedsAppForTimerAsync(Guid goalId, CancellationToken ct)
     {
+        if (focus is not null && await focus.GetAsync(ct) is not null)
+            return true; // um relógio por vez: com sessão aberta, só a pessoa decide na aba Tempo
         if (await timers.GetAsync(ct) is not { } timer)
             return false;
         if (timer.GoalId == goalId)

@@ -1,0 +1,418 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SlimeGoals.App.ViewModels"
+             xmlns:conv="using:SlimeGoals.App.Converters"
+             xmlns:services="using:SlimeGoals.Core.Services"
+             x:Class="SlimeGoals.App.Views.PomodoroView"
+             x:DataType="vm:PomodoroViewModel">
+  <!-- Subaba Pomodoro (spec Pomodoro §4 e §6). Três momentos: o preparo, a sessão rodando e a tela de fim. O conteúdo rola;
+       as ações ficam presas embaixo no celular e logo abaixo do conteúdo no desktop (estilo focus-page), na mesma coluna.
+       Espaçamentos só de 4, 8, 12, 16 e 24. -->
+  <DockPanel Classes="focus-page">
+    <StackPanel DockPanel.Dock="Bottom" Classes="focus-column" Spacing="12" Margin="0,16,0,0">
+      <!-- O erro de um toque. Se for o mesmo motivo de "Começar" desligado, a faixa do motivo já diz -->
+      <Border Classes="warning-band">
+        <Border.IsVisible>
+          <MultiBinding Converter="{x:Static conv:DistinctTextConverter.Instance}">
+            <Binding Path="Error" />
+            <Binding Path="StartBlockedReason" />
+          </MultiBinding>
+        </Border.IsVisible>
+        <TextBlock Text="{Binding Error}" TextWrapping="Wrap" />
+      </Border>
+
+      <!-- Preparo: o motivo de não poder começar, com o caminho para o Hoje, e o "Começar" -->
+      <StackPanel Spacing="12" IsVisible="{Binding IsPreparing}">
+        <Border Classes="inline-panel"
+                IsVisible="{Binding StartBlockedReason, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <TextBlock Text="{Binding StartBlockedReason}" VerticalAlignment="Center" TextWrapping="Wrap" />
+            <Button Grid.Column="1" Classes="ghost" Content="Abrir Hoje" VerticalAlignment="Center"
+                    Command="{Binding GoToTodayCommand}" />
+          </Grid>
+        </Border>
+        <Button Classes="primary wide" Content="{Binding StartText}" Command="{Binding StartCommand}" />
+      </StackPanel>
+
+      <!-- Rodando: ✕ encerrar, ⏸/▶ e ⏭, centrados no eixo da coluna. Saem enquanto o campo da subatividade está aberto
+           (ele tem o próprio ✓/✕ ou Cancelar/Trocar), para o campo e o teclado do celular terem a altura -->
+      <StackPanel Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center">
+        <StackPanel.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="IsRunning" />
+            <Binding Path="!IsWaiting" />
+            <Binding Path="!IsConfirmingEnd" />
+            <Binding Path="!IsReviewing" />
+            <Binding Path="!IsTaskFieldOpen" />
+          </MultiBinding>
+        </StackPanel.IsVisible>
+        <Button Classes="ghost focus-control" AutomationProperties.Name="Encerrar" ToolTip.Tip="Encerrar a sessão"
+                Command="{Binding AskEndCommand}">
+          <Path Classes="btn-icon" Data="{StaticResource IconX}" />
+        </Button>
+        <Button Classes="primary focus-control main" Command="{Binding PauseResumeCommand}"
+                AutomationProperties.Name="Pausar ou retomar" ToolTip.Tip="Pausar ou retomar o relógio">
+          <Panel>
+            <Path Classes="btn-icon" Data="{StaticResource IconPause}" IsVisible="{Binding !IsPaused}" />
+            <Path Classes="btn-icon" Data="{StaticResource IconPlay}" IsVisible="{Binding IsPaused}" />
+          </Panel>
+        </Button>
+        <Button Classes="ghost focus-control" AutomationProperties.Name="Pular bloco" ToolTip.Tip="Pular para o próximo bloco"
+                Command="{Binding SkipCommand}">
+          <Path Classes="btn-icon" Data="{StaticResource IconSkip}" />
+        </Button>
+      </StackPanel>
+
+      <!-- Fim de um bloco: o próximo só começa no toque. No último, só o "Encerrar" do toque -->
+      <UniformGrid Rows="1" ColumnSpacing="12">
+        <UniformGrid.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="IsWaiting" />
+            <Binding Path="!IsConfirmingEnd" />
+            <Binding Path="!IsReviewing" />
+          </MultiBinding>
+        </UniformGrid.IsVisible>
+        <Button Classes="ghost wide" Content="Encerrar" Command="{Binding AskEndCommand}"
+                IsVisible="{Binding HasNextBlock}" />
+        <Button Classes="primary wide" Content="{Binding NextActionText}" Command="{Binding AdvanceCommand}" />
+      </UniformGrid>
+
+      <!-- ✕: confirmação no lugar dos controles -->
+      <Border Classes="inline-panel" Padding="16" IsVisible="{Binding IsConfirmingEnd}">
+        <StackPanel Spacing="12">
+          <TextBlock Text="Encerrar a sessão?" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <UniformGrid Rows="1" ColumnSpacing="12">
+            <Button Classes="ghost wide" Content="Cancelar" Command="{Binding CancelEndCommand}" />
+            <Button Classes="primary wide" Content="Encerrar" Command="{Binding ConfirmEndCommand}" />
+          </UniformGrid>
+        </StackPanel>
+      </Border>
+
+      <!-- Conferência do foco esquecido (30 min ou mais de extra): o trecho aberto em horas e minutos -->
+      <Border Classes="inline-panel" Padding="16" IsVisible="{Binding IsReviewing}">
+        <StackPanel Spacing="12">
+          <StackPanel Spacing="4">
+            <TextBlock Text="Confira o último trecho" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Text="O bloco acabou há mais de 30 min. Ajuste o tempo de foco, se precisar."
+                       Foreground="{DynamicResource Muted}" FontSize="13" TextWrapping="Wrap" />
+          </StackPanel>
+          <WrapPanel ItemSpacing="16" LineSpacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <NumericUpDown Value="{Binding ReviewHoursInput}" Minimum="0" Maximum="24" Increment="1"
+                             FormatString="0" Width="110" AutomationProperties.Name="Horas do último trecho" />
+              <TextBlock Text="h" VerticalAlignment="Center" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <NumericUpDown Value="{Binding ReviewMinutesInput}" Minimum="0" Maximum="59" Increment="1"
+                             FormatString="0" Width="110" AutomationProperties.Name="Minutos do último trecho" />
+              <TextBlock Text="min" VerticalAlignment="Center" />
+            </StackPanel>
+          </WrapPanel>
+          <UniformGrid Rows="1" ColumnSpacing="12">
+            <Button Classes="ghost wide" Content="Cancelar" Command="{Binding CancelReviewCommand}" />
+            <Button Classes="primary wide" Content="Confirmar" Command="{Binding ConfirmReviewCommand}" />
+          </UniformGrid>
+        </StackPanel>
+      </Border>
+
+      <!-- Fim da sessão com o tempo já numa meta -->
+      <Button Classes="ghost wide" Content="Nova sessão" Command="{Binding NewSessionCommand}">
+        <Button.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="IsFinished" />
+            <Binding Path="!IsAwaitingDestination" />
+          </MultiBinding>
+        </Button.IsVisible>
+      </Button>
+    </StackPanel>
+
+    <ScrollViewer Classes="page">
+      <Panel Classes="focus-column" Margin="0,0,0,8">
+
+        <!-- ===== Preparo ===== -->
+        <StackPanel Spacing="16" IsVisible="{Binding IsPreparing}">
+          <Border Classes="card" Padding="16">
+            <StackPanel Spacing="8">
+              <TextBlock Classes="field-label" Text="Sequência" />
+              <!-- Cada bloco: marca, nome, tempo à direita e ✕ numa coluna fixa de 44 px. A barra colorida ocupa as três
+                   primeiras colunas; as linhas de baixo (+ Foco, + Pausa, Repetir) usam a mesma largura -->
+              <ItemsControl ItemsSource="{Binding Blocks}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:FocusBlockViewModel">
+                    <Grid ColumnDefinitions="Auto,*,Auto,44" RowDefinitions="Auto,Auto" ColumnSpacing="12">
+                      <Button Grid.ColumnSpan="3" Classes="focus-block" Classes.break="{Binding !IsFocus}"
+                              Classes.editing="{Binding IsEditing}" AutomationProperties.Name="Mudar o tempo do bloco"
+                              ToolTip.Tip="Mudar o tempo"
+                              Command="{Binding $parent[ItemsControl].((vm:PomodoroViewModel)DataContext).EditBlockCommand}"
+                              CommandParameter="{Binding}" />
+                      <Border Classes="focus-marker" Classes.break="{Binding !IsFocus}" Margin="16,0,0,0" />
+                      <Panel Grid.Column="1">
+                        <TextBlock Classes="focus-block-text" Classes.break="{Binding !IsFocus}" Text="Foco"
+                                   IsVisible="{Binding IsFocus}" />
+                        <TextBlock Classes="focus-block-text" Classes.break="{Binding !IsFocus}" Text="Pausa"
+                                   IsVisible="{Binding !IsFocus}" />
+                      </Panel>
+                      <TextBlock Grid.Column="2" Classes="focus-block-text" Classes.break="{Binding !IsFocus}"
+                                 Text="{Binding Text}" HorizontalAlignment="Right" Margin="0,0,16,0" />
+                      <Button Grid.Column="3" Classes="ghost icon" AutomationProperties.Name="Tirar o bloco"
+                              ToolTip.Tip="Tirar o bloco"
+                              Command="{Binding $parent[ItemsControl].((vm:PomodoroViewModel)DataContext).RemoveBlockCommand}"
+                              CommandParameter="{Binding}">
+                        <Path Classes="btn-icon" Data="{StaticResource IconX}" />
+                      </Button>
+
+                      <!-- Editor do tempo, colado à barra do bloco e na largura dela -->
+                      <Border Grid.Row="1" Grid.ColumnSpan="3" Classes="inline-panel" Padding="12" Margin="0,8,0,0"
+                              IsVisible="{Binding IsEditing}">
+                        <StackPanel Spacing="12">
+                          <WrapPanel ItemSpacing="16" LineSpacing="12">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <NumericUpDown Value="{Binding HoursInput}" Minimum="0" Maximum="4" Increment="1"
+                                             FormatString="0" Width="110" AutomationProperties.Name="Horas do bloco" />
+                              <TextBlock Text="h" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <NumericUpDown Value="{Binding MinutesInput}" Minimum="0" Maximum="59" Increment="1"
+                                             FormatString="0" Width="110" AutomationProperties.Name="Minutos do bloco" />
+                              <TextBlock Text="min" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </WrapPanel>
+                          <Button Classes="ghost" Content="Pronto" HorizontalAlignment="Right"
+                                  Command="{Binding $parent[ItemsControl].((vm:PomodoroViewModel)DataContext).CloseBlockEditorCommand}" />
+                        </StackPanel>
+                      </Border>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <!-- + Foco, + Pausa e Repetir N×, na largura das barras (a coluna do ✕ fica vazia) -->
+              <Grid ColumnDefinitions="*,44" ColumnSpacing="12">
+                <UniformGrid Rows="1" ColumnSpacing="8">
+                  <Button Classes="ghost wide" Content="+ Foco" Command="{Binding AddFocusCommand}" />
+                  <Button Classes="ghost wide" Content="+ Pausa" Command="{Binding AddBreakCommand}" />
+                </UniformGrid>
+              </Grid>
+              <!-- "Repetir [N] vez(es)" lido de uma vez, junto da margem esquerda das barras -->
+              <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="Repetir" VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <NumericUpDown Value="{Binding RepeatInput}" Minimum="1" Maximum="10" Increment="1"
+                                 FormatString="0" Width="110" AutomationProperties.Name="Repetir quantas vezes" />
+                  <TextBlock Text="{Binding RepeatUnitText}" VerticalAlignment="Center" />
+                </StackPanel>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <Border Classes="card" Padding="16">
+            <StackPanel Spacing="8">
+              <TextBlock Classes="field-label" Text="Contar numa meta" />
+              <ComboBox ItemsSource="{Binding GoalOptions}" SelectedItem="{Binding SelectedGoal}"
+                        HorizontalAlignment="Stretch" AutomationProperties.Name="Contar numa meta">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:FocusGoalOption">
+                    <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <!-- ===== Rodando: tudo no mesmo eixo central ===== -->
+        <StackPanel IsVisible="{Binding IsRunning}">
+          <ItemsControl ItemsSource="{Binding Dots}" HorizontalAlignment="Center">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:FocusDotViewModel">
+                <Border Classes="focus-dot" Classes.break="{Binding !IsFocus}" Classes.done="{Binding IsDone}"
+                        Classes.current="{Binding IsCurrent}">
+                  <Border />
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="{Binding RoundText}" HorizontalAlignment="Center" Margin="0,8,0,0" FontSize="13"
+                     Foreground="{DynamicResource Muted}"
+                     IsVisible="{Binding RoundText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+          <Border Classes="focus-chip" Classes.break="{Binding IsBreak}" Classes.paused="{Binding IsPaused}"
+                  Margin="0,16,0,0">
+            <TextBlock Text="{Binding PhaseText}" />
+          </Border>
+
+          <!-- Sem margem em cima: a folga do próprio texto (acima dos algarismos) já dá o respiro sob o selo -->
+          <StackPanel AutomationProperties.Name="Tempo que falta">
+            <StackPanel.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="!IsTaskFieldOpen" />
+                <Binding Path="!IsReviewing" />
+                <Binding Path="!IsConfirmingEnd" />
+              </MultiBinding>
+            </StackPanel.IsVisible>
+            <TextBlock Classes="focus-digits" Classes.break="{Binding IsBreak}" Classes.paused="{Binding IsPaused}"
+                       Text="{Binding MinutesText}" />
+            <TextBlock Classes="focus-digits" Classes.break="{Binding IsBreak}" Classes.paused="{Binding IsPaused}"
+                       Text="{Binding SecondsText}" />
+          </StackPanel>
+          <!-- O mesmo tempo numa linha (47:12), enquanto o campo da subatividade ou um painel de baixo precisa da altura:
+               nada fica cortado a 320 px -->
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0"
+                      AutomationProperties.Name="Tempo que falta">
+            <StackPanel.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                <Binding Path="IsTaskFieldOpen" />
+                <Binding Path="IsReviewing" />
+                <Binding Path="IsConfirmingEnd" />
+              </MultiBinding>
+            </StackPanel.IsVisible>
+            <TextBlock Classes="focus-digits small" Classes.break="{Binding IsBreak}" Classes.paused="{Binding IsPaused}"
+                       Text="{Binding MinutesText}" />
+            <TextBlock Classes="focus-digits small" Classes.break="{Binding IsBreak}" Classes.paused="{Binding IsPaused}"
+                       Text=":" />
+            <TextBlock Classes="focus-digits small" Classes.break="{Binding IsBreak}" Classes.paused="{Binding IsPaused}"
+                       Text="{Binding SecondsText}" />
+          </StackPanel>
+
+          <!-- O extra à espera do toque e a meta -->
+          <StackPanel Spacing="8" Margin="0,16,0,0">
+            <StackPanel.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                <Binding Path="OvertimeText" Converter="{x:Static ObjectConverters.IsNotNull}" />
+                <Binding Path="GoalText" Converter="{x:Static ObjectConverters.IsNotNull}" />
+              </MultiBinding>
+            </StackPanel.IsVisible>
+            <TextBlock Text="{Binding OvertimeText}" HorizontalAlignment="Center" FontSize="16" FontWeight="SemiBold"
+                       IsVisible="{Binding OvertimeText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <TextBlock Text="{Binding GoalText}" HorizontalAlignment="Center" FontSize="14"
+                       Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis"
+                       IsVisible="{Binding GoalText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          </StackPanel>
+
+          <!-- Subatividade, só no foco: como no cartão do cronômetro (nome gravado com ✎ e ⇄, ou o campo com ✓) -->
+          <!-- Sai durante a conferência e o "Encerrar a sessão?": o painel de baixo é o assunto, e o resto termina inteiro -->
+          <Border x:Name="TaskArea" Classes="card" Padding="12" Margin="0,24,0,0">
+            <Border.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                  <Binding Path="ShowsTaskLabel" />
+                  <Binding Path="ShowsTaskField" />
+                </MultiBinding>
+                <Binding Path="!IsReviewing" />
+                <Binding Path="!IsConfirmingEnd" />
+              </MultiBinding>
+            </Border.IsVisible>
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding ShowsTaskLabel}">
+                <TextBlock Text="{Binding TaskLabel}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"
+                           Margin="4,0,0,0" TextTrimming="CharacterEllipsis" />
+                <Button Grid.Column="1" Classes="ghost icon" AutomationProperties.Name="Editar subatividade"
+                        ToolTip.Tip="Editar subatividade" Command="{Binding BeginEditTaskCommand}" Click="OnEditTaskClick">
+                  <Path Classes="btn-icon" Data="{StaticResource IconPencil}" />
+                </Button>
+                <!-- O ⇄ não tem conferência: esperando o toque, some até o próximo foco -->
+                <Button Grid.Column="2" Classes="ghost icon" AutomationProperties.Name="Trocar de subatividade"
+                        ToolTip.Tip="Trocar de subatividade" Command="{Binding BeginSwitchTaskCommand}"
+                        IsVisible="{Binding CanSwitchTask}">
+                  <Path Classes="btn-icon" Data="{StaticResource IconSwap}" />
+                </Button>
+              </Grid>
+              <!-- O campo. O modo de troca fecha sozinho no fim do foco (a troca não vale mais), então não sobra cartão vazio -->
+              <StackPanel Spacing="8" IsVisible="{Binding ShowsTaskField}">
+                <!-- Os botões num grupo que some inteiro: sem ✓ nem ✕ (modo de troca), o campo vai até a borda, alinhado
+                     com o Trocar de baixo (ColumnSpacing deixaria 8 px por coluna vazia) -->
+                <Grid ColumnDefinitions="*,Auto">
+                  <AutoCompleteBox x:Name="TaskField" Text="{Binding TaskInput, Mode=TwoWay}"
+                                   ItemsSource="{Binding TaskSuggestions}" PlaceholderText="No que está trabalhando?"
+                                   FilterMode="Contains" MinimumPrefixLength="0"
+                                   MaxLength="{x:Static services:CheckinService.MaxNoteLength}"
+                                   AutomationProperties.Name="Subatividade" SelectionChanged="OnTaskSelectionChanged" />
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="8,0,0,0"
+                              IsVisible="{Binding !IsSwitchingTask}">
+                    <Button Classes="primary icon" AutomationProperties.Name="Confirmar subatividade"
+                            ToolTip.Tip="Confirmar subatividade" Command="{Binding SaveTaskCommand}"
+                            IsVisible="{Binding ShowsConfirmTask}">
+                      <Path Classes="btn-icon" Data="{StaticResource IconCheck}" />
+                    </Button>
+                    <Button Classes="ghost icon" AutomationProperties.Name="Cancelar edição"
+                            ToolTip.Tip="Cancelar edição" Command="{Binding CancelEditTaskCommand}"
+                            IsVisible="{Binding IsEditingTask}">
+                      <Path Classes="btn-icon" Data="{StaticResource IconX}" />
+                    </Button>
+                  </StackPanel>
+                </Grid>
+                <UniformGrid Rows="1" ColumnSpacing="12" IsVisible="{Binding IsSwitchingTask}">
+                  <Button Classes="ghost wide" Content="Cancelar" Command="{Binding CancelSwitchTaskCommand}" />
+                  <Button Classes="primary wide" Content="Trocar" Command="{Binding SwitchTaskCommand}" />
+                </UniformGrid>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <!-- ===== Fim da sessão ===== -->
+        <StackPanel Spacing="16" IsVisible="{Binding IsFinished}">
+          <Border Classes="focus-chip done">
+            <TextBlock Text="Sessão concluída" />
+          </Border>
+
+          <Border Classes="card" Padding="16">
+            <StackPanel Spacing="8">
+              <TextBlock Classes="field-label" Text="Foco feito" />
+              <TextBlock Classes="stat-value" Text="{Binding SummaryText}" FontFeatures="+tnum" />
+              <ItemsControl ItemsSource="{Binding SummaryLines}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><StackPanel Spacing="4" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <TextBlock Text="{Binding}" FontSize="14" Foreground="{DynamicResource Muted}"
+                               FontFeatures="+tnum" TextTrimming="CharacterEllipsis" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Text="{Binding GoalText, StringFormat='Somado na meta {0}'}" FontSize="14"
+                         TextWrapping="Wrap" Margin="0,4,0,0"
+                         IsVisible="{Binding GoalText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            </StackPanel>
+          </Border>
+
+          <!-- Sessão sem meta: três destinos para o tempo guardado -->
+          <Border Classes="card" Padding="16" IsVisible="{Binding IsAwaitingDestination}">
+            <StackPanel Spacing="12">
+              <TextBlock Classes="field-label" Text="O que fazer com esse tempo?" TextWrapping="Wrap" />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <ComboBox ItemsSource="{Binding AssignOptions}" SelectedItem="{Binding AssignGoal}"
+                          PlaceholderText="Somar na meta…" HorizontalAlignment="Stretch"
+                          AutomationProperties.Name="Somar na meta">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:FocusGoalOption">
+                      <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Button Grid.Column="1" Classes="primary" Content="Somar" Command="{Binding AssignCommand}" />
+              </Grid>
+              <Button Classes="ghost wide" Content="Criar uma meta com ele" Command="{Binding CreateGoalCommand}" />
+              <Button Classes="danger wide" Content="Descartar" Command="{Binding AskDiscardCommand}"
+                      IsVisible="{Binding !IsConfirmingDiscard}" />
+              <StackPanel Spacing="12" IsVisible="{Binding IsConfirmingDiscard}">
+                <TextBlock Text="Descartar o tempo desta sessão?" Foreground="{DynamicResource Warning}"
+                           TextWrapping="Wrap" />
+                <UniformGrid Rows="1" ColumnSpacing="12">
+                  <Button Classes="ghost wide" Content="Cancelar" Command="{Binding CancelDiscardCommand}" />
+                  <Button Classes="danger-solid wide" Content="Descartar" Command="{Binding ConfirmDiscardCommand}" />
+                </UniformGrid>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </Panel>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

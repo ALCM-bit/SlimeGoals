@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using SlimeGoals.Core.Abstractions;
+using SlimeGoals.Core.Domain;
 
 namespace SlimeGoals.Core.Services;
 
@@ -24,6 +25,9 @@ public sealed class AppSettings(ISettingsRepository settings, DataChangeNotifier
 
     /// <summary>Chave: posição da janelinha do cronômetro, "x,y" em pixels da tela.</summary>
     public const string MiniTimerPositionKey = "timer.mini_window_position";
+
+    /// <summary>Chave: sequência da última sessão de Pomodoro começada, em JSON (sem a meta).</summary>
+    public const string FocusPlanKey = "focus.plan";
 
     /// <summary>Servidor padrão: o do <c>compose.yaml</c> de desenvolvimento.</summary>
     public static Uri DefaultSyncServer { get; } = new("http://127.0.0.1:8080");
@@ -119,4 +123,24 @@ public sealed class AppSettings(ISettingsRepository settings, DataChangeNotifier
     /// </summary>
     public Task SetMiniTimerPositionAsync(int x, int y, CancellationToken ct = default) =>
         settings.SetAsync(MiniTimerPositionKey, string.Create(CultureInfo.InvariantCulture, $"{x},{y}"), ct);
+
+    /// <summary>Sequência sugerida para a próxima sessão; ausente, ilegível ou fora dos limites vale <see cref="FocusPlan.Default"/>.</summary>
+    public async Task<FocusPlan> GetFocusPlanAsync(CancellationToken ct = default)
+    {
+        if (await settings.GetAsync(FocusPlanKey, ct) is not { } raw)
+            return FocusPlan.Default;
+        // Um plano sem blocos ou com Repeat 0 se lê, mas quebraria as contas de passo: só vale o que passa na validação.
+        if (FocusPlan.FromJson(raw) is { } plan && plan.Validate().Count == 0)
+            return plan;
+        Trace.TraceWarning($"Valor inválido em {FocusPlanKey}.");
+        return FocusPlan.Default;
+    }
+
+    /// <summary>Grava a sequência sugerida para a próxima sessão.</summary>
+    public async Task SetFocusPlanAsync(FocusPlan plan, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        await settings.SetAsync(FocusPlanKey, plan.ToJson(), ct);
+        changes?.NotifyChanged();
+    }
 }

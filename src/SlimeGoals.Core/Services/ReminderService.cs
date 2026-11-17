@@ -15,7 +15,7 @@ public sealed record UpcomingReminder(Goal Goal, DateTimeOffset At);
 /// </summary>
 public sealed class ReminderService(IGoalRepository goals, ICheckinRepository checkins, ITimerRepository timers,
     IReminderLogRepository log, INotificationService notifications, IReminderFormatter formatter, TimeProvider time,
-    ReminderPause? pause = null, AppSettings? settings = null) : IRemoteDeletionGate
+    ReminderPause? pause = null, AppSettings? settings = null, IFocusSessionRepository? focus = null) : IRemoteDeletionGate
 {
     // Disparo e exclusão não se cruzam: um disparo em andamento já gravou o log, mas ainda não mostrou a notificação.
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -194,6 +194,7 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
         var weekCheckins = await checkins.ListAsync(from, to, ct);
         var fires = (await log.ListAsync(from, to, ct)).ToList();
         var timer = await timers.GetAsync(ct);
+        var session = focus is null ? null : await focus.GetAsync(ct);
         var pauseState = pause is null ? new PauseState(false, null) : await pause.GetAsync(ct);
         var snooze = settings is null ? AppSettings.DefaultSnoozeMinutes : await settings.GetSnoozeMinutesAsync(ct);
 
@@ -202,14 +203,15 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
             .ToDictionary(g => g.Key, g => g.Sum(c => c.Amount));
 
         return new Snapshot(active, zone, today, todayStart, tomorrowStart, byGoalAndDay, weekCheckins, fires, timer,
-            pauseState, snooze);
+            pauseState, snooze, session);
     }
 
     /// <summary>Fatos da semana local levantados de uma vez; <see cref="Fires"/> cresce conforme se dispara.</summary>
     private sealed class Snapshot(IReadOnlyList<Goal> goals, TimeZoneInfo zone, DateOnly today,
         DateTimeOffset todayStart, DateTimeOffset tomorrowStart,
         Dictionary<(Guid GoalId, DateOnly Day), int> sums, IReadOnlyList<Checkin> weekCheckins,
-        List<ReminderLogEntry> fires, ActiveTimer? timer, PauseState pauseState, int snoozeMinutes)
+        List<ReminderLogEntry> fires, ActiveTimer? timer, PauseState pauseState, int snoozeMinutes,
+        FocusSession? session)
     {
         public bool Paused => pauseState.IsPaused;
         public int SnoozeMinutes => snoozeMinutes;
@@ -239,7 +241,8 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
             var intervalStart = new[] { goal.CreatedAt, pauseState.ResumedAt }
                 .Where(t => t is { } v && v >= todayStart && v < tomorrowStart)
                 .Max();
-            return new ReminderState(PeriodTotal(goal) >= goal.Target, timer is { StoppedAt: null } && timer.GoalId == goal.Id,
+            return new ReminderState(PeriodTotal(goal) >= goal.Target, (timer is { StoppedAt: null } && timer.GoalId == goal.Id)
+                || (session is { FinishedAt: null } && session.GoalId == goal.Id),
                 last?.FiredAt, new[] { lastCheckin, stoppedToday }.Max(), snoozedAt, intervalStart);
         }
     }

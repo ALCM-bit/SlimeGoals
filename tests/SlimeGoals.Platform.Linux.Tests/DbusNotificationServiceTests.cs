@@ -6,48 +6,13 @@ namespace SlimeGoals.Platform.Linux.Tests;
 
 public sealed class DbusNotificationServiceTests
 {
-    private sealed class FakeBus : INotificationBus
-    {
-        private uint _next;
-        public List<(string Summary, string Body, IReadOnlyList<(string Key, string Label)> Actions)> Notified { get; } = [];
-        public List<uint> Closed { get; } = [];
-        public bool BodyMarkup { get; init; }
-        public Exception? CapabilitiesFailure { get; init; }
-        public int CapabilityQueries { get; private set; }
-        public event Action<uint, string>? ActionInvoked;
-        public event Action<uint, uint>? NotificationClosed;
-
-        public Task<uint> NotifyAsync(string summary, string body, IReadOnlyList<(string Key, string Label)> actions,
-            CancellationToken ct = default)
-        {
-            Notified.Add((summary, body, actions));
-            return Task.FromResult(++_next);
-        }
-
-        public Task<bool> SupportsBodyMarkupAsync(CancellationToken ct = default)
-        {
-            CapabilityQueries++;
-            return CapabilitiesFailure is null ? Task.FromResult(BodyMarkup) : Task.FromException<bool>(CapabilitiesFailure);
-        }
-
-        public Task CloseAsync(uint id, CancellationToken ct = default)
-        {
-            Closed.Add(id);
-            return Task.CompletedTask;
-        }
-
-        public void RaiseAction(uint id, string key) => ActionInvoked?.Invoke(id, key);
-        public void RaiseClosed(uint id, uint reason) => NotificationClosed?.Invoke(id, reason);
-        public void Dispose() { }
-    }
-
     private static Reminder ReminderWith(string body) =>
         new(Guid.NewGuid(), Guid.NewGuid(), new ReminderText("P&D <título>", body, "Feito"));
 
     [Fact]
     public async Task Body_is_escaped_when_the_server_reads_markup_and_the_title_stays_plain()
     {
-        var bus = new FakeBus { BodyMarkup = true };
+        var bus = new FakeNotificationBus { BodyMarkup = true };
         using var service = new DbusNotificationService(bus);
 
         await service.ShowAsync(ReminderWith("3 de 5 P&D <b>x</b>"));
@@ -59,7 +24,7 @@ public sealed class DbusNotificationServiceTests
     [Fact]
     public async Task Body_stays_plain_when_the_server_has_no_markup()
     {
-        var bus = new FakeBus();
+        var bus = new FakeNotificationBus();
         using var service = new DbusNotificationService(bus);
 
         await service.ShowAsync(ReminderWith("P&D"));
@@ -70,7 +35,7 @@ public sealed class DbusNotificationServiceTests
     [Fact]
     public async Task Capability_failure_still_shows_the_reminder_with_plain_body()
     {
-        var bus = new FakeBus { CapabilitiesFailure = new InvalidOperationException("sem servidor") };
+        var bus = new FakeNotificationBus { CapabilitiesFailure = new InvalidOperationException("sem servidor") };
         using var service = new DbusNotificationService(bus);
 
         await service.ShowAsync(ReminderWith("P&D"));
@@ -81,7 +46,7 @@ public sealed class DbusNotificationServiceTests
     [Fact]
     public async Task Capabilities_are_asked_only_once()
     {
-        var bus = new FakeBus { BodyMarkup = true };
+        var bus = new FakeNotificationBus { BodyMarkup = true };
         using var service = new DbusNotificationService(bus);
 
         await service.ShowAsync(ReminderWith("a"));
@@ -93,9 +58,9 @@ public sealed class DbusNotificationServiceTests
     private static Reminder NewReminder() =>
         new(Guid.NewGuid(), Guid.NewGuid(), new ReminderText("Título", "Corpo", "Feito"));
 
-    private static (FakeBus Bus, DbusNotificationService Service, List<ReminderActionEventArgs> Received) Create()
+    private static (FakeNotificationBus Bus, DbusNotificationService Service, List<ReminderActionEventArgs> Received) Create()
     {
-        var bus = new FakeBus();
+        var bus = new FakeNotificationBus();
         var service = new DbusNotificationService(bus);
         var received = new List<ReminderActionEventArgs>();
         service.ActionReceived += (_, e) => received.Add(e);
@@ -114,6 +79,7 @@ public sealed class DbusNotificationServiceTests
         call.Summary.Should().Be("T");
         call.Body.Should().Be("B");
         call.Actions.Should().Equal(("primary", "+1"), ("snooze", "Adiar"), ("ignore", "Ignorar"), ("default", "Abrir"));
+        (call.Critical, call.SoundName).Should().Be((false, (string?)null), "lembrete não é despertador");
     }
 
     [Theory]

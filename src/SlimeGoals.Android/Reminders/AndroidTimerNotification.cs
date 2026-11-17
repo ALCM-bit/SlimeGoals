@@ -1,6 +1,8 @@
 using Android.App;
 using Android.Content;
 using Android.OS;
+using Android.Text.Format;
+using Android.Views;
 using Android.Widget;
 using SlimeGoals.App.Hosting;
 using SlimeGoals.Core.Abstractions;
@@ -16,6 +18,8 @@ namespace SlimeGoals.Android.Reminders;
 /// <see cref="MainActivity"/> para o cronômetro se o código conferir. Desde o Android 12, um receiver não pode abrir
 /// uma Activity a partir de uma notificação, por isso o "Parar" não passa por um; e como a Activity é exportada, o
 /// código impede que outro app peça para parar.
+/// A sessão de Pomodoro (<see cref="RunningTimer.Focus"/>) usa a mesma notificação, sem o "Parar": o tempo conta para
+/// baixo até o fim do bloco e, pausado ou à espera do toque, fica parado.
 /// </summary>
 internal sealed class AndroidTimerNotification(Context context, StopTimerSecretStore secrets) : ITimerNotification
 {
@@ -26,6 +30,7 @@ internal sealed class AndroidTimerNotification(Context context, StopTimerSecretS
     private const int NotificationId = 2;
     private const int OpenRequestCode = 10;
     private const int StopRequestCode = 11;
+    private const int OpenTempoRequestCode = 15;
 
     private NotificationManager Manager => (NotificationManager)context.GetSystemService(Context.NotificationService)!;
 
@@ -45,9 +50,13 @@ internal sealed class AndroidTimerNotification(Context context, StopTimerSecretS
             .SetStyle(new Notification.DecoratedCustomViewStyle())
             .SetCustomContentView(Body(Resource.Layout.notification_timer, timer))
             .SetCustomBigContentView(Body(Resource.Layout.notification_timer_big, timer))
-            .SetContentIntent(ActivityIntent(OpenRequestCode, secret: null));
-        // Sem o código (preferências com falha), o botão não funcionaria: a notificação fica só com o toque.
-        if (secrets.Get() is { } secret)
+            // A sessão de Pomodoro abre na aba Tempo.
+            .SetContentIntent(timer.Focus is null
+                ? ActivityIntent(OpenRequestCode, secret: null)
+                : AndroidFocusAlert.OpenTempo(context, OpenTempoRequestCode));
+        // Sem o código (preferências com falha), o botão não funcionaria: a notificação fica só com o toque. A sessão de
+        // Pomodoro termina só pela aba Tempo.
+        if (timer.Focus is null && secrets.Get() is { } secret)
             builder.AddAction(new Notification.Action.Builder((global::Android.Graphics.Drawables.Icon?)null, "Parar",
                 ActivityIntent(StopRequestCode, secret)).Build());
         Manager.Notify(NotificationId, builder.Build());
@@ -60,10 +69,29 @@ internal sealed class AndroidTimerNotification(Context context, StopTimerSecretS
     {
         var views = new RemoteViews(context.PackageName, layout);
         views.SetTextViewText(Resource.Id.timer_title, timer.Label);
-        views.SetChronometer(Resource.Id.timer_elapsed,
-            ChronometerBase.Of(timer.StartedAt, DateTimeOffset.UtcNow, SystemClock.ElapsedRealtime()), null, true);
+        var now = DateTimeOffset.UtcNow;
+        if (timer.Focus is not { } focus)
+            views.SetChronometer(Resource.Id.timer_elapsed,
+                ChronometerBase.Of(timer.StartedAt, now, SystemClock.ElapsedRealtime()), null, true);
+        else if (focus.PausedRemaining is null && focus.EndsAt > now)
+        {
+            views.SetChronometer(Resource.Id.timer_elapsed,
+                ChronometerBase.CountdownOf(focus.EndsAt, now, SystemClock.ElapsedRealtime()), null, true);
+            views.SetChronometerCountDown(Resource.Id.timer_elapsed, true);
+        }
+        else
+        {
+            // Um Chronometer parado relê o relógio cada vez que a notificação é desenhada: o texto fixo não anda.
+            views.SetViewVisibility(Resource.Id.timer_elapsed, ViewStates.Gone);
+            views.SetViewVisibility(Resource.Id.timer_fixed, ViewStates.Visible);
+            views.SetTextViewText(Resource.Id.timer_fixed, Fixed(focus.PausedRemaining ?? TimeSpan.Zero));
+        }
         return views;
     }
+
+    /// <summary>O tempo que falta no formato do Chronometer ("24:10", "1:05:00"), com os segundos para cima.</summary>
+    private static string Fixed(TimeSpan remaining)
+        => DateUtils.FormatElapsedTime(Math.Max(0, (long)Math.Ceiling(remaining.TotalSeconds))) ?? "";
 
     // Códigos de pedido diferentes: os dois intents só diferem no extra, que não conta para o PendingIntent ser outro.
     // Imutável: quem recebe a notificação não troca o extra.

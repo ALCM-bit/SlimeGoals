@@ -1,4 +1,5 @@
 using Android.Content;
+using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using SlimeGoals.Android.Reminders;
 using SlimeGoals.App.Goals;
@@ -34,6 +35,7 @@ internal static class AndroidCompositionRoot
         services.AddSingleton<GoalService>();
         services.AddSingleton<CheckinService>();
         services.AddSingleton<TimerService>();
+        services.AddSingleton<FocusService>();
         services.AddSingleton<AppSettings>();
         services.AddSingleton<ProgressService>();
         services.AddSingleton<ReportService>();
@@ -63,13 +65,27 @@ internal static class AndroidCompositionRoot
             => new AndroidTimerNotification(context, sp.GetRequiredService<StopTimerSecretStore>()));
         services.AddSingleton<TimerNotificationSync>();
 
+        // Aviso de fim de bloco do Pomodoro: alarme de despertador e notificação no canal "Pomodoro". Ligado no
+        // AndroidApplication.OnCreate; o alarme chega pelo FocusAlarmReceiver e o toque no aviso, pela MainActivity.
+        services.AddSingleton<IFocusAlarm>(_ => new AndroidFocusAlarm(context));
+        services.AddSingleton<IFocusAlert>(_ => new AndroidFocusAlert(context));
+        services.AddSingleton<FocusAlerts>();
+        services.AddSingleton(sp => new FocusAlertHost(sp.GetRequiredService<FocusAlerts>(),
+            sp.GetRequiredService<IWindowActivator>(), sp.GetRequiredService<PageNavigator>(),
+            action => Dispatcher.UIThread.Post(action)));
+
 #if SYNC_DEV
         AddSync(services, context);
 #endif
 
+        // Pedidos de troca de página feitos por dentro das páginas (ex.: Tempo → Hoje); o shell assina
+        services.AddSingleton<PageNavigator>();
+
         // UI — ordem de registro = ordem na navegação
         services.AddSingleton<PageViewModel, TodayPageViewModel>();
         services.AddSingleton<PageViewModel, GoalsPageViewModel>();
+        services.AddSingleton<PomodoroViewModel>();
+        services.AddSingleton<PageViewModel, TimePageViewModel>();
         services.AddSingleton<PageViewModel, ReportsPageViewModel>();
         services.AddSingleton<PageViewModel, SettingsPageViewModel>();
         services.AddSingleton<ShellViewModel>();

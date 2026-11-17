@@ -1,5 +1,6 @@
 using SlimeGoals.App.Hosting;
 using SlimeGoals.App.Tests.Support;
+using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
 
 namespace SlimeGoals.App.Tests.Hosting;
@@ -155,6 +156,24 @@ public sealed class MiniTimerControllerTests : IDisposable
         _f.Time.Advance(TimeSpan.FromMinutes(1));
         await _f.Timers.StartAsync(goal.Id);
 
+        _window.Calls.Should().Equal("show default", "hide", "show default");
+    }
+
+    [Fact]
+    public async Task Hiding_during_a_session_lasts_for_every_block_of_it()
+    {
+        await _f.Focus.StartAsync(FocusPlan.Default, null);
+        await StartedAsync();
+        _window.Dismiss();
+
+        _f.Time.Advance(TimeSpan.FromMinutes(25));
+        await _f.Focus.AdvanceAsync(); // a pausa começa: outro bloco, a mesma sessão
+        _window.Calls.Should().Equal("show default", "hide");
+
+        await _f.Focus.EndAsync();
+        await _f.Focus.DiscardAsync();
+        _f.Time.Advance(TimeSpan.FromMinutes(1));
+        await _f.Focus.StartAsync(FocusPlan.Default, null);
         _window.Calls.Should().Equal("show default", "hide", "show default");
     }
 

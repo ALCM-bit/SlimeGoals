@@ -17,7 +17,11 @@ public partial class ShellView : UserControl
     {
         InitializeComponent();
         SizeChanged += (_, e) => Classes.Set("compact", e.NewSize.Width < CompactBreakpoint);
+        // Android: a página volta inteira depois de mudar com o app em segundo plano.
+        LayoutUpdated += (_, _) => _layoutRepair.OnLayoutUpdated(this);
     }
+
+    private readonly StaleLayoutRepair _layoutRepair = new();
 
     private TopLevel? _topLevel;
     private bool _backSubscribed;
@@ -27,6 +31,10 @@ public partial class ShellView : UserControl
     {
         base.OnAttachedToVisualTree(e);
         _topLevel = TopLevel.GetTopLevel(this);
+        // Voltar ao app no desktop: a janela ganha o foco. No Android, quem avisa é a MainActivity, que sabe se a volta
+        // foi da pessoa ou da tela acendendo.
+        if (_topLevel is Window window)
+            window.Activated += OnAppResumed;
         // Só no Android: no desktop Alt+Left / botão Voltar do mouse descartariam o formulário em edição.
         if (_topLevel is not null && Application.Current?.ApplicationLifetime is IActivityApplicationLifetime)
         {
@@ -42,6 +50,8 @@ public partial class ShellView : UserControl
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        if (_topLevel is Window window)
+            window.Activated -= OnAppResumed;
         if (_topLevel is not null && _backSubscribed)
             _topLevel.BackRequested -= OnBackRequested;
         _backSubscribed = false;
@@ -68,6 +78,8 @@ public partial class ShellView : UserControl
             () => (_topLevel?.FocusManager?.GetFocusedElement() as Control)?.BringIntoView(),
             TimeSpan.FromMilliseconds(250));
     }
+
+    private void OnAppResumed(object? sender, EventArgs e) => (DataContext as ShellViewModel)?.Resume();
 
     /// <summary>Voltar do Android: o shell consome quando há algo a fechar; em Hoje o sistema segue o padrão.</summary>
     private void OnBackRequested(object? sender, RoutedEventArgs e) =>

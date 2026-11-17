@@ -21,6 +21,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<IGoalRepository, GoalRepository>();
         services.AddSingleton<ICheckinRepository, CheckinRepository>();
         services.AddSingleton<ITimerRepository, TimerRepository>();
+        services.AddSingleton<IFocusSessionRepository, FocusSessionRepository>();
         services.AddSingleton<IReminderLogRepository, ReminderLogRepository>();
         services.AddSingleton<ISettingsRepository, SettingsRepository>();
         services.AddSingleton<ISyncStateStore, SyncStateRepository>();

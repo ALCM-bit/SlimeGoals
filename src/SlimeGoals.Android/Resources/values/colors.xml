@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <!-- As do tema escuro do app (SlimeGoals.App/Styles/Theme.axaml). -->
   <color name="slime_bg">#0F0D15</color>
+  <color name="slime_surface2">#1F1B2B</color>
+  <color name="slime_border">#2A2538</color>
+  <color name="slime_text">#E8E4F0</color>
+  <color name="slime_primary">#9B7BEA</color>
+  <color name="slime_on_primary">#14101D</color>
 </resources>

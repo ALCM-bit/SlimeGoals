@@ -381,6 +381,23 @@ public class GoalEditViewModelTests
     }
 
     [Fact]
+    public async Task New_goal_can_start_as_locked_time_goal_and_tells_the_saved_id()
+    {
+        var vm = new GoalEditViewModel(Service, null, measureLocked: true, _closed.Add, initialMeasure: Measure.Duration);
+        (vm.IsDuration, vm.IsMeasureLocked, vm.SavedGoalId).Should().Be((true, true, (Guid?)null));
+        vm.IsQuantity = true; // travada: não muda
+        vm.Title = "Estudar";
+        vm.DurationHoursInput = 1;
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        var saved = (await _repo.ListAsync(includeArchived: false)).Single();
+        (saved.Measure, saved.Target).Should().Be((Measure.Duration, 60));
+        vm.SavedGoalId.Should().Be(saved.Id);
+        _closed.Should().Equal(true);
+    }
+
+    [Fact]
     public async Task Editing_duration_goal_splits_target()
     {
         var goal = await Existing(d => d with { Measure = Measure.Duration, Target = 150, Unit = null });

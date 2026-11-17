@@ -38,10 +38,12 @@ public sealed class TimerRepository(SqliteConnectionFactory db) : ITimerReposito
         await using var c = db.Open();
         try
         {
-            // INSERT OR IGNORE é atômico: dois processos iniciando juntos não criam dois cronômetros.
-            return await c.ExecuteAsync(new CommandDefinition(
-                "INSERT OR IGNORE INTO active_timer (id, goal_id, started_at, stopped_at, task) VALUES (1, @GoalId, @StartedAt, @StoppedAt, @Task)",
-                Params(timer), cancellationToken: ct)) == 1;
+            // Um comando só, atômico: dois processos iniciando juntos não criam dois cronômetros, e uma sessão de
+            // Pomodoro aberta por outro processo no meio do caminho impede o cronômetro (um relógio por vez).
+            return await c.ExecuteAsync(new CommandDefinition("""
+                INSERT OR IGNORE INTO active_timer (id, goal_id, started_at, stopped_at, task)
+                SELECT 1, @GoalId, @StartedAt, @StoppedAt, @Task WHERE NOT EXISTS (SELECT 1 FROM focus_session)
+                """, Params(timer), cancellationToken: ct)) == 1;
         }
         catch (SqliteException e) when (e.SqliteExtendedErrorCode == SqlText.ForeignKeyViolation)
         {

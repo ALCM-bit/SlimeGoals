@@ -9,14 +9,15 @@ using Avalonia.VisualTree;
 using SlimeGoals.App.Account;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.App.Views;
+using SlimeGoals.Core.Domain;
 using SlimeGoals.Render;
 using SlimeGoals.Sync;
 using ScrollViewer = Avalonia.Controls.ScrollViewer;
 using Window = Avalonia.Controls.Window;
 
-if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "account" or "mini")))
+if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini")))
 {
-    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|account|mini]");
+    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini]");
     return 1;
 }
 
@@ -43,13 +44,25 @@ if (which == "narrow")
     RenderTodayWithTimer(360);
     RenderTodayWithTimer(1100);
 }
+// A aba Tempo vem no narrow e, sozinha, no time (bem mais rápido para conferir só o Pomodoro)
+if (which is "narrow" or "time")
+{
+    RenderTime(320, 640);
+    RenderTime(360, 760);
+    RenderTime(1100, 720);
+}
 if (which == "mascot")
     RenderMascot();
 if (which == "mini")
 {
-    RenderMini("mini-timer", "Leitura");
-    RenderMini("mini-timer-long", "Aula de inglês com a professora particular às terças");
-    RenderMini("mini-timer-hover", "Leitura", hover: true);
+    RenderMini("mini-timer", () => sample.CreateMiniTimer("Leitura"));
+    RenderMini("mini-timer-long", () => sample.CreateMiniTimer("Aula de inglês com a professora particular às terças"));
+    RenderMini("mini-timer-hover", () => sample.CreateMiniTimer("Leitura"), hover: true);
+    // Sessão de Pomodoro: sem o "Parar", contando para baixo
+    RenderMini("mini-focus", () => sample.CreateMiniFocus(null, null));
+    RenderMini("mini-focus-goal-task", () => sample.CreateMiniFocus("Leitura", "Revisar capítulo 3"));
+    RenderMini("mini-focus-paused-hover", () => sample.CreateMiniFocus("Leitura", null, paused: true), hover: true);
+    sample.ClearFocus();
 }
 if (which == "account")
 {
@@ -188,11 +201,11 @@ void RenderMascot()
 
 // A janelinha do cronômetro de verdade, sobre um fundo neutro com folga, para ver os cantos arredondados.
 // Com hover, o "×" aparece como com o mouse sobre a janelinha (a captura não tem ponteiro).
-void RenderMini(string name, string title, bool hover = false)
+void RenderMini(string name, Func<MiniTimerViewModel> viewModel, bool hover = false)
 {
     var window = new MiniTimerWindow
     {
-        DataContext = sample.CreateMiniTimer(title),
+        DataContext = viewModel(),
         Background = new SolidColorBrush(Color.Parse("#3B4250")),
         Padding = new Thickness(14),
     };
@@ -210,6 +223,143 @@ void RenderMini(string name, string title, bool hover = false)
     }
     Console.WriteLine(path);
     window.Close();
+}
+
+// Aba Tempo: cada momento do Pomodoro (spec Pomodoro §6), em altura de celular de verdade, para ver as ações presas
+// embaixo. O relógio do Pomodoro é o da amostra, parado: cada cena avança o tempo que precisa.
+void RenderTime(int width, int height)
+{
+    sample.ClearFocus();
+    var shell = sample.CreateShell(width < 720);
+    var window = new Window { Width = width, Height = height, Content = new ShellView { DataContext = shell } };
+    window.Show();
+    var page = shell.Pages.OfType<TimePageViewModel>().Single();
+    shell.CurrentPage = page;
+    Pump();
+    var vm = page.Pomodoro;
+    var clock = sample.Clock;
+
+    // Preparo: a sequência do esboço aprovado (40, 20, 1 h, 30), "Começar · 2 h 30"
+    SetPlan([(FocusBlockKind.Focus, 40), (FocusBlockKind.Break, 20), (FocusBlockKind.Focus, 60), (FocusBlockKind.Break, 30)], 1);
+    Pump();
+    Capture("time-prepare");
+    vm.EditBlockCommand.Execute(vm.Blocks[2]);
+    Pump();
+    Capture("time-block-edit");
+    vm.CloseBlockEditorCommand.Execute(null);
+
+    // Rodando: duas rodadas, meta Leitura, no segundo foco da primeira rodada com 47:12 de 1 h
+    vm.RepeatInput = 2;
+    vm.SelectedGoal = vm.GoalOptions.First(o => o.Title == "Leitura");
+    Run(vm.StartCommand.ExecuteAsync(null));
+    clock.Advance(TimeSpan.FromMinutes(40));
+    Run(vm.AdvanceCommand.ExecuteAsync(null));
+    clock.Advance(TimeSpan.FromMinutes(20));
+    Run(vm.AdvanceCommand.ExecuteAsync(null));
+    vm.TaskInput = "Revisar capítulo 3";
+    Run(vm.SaveTaskCommand.ExecuteAsync(null));
+    clock.Advance(new TimeSpan(0, 12, 48));
+    Reload();
+    Capture("time-running");
+    // Trocando de subatividade: o campo vazio com Cancelar e Trocar
+    Run(vm.BeginSwitchTaskCommand.ExecuteAsync(null));
+    Capture("time-switch");
+    vm.CancelSwitchTaskCommand.Execute(null);
+
+    Run(vm.PauseResumeCommand.ExecuteAsync(null));
+    Capture("time-paused");
+    Run(vm.PauseResumeCommand.ExecuteAsync(null));
+
+    // Fim do foco, 2 min depois: "Foco concluído", "+2 min", [Encerrar] [Começar pausa]
+    clock.Advance(new TimeSpan(0, 49, 12));
+    Reload();
+    Capture("time-waiting");
+    Run(vm.AdvanceCommand.ExecuteAsync(null));
+    // Fim da pausa, 3 min depois: [Encerrar] [Voltar ao foco]
+    clock.Advance(TimeSpan.FromMinutes(33));
+    Reload();
+    Capture("time-waiting-break");
+    Run(vm.AdvanceCommand.ExecuteAsync(null));
+    // Foco esquecido (35 min de extra): o toque abre a conferência do último trecho
+    clock.Advance(TimeSpan.FromMinutes(75));
+    Reload();
+    Run(vm.AdvanceCommand.ExecuteAsync(null));
+    Capture("time-review");
+    (vm.ReviewHoursInput, vm.ReviewMinutesInput) = (0, 45);
+    Run(vm.ConfirmReviewCommand.ExecuteAsync(null));
+    // ✕ na pausa: a confirmação, e a tela de fim de uma sessão com meta
+    vm.AskEndCommand.Execute(null);
+    Pump();
+    Capture("time-confirm-end");
+    Run(vm.ConfirmEndCommand.ExecuteAsync(null));
+    Capture("time-end-linked");
+    vm.NewSessionCommand.Execute(null);
+    Pump();
+
+    // Sessão sem meta: 58 min em uma subatividade e 44 em outra, encerrada no meio do foco
+    SetPlan([(FocusBlockKind.Focus, 120), (FocusBlockKind.Break, 20)], 1);
+    Run(vm.StartCommand.ExecuteAsync(null));
+    vm.TaskInput = "Revisar capítulo 3";
+    Run(vm.SaveTaskCommand.ExecuteAsync(null));
+    clock.Advance(TimeSpan.FromMinutes(58));
+    Reload();
+    Run(vm.BeginSwitchTaskCommand.ExecuteAsync(null));
+    vm.TaskInput = "Exercícios";
+    Run(vm.SwitchTaskCommand.ExecuteAsync(null));
+    clock.Advance(TimeSpan.FromMinutes(44));
+    Reload();
+    vm.AskEndCommand.Execute(null);
+    Run(vm.ConfirmEndCommand.ExecuteAsync(null));
+    Capture("time-end-unassigned");
+    vm.AskDiscardCommand.Execute(null);
+    Pump();
+    Capture("time-discard");
+    vm.CancelDiscardCommand.Execute(null);
+    // "Criar uma meta com ele": o editor de meta, já como meta de tempo
+    vm.CreateGoalCommand.Execute(null);
+    Pump();
+    Capture("time-create-goal");
+    vm.Editor!.CancelCommand.Execute(null);
+    Pump();
+
+    // Hoje com a sessão aberta: a faixa que leva à aba Tempo, na altura das outras cenas do Hoje no celular (915)
+    window.Height = width < 720 ? 915 : height;
+    shell.CurrentPage = shell.Pages.OfType<TodayPageViewModel>().Single();
+    Pump();
+    Capture("today-focus-band");
+    window.Close();
+    sample.ClearFocus();
+
+    void SetPlan((FocusBlockKind Kind, int Minutes)[] blocks, int repeat)
+    {
+        vm.Blocks.Clear();
+        foreach (var (kind, minutes) in blocks)
+            vm.Blocks.Add(new FocusBlockViewModel(new FocusBlock(kind, minutes)));
+        vm.RepeatInput = repeat;
+    }
+
+    void Run(Task task)
+    {
+        while (!task.IsCompleted)
+            Pump();
+        task.GetAwaiter().GetResult();
+        Pump();
+    }
+
+    void Reload() => Run(vm.LoadCommand.ExecuteAsync(null));
+
+    void Capture(string name)
+    {
+        var path = Path.Combine(outDir, $"{name}-{width}.png");
+        var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException($"Sem quadro para {name}.");
+        using (var stream = File.Create(path))
+        {
+#pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
+            frame.Save(stream);
+#pragma warning restore CS0618
+        }
+        Console.WriteLine(path);
+    }
 }
 
 // Editor de uma meta existente, com a confirmação de exclusão aberta, em janela alta: o formulário cabe num quadro só.

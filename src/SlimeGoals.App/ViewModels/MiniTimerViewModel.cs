@@ -8,8 +8,9 @@ using SlimeGoals.Core.Services;
 namespace SlimeGoals.App.ViewModels;
 
 /// <summary>
-/// Janelinha do cronômetro: a meta, o tempo correndo segundo a segundo e o botão de parar. O relógio só bate
-/// enquanto há cronômetro rodando. Criado na thread da interface; avisos de outras threads voltam para ela.
+/// Janelinha do cronômetro: a meta, o tempo correndo segundo a segundo e o botão de parar. Na sessão de Pomodoro, a fase
+/// e o tempo que falta do bloco, sem o botão de parar (a sessão termina na aba Tempo). O relógio só bate enquanto há
+/// cronômetro ou sessão rodando. Criado na thread da interface; avisos de outras threads voltam para ela.
 /// </summary>
 public sealed partial class MiniTimerViewModel : ObservableObject, IDisposable
 {
@@ -19,33 +20,47 @@ public sealed partial class MiniTimerViewModel : ObservableObject, IDisposable
     private readonly TimerService _timers;
     private readonly IWindowActivator _window;
     private readonly ShellViewModel _shell;
+    private readonly PageNavigator _navigator;
     private readonly TimeProvider _time;
     private readonly SynchronizationContext? _ui;
     private RunningTimer? _timer;
     private ITimer? _tick;
 
     public MiniTimerViewModel(RunningTimerWatcher watcher, TimerService timers, IWindowActivator window, ShellViewModel shell,
-        TimeProvider time)
+        PageNavigator navigator, TimeProvider time)
     {
         _watcher = watcher;
         _timers = timers;
         _window = window;
         _shell = shell;
+        _navigator = navigator;
         _time = time;
         _ui = SynchronizationContext.Current;
         watcher.Changed += OnWatcherChanged;
         Update();
     }
 
-    /// <summary>Nome da meta.</summary>
+    /// <summary>Nome da meta, e a tarefa; na sessão, a fase antes ("Foco · Estudar").</summary>
     [ObservableProperty] public partial string Title { get; private set; } = "";
 
     [ObservableProperty] public partial string IconKey { get; private set; } = "";
 
     [ObservableProperty] public partial GoalColor Color { get; private set; }
 
-    /// <summary>Tempo desde o início, como "0:23:51".</summary>
+    /// <summary>
+    /// Tempo desde o início, como "0:23:51". Na sessão, o que falta do bloco ("24:59", ou "1:15:00" com 1 h ou mais),
+    /// parado enquanto pausada.
+    /// </summary>
     [ObservableProperty] public partial string Elapsed { get; private set; } = GoalFormatting.Elapsed(TimeSpan.Zero);
+
+    /// <summary>O botão de parar: só no cronômetro.</summary>
+    [ObservableProperty] public partial bool IsStopVisible { get; private set; } = true;
+
+    /// <summary>A dica e o nome acessível do "×": o "−" vale até o próximo cronômetro, ou até o fim da sessão.</summary>
+    [ObservableProperty] public partial string HideText { get; private set; } = HideTimerText;
+
+    private const string HideTimerText = "Esconder até o próximo cronômetro";
+    private const string HideSessionText = "Esconder até o fim da sessão";
 
     public void Dispose()
     {
@@ -53,9 +68,14 @@ public sealed partial class MiniTimerViewModel : ObservableObject, IDisposable
         _tick?.Dispose();
     }
 
-    /// <summary>Clique na janelinha: mostra a janela principal.</summary>
+    /// <summary>Clique na janelinha: mostra a janela principal; na sessão, na aba Tempo.</summary>
     [RelayCommand]
-    private void Open() => _window.Activate();
+    private void Open()
+    {
+        if (_timer?.Focus is not null)
+            _navigator.Show<TimePageViewModel>();
+        _window.Activate();
+    }
 
     /// <summary>Congela o cronômetro e abre a janela principal em Hoje, para conferir e registrar.</summary>
     [RelayCommand]
@@ -79,14 +99,20 @@ public sealed partial class MiniTimerViewModel : ObservableObject, IDisposable
         Title = _timer.Label;
         IconKey = _timer.Icon;
         Color = _timer.Color;
+        IsStopVisible = _timer.Focus is null;
+        HideText = _timer.Focus is null ? HideTimerText : HideSessionText;
         RefreshElapsed();
         _tick ??= _time.CreateTimer(_ => OnUi(RefreshElapsed), null, Second, Second);
     }
 
     private void RefreshElapsed()
     {
-        // Relógio do sistema atrasado em relação ao início gravado: mostra zero, não um tempo negativo.
-        if (_timer is { } timer)
+        if (_timer is not { } timer)
+            return;
+        if (timer.Focus is { } focus)
+            Elapsed = GoalFormatting.Countdown(focus.PausedRemaining ?? focus.EndsAt - _time.GetUtcNow());
+        else
+            // Relógio do sistema atrasado em relação ao início gravado: mostra zero, não um tempo negativo.
             Elapsed = GoalFormatting.Elapsed(TimeSpan.FromTicks(Math.Max(0, (_time.GetUtcNow() - timer.StartedAt).Ticks)));
     }
 

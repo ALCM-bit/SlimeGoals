@@ -39,6 +39,7 @@ internal static class CompositionRoot
         services.AddSingleton<GoalService>();
         services.AddSingleton<CheckinService>();
         services.AddSingleton<TimerService>();
+        services.AddSingleton<FocusService>();
         services.AddSingleton<AppSettings>();
         services.AddSingleton<ProgressService>();
         services.AddSingleton<ReportService>();
@@ -53,15 +54,36 @@ internal static class CompositionRoot
         services.AddSingleton<INotificationService, DbusNotificationService>();
         services.AddSingleton<IReminderScheduler, ProcessTimerReminderScheduler>();
 
+        // Aviso de fim de bloco do Pomodoro: alarme próprio no processo e notificação crítica pelo mesmo bus
+        services.AddSingleton<ProcessFocusAlarm>();
+        services.AddSingleton<IFocusAlarm>(sp => sp.GetRequiredService<ProcessFocusAlarm>());
+        services.AddSingleton<DbusFocusAlert>();
+        services.AddSingleton<IFocusAlert>(sp => sp.GetRequiredService<DbusFocusAlert>());
+        services.AddSingleton<FocusAlerts>();
+
         // Ciclo de vida do app — a mesma instância do ativador é a que a App preenche com a janela
         services.AddSingleton<MainWindowActivator>();
         services.AddSingleton<IWindowActivator>(sp => sp.GetRequiredService<MainWindowActivator>());
         services.AddSingleton<DesktopAppLifetime>();
-        services.AddSingleton<IAppLifetime>(sp => sp.GetRequiredService<DesktopAppLifetime>());
+        // O "Sair" com uma sessão de Pomodoro guardada avisa antes que o aviso de fim de bloco não vai tocar
+        services.AddSingleton<IAppLifetime>(sp => new FocusQuitNotice(
+            sp.GetRequiredService<DesktopAppLifetime>(),
+            sp.GetRequiredService<FocusService>(),
+            (title, body, ct) => sp.GetRequiredService<INotificationBus>().NotifyAsync(title, body, [], ct: ct),
+            sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton(options);
         services.AddSingleton<WindowCloseBehavior>();
         services.AddSingleton<IAppHostedService>(sp => sp.GetRequiredService<WindowCloseBehavior>());
         services.AddSingleton<IAppHostedService, ReminderHost>();
+        // O alarme e o toque no aviso chegam por threads do relógio e do D-Bus; o host leva a navegação para a interface
+        services.AddSingleton<IAppHostedService>(sp =>
+        {
+            var host = new FocusAlertHost(sp.GetRequiredService<FocusAlerts>(), sp.GetRequiredService<IWindowActivator>(),
+                sp.GetRequiredService<PageNavigator>(), action => Dispatcher.UIThread.Post(action));
+            sp.GetRequiredService<ProcessFocusAlarm>().Fired += (_, _) => _ = host.FireAsync();
+            sp.GetRequiredService<DbusFocusAlert>().Opened += (_, _) => host.Open();
+            return host;
+        });
         services.AddSingleton<IAutostart>(_ => new XdgAutostart(
             XdgPaths.AutostartDirectory(Environment.GetEnvironmentVariable, home), Environment.ProcessPath!));
         services.AddSingleton<ISleepSignalSource, LogindSleepSignalSource>();
@@ -84,9 +106,14 @@ internal static class CompositionRoot
         AddSync(services, databasePath);
 #endif
 
+        // Pedidos de troca de página feitos por dentro das páginas (ex.: Tempo → Hoje); o shell assina
+        services.AddSingleton<PageNavigator>();
+
         // UI — ordem de registro = ordem na navegação (spec §7)
         services.AddSingleton<PageViewModel, TodayPageViewModel>();
         services.AddSingleton<PageViewModel, GoalsPageViewModel>();
+        services.AddSingleton<PomodoroViewModel>();
+        services.AddSingleton<PageViewModel, TimePageViewModel>();
         services.AddSingleton<PageViewModel, ReportsPageViewModel>();
         services.AddSingleton<PageViewModel, SettingsPageViewModel>();
         services.AddSingleton<ShellViewModel>();

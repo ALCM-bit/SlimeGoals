@@ -24,7 +24,8 @@
                   </Canvas>
                 </Viewbox>
               </Border>
-              <TextBlock Classes="nav-label" Text="{Binding Title}" />
+              <!-- Na barra de baixo cabem cinco rótulos a 320 px: o curto ("Config."); a lateral mantém o inteiro -->
+              <TextBlock Classes="nav-label" Text="{Binding ShortTitle}" />
             </StackPanel>
           </DataTemplate>
         </ListBox.ItemTemplate>

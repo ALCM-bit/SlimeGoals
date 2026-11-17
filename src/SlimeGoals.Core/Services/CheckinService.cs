@@ -17,8 +17,11 @@ public sealed class CheckinService(IGoalRepository goals, ICheckinRepository che
     public const int MaxDurationAmount = 24 * 60;
     public const int RecentNotesLimit = 5;
 
-    /// <summary>Até <see cref="RecentNotesLimit"/> notas distintas da meta, da mais recente para a mais antiga.</summary>
-    public Task<IReadOnlyList<string>> RecentNotesAsync(Guid goalId, CancellationToken ct = default) =>
+    /// <summary>
+    /// Até <see cref="RecentNotesLimit"/> notas distintas da meta (ou de todas, com <paramref name="goalId"/> nulo), da mais
+    /// recente para a mais antiga.
+    /// </summary>
+    public Task<IReadOnlyList<string>> RecentNotesAsync(Guid? goalId, CancellationToken ct = default) =>
         checkins.RecentNotesAsync(goalId, RecentNotesLimit, ct);
 
     /// <summary>Registra um ajuste no período atual e devolve o novo total do período.</summary>

@@ -20,6 +20,7 @@
   <Application.DataTemplates>
     <DataTemplate DataType="vm:TodayPageViewModel"><views:TodayView /></DataTemplate>
     <DataTemplate DataType="vm:GoalsPageViewModel"><views:GoalsView /></DataTemplate>
+    <DataTemplate DataType="vm:TimePageViewModel"><views:TimeView /></DataTemplate>
     <DataTemplate DataType="vm:ReportsPageViewModel"><views:ReportsView /></DataTemplate>
     <DataTemplate DataType="vm:SettingsPageViewModel"><views:SettingsView /></DataTemplate>
     <DataTemplate DataType="vm:GoalEditViewModel"><views:GoalEditView /></DataTemplate>

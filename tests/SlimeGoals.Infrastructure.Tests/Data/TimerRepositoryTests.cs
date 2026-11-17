@@ -47,6 +47,17 @@ public class TimerRepositoryTests : IDisposable
         (await Repo.TryStartAsync(new ActiveTimer(_b, T0))).Should().BeTrue();
     }
 
+    [Fact]
+    public async Task Start_is_refused_while_a_focus_session_is_open()
+    {
+        await new FocusSessionRepository(_db.Factory).TryStartAsync(new FocusSession(FocusPlan.Default, null, T0, 0, T0, T0,
+            TimeSpan.Zero, null, null, null, null, 0));
+
+        (await Repo.TryStartAsync(new ActiveTimer(_a, T0))).Should().BeFalse();
+
+        (await Repo.GetAsync()).Should().BeNull();
+    }
+
     [Theory]
     [InlineData("started_at", "'ontem'")]
     [InlineData("stopped_at", "'nunca'")]
