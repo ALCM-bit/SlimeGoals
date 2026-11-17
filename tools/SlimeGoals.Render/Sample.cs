@@ -99,33 +99,42 @@ public sealed class Sample : IDisposable
 
         var water = await goals.CreateAsync(new GoalDraft("Beber água", Recurrence.Daily, 8, "water", GoalColor.Pink,
             120, from, until, WeekDays.All, null, null, Measure.Quantity, "copos"));
-        var reading = await goals.CreateAsync(new GoalDraft("Leitura", Recurrence.Daily, 30, "book", GoalColor.Purple,
+        var reading = await goals.CreateAsync(new GoalDraft("Leitura", Recurrence.Daily, 9000, "book", GoalColor.Purple,
             180, from, until, WeekDays.All, null, null, Measure.Duration));
-        var workout = await goals.CreateAsync(new GoalDraft("Treino", Recurrence.Weekly, 300, "workout", GoalColor.Green,
+        var workout = await goals.CreateAsync(new GoalDraft("Treino", Recurrence.Weekly, 18000, "workout", GoalColor.Green,
             180, from, until, WeekDays.All, null, null, Measure.Duration));
         var english = await goals.CreateAsync(new GoalDraft("Aula de inglês com a professora particular às terças", Recurrence.Weekly, 1, "language", GoalColor.Amber,
             180, from, until, WeekDays.All, null, null, Measure.Completion));
 
         var now = DateTimeOffset.Now;
         int[] waterCups = [8, 6, 8, 3, 8, 7, 9, 8, 5, 4];
-        int[] readingMinutes = [30, 0, 35, 20, 30, 30, 0, 45, 10, 15];
+        // Tempo em segundos. Hoje (índice 0) entra à parte, logo abaixo, a qualquer hora que a amostra rode.
+        int[] readingSeconds = [0, 0, 9000, 5400, 9300, 9000, 0, 10800, 2400, 3600];
         for (var back = 0; back < 10; back++)
         {
             var day = now.AddDays(-back);
             var noon = new DateTimeOffset(day.Year, day.Month, day.Day, 12, 0, 0, day.Offset);
             await AddAsync(water.Id, noon, waterCups[back]);
-            await AddAsync(reading.Id, noon.AddHours(7), readingMinutes[back]);
+            await AddAsync(reading.Id, noon.AddHours(7), readingSeconds[back]);
             if (back is 1 or 3 or 5)
-                await AddAsync(workout.Id, noon.AddHours(5), 60 + back * 5);
+                await AddAsync(workout.Id, noon.AddHours(5), (60 + back * 5) * 60);
             if (back is 2 or 8)
                 await AddAsync(english.Id, noon.AddHours(6), 1);
         }
+        // O caso longo da conferência a 320 px: "1 h 12 min 40 s de 2 h 30 min" e um trecho de "2 min 40 s".
+        var midnight = new DateTimeOffset(now.Year, now.Month, now.Day, 0, 0, 0, now.Offset);
+        var earlier = now.AddMinutes(-2) < midnight ? midnight : now.AddMinutes(-2);
+        await AddAsync(reading.Id, earlier, 4200);
+        await AddAsync(reading.Id, earlier.AddSeconds(1), 160, "Revisar capítulo 3");
 
-        async Task AddAsync(Guid goalId, DateTimeOffset at, int amount)
+        async Task AddAsync(Guid goalId, DateTimeOffset at, int amount, string? note = null)
         {
             if (amount <= 0 || at > now)
                 return;
-            await checkins.AddAsync(new Checkin { Id = Guid.NewGuid(), GoalId = goalId, DoneAt = at, Amount = amount, UpdatedAt = at });
+            await checkins.AddAsync(new Checkin
+            {
+                Id = Guid.NewGuid(), GoalId = goalId, DoneAt = at, Amount = amount, UpdatedAt = at, Note = note,
+            });
         }
     }
 

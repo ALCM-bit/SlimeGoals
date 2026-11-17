@@ -30,8 +30,8 @@ public sealed partial class FocusBlockViewModel : ObservableObject
 
     [ObservableProperty] public partial bool IsEditing { get; set; }
 
-    /// <summary>"40 min", "1 h" ou "1 h 15"; com os campos vazios, "0 min".</summary>
-    public string Text => GoalFormatting.Duration(Minutes() ?? 0);
+    /// <summary>"40 min", "1 h" ou "1 h 15 min"; com os campos vazios, "0 min".</summary>
+    public string Text => GoalFormatting.Duration((Minutes() ?? 0) * 60); // até 1 000 000 min: cabe em int
 
     // Limite só para o cast de decimal para int não estourar; o de verdade é o do FocusPlan.Validate.
     private const decimal MaxInput = 1_000_000;

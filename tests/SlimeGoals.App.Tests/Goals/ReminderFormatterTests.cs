@@ -15,7 +15,7 @@ public class ReminderFormatterTests
     [Theory]
     [InlineData(Measure.Completion, 1, null, 0, "Pendente", "Feito")]
     [InlineData(Measure.Quantity, 8, "copos", 3, "3 de 8 copos hoje", "+1")]
-    [InlineData(Measure.Duration, 120, null, 90, "1 h 30 de 2 h hoje", "Iniciar")]
+    [InlineData(Measure.Duration, 7200, null, 5400, "1 h 30 min de 2 h hoje", "Iniciar")]
     public void Formatter_uses_progress_text_and_primary_label_per_measure(
         Measure measure, int target, string? unit, int total, string body, string label)
     {

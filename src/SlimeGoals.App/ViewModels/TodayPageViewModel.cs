@@ -588,7 +588,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     {
         null => null,
         { StoppedAt: null } t => $"Cronômetro rodando em \"{_offscreenTitle}\" · {GoalFormatting.Elapsed(time.GetUtcNow() - t.StartedAt)}",
-        var t => $"Cronômetro parado em \"{_offscreenTitle}\" · {GoalFormatting.Duration(TimerService.Seconds(t, time.GetUtcNow()) / 60)}",
+        var t => $"Cronômetro parado em \"{_offscreenTitle}\" · {GoalFormatting.Duration(TimerService.Seconds(t, time.GetUtcNow()))}",
     };
 
     private void OnUi(Action action)

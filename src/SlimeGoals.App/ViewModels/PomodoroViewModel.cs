@@ -83,13 +83,13 @@ public sealed partial class PomodoroViewModel : ObservableObject
         }
     }
 
-    /// <summary>"Começar · 2 h 30": quanto a sessão inteira dura, com a repetição.</summary>
+    /// <summary>"Começar · 2 h 30 min": quanto a sessão inteira dura, com a repetição.</summary>
     public string StartText
     {
         get
         {
             // Em long: campos absurdos (antes da validação) não podem estourar a conta.
-            var total = Blocks.Sum(b => (long)(b.Minutes() ?? 0)) * Math.Max(0, Repeat());
+            var total = Blocks.Sum(b => (long)(b.Minutes() ?? 0)) * Math.Max(0, Repeat()) * 60;
             return $"Começar · {GoalFormatting.Duration((int)Math.Clamp(total, 0, int.MaxValue))}";
         }
     }

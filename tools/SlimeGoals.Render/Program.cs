@@ -38,6 +38,9 @@ if (which is "desktop" or "all")
     Render(false, "desktop", 1100, 720);
 if (which == "narrow")
 {
+    // As páginas do celular também nas larguras mais estreitas (Hoje e Relatórios com os textos longos de tempo)
+    Render(true, "phone-320", 320, 915);
+    Render(true, "phone-360", 360, 915);
     RenderNarrow(320);
     RenderNarrow(360);
     RenderTodayWithTimer(320);
@@ -240,7 +243,7 @@ void RenderTime(int width, int height)
     var vm = page.Pomodoro;
     var clock = sample.Clock;
 
-    // Preparo: a sequência do esboço aprovado (40, 20, 1 h, 30), "Começar · 2 h 30"
+    // Preparo: a sequência do esboço aprovado (40, 20, 1 h, 30), "Começar · 2 h 30 min"
     SetPlan([(FocusBlockKind.Focus, 40), (FocusBlockKind.Break, 20), (FocusBlockKind.Focus, 60), (FocusBlockKind.Break, 30)], 1);
     Pump();
     Capture("time-prepare");
@@ -297,12 +300,12 @@ void RenderTime(int width, int height)
     vm.NewSessionCommand.Execute(null);
     Pump();
 
-    // Sessão sem meta: 58 min em uma subatividade e 44 em outra, encerrada no meio do foco
+    // Sessão sem meta: 58 min 40 s em uma subatividade e 44 min em outra, encerrada no meio do foco
     SetPlan([(FocusBlockKind.Focus, 120), (FocusBlockKind.Break, 20)], 1);
     Run(vm.StartCommand.ExecuteAsync(null));
     vm.TaskInput = "Revisar capítulo 3";
     Run(vm.SaveTaskCommand.ExecuteAsync(null));
-    clock.Advance(TimeSpan.FromMinutes(58));
+    clock.Advance(new TimeSpan(0, 58, 40));
     Reload();
     Run(vm.BeginSwitchTaskCommand.ExecuteAsync(null));
     vm.TaskInput = "Exercícios";
@@ -417,8 +420,8 @@ void RenderTodayWithTimer(int width)
     running = today.Goals.Single(g => g.IsTimerRunning);
     if (!running.HasChunks)
     {
-        sample.Checkins.AdjustAsync(running.Goal.Id, 25, "Inglês").GetAwaiter().GetResult();
-        sample.Checkins.AdjustAsync(running.Goal.Id, 12).GetAwaiter().GetResult();
+        sample.Checkins.AdjustAsync(running.Goal.Id, 25 * 60, "Inglês").GetAwaiter().GetResult();
+        sample.Checkins.AdjustAsync(running.Goal.Id, 160).GetAwaiter().GetResult();
         today.LoadCommand.Execute(null);
         Pump();
         running = today.Goals.Single(g => g.IsTimerRunning);

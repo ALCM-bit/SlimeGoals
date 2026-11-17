@@ -25,7 +25,7 @@ public static class GoalFormatting
         _ => throw new ArgumentOutOfRangeException(nameof(goal), goal.Measure, null),
     };
 
-    /// <summary>Progresso do período atual: "5 de 8 copos hoje", "2 h 30 de 5 h na semana", "Feito hoje", "Pendente".</summary>
+    /// <summary>Progresso do período atual: "5 de 8 copos hoje", "2 h 30 min de 5 h na semana", "Feito hoje", "Pendente".</summary>
     public static string Progress(GoalProgress progress)
     {
         var goal = progress.Goal;
@@ -39,17 +39,22 @@ public static class GoalFormatting
         };
     }
 
-    /// <summary>Tempo de meta: 45 → "45 min"; 120 → "2 h"; 150 → "2 h 30".</summary>
-    public static string Duration(int minutes)
+    /// <summary>
+    /// Tempo de meta em segundos, sem as partes zeradas: 40 → "40 s"; 160 → "2 min 40 s"; 3600 → "1 h";
+    /// 4360 → "1 h 12 min 40 s"; 9000 → "2 h 30 min"; zero → "0 min"; negativo com "-" na frente.
+    /// </summary>
+    public static string Duration(int seconds)
     {
-        var (hours, rest) = (Math.Abs(minutes) / 60, Math.Abs(minutes) % 60);
-        var sign = minutes < 0 ? "-" : "";
-        return (hours, rest) switch
-        {
-            (0, _) => $"{sign}{rest} min",
-            (_, 0) => $"{sign}{hours} h",
-            _ => $"{sign}{hours} h {rest:00}",
-        };
+        var total = Math.Abs((long)seconds); // em long: o Abs de int.MinValue estoura
+        var (hours, minutes, rest) = (total / 3600, total / 60 % 60, total % 60);
+        var parts = new List<string>(3);
+        if (hours > 0)
+            parts.Add($"{hours} h");
+        if (minutes > 0)
+            parts.Add($"{minutes} min");
+        if (rest > 0)
+            parts.Add($"{rest} s");
+        return parts.Count == 0 ? "0 min" : (seconds < 0 ? "-" : "") + string.Join(' ', parts);
     }
 
     /// <summary>Cronômetro: "0:05:09", "1:02:03" (horas sem zero à esquerda).</summary>
