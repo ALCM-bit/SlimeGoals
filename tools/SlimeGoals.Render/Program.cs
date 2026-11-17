@@ -284,12 +284,12 @@ void RenderTime(int width, int height)
     Reload();
     Capture("time-waiting-break");
     Run(vm.AdvanceCommand.ExecuteAsync(null));
-    // Foco esquecido (35 min de extra): o toque abre a conferência do último trecho
-    clock.Advance(TimeSpan.FromMinutes(75));
+    // Foco esquecido (35 min de extra): o toque abre a conferência do último trecho, com os segundos
+    clock.Advance(new TimeSpan(0, 75, 20));
     Reload();
     Run(vm.AdvanceCommand.ExecuteAsync(null));
     Capture("time-review");
-    (vm.ReviewHoursInput, vm.ReviewMinutesInput) = (0, 45);
+    (vm.ReviewHoursInput, vm.ReviewMinutesInput, vm.ReviewSecondsInput) = (0, 45, 0);
     Run(vm.ConfirmReviewCommand.ExecuteAsync(null));
     // ✕ na pausa: a confirmação, e a tela de fim de uma sessão com meta
     vm.AskEndCommand.Execute(null);
@@ -433,14 +433,20 @@ void RenderTodayWithTimer(int width)
         .BringIntoView(new Rect(0, 0, 1, 400));
     Pump();
     Capture($"today-chunks-{width}.png");
-    today.EditChunkCommand.Execute(running.Chunks.First(c => c.CanEdit));
+    var edited = running.Chunks.First(c => c.CanEdit);
+    today.EditChunkCommand.Execute(edited);
     Pump();
-    // O cartão do cronômetro, com a lista aberta, fica abaixo da dobra: rola até o começo da lista
+    // O cartão do cronômetro, com a lista aberta, fica abaixo da dobra: rola até o começo da lista e depois até o fim do
+    // editor, para Cancelar e Salvar aparecerem abaixo dos três campos empilhados
     window.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("chunks-toggle") && b.DataContext == running)
         .BringIntoView(new Rect(0, 0, 1, 400));
     Pump();
+    window.GetVisualDescendants().OfType<Border>()
+        .Single(b => b.Classes.Contains("inline-panel") && b.IsEffectivelyVisible && b.DataContext == edited)
+        .BringIntoView();
+    Pump();
     Capture($"today-chunk-edit-{width}.png");
-    today.CancelChunkEditCommand.Execute(running.Chunks.First(c => c.CanEdit));
+    today.CancelChunkEditCommand.Execute(edited);
     today.ToggleChunksCommand.Execute(running);
     // Painel de lançar tempo, para comparar com o editor do trecho na mesma largura
     var idle = today.Goals.First(g => g.IsDuration && !g.IsTimerRunning);
@@ -464,12 +470,12 @@ void RenderTodayWithTimer(int width)
     Capture($"today-timer-switch-{width}.png");
     today.CancelSwitchTaskCommand.Execute(running);
     Pump();
-    // Cronômetro parado: a conferência em horas e minutos. O tempo é de exemplo (o relógio aqui é o real); o cronômetro
+    // Cronômetro parado: a conferência em h, min e s. O tempo é de exemplo (o relógio aqui é o real); o cronômetro
     // é descartado depois, e a próxima largura começa outro.
     today.StopTimerCommand.Execute(running);
     Pump();
     var stopped = today.Goals.Single(g => g.IsTimerStopped);
-    (stopped.StoppedHoursInput, stopped.StoppedMinutesInput) = (1, 25);
+    (stopped.StoppedHoursInput, stopped.StoppedMinutesInput, stopped.StoppedSecondsInput) = (1, 25, 40);
     window.GetVisualDescendants().OfType<TodayView>().Single()
         .GetVisualDescendants().OfType<ScrollViewer>().First().ScrollToHome();
     Pump();

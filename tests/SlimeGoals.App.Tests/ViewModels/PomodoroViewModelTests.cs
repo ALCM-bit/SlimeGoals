@@ -428,7 +428,7 @@ public class PomodoroViewModelTests
     }
 
     [Fact]
-    public async Task Forgotten_focus_opens_the_review_prefilled_in_hours_and_minutes()
+    public async Task Forgotten_focus_opens_the_review_prefilled_with_the_open_time()
     {
         var study = await Create("Estudar");
         var vm = await Running(new FocusPlan([F(25), B(5)], 1), study.Id);
@@ -436,7 +436,7 @@ public class PomodoroViewModelTests
 
         await vm.AdvanceCommand.ExecuteAsync(null);
 
-        (vm.IsReviewing, vm.ReviewHoursInput, vm.ReviewMinutesInput).Should().Be((true, 1m, 35m)); // os 40 s ficam de fora
+        (vm.IsReviewing, vm.ReviewHoursInput, vm.ReviewMinutesInput, vm.ReviewSecondsInput).Should().Be((true, 1m, 35m, 40m));
         _checkins.All.Should().BeEmpty();
         (await _sessions.GetAsync())!.Step.Should().Be(0);
 
@@ -454,12 +454,47 @@ public class PomodoroViewModelTests
         (vm.IsReviewing, vm.Error).Should().Be((true, "Valor fora do limite."));
         _checkins.All.Should().BeEmpty();
 
-        (vm.ReviewHoursInput, vm.ReviewMinutesInput) = (0, 30);
+        (vm.ReviewHoursInput, vm.ReviewMinutesInput, vm.ReviewSecondsInput) = (0, 30, 0);
         await vm.ConfirmReviewCommand.ExecuteAsync(null);
 
         (vm.IsReviewing, vm.Error, vm.PhaseText).Should().Be((false, null, "Pausa"));
         _checkins.All.Single().Should().Match<Checkin>(c => c.GoalId == study.Id && c.Amount == 30 * 60);
         (vm.MinutesText, vm.SecondsText).Should().Be(("05", "00")); // a pausa começa na confirmação
+    }
+
+    [Fact]
+    public async Task Review_fields_include_seconds()
+    {
+        var study = await Create("Estudar");
+        var vm = await Running(new FocusPlan([F(25), B(5)], 1), study.Id);
+        _time.Advance(TimeSpan.FromMinutes(62) + TimeSpan.FromSeconds(17) + TimeSpan.FromMilliseconds(900));
+
+        await vm.AdvanceCommand.ExecuteAsync(null);
+        (vm.IsReviewing, vm.ReviewHoursInput, vm.ReviewMinutesInput, vm.ReviewSecondsInput).Should().Be((true, 1m, 2m, 17m));
+
+        vm.ReviewSecondsInput = 5;
+        await vm.ConfirmReviewCommand.ExecuteAsync(null);
+
+        (vm.IsReviewing, vm.Error).Should().Be((false, null));
+        _checkins.All.Single().Should().Match<Checkin>(c => c.GoalId == study.Id && c.Amount == 3725);
+    }
+
+    [Fact]
+    public async Task Review_accepts_only_seconds_and_asks_for_the_time_when_empty()
+    {
+        var vm = await Running(new FocusPlan([F(25), B(5)], 1));
+        _time.Advance(TimeSpan.FromMinutes(70));
+        await vm.AdvanceCommand.ExecuteAsync(null);
+
+        (vm.ReviewHoursInput, vm.ReviewMinutesInput, vm.ReviewSecondsInput) = (null, null, null);
+        await vm.ConfirmReviewCommand.ExecuteAsync(null);
+        (vm.IsReviewing, vm.Error).Should().Be((true, "Informe o tempo."));
+
+        vm.ReviewSecondsInput = 50;
+        await vm.ConfirmReviewCommand.ExecuteAsync(null);
+
+        (vm.IsReviewing, vm.Error).Should().Be((false, null));
+        (await _sessions.ChunksAsync()).Single().Seconds.Should().Be(50);
     }
 
     [Fact]
@@ -507,11 +542,11 @@ public class PomodoroViewModelTests
         _time.Advance(TimeSpan.FromMinutes(70)); // 45 min de extra
         await vm.AdvanceCommand.ExecuteAsync(null);
         vm.IsReviewing.Should().BeTrue();
-        (vm.ReviewHoursInput, vm.ReviewMinutesInput) = (0, 40);
+        (vm.ReviewHoursInput, vm.ReviewMinutesInput, vm.ReviewSecondsInput) = (0, 40, 0);
 
         await Reloaded(vm);
 
-        (vm.IsReviewing, vm.ReviewHoursInput, vm.ReviewMinutesInput).Should().Be((true, 0m, 40m));
+        (vm.IsReviewing, vm.ReviewHoursInput, vm.ReviewMinutesInput, vm.ReviewSecondsInput).Should().Be((true, 0m, 40m, 0m));
         await vm.ConfirmReviewCommand.ExecuteAsync(null);
         (await _sessions.ChunksAsync()).Single().Seconds.Should().Be(40 * 60);
     }

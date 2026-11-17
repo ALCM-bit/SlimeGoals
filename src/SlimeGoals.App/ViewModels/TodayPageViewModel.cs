@@ -169,8 +169,9 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
                 if (chunkDraft is not null && card.Chunks.FirstOrDefault(c => c.CheckinId == chunkDraft.CheckinId) is { } same)
                 {
                     same.OpenEditor();
-                    (same.HoursInput, same.MinutesInput, same.NoteInput, same.Error) =
-                        (chunkDraft.HoursInput, chunkDraft.MinutesInput, chunkDraft.NoteInput, chunkDraft.Error);
+                    (same.HoursInput, same.MinutesInput, same.SecondsInput, same.NoteInput, same.Error) =
+                        (chunkDraft.HoursInput, chunkDraft.MinutesInput, chunkDraft.SecondsInput, chunkDraft.NoteInput,
+                            chunkDraft.Error);
                 }
                 Goals.Add(card);
             }
@@ -361,7 +362,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             item.PanelError = "Informe um valor.";
             return Task.CompletedTask;
         }
-        return RunAsync(item, _ => timers.RegisterAsync(value * 60, item.PanelNote), panel: true);
+        return RunAsync(item, _ => timers.RegisterAsync(value, item.PanelNote), panel: true);
     }
 
     /// <summary>✓, Enter ou sugestão escolhida: grava o nome digitado e fecha a edição. Sem mudança, só fecha.</summary>
@@ -475,12 +476,12 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     {
         if (chunk is not { IsEditing: true, CheckinId: { } id })
             return Task.CompletedTask;
-        if (chunk.Minutes() is not { } minutes)
+        if (chunk.Seconds() is not { } seconds)
         {
             chunk.Error = "Informe um valor.";
             return Task.CompletedTask;
         }
-        return RunChunkAsync(chunk, () => checkins.ReplaceAsync(chunk.GoalId, id, minutes * 60, chunk.NoteInput));
+        return RunChunkAsync(chunk, () => checkins.ReplaceAsync(chunk.GoalId, id, seconds, chunk.NoteInput));
     }
 
     [RelayCommand]
