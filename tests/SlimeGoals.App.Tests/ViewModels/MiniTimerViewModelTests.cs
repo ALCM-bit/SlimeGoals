@@ -46,6 +46,7 @@ public sealed class MiniTimerViewModelTests : IDisposable
         vm.Color.Should().Be(GoalColor.Green);
         vm.Elapsed.Should().Be("0:00:00");
         vm.IsStopVisible.Should().BeTrue();
+        vm.HideText.Should().Be("Esconder até o próximo cronômetro");
     }
 
     [Fact]
@@ -106,6 +107,7 @@ public sealed class MiniTimerViewModelTests : IDisposable
         (vm.Title, vm.IconKey, vm.Color).Should().Be(("Foco", "NavTime", GoalColor.Purple));
         vm.Elapsed.Should().Be("25:00");
         vm.IsStopVisible.Should().BeFalse();
+        vm.HideText.Should().Be("Esconder até o fim da sessão");
 
         _f.Time.Advance(TimeSpan.FromSeconds(61));
         vm.Elapsed.Should().Be("23:59");

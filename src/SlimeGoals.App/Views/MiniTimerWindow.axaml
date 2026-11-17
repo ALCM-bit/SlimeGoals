@@ -34,10 +34,11 @@
       </Button>
     </Grid>
   </Border>
-  <!-- Esconde só até o próximo cronômetro; a opção em Configurações › Janela continua como está -->
+  <!-- Esconde só até o próximo cronômetro (ou até o fim da sessão de Pomodoro); a opção em Configurações › Janela
+       continua como está -->
   <Button Classes="mini-timer-hide" HorizontalAlignment="Right" VerticalAlignment="Top"
-          AutomationProperties.Name="Esconder até o próximo cronômetro"
-          ToolTip.Tip="Esconder até o próximo cronômetro" Click="OnHideClick">
+          AutomationProperties.Name="{Binding HideText}"
+          ToolTip.Tip="{Binding HideText}" Click="OnHideClick">
     <Path Classes="btn-icon" Data="{StaticResource IconX}" />
   </Button>
   </Panel>

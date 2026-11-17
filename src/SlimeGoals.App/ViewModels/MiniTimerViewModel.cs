@@ -56,6 +56,12 @@ public sealed partial class MiniTimerViewModel : ObservableObject, IDisposable
     /// <summary>O botão de parar: só no cronômetro.</summary>
     [ObservableProperty] public partial bool IsStopVisible { get; private set; } = true;
 
+    /// <summary>A dica e o nome acessível do "×": o "−" vale até o próximo cronômetro, ou até o fim da sessão.</summary>
+    [ObservableProperty] public partial string HideText { get; private set; } = HideTimerText;
+
+    private const string HideTimerText = "Esconder até o próximo cronômetro";
+    private const string HideSessionText = "Esconder até o fim da sessão";
+
     public void Dispose()
     {
         _watcher.Changed -= OnWatcherChanged;
@@ -94,6 +100,7 @@ public sealed partial class MiniTimerViewModel : ObservableObject, IDisposable
         IconKey = _timer.Icon;
         Color = _timer.Color;
         IsStopVisible = _timer.Focus is null;
+        HideText = _timer.Focus is null ? HideTimerText : HideSessionText;
         RefreshElapsed();
         _tick ??= _time.CreateTimer(_ => OnUi(RefreshElapsed), null, Second, Second);
     }

@@ -36,6 +36,19 @@ public sealed class FocusQuitNoticeTests : IDisposable
     }
 
     [Fact]
+    public async Task Quit_with_a_finished_session_just_quits()
+    {
+        await _f.Focus.StartAsync(FocusPlan.Default, null);
+        _f.Time.Advance(TimeSpan.FromMinutes(10));
+        await _f.Focus.EndAsync(); // sem meta e com foco feito: fica guardada à espera de um destino
+        (await _f.Focus.GetAsync())!.FinishedAt.Should().NotBeNull();
+
+        await Create().QuitAsync();
+
+        _calls.Should().Equal("quit");
+    }
+
+    [Fact]
     public async Task Quit_without_a_session_just_quits()
     {
         await Create().QuitAsync();

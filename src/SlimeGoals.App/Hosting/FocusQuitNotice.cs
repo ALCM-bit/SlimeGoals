@@ -5,7 +5,7 @@ using SlimeGoals.Core.Services;
 namespace SlimeGoals.App.Hosting;
 
 /// <summary>
-/// O "Sair" do Linux com uma sessão de Pomodoro guardada (spec Pomodoro §4.5): avisa que a sessão continua guardada e
+/// O "Sair" do Linux com uma sessão de Pomodoro em andamento (spec Pomodoro §4.5): avisa que a sessão continua guardada e
 /// que o aviso de fim de bloco só toca com o app aberto, e então encerra. Envolve o <see cref="IAppLifetime"/> de verdade,
 /// então vale para a bandeja, o Ctrl+Q e o fechar que encerra. O aviso nunca segura o encerramento: falha ou demora
 /// além de <see cref="NoticeTimeout"/>, o app sai assim mesmo.
@@ -24,14 +24,16 @@ public sealed class FocusQuitNotice(IAppLifetime inner, FocusService focus,
 
     public void Quit() => _ = QuitAsync();
 
-    /// <summary>Avisa, se há sessão, e encerra. Um segundo pedido no meio do aviso não avisa de novo.</summary>
+    /// <summary>Avisa, se há sessão em andamento, e encerra. Um segundo pedido no meio do aviso não avisa de novo.</summary>
     public async Task QuitAsync()
     {
         if (Interlocked.Exchange(ref _quitting, 1) == 1)
             return;
         try
         {
-            if (await focus.GetAsync().ConfigureAwait(false) is not null)
+            // Só a sessão em andamento (pausada inclusive) tem aviso de fim de bloco a perder; a terminada, à espera de um
+            // destino, não.
+            if (await focus.GetAsync().ConfigureAwait(false) is { FinishedAt: null })
             {
                 using var timeout = new CancellationTokenSource(NoticeTimeout, time);
                 await notify(Title, Body, timeout.Token).WaitAsync(timeout.Token).ConfigureAwait(false);
