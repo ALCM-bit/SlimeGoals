@@ -103,6 +103,23 @@ public class PomodoroViewModelTests
     }
 
     [Fact]
+    public async Task Block_being_edited_survives_a_background_reload()
+    {
+        var vm = await Loaded();
+        var focus = vm.Blocks[0];
+        vm.EditBlockCommand.Execute(focus);
+        (focus.HoursInput, focus.MinutesInput) = (1, 10);
+        vm.RepeatInput = 2;
+
+        _changes.NotifyChanged(); // a sincronização, ou outra página, grava algo
+        await vm.LoadCommand.ExecutionTask!;
+
+        vm.Blocks[0].Should().BeSameAs(focus);
+        (focus.IsEditing, focus.HoursInput, focus.MinutesInput, vm.RepeatInput).Should().Be((true, 1m, 10m, 2m));
+        vm.Blocks.Select(b => b.IsEditing).Should().Equal(true, false);
+    }
+
+    [Fact]
     public async Task Editing_one_block_closes_the_other_editor()
     {
         var vm = await Loaded();
@@ -454,6 +471,22 @@ public class PomodoroViewModelTests
         (vm.IsReviewing, vm.ReviewHoursInput, vm.ReviewMinutesInput, vm.Error).Should().Be((true, 1m, 10m, (string?)null));
         _checkins.All.Should().BeEmpty();
         (await _sessions.GetAsync())!.Step.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Typed_review_survives_a_background_reload()
+    {
+        var vm = await Running(new FocusPlan([F(25), B(5)], 1));
+        _time.Advance(TimeSpan.FromMinutes(70)); // 45 min de extra
+        await vm.AdvanceCommand.ExecuteAsync(null);
+        vm.IsReviewing.Should().BeTrue();
+        (vm.ReviewHoursInput, vm.ReviewMinutesInput) = (0, 40);
+
+        await Reloaded(vm);
+
+        (vm.IsReviewing, vm.ReviewHoursInput, vm.ReviewMinutesInput).Should().Be((true, 0m, 40m));
+        await vm.ConfirmReviewCommand.ExecuteAsync(null);
+        (await _sessions.ChunksAsync()).Single().Minutes.Should().Be(40);
     }
 
     [Fact]
