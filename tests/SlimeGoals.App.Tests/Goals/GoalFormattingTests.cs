@@ -2,6 +2,8 @@ using SlimeGoals.App.Goals;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
 
+using static SlimeGoals.App.Tests.Support.DurationText;
+
 namespace SlimeGoals.App.Tests.Goals;
 
 public class GoalFormattingTests
@@ -18,7 +20,7 @@ public class GoalFormattingTests
     [InlineData(Measure.Duration, Recurrence.Weekly, 18000, null, "5 h por semana")]
     [InlineData(Measure.Duration, Recurrence.Daily, 9000, null, "2 h 30 min por dia")]
     public void Target(Measure m, Recurrence r, int target, string? unit, string expected) =>
-        GoalFormatting.Target(Sample() with { Measure = m, Recurrence = r, Target = target, Unit = unit }).Should().Be(expected);
+        GoalFormatting.Target(Sample() with { Measure = m, Recurrence = r, Target = target, Unit = unit }).Should().Be(Dur(expected));
 
     [Theory]
     [InlineData(0, "0 min")]
@@ -32,7 +34,12 @@ public class GoalFormattingTests
     [InlineData(-1800, "-30 min")]
     [InlineData(-160, "-2 min 40 s")]
     public void Duration_shows_hours_minutes_and_seconds(int seconds, string expected) =>
-        GoalFormatting.Duration(seconds).Should().Be(expected);
+        GoalFormatting.Duration(seconds).Should().Be(Dur(expected));
+
+    // A 320 px, "2 h 30 min" quebrava entre "30" e "min": cada parte fica inteira, e a quebra só cai entre as partes.
+    [Fact]
+    public void Duration_keeps_each_part_on_one_line() =>
+        GoalFormatting.Duration(4360).Should().Be("1\u00A0h 12\u00A0min 40\u00A0s");
 
     [Theory]
     [InlineData(309, "0:05:09")]
@@ -55,7 +62,7 @@ public class GoalFormattingTests
     public void Progress(Measure m, Recurrence r, int target, string? unit, int done, string expected)
     {
         var goal = Sample() with { Measure = m, Recurrence = r, Target = target, Unit = unit };
-        GoalFormatting.Progress(new GoalProgress(goal, done, done >= target)).Should().Be(expected);
+        GoalFormatting.Progress(new GoalProgress(goal, done, done >= target)).Should().Be(Dur(expected));
     }
 
     [Theory]
@@ -104,5 +111,5 @@ public class GoalFormattingTests
     [Fact]
     public void Summary_uses_measure_target() =>
         GoalFormatting.Summary(Sample() with { Measure = Measure.Duration, Target = 9000, Unit = null })
-            .Should().StartWith("2 h 30 min por semana · ");
+            .Should().StartWith(Dur("2 h 30 min por semana · "));
 }

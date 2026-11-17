@@ -6,6 +6,8 @@ using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Testing;
 
+using static SlimeGoals.App.Tests.Support.DurationText;
+
 namespace SlimeGoals.App.Tests.ViewModels;
 
 public class TodayPageViewModelTests
@@ -264,7 +266,7 @@ public class TodayPageViewModelTests
         card.PanelNote = "contei errado";
         await page.ConfirmPanelCommand.ExecuteAsync(card);
 
-        Card(page, "Estudar").ProgressText.Should().Be("1 h de 2 h hoje");
+        Card(page, "Estudar").ProgressText.Should().Be(Dur("1 h de 2 h hoje"));
         _checkins.All.Last().Should().Match<Checkin>(c => c.Amount == -1800 && c.Note == "contei errado");
     }
 
@@ -331,7 +333,7 @@ public class TodayPageViewModelTests
         await page.RegisterTimerCommand.ExecuteAsync(stopped);
 
         var done = Card(page, "Estudar");
-        (done.IsTimerStopped, done.ProgressText).Should().Be((false, "25 min 40 s de 1 h hoje"));
+        (done.IsTimerStopped, done.ProgressText).Should().Be((false, Dur("25 min 40 s de 1 h hoje")));
         _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(25 * 60 + 40);
     }
 
@@ -483,7 +485,7 @@ public class TodayPageViewModelTests
         Card(page, "Violão").CanStartTimer.Should().BeFalse();
 
         await page.StopOffscreenTimerCommand.ExecuteAsync(null);
-        page.OffscreenTimerText.Should().Be("Cronômetro parado em \"Fim de semana\" · 12 min 40 s");
+        page.OffscreenTimerText.Should().Be(Dur("Cronômetro parado em \"Fim de semana\" · 12 min 40 s"));
         await page.DiscardOffscreenTimerCommand.ExecuteAsync(null);
 
         page.HasOffscreenTimer.Should().BeFalse();
@@ -939,8 +941,8 @@ public class TodayPageViewModelTests
 
         var card = Card(await Loaded(), "Estudar");
 
-        Rows(card).Should().Equal(("Sem nome", "12 min"), ("Inglês", "25 min"));
-        (card.HasChunks, card.ChunksHeader, card.IsChunksOpen).Should().Be((true, "Hoje · 37 min", false));
+        Rows(card).Should().Equal(("Sem nome", Dur("12 min")), ("Inglês", Dur("25 min")));
+        (card.HasChunks, card.ChunksHeader, card.IsChunksOpen).Should().Be((true, Dur("Hoje · 37 min"), false));
         card.Chunks.Should().OnlyContain(c => c.CanEdit && !c.IsRunning);
     }
 
@@ -954,9 +956,9 @@ public class TodayPageViewModelTests
 
         var card = Card(await Loaded(), "Estudar");
 
-        card.ProgressText.Should().Be("1 h 12 min 40 s de 2 h 30 min hoje");
-        card.ChunksHeader.Should().Be("Hoje · 1 h 12 min 40 s");
-        Rows(card).Should().Equal(("Revisar capítulo 3", "2 min 40 s"), ("Projeto", "1 h 10 min"));
+        card.ProgressText.Should().Be(Dur("1 h 12 min 40 s de 2 h 30 min hoje"));
+        card.ChunksHeader.Should().Be(Dur("Hoje · 1 h 12 min 40 s"));
+        Rows(card).Should().Equal(("Revisar capítulo 3", Dur("2 min 40 s")), ("Projeto", Dur("1 h 10 min")));
     }
 
     [Fact]
@@ -983,7 +985,7 @@ public class TodayPageViewModelTests
 
         var running = card.Chunks[0];
         (running.IsRunning, running.CanEdit, running.Name, running.Text, running.CheckinId).Should().Be((true, false, "Leitura", "0:03:00", null));
-        card.ChunksHeader.Should().Be("Hoje · 37 min");
+        card.ChunksHeader.Should().Be(Dur("Hoje · 37 min"));
         _time.Advance(TimeSpan.FromSeconds(5));
         card.UpdateElapsed();
         running.Text.Should().Be("0:03:05");
@@ -1011,7 +1013,7 @@ public class TodayPageViewModelTests
 
         var card = Card(await Loaded(), "Estudar");
 
-        (card.Chunks[0].Text, card.ChunksHeader).Should().Be(("-5 min", "Hoje · 32 min"));
+        (card.Chunks[0].Text, card.ChunksHeader).Should().Be((Dur("-5 min"), Dur("Hoje · 32 min")));
     }
 
     [Fact]
@@ -1058,8 +1060,8 @@ public class TodayPageViewModelTests
         await page.SaveChunkCommand.ExecuteAsync(english);
 
         var card = Card(page, "Estudar");
-        (card.ChunksHeader, card.Chunks.Any(c => c.IsEditing)).Should().Be(("Hoje · 32 min", false));
-        Rows(card).Should().Contain(("Inglês 2", "20 min"));
+        (card.ChunksHeader, card.Chunks.Any(c => c.IsEditing)).Should().Be((Dur("Hoje · 32 min"), false));
+        Rows(card).Should().Contain(("Inglês 2", Dur("20 min")));
     }
 
     [Fact]
@@ -1072,7 +1074,7 @@ public class TodayPageViewModelTests
 
         await page.DeleteChunkCommand.ExecuteAsync(unnamed);
 
-        Rows(Card(page, "Estudar")).Should().Equal(("Inglês", "25 min"));
+        Rows(Card(page, "Estudar")).Should().Equal(("Inglês", Dur("25 min")));
     }
 
     [Fact]
@@ -1128,14 +1130,14 @@ public class TodayPageViewModelTests
         await CheckinService.AdjustAsync(goal.Id, 150 * 60, "Projeto");
         var page = await Loaded();
         var chunk = Card(page, "Estudar").Chunks.Single();
-        chunk.Text.Should().Be("2 h 30 min");
+        chunk.Text.Should().Be(Dur("2 h 30 min"));
 
         page.EditChunkCommand.Execute(chunk);
         (chunk.HoursInput, chunk.MinutesInput).Should().Be((2m, 30m));
         (chunk.HoursInput, chunk.MinutesInput) = (3, null);
         await page.SaveChunkCommand.ExecuteAsync(chunk);
 
-        Rows(Card(page, "Estudar")).Should().Equal(("Projeto", "3 h"));
+        Rows(Card(page, "Estudar")).Should().Equal(("Projeto", Dur("3 h")));
     }
 
     [Fact]
@@ -1152,7 +1154,7 @@ public class TodayPageViewModelTests
         (stopped.StoppedHoursInput, stopped.StoppedMinutesInput) = (1, null);
         await page.RegisterTimerCommand.ExecuteAsync(stopped);
 
-        Card(page, "Estudar").ProgressText.Should().Be("1 h de 5 h hoje");
+        Card(page, "Estudar").ProgressText.Should().Be(Dur("1 h de 5 h hoje"));
         _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(3600);
     }
 
@@ -1197,7 +1199,7 @@ public class TodayPageViewModelTests
 
         reloaded.Error.Should().BeNull();
         _checkins.All.Should().ContainSingle(c => c.Amount < 0).Which.Amount.Should().Be(-185);
-        Rows(Card(page, "Estudar")).First().Should().Be(("Sem nome", "-3 min 5 s"));
+        Rows(Card(page, "Estudar")).First().Should().Be(("Sem nome", Dur("-3 min 5 s")));
     }
 
     [Fact]
@@ -1213,7 +1215,7 @@ public class TodayPageViewModelTests
         await page.SaveChunkCommand.ExecuteAsync(chunk);
 
         _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(185);
-        Rows(Card(page, "Estudar")).Should().Equal(("Revisar capítulo 3", "3 min 5 s"));
+        Rows(Card(page, "Estudar")).Should().Equal(("Revisar capítulo 3", Dur("3 min 5 s")));
     }
 
     [Fact]
@@ -1259,7 +1261,7 @@ public class TodayPageViewModelTests
         await page.RegisterTimerCommand.ExecuteAsync(stopped);
 
         _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(160);
-        Card(page, "Estudar").ProgressText.Should().Be("2 min 40 s de 1 h hoje");
+        Card(page, "Estudar").ProgressText.Should().Be(Dur("2 min 40 s de 1 h hoje"));
     }
 
     [Fact]

@@ -8,6 +8,7 @@ namespace SlimeGoals.App.Goals;
 public static class GoalFormatting
 {
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+    private const char Nbsp = '\u00A0';
 
     // Ordem ISO: segunda primeiro (semana do app, spec §5.1).
     private static readonly (WeekDays Day, string Short)[] DayNames =
@@ -41,7 +42,8 @@ public static class GoalFormatting
 
     /// <summary>
     /// Tempo de meta em segundos, sem as partes zeradas: 40 → "40 s"; 160 → "2 min 40 s"; 3600 → "1 h";
-    /// 4360 → "1 h 12 min 40 s"; 9000 → "2 h 30 min"; zero → "0 min"; negativo com "-" na frente.
+    /// 4360 → "1 h 12 min 40 s"; 9000 → "2 h 30 min"; zero → "0 min"; negativo com "-" na frente. O número e a unidade
+    /// ficam juntos por um espaço inquebrável: numa tela estreita a linha quebra entre as partes, nunca entre "30" e "min".
     /// </summary>
     public static string Duration(int seconds)
     {
@@ -49,12 +51,12 @@ public static class GoalFormatting
         var (hours, minutes, rest) = (total / 3600, total / 60 % 60, total % 60);
         var parts = new List<string>(3);
         if (hours > 0)
-            parts.Add($"{hours} h");
+            parts.Add($"{hours}{Nbsp}h");
         if (minutes > 0)
-            parts.Add($"{minutes} min");
+            parts.Add($"{minutes}{Nbsp}min");
         if (rest > 0)
-            parts.Add($"{rest} s");
-        return parts.Count == 0 ? "0 min" : (seconds < 0 ? "-" : "") + string.Join(' ', parts);
+            parts.Add($"{rest}{Nbsp}s");
+        return parts.Count == 0 ? $"0{Nbsp}min" : (seconds < 0 ? "-" : "") + string.Join(' ', parts);
     }
 
     /// <summary>Cronômetro: "0:05:09", "1:02:03" (horas sem zero à esquerda).</summary>

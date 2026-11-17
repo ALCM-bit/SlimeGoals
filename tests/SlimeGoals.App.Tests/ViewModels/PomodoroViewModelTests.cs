@@ -6,6 +6,8 @@ using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Testing;
 
+using static SlimeGoals.App.Tests.Support.DurationText;
+
 namespace SlimeGoals.App.Tests.ViewModels;
 
 public class PomodoroViewModelTests
@@ -54,7 +56,7 @@ public class PomodoroViewModelTests
         var vm = await Loaded();
 
         Plan(vm).Should().Equal((FocusBlockKind.Focus, 25), (FocusBlockKind.Break, 5));
-        vm.Blocks.Select(b => (b.Text, b.IsFocus)).Should().Equal(("25 min", true), ("5 min", false));
+        vm.Blocks.Select(b => (b.Text, b.IsFocus)).Should().Equal((Dur("25 min"), true), (Dur("5 min"), false));
         vm.RepeatInput.Should().Be(4);
         vm.SelectedGoal.Should().Be(new FocusGoalOption(null, "Sem meta"));
         (vm.IsPreparing, vm.IsRunning, vm.IsFinished).Should().Be((true, false, false));
@@ -96,7 +98,7 @@ public class PomodoroViewModelTests
         vm.CloseBlockEditorCommand.Execute(focus);
 
         vm.Blocks.Select(b => b.IsEditing).Should().Equal(false, false);
-        focus.Text.Should().Be("1 h 15 min");
+        focus.Text.Should().Be(Dur("1 h 15 min"));
         await vm.StartCommand.ExecuteAsync(null);
         (await _sessions.GetAsync())!.Plan.Blocks.Should().Equal(
             new FocusBlock(FocusBlockKind.Focus, 75), new FocusBlock(FocusBlockKind.Break, 5));
@@ -134,7 +136,7 @@ public class PomodoroViewModelTests
     public async Task Start_text_shows_the_whole_session_length()
     {
         var vm = await Loaded();
-        vm.StartText.Should().Be("Começar · 2 h");
+        vm.StartText.Should().Be(Dur("Começar · 2 h"));
 
         // O exemplo do autor: 40 de foco, 20 de pausa, 60 de foco e 30 de pausa, uma vez.
         vm.Blocks[0].MinutesInput = 40;
@@ -146,9 +148,9 @@ public class PomodoroViewModelTests
         vm.Blocks[3].MinutesInput = 30;
         vm.RepeatInput = 1;
 
-        vm.StartText.Should().Be("Começar · 2 h 30 min");
+        vm.StartText.Should().Be(Dur("Começar · 2 h 30 min"));
         vm.RemoveBlockCommand.Execute(vm.Blocks[3]);
-        vm.StartText.Should().Be("Começar · 2 h");
+        vm.StartText.Should().Be(Dur("Começar · 2 h"));
     }
 
     [Fact]
@@ -159,8 +161,8 @@ public class PomodoroViewModelTests
         (vm.Blocks[1].HoursInput, vm.Blocks[1].MinutesInput) = (0, 30);
         vm.RepeatInput = 1;
 
-        vm.StartText.Should().Be("Começar · 2 h 30 min");
-        vm.Blocks.Select(b => b.Text).Should().Equal("2 h", "30 min");
+        vm.StartText.Should().Be(Dur("Começar · 2 h 30 min"));
+        vm.Blocks.Select(b => b.Text).Should().Equal(Dur("2 h"), Dur("30 min"));
     }
 
     [Theory]
@@ -393,7 +395,7 @@ public class PomodoroViewModelTests
         _time.Advance(TimeSpan.FromMinutes(27)); // o relógio vê o fim do bloco e conta o extra
 
         (vm.IsWaiting, vm.PhaseText, vm.OvertimeText, vm.NextActionText).Should()
-            .Be((true, "Foco concluído", "+2 min", "Começar pausa"));
+            .Be((true, "Foco concluído", Dur("+2 min"), "Começar pausa"));
         (vm.MinutesText, vm.SecondsText).Should().Be(("00", "00"));
         // O ⇄ não tem conferência: esperando o toque, ele some; o ⏸ também.
         (vm.CanSwitchTask, vm.BeginSwitchTaskCommand.CanExecute(null), vm.PauseResumeCommand.CanExecute(null)).Should()
@@ -406,10 +408,10 @@ public class PomodoroViewModelTests
         vm.ShowsTaskField.Should().BeFalse(); // a subatividade só aparece no foco
 
         _time.Advance(TimeSpan.FromMinutes(6));
-        (vm.PhaseText, vm.OvertimeText, vm.NextActionText).Should().Be(("Pausa concluída", "+1 min", "Encerrar"));
+        (vm.PhaseText, vm.OvertimeText, vm.NextActionText).Should().Be(("Pausa concluída", Dur("+1 min"), "Encerrar"));
 
         await vm.AdvanceCommand.ExecuteAsync(null);
-        (vm.IsFinished, vm.IsAwaitingDestination, vm.SummaryText).Should().Be((true, true, "27 min"));
+        (vm.IsFinished, vm.IsAwaitingDestination, vm.SummaryText).Should().Be((true, true, Dur("27 min")));
     }
 
     [Fact]
@@ -421,10 +423,10 @@ public class PomodoroViewModelTests
         (vm.IsWaiting, vm.PhaseText, vm.OvertimeText).Should().Be((true, "Foco concluído", (string?)null)); // sem "+0 s"
 
         _time.Advance(TimeSpan.FromMilliseconds(500));
-        vm.OvertimeText.Should().Be("+1 s");
+        vm.OvertimeText.Should().Be(Dur("+1 s"));
 
         _time.Advance(TimeSpan.FromSeconds(64));
-        vm.OvertimeText.Should().Be("+1 min 5 s");
+        vm.OvertimeText.Should().Be(Dur("+1 min 5 s"));
     }
 
     [Fact]
@@ -515,7 +517,7 @@ public class PomodoroViewModelTests
 
         await vm.SkipCommand.ExecuteAsync(null);
         await vm.ConfirmEndCommand.ExecuteAsync(null);
-        (vm.IsFinished, vm.SummaryText).Should().Be((true, "10 min"));
+        (vm.IsFinished, vm.SummaryText).Should().Be((true, Dur("10 min")));
     }
 
     [Fact]
@@ -678,14 +680,14 @@ public class PomodoroViewModelTests
         await vm.ConfirmEndCommand.ExecuteAsync(null);
 
         (vm.IsFinished, vm.IsRunning, vm.IsPreparing, vm.IsAwaitingDestination).Should().Be((true, false, false, true));
-        (vm.SummaryText, vm.GoalText).Should().Be(("38 min 40 s", null));
-        vm.SummaryLines.Should().Equal("Capítulo 3 · 20 min 40 s", "Revisão · 18 min");
+        (vm.SummaryText, vm.GoalText).Should().Be((Dur("38 min 40 s"), null));
+        vm.SummaryLines.Should().Equal(Dur("Capítulo 3 · 20 min 40 s"), Dur("Revisão · 18 min"));
         vm.AssignOptions.Select(o => o.Title).Should().Equal("Estudar", "Inglês");
         vm.AssignCommand.CanExecute(null).Should().BeFalse();
 
         var reopened = await Loaded(); // o app reaberto mostra o mesmo fim, dos trechos guardados
-        (reopened.IsAwaitingDestination, reopened.SummaryText).Should().Be((true, "38 min 40 s"));
-        reopened.SummaryLines.Should().Equal("Capítulo 3 · 20 min 40 s", "Revisão · 18 min");
+        (reopened.IsAwaitingDestination, reopened.SummaryText).Should().Be((true, Dur("38 min 40 s")));
+        reopened.SummaryLines.Should().Equal(Dur("Capítulo 3 · 20 min 40 s"), Dur("Revisão · 18 min"));
 
         vm.AskDiscardCommand.Execute(null);
         vm.IsConfirmingDiscard.Should().BeTrue();
@@ -698,7 +700,7 @@ public class PomodoroViewModelTests
         _checkins.All.Select(c => (c.GoalId, c.Amount, c.Note)).Should()
             .BeEquivalentTo([(study.Id, 20 * 60 + 40, "Capítulo 3"), (study.Id, 18 * 60, "Revisão")]);
         (await _sessions.GetAsync()).Should().BeNull();
-        (vm.IsFinished, vm.IsAwaitingDestination, vm.GoalText, vm.SummaryText).Should().Be((true, false, "Estudar", "38 min 40 s"));
+        (vm.IsFinished, vm.IsAwaitingDestination, vm.GoalText, vm.SummaryText).Should().Be((true, false, "Estudar", Dur("38 min 40 s")));
         vm.NewSessionCommand.Execute(null);
         vm.IsPreparing.Should().BeTrue();
 
@@ -730,7 +732,7 @@ public class PomodoroViewModelTests
         vm.Editor.BackText.Should().Be("← Tempo"); // o voltar do editor leva de volta à aba Tempo, não a Metas
         vm.Editor.CancelCommand.Execute(null);
         vm.Editor.Should().BeNull();
-        (vm.IsAwaitingDestination, vm.SummaryText).Should().Be((true, "25 min"));
+        (vm.IsAwaitingDestination, vm.SummaryText).Should().Be((true, Dur("25 min")));
 
         vm.CreateGoalCommand.Execute(null);
         var editor = vm.Editor!;
@@ -832,12 +834,12 @@ public class PomodoroViewModelTests
 
         (await _sessions.GetAsync()).Should().BeNull();
         (vm.IsFinished, vm.IsPreparing, vm.IsAwaitingDestination).Should().Be((true, false, false));
-        (vm.SummaryText, vm.GoalText).Should().Be(("25 min", "Estudar"));
-        vm.SummaryLines.Should().Equal("Capítulo 3 · 25 min");
+        (vm.SummaryText, vm.GoalText).Should().Be((Dur("25 min"), "Estudar"));
+        vm.SummaryLines.Should().Equal(Dur("Capítulo 3 · 25 min"));
         _checkins.All.Single().Should().Match<Checkin>(c => c.GoalId == study.Id && c.Amount == 25 * 60 && c.Note == "Capítulo 3");
 
         await Reloaded(vm);
-        (vm.IsFinished, vm.IsPreparing, vm.SummaryText).Should().Be((true, false, "25 min"));
+        (vm.IsFinished, vm.IsPreparing, vm.SummaryText).Should().Be((true, false, Dur("25 min")));
 
         vm.NewSessionCommand.Execute(null);
         await vm.LoadCommand.ExecutionTask!;

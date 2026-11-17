@@ -1,6 +1,8 @@
 using SlimeGoals.App.Goals;
 using SlimeGoals.Core.Domain;
 
+using static SlimeGoals.App.Tests.Support.DurationText;
+
 namespace SlimeGoals.App.Tests.Goals;
 
 public class ReminderFormatterTests
@@ -21,6 +23,6 @@ public class ReminderFormatterTests
     {
         var goal = Sample(measure, target, unit) with { Title = "Beber água" };
 
-        new ReminderFormatter().Format(goal, total).Should().Be(new ReminderText("Beber água", body, label));
+        new ReminderFormatter().Format(goal, total).Should().Be(new ReminderText("Beber água", Dur(body), label));
     }
 }
