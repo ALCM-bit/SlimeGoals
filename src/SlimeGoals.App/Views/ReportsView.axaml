@@ -102,7 +102,7 @@
                                 Stroke="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
                         </Viewbox>
                       </Border>
-                      <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center"
+                      <TextBlock Classes="bar-detail-title" Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center"
                                  TextTrimming="CharacterEllipsis" />
                       <TextBlock Classes="bar-detail-value" Text="{Binding Value}" VerticalAlignment="Center"
                                  Foreground="{DynamicResource Muted}" />
