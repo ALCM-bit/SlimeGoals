@@ -1,6 +1,6 @@
 # Segundos nas metas de tempo (v1)
 
-> Desenho completo, em revisão pelo autor desde 17/11/2026. Caminho escolhido: 1, guardar segundos. Na conversa o autor escolheu ver os segundos "em todo lugar" (opção B), e não só na lista de trechos. Um revisor leu o desenho como quem vai construir e não deixou dúvida para o autor; as duas pequenas que levantou foram decididas aqui (versão de lançamento e o "+N" do Pomodoro).
+> Desenho completo, aprovado pelo autor em 17/11/2026 e construído. Caminho escolhido: 1, guardar segundos. Na conversa o autor escolheu ver os segundos "em todo lugar" (opção B), e não só na lista de trechos. Um revisor leu o desenho como quem vai construir e não deixou dúvida para o autor; as duas pequenas que levantou foram decididas aqui (versão de lançamento e o "+N" do Pomodoro).
 
 Sai depois da 0.9.0 (Pomodoro), numa versão própria.
 
@@ -101,6 +101,20 @@ Este desenho faz as metas de tempo guardarem e mostrarem o tempo até o segundo.
 - A ordem das tarefas, desde que cada uma deixe a `main` compilando e com os testes passando.
 - Os testes de cada regra de §4, incluindo a migração (valores antes e depois, por medida) e a leitura do formato 1 com o registro chegando antes da meta.
 
-## 6. Verificação
+## 6. Verificação (17/11/2026)
 
-*(preenchida ao fim da construção)*
+**Conferido**
+- **Automatizado:** `dotnet test --solution SlimeGoals.slnx` passa com 1855 testes, nenhum ignorado. `dotnet build SlimeGoals.slnx -c Release` fecha com 0 avisos e 0 erros. O build de `SlimeGoals.Android.slnx` fecha com 0 erros e só o aviso XA0033 do JDK.
+- **Telas (Render, `all`, `time` e `narrow`):** lidas a Hoje com trechos em 320 px, o fim do Pomodoro em 412 px e Relatórios da semana em 360 px.
+  - Hoje: "Hoje · 1 h 12 min 40 s", o trecho "2 min 40 s" e a subtarefa de 4 s em "0:00:04". Nada cortado em 320.
+  - Relatórios: "1 h 12 min 40 s de 2 h 30 min".
+  - Fim do Pomodoro: a amostra tem só minutos cheios, então a tela sai sem segundos, como deve.
+- **Migração, leitura do formato 1 e cortes:** cobertos pelos testes de Core, Infraestrutura e Sync (valores antes e depois por medida, registro do formato 1 chegando antes da meta, trecho abaixo de 1 min gravado).
+- **Não conferido aqui:** o app aberto. O ambiente de verificação não enxerga janelas (Wayland).
+
+**Falta o autor ver**
+- Os dados reais depois de atualizar, no celular e no desktop: uma meta que tinha minutos mostra o mesmo tempo.
+- No celular, a troca de subtarefa com cerca de 40 s: aparece "40 s" com o nome da tarefa.
+- O resumo do fim do Pomodoro com segundos.
+- A sincronização entre dois aparelhos já na nova versão.
+- Um aparelho na 0.9.0 pausando com "atualize o app" ao receber um registro do formato 2.
