@@ -627,6 +627,11 @@
   <Style Selector=".compact DockPanel.focus-page">
     <Setter Property="VerticalAlignment" Value="Stretch" />
   </Style>
+  <!-- No celular, o conteúdo do Pomodoro ocupa pelo menos a altura visível (para a sessão rodando ficar no meio). Só no
+       compact: no desktop a página tem a altura do conteúdo, e amarrar uma à outra prenderia a altura antiga -->
+  <Style Selector=".compact Border.focus-fill">
+    <Setter Property="MinHeight" Value="{Binding $parent[ScrollViewer].Viewport.Height}" />
+  </Style>
   <!-- Subaba única da aba Tempo: um selo, não um segmento -->
   <Style Selector="Border.method-tab">
     <Setter Property="HorizontalAlignment" Value="Left" />
