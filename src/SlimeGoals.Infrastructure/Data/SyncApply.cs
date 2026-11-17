@@ -235,7 +235,9 @@ internal sealed class SyncApply
         if (rows.Count == 0)
             return;
 
-        var isDuration = await IsDurationGoalAsync(goalId) ?? false;
+        // Sem a linha da meta não se sabe a medida: os registros continuam esperando, sem converter nem sair da fila.
+        if (await IsDurationGoalAsync(goalId) is not { } isDuration)
+            return;
         foreach (var row in rows)
         {
             try

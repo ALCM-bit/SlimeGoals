@@ -289,6 +289,20 @@ public class SyncApplyTests : IDisposable
     }
 
     [Fact]
+    public async Task Format_1_checkin_waiting_for_a_quantity_goal_is_not_converted()
+    {
+        var goal = NewGoal();
+        var checkin = NewCheckin(goal.Id, 3);
+        await ApplyAsync(1, In(checkin, 1, version: 1));
+
+        await ApplyAsync(2, In(goal, 2, version: 1));
+
+        AmountOf(checkin.Id).Should().Be(3);
+        (await Goals.GetAsync(goal.Id))!.Target.Should().Be(goal.Target);
+        Count("sync_pending").Should().Be(0);
+    }
+
+    [Fact]
     public async Task Format_2_checkin_waiting_for_its_goal_is_not_converted()
     {
         var goal = NewDurationGoal(target: 3600);
