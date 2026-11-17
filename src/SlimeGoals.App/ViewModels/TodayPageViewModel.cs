@@ -188,7 +188,13 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             _offscreenTimer = shownInCard ? null : snapshot.Timer;
             _offscreenTitle = snapshot.TimerGoal?.Title ?? "meta removida";
             HasOffscreenTimer = _offscreenTimer is not null;
-            FocusBandText = session is null ? null : "Sessão de Pomodoro em andamento.";
+            FocusBandText = session switch
+            {
+                null => null,
+                // Terminada sem meta: não anda mais, só espera o destino dos trechos guardados.
+                { FinishedAt: not null } => "Pomodoro concluído. Escolha o destino do tempo na aba Tempo.",
+                _ => "Sessão de Pomodoro em andamento.",
+            };
             IsOffscreenTimerRunning = _offscreenTimer is { StoppedAt: null };
             UpdateOffscreenText();
             (WeekPercent, InProgress, Completed) = (snapshot.Week.Percent, snapshot.Week.InProgress, snapshot.Week.Completed);

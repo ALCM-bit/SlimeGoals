@@ -29,7 +29,7 @@ O modo `time` (também incluído no `narrow`) grava a aba Tempo (Pomodoro) a 320
 - preparo: `time-prepare` (a sequência montada) e `time-block-edit` (o terceiro bloco aberto para editar);
 - sessão: `time-running` (foco com a subatividade), `time-switch` (trocando de subatividade), `time-paused`, `time-waiting` (foco acabou, esperando o toque), `time-waiting-break` (pausa acabou), `time-review` (conferência depois de mais de 30 min parado) e `time-confirm-end`;
 - fim: `time-end-linked` (com meta), `time-end-unassigned` (sem meta, com dois trechos), `time-discard` (confirmação de descartar) e `time-create-goal` (o editor de meta aberto pela aba Tempo);
-- `today-focus-band`: o Hoje com a faixa da sessão aberta, a 915 px de altura no celular.
+- `today-focus-band`: o Hoje com a faixa da sessão terminada sem meta ("Pomodoro concluído"), a 915 px de altura no celular.
 
 O modo `mini` grava a janelinha do cronômetro (a `MiniTimerWindow` de verdade, sobre um fundo cinza com 24 px de folga em volta do cartão para os cantos aparecerem), rodando há 23 min 51 s: `mini-timer.png` com a meta "Leitura", `mini-timer-long.png` com o título longo de exemplo, para ver o corte com reticências, e `mini-timer-hover.png` com o "×" de esconder à vista, como fica com o mouse sobre a janelinha. Compare com `specs/design/cronometro-janelinha-prototipo.png` (opção A).
 

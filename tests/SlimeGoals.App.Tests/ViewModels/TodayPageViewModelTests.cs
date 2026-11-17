@@ -413,9 +413,10 @@ public class TodayPageViewModelTests
         shown.Should().Equal(typeof(TimePageViewModel));
 
         _time.Advance(TimeSpan.FromMinutes(1));
-        await focus.EndAsync(); // sem meta, terminada à espera de destino: ainda é uma sessão
+        await focus.EndAsync(); // sem meta, terminada à espera de destino: ainda é uma sessão, mas não está andando
         await page.LoadCommand.ExecutionTask!;
-        (Card(page, "Estudar").CanStartTimer, page.FocusBandText).Should().Be((false, "Sessão de Pomodoro em andamento."));
+        (Card(page, "Estudar").CanStartTimer, page.FocusBandText).Should()
+            .Be((false, "Pomodoro concluído. Escolha o destino do tempo na aba Tempo."));
 
         await focus.DiscardAsync();
         await page.LoadCommand.ExecutionTask!;
