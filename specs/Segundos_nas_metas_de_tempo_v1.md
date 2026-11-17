@@ -71,7 +71,7 @@ Este desenho faz as metas de tempo guardarem e mostrarem o tempo até o segundo.
    - 9 000 → "2 h 30 min" (hoje é "2 h 30": *decisão minha*, o "min" volta porque agora há uma terceira parte depois dele);
    - negativo leva o sinal na frente, como hoje.
 2. **Em todo lugar.** O formato vale para: alvo e progresso da meta ("1 h 12 min 40 s de 2 h hoje"), cabeçalho e lista de trechos ("Hoje · 1 h 12 min 40 s", "Revisar capítulo 3 · 2 min 40 s"), relatórios, faixa do Hoje do cronômetro parado, fim do Pomodoro (total e linhas por subtarefa), botão "Começar · 2 h 30 min" e o "+N" do excesso do Pomodoro.
-3. **Progresso com o cronômetro rodando.** O progresso ao vivo soma os segundos já passados e passa a mudar a cada segundo, no mesmo ritmo do relógio do cartão.
+3. **Progresso com o cronômetro rodando.** Não muda: o progresso conta só o que já foi registrado, e o tempo correndo aparece no relógio do cartão, como hoje. (Corrigido ao planejar: a primeira versão deste item supunha um progresso ao vivo que o app não tem.)
 4. **O "+N" do excesso do Pomodoro.** Hoje ele fica escondido no primeiro minuto, para não mostrar "+0 min". *Decisão minha:* com segundos ele aparece a partir de 1 s ("+1 s"); abaixo de 1 s continua escondido.
 5. **320 px.** Os textos mais longos quebram linha em vez de cortar. A conferência visual inclui "1 h 12 min 40 s de 2 h 30 min hoje" no card do Hoje e no relatório.
 
