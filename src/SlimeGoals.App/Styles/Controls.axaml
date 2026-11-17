@@ -436,6 +436,11 @@
     <Setter Property="VerticalAlignment" Value="Bottom" />
     <Setter Property="Margin" Value="4,0,0,5" />
   </Style>
+  <!-- Valor no detalhe da barra dos Relatórios: à direita do nome na tela larga (na estreita, embaixo; ver .compact).
+       A coluna vem do estilo, e não do XAML, para o estilo estreito conseguir trocá-la. -->
+  <Style Selector="TextBlock.bar-detail-value">
+    <Setter Property="Grid.Column" Value="2" />
+  </Style>
   <!-- Legenda do valor: ao lado dele na tela larga, para os três blocos terem as mesmas duas linhas -->
   <Style Selector="TextBlock.stat-caption">
     <Setter Property="Grid.Column" Value="2" />
@@ -973,6 +978,13 @@
     <Setter Property="Grid.Column" Value="0" />
     <Setter Property="Grid.ColumnSpan" Value="3" />
     <Setter Property="Margin" Value="0" />
+  </Style>
+  <!-- Detalhe da barra nos Relatórios: o valor ("1 h 12 min 40 s de 2 h 30 min") desce para sob o nome e quebra linha.
+       Só na coluna do nome (a *): numa coluna Auto o texto é medido sem limite e não quebra. -->
+  <Style Selector=".compact TextBlock.bar-detail-value">
+    <Setter Property="Grid.Row" Value="1" />
+    <Setter Property="Grid.Column" Value="1" />
+    <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
   <!-- Metas: ações do cartão na linha de baixo, sob o texto -->
   <Style Selector=".compact StackPanel.card-actions">

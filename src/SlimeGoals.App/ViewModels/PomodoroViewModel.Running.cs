@@ -20,9 +20,6 @@ public sealed partial class PomodoroViewModel
 {
     private const string NoName = "Sem nome";
 
-    // Limite só para o cast de decimal para int não estourar; o de verdade é o do registro (24 h), no serviço.
-    private const decimal MaxReviewInput = 1_000_000;
-
     private ITimer? _ticker;
     private PendingCut _pendingCut;
     private bool _acting;
@@ -75,10 +72,10 @@ public sealed partial class PomodoroViewModel
         ? (total % 60).ToString("00", CultureInfo.InvariantCulture)
         : null;
 
-    /// <summary>"+2 min": o extra desde o fim do bloco, enquanto a sessão espera o toque. No primeiro minuto, nada.</summary>
+    /// <summary>"+2 min 5 s": o extra desde o fim do bloco, enquanto a sessão espera o toque. Antes do primeiro segundo, nada.</summary>
     public string? OvertimeText => Live is { } s && FocusClock.IsWaiting(s, Now)
-        && (int)FocusClock.Overtime(s, Now).TotalMinutes is var minutes and > 0
-        ? $"+{GoalFormatting.Duration(minutes)}"
+        && (int)FocusClock.Overtime(s, Now).TotalSeconds is var seconds and > 0
+        ? $"+{GoalFormatting.Duration(seconds)}"
         : null;
 
     /// <summary>A meta da sessão rodando, ou a do resumo na tela de fim.</summary>
@@ -102,6 +99,8 @@ public sealed partial class PomodoroViewModel
     [ObservableProperty] public partial decimal? ReviewHoursInput { get; set; }
 
     [ObservableProperty] public partial decimal? ReviewMinutesInput { get; set; }
+
+    [ObservableProperty] public partial decimal? ReviewSecondsInput { get; set; }
 
     // ---- Subatividade (spec das tarefas §7.1) ----
 
@@ -199,15 +198,12 @@ public sealed partial class PomodoroViewModel
     {
         if (!IsReviewing || !CanAct)
             return Task.CompletedTask;
-        if (ReviewHoursInput is null && ReviewMinutesInput is null)
+        if (DurationFields.Seconds(ReviewHoursInput, ReviewMinutesInput, ReviewSecondsInput) is not { } seconds)
         {
             Error = "Informe o tempo.";
             return Task.CompletedTask;
         }
-        var minutes = (int)Math.Round(
-            Math.Clamp((ReviewHoursInput ?? 0) * 60 + (ReviewMinutesInput ?? 0), -MaxReviewInput, MaxReviewInput),
-            MidpointRounding.AwayFromZero);
-        return ActAsync(() => RunCutAsync(_pendingCut, minutes));
+        return ActAsync(() => RunCutAsync(_pendingCut, seconds));
     }
 
     [RelayCommand]
@@ -352,10 +348,10 @@ public sealed partial class PomodoroViewModel
             OpenReview(cut);
             return Task.CompletedTask;
         }
-        return RunCutAsync(cut, reviewedMinutes: null);
+        return RunCutAsync(cut, reviewedSeconds: null);
     }
 
-    private async Task RunCutAsync(PendingCut cut, int? reviewedMinutes)
+    private async Task RunCutAsync(PendingCut cut, int? reviewedSeconds)
     {
         var goalTitle = _sessionGoalTitle;
         var review = false;
@@ -367,8 +363,8 @@ public sealed partial class PomodoroViewModel
                 // Como o ■ do cronômetro: o nome digitado e não confirmado vale para o trecho que fecha agora.
                 await SaveTypedTaskAsync();
                 summary = cut == PendingCut.Advance
-                    ? await _focus.AdvanceAsync(reviewedMinutes)
-                    : await _focus.EndAsync(reviewedMinutes);
+                    ? await _focus.AdvanceAsync(reviewedSeconds)
+                    : await _focus.EndAsync(reviewedSeconds);
             }
             catch (FocusReviewRequiredException)
             {
@@ -384,15 +380,15 @@ public sealed partial class PomodoroViewModel
             OpenReview(cut);
     }
 
-    /// <summary>Abre a conferência com o trecho aberto (do último corte até agora, com o extra), em horas e minutos.</summary>
+    /// <summary>Abre a conferência com o trecho aberto (do último corte até agora, com o extra), em h, min e s.</summary>
     private void OpenReview(PendingCut cut)
     {
         if (Live is not { } session)
             return;
         var open = FocusClock.OpenFocus(session, Now);
-        var minutes = Math.Max(0, (int)Math.Round(open.TotalMinutes, MidpointRounding.AwayFromZero));
         _pendingCut = cut;
-        (ReviewHoursInput, ReviewMinutesInput) = (minutes / 60, minutes % 60);
+        (ReviewHoursInput, ReviewMinutesInput, ReviewSecondsInput) =
+            DurationFields.Split(Math.Max(0, (int)Math.Floor(open.TotalSeconds)));
         Error = null;
         IsConfirmingEnd = false;
         IsReviewing = true;

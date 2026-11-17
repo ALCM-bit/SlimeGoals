@@ -49,21 +49,21 @@ public class TimerServiceTests
     }
 
     [Theory]
-    [InlineData(29, 0)]
-    [InlineData(30, 1)]
-    [InlineData(25 * 60 + 40, 26)]
-    public async Task Start_then_stop_returns_rounded_minutes(int seconds, int minutes)
+    [InlineData(900, 0)]
+    [InlineData(29_999, 29)]
+    [InlineData(2 * 60_000 + 40_900, 160)]
+    public async Task Stop_returns_whole_seconds(int milliseconds, int seconds)
     {
         var goal = await Study();
         await Service.StartAsync(goal.Id);
-        _time.Advance(TimeSpan.FromSeconds(seconds));
+        _time.Advance(TimeSpan.FromMilliseconds(milliseconds));
 
-        (await Service.StopAsync()).Should().Be(minutes);
-        (await Service.GetAsync()).Should().Be(new ActiveTimer(goal.Id, T0, T0.AddSeconds(seconds)));
+        (await Service.StopAsync()).Should().Be(seconds);
+        (await Service.GetAsync()).Should().Be(new ActiveTimer(goal.Id, T0, T0.AddMilliseconds(milliseconds)));
     }
 
     [Fact]
-    public async Task Stopped_timer_minutes_stay_frozen_while_time_passes()
+    public async Task Stopped_timer_seconds_stay_frozen_while_time_passes()
     {
         var goal = await Study();
         await Service.StartAsync(goal.Id);
@@ -71,8 +71,8 @@ public class TimerServiceTests
         await Service.StopAsync();
         _time.Advance(TimeSpan.FromHours(2));
 
-        (await Service.StopAsync()).Should().Be(10); // idempotente
-        TimerService.Minutes((await Service.GetAsync())!, _time.GetUtcNow()).Should().Be(10);
+        (await Service.StopAsync()).Should().Be(600); // idempotente
+        TimerService.Seconds((await Service.GetAsync())!, _time.GetUtcNow()).Should().Be(600);
     }
 
     [Fact]
@@ -118,14 +118,14 @@ public class TimerServiceTests
         _time.Advance(TimeSpan.FromMinutes(25));
         await Service.StopAsync();
 
-        (await Service.RegisterAsync(20, "foco")).Should().Be(20);
+        (await Service.RegisterAsync(1205, "foco")).Should().Be(1205);
 
         (await Service.GetAsync()).Should().BeNull();
-        _checkins.All.Should().ContainSingle(c => c.GoalId == goal.Id && c.Amount == 20 && c.Note == "foco");
+        _checkins.All.Should().ContainSingle(c => c.GoalId == goal.Id && c.Amount == 1205 && c.Note == "foco");
     }
 
     [Fact]
-    public async Task Register_with_zero_minutes_is_refused_and_keeps_timer()
+    public async Task Register_with_zero_seconds_is_refused_and_keeps_timer()
     {
         var goal = await Study();
         await Service.StartAsync(goal.Id);
@@ -175,7 +175,7 @@ public class TimerServiceTests
         var reopened = new TimerService(_goals, _timers, Checkins, _time);
 
         (await reopened.GetAsync())!.StoppedAt.Should().BeNull();
-        (await reopened.StopAsync()).Should().Be(7);
+        (await reopened.StopAsync()).Should().Be(7 * 60);
     }
 
     // Tarefas no cronômetro (specs/Tarefas_no_cronometro_v1.md).
@@ -238,17 +238,18 @@ public class TimerServiceTests
     }
 
     [Fact]
-    public async Task Switch_registers_whole_minutes_with_the_old_task_and_carries_the_seconds()
+    public async Task Switch_after_40_seconds_records_a_40_second_chunk()
     {
         var goal = await Study();
         await Service.StartAsync(goal.Id);
         await Service.SetTaskAsync("Inglês");
-        _time.Advance(TimeSpan.FromSeconds(25 * 60 + 40));
+        _time.Advance(TimeSpan.FromMilliseconds(40_400));
 
-        (await Service.SwitchTaskAsync("Capítulo 3")).Should().Be(25);
+        (await Service.SwitchTaskAsync("Capítulo 3")).Should().Be(40);
 
-        _checkins.All.Should().ContainSingle().Which.Should().Match<Checkin>(c => c.Amount == 25 && c.Note == "Inglês");
-        (await Service.GetAsync()).Should().Be(new ActiveTimer(goal.Id, T0.AddMinutes(25), null, "Capítulo 3"));
+        _checkins.All.Should().ContainSingle().Which.Should().Match<Checkin>(c => c.Amount == 40 && c.Note == "Inglês");
+        // A fração de segundo passa para a próxima tarefa.
+        (await Service.GetAsync()).Should().Be(new ActiveTimer(goal.Id, T0.AddSeconds(40), null, "Capítulo 3"));
     }
 
     [Fact]
@@ -256,22 +257,22 @@ public class TimerServiceTests
     {
         var goal = await Study();
         await Service.StartAsync(goal.Id);
-        _time.Advance(TimeSpan.FromSeconds(10 * 60 + 50));
+        _time.Advance(TimeSpan.FromMilliseconds(10 * 60_000 + 50_700));
         await Service.SwitchTaskAsync("B");
-        _time.Advance(TimeSpan.FromSeconds(19 * 60 + 30)); // 30 min 20 s desde o início
+        _time.Advance(TimeSpan.FromMilliseconds(19 * 60_000 + 30_600)); // 30 min 21,3 s desde o início
 
-        var minutes = await Service.StopAsync();
-        await Service.RegisterAsync(minutes);
+        var seconds = await Service.StopAsync();
+        await Service.RegisterAsync(seconds);
 
-        _checkins.All.Sum(c => c.Amount).Should().Be(30);
+        _checkins.All.Select(c => c.Amount).Should().Equal(650, 1171);
     }
 
     [Fact]
-    public async Task Switch_under_a_minute_only_renames()
+    public async Task Switch_under_one_second_only_renames()
     {
         var goal = await Study();
         await Service.StartAsync(goal.Id);
-        _time.Advance(TimeSpan.FromSeconds(40));
+        _time.Advance(TimeSpan.FromMilliseconds(600));
 
         (await Service.SwitchTaskAsync("B")).Should().Be(0);
 
@@ -301,7 +302,7 @@ public class TimerServiceTests
         await Service.StartAsync(goal.Id);
         await Service.SetTaskAsync("A");
         var before = await Service.GetAsync();
-        _time.Advance(TimeSpan.FromMinutes(24 * 60 + 1));
+        _time.Advance(TimeSpan.FromSeconds(CheckinService.MaxDurationAmount + 1));
 
         var act = () => Service.SwitchTaskAsync("B");
 
@@ -342,26 +343,26 @@ public class TimerServiceTests
         // O "Parar" da notificação lê o cronômetro; antes de gravar, o Hoje troca para "B" e registra os 5 min de "A".
         var racing = new RacingTimers(_timers, () => Service.SwitchTaskAsync("B"));
 
-        var minutes = await new TimerService(_goals, racing, Checkins, _time).StopAsync();
+        var seconds = await new TimerService(_goals, racing, Checkins, _time).StopAsync();
 
-        minutes.Should().Be(0);
-        _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(5);
+        seconds.Should().Be(0);
+        _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(5 * 60);
         (await _timers.GetAsync()).Should().Be(new ActiveTimer(goal.Id, T0.AddMinutes(5), T0.AddMinutes(5), "B"));
     }
 
     [Fact]
-    public async Task Switch_under_a_minute_racing_a_stop_fails_and_keeps_the_name()
+    public async Task Switch_under_one_second_racing_a_stop_fails_and_keeps_the_name()
     {
         var goal = await Study();
         await Service.StartAsync(goal.Id);
         await Service.SetTaskAsync("A");
-        _time.Advance(TimeSpan.FromSeconds(40));
+        _time.Advance(TimeSpan.FromMilliseconds(400));
         var racing = new RacingTimers(_timers, () => Service.StopAsync());
 
         var act = () => new TimerService(_goals, racing, Checkins, _time).SwitchTaskAsync("B");
 
         await act.Should().ThrowAsync<GoalStateException>().WithMessage("O cronômetro mudou. Confira em Hoje.");
-        (await _timers.GetAsync()).Should().Be(new ActiveTimer(goal.Id, T0, T0.AddSeconds(40), "A"));
+        (await _timers.GetAsync()).Should().Be(new ActiveTimer(goal.Id, T0, T0.AddMilliseconds(400), "A"));
     }
 
     /// <summary>Outro processo age logo depois da primeira leitura do cronômetro (a corrida entre ler e gravar).</summary>

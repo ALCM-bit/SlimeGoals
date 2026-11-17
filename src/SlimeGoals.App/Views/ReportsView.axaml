@@ -94,7 +94,7 @@
               <ItemsControl ItemsSource="{Binding SelectedBar.Details}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:BarDetailViewModel">
-                    <Grid ColumnDefinitions="Auto,*,Auto,28" ColumnSpacing="12" Margin="0,4">
+                    <Grid ColumnDefinitions="Auto,*,Auto,28" RowDefinitions="Auto,Auto" ColumnSpacing="12" Margin="0,4">
                       <Border Classes="icon-tile small"
                               Background="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Bg}">
                         <Viewbox Width="16" Height="16">
@@ -104,7 +104,7 @@
                       </Border>
                       <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center"
                                  TextTrimming="CharacterEllipsis" />
-                      <TextBlock Grid.Column="2" Text="{Binding Value}" VerticalAlignment="Center"
+                      <TextBlock Classes="bar-detail-value" Text="{Binding Value}" VerticalAlignment="Center"
                                  Foreground="{DynamicResource Muted}" />
                       <Path Grid.Column="3" Classes="met-icon" Data="{StaticResource IconCheck}"
                             IsVisible="{Binding IsMet}" ToolTip.Tip="Cumprida" />

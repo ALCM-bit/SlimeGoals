@@ -169,8 +169,9 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
                 if (chunkDraft is not null && card.Chunks.FirstOrDefault(c => c.CheckinId == chunkDraft.CheckinId) is { } same)
                 {
                     same.OpenEditor();
-                    (same.HoursInput, same.MinutesInput, same.NoteInput, same.Error) =
-                        (chunkDraft.HoursInput, chunkDraft.MinutesInput, chunkDraft.NoteInput, chunkDraft.Error);
+                    (same.HoursInput, same.MinutesInput, same.SecondsInput, same.NoteInput, same.Error) =
+                        (chunkDraft.HoursInput, chunkDraft.MinutesInput, chunkDraft.SecondsInput, chunkDraft.NoteInput,
+                            chunkDraft.Error);
                 }
                 Goals.Add(card);
             }
@@ -475,12 +476,12 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     {
         if (chunk is not { IsEditing: true, CheckinId: { } id })
             return Task.CompletedTask;
-        if (chunk.Minutes() is not { } minutes)
+        if (chunk.Seconds() is not { } seconds)
         {
             chunk.Error = "Informe um valor.";
             return Task.CompletedTask;
         }
-        return RunChunkAsync(chunk, () => checkins.ReplaceAsync(chunk.GoalId, id, minutes, chunk.NoteInput));
+        return RunChunkAsync(chunk, () => checkins.ReplaceAsync(chunk.GoalId, id, seconds, chunk.NoteInput));
     }
 
     [RelayCommand]
@@ -588,7 +589,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     {
         null => null,
         { StoppedAt: null } t => $"Cronômetro rodando em \"{_offscreenTitle}\" · {GoalFormatting.Elapsed(time.GetUtcNow() - t.StartedAt)}",
-        var t => $"Cronômetro parado em \"{_offscreenTitle}\" · {GoalFormatting.Duration(TimerService.Minutes(t, time.GetUtcNow()))}",
+        var t => $"Cronômetro parado em \"{_offscreenTitle}\" · {GoalFormatting.Duration(TimerService.Seconds(t, time.GetUtcNow()))}",
     };
 
     private void OnUi(Action action)

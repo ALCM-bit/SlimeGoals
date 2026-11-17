@@ -90,6 +90,7 @@ Migração `006_sync_engine.sql`:
 - Linha que não converte vai para o Trace e não trava a sincronização, como no `RowReader`.
 - Registro que não pode ser lido mantém a cópia local: o `seq` dele e o `base_seq` da fila avançam, e ele continua confirmado.
 - Versão de formato desconhecida pausa a sincronização, com o aviso "atualize o app". `last_seq` não avança e nada se perde.
+- Desde os segundos nas metas de tempo (`Segundos_nas_metas_de_tempo_v1.md`), o app grava o formato 2 e lê os formatos 1 e 2. O formato 1 guarda minutos: o leitor multiplica por 60 nas metas de duração e nos registros delas, inclusive os que esperam a meta em `sync_pending`. Versão fora de 1–2 continua pausando com "atualize o app".
 - Um `DataChangeNotifier.Defer` agrupa a página num único aviso.
 - Dados aplicados não voltam para a fila (inclusive a exclusão recebida, que usa o caminho sem fila).
 

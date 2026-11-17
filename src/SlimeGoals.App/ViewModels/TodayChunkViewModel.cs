@@ -6,7 +6,7 @@ namespace SlimeGoals.App.ViewModels;
 
 /// <summary>
 /// Uma linha de "Hoje · N min" no cartão de uma meta de tempo: um registro do dia, ou o trecho em andamento do cronômetro
-/// (só para ver). O editor (minutos e nome) abre no lugar da linha (specs/Tarefas_no_cronometro_v1.md §7.2).
+/// (só para ver). O editor (h · min · s e nome) abre no lugar da linha (specs/Tarefas_no_cronometro_v1.md §7.2).
 /// </summary>
 public sealed partial class TodayChunkViewModel : ObservableObject
 {
@@ -50,17 +50,20 @@ public sealed partial class TodayChunkViewModel : ObservableObject
 
     [ObservableProperty] public partial decimal? HoursInput { get; set; }
     [ObservableProperty] public partial decimal? MinutesInput { get; set; }
+    [ObservableProperty] public partial decimal? SecondsInput { get; set; }
     [ObservableProperty] public partial string? NoteInput { get; set; }
     [ObservableProperty] public partial string? Error { get; set; }
 
     public bool ShowsEditButton => CanEdit && !IsEditing;
 
-    /// <summary>Abre o editor com o tempo atual em horas e minutos (sem sinal: o sinal do registro se mantém) e o nome.</summary>
+    /// <summary>
+    /// Abre o editor com o tempo atual em horas, minutos e segundos (sem sinal: o sinal do registro se mantém) e o nome.
+    /// </summary>
     public void OpenEditor()
     {
         if (!CanEdit)
             return;
-        (HoursInput, MinutesInput) = (Math.Abs(Amount) / 60, Math.Abs(Amount) % 60);
+        (HoursInput, MinutesInput, SecondsInput) = DurationFields.Split(Amount);
         NoteInput = Note;
         Error = null;
         IsEditing = true;
@@ -72,9 +75,6 @@ public sealed partial class TodayChunkViewModel : ObservableObject
         Error = null;
     }
 
-    /// <summary>Total em minutos, com a mesma conta do painel de registro, ou null se horas e minutos estão vazios.</summary>
-    public int? Minutes() =>
-        HoursInput is null && MinutesInput is null
-            ? null
-            : (int)Math.Round((HoursInput ?? 0) * 60 + (MinutesInput ?? 0), MidpointRounding.AwayFromZero);
+    /// <summary>Total em segundos, ou null se horas, minutos e segundos estão vazios.</summary>
+    public int? Seconds() => DurationFields.Seconds(HoursInput, MinutesInput, SecondsInput);
 }

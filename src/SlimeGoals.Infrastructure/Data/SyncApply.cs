@@ -34,7 +34,7 @@ internal sealed class SyncApply
 
     private sealed record CompensationGroup(string GoalId, string Period);
 
-    private sealed record PendingRow(string RecordId, string Payload);
+    private sealed record PendingRow(string RecordId, string Payload, long FormatVersion);
 
     private sealed class CompensationRow
     {
@@ -144,7 +144,7 @@ internal sealed class SyncApply
 
     private async Task ApplyGoalAsync(IncomingRecord record, SyncEnvelope envelope, Guid deviceId)
     {
-        var goal = Decode(envelope, SyncCodec.DecodeGoal, g => g.Id);
+        var goal = Decode(envelope, json => SyncCodec.DecodeGoal(json, envelope.Version), g => g.Id);
         if (goal is null)
         {
             await KeepUnreadableAsync(record);
@@ -191,30 +191,58 @@ internal sealed class SyncApply
             return;
         }
 
-        await MapAsync(record, SqlText.Id(envelope.RecordId), SyncOutbox.Checkin);
-        if (await GoalExistsAsync(checkin.GoalId))
-            await InsertCheckinAsync(checkin);
-        else
+        // Sem a meta, não se sabe a medida: o registro espera com a versão do formato e converte quando ela chegar.
+        if (await IsDurationGoalAsync(checkin.GoalId) is not { } isDuration)
+        {
+            await MapAsync(record, SqlText.Id(envelope.RecordId), SyncOutbox.Checkin);
             await RunAsync("""
-                INSERT INTO sync_pending (record_id, goal_id, seq, payload) VALUES (@Id, @GoalId, @Seq, @Payload)
-                ON CONFLICT (record_id) DO UPDATE SET goal_id = excluded.goal_id, seq = excluded.seq, payload = excluded.payload
-                """, new { Id = SqlText.Id(checkin.Id), GoalId = SqlText.Id(checkin.GoalId), record.Seq, envelope.Payload });
+                INSERT INTO sync_pending (record_id, goal_id, seq, payload, format_version) VALUES (@Id, @GoalId, @Seq, @Payload, @Version)
+                ON CONFLICT (record_id) DO UPDATE SET goal_id = excluded.goal_id, seq = excluded.seq, payload = excluded.payload,
+                    format_version = excluded.format_version
+                """, new { Id = SqlText.Id(checkin.Id), GoalId = SqlText.Id(checkin.GoalId), record.Seq, envelope.Payload, envelope.Version });
+            return;
+        }
+
+        try
+        {
+            checkin = InCurrentFormat(checkin, envelope.Version, isDuration);
+        }
+        catch (FormatException e)
+        {
+            Trace.TraceError($"Registro inválido ignorado na sincronização ({envelope.Kind} {envelope.RecordId:D}): {TraceText.Types(e)}");
+            await KeepUnreadableAsync(record);
+            return;
+        }
+        await MapAsync(record, SqlText.Id(envelope.RecordId), SyncOutbox.Checkin);
+        await InsertCheckinAsync(checkin);
     }
+
+    /// <summary>Registro do formato 1 de meta de tempo vem em minutos e fica em segundos; o resto já está no formato atual.</summary>
+    /// <exception cref="FormatException">O valor não cabe em segundos.</exception>
+    private static Checkin InCurrentFormat(Checkin checkin, long formatVersion, bool isDuration) =>
+        formatVersion == 1 && isDuration ? SyncCodec.FromFormat1Duration(checkin) : checkin;
 
     private Task<bool> QueuedDeletionAsync(Guid recordId) => _c.ExecuteScalarAsync<bool>(new CommandDefinition(
         "SELECT EXISTS (SELECT 1 FROM sync_outbox WHERE record_id = @Id AND op = 'delete')",
         new { Id = SqlText.Id(recordId) }, _tx, cancellationToken: _ct));
 
+    /// <summary>Roda com a meta já gravada: a medida dela decide a conversão dos registros do formato 1.</summary>
     private async Task ApplyPendingAsync(Guid goalId)
     {
-        var rows = await _c.QueryAsync<PendingRow>(new CommandDefinition(
-            "SELECT record_id AS RecordId, payload AS Payload FROM sync_pending WHERE goal_id = @Id",
-            new { Id = SqlText.Id(goalId) }, _tx, cancellationToken: _ct));
+        var rows = (await _c.QueryAsync<PendingRow>(new CommandDefinition(
+            "SELECT record_id AS RecordId, payload AS Payload, format_version AS FormatVersion FROM sync_pending WHERE goal_id = @Id",
+            new { Id = SqlText.Id(goalId) }, _tx, cancellationToken: _ct))).ToList();
+        if (rows.Count == 0)
+            return;
+
+        // Sem a linha da meta não se sabe a medida: os registros continuam esperando, sem converter nem sair da fila.
+        if (await IsDurationGoalAsync(goalId) is not { } isDuration)
+            return;
         foreach (var row in rows)
         {
             try
             {
-                await InsertCheckinAsync(SyncCodec.DecodeCheckin(row.Payload));
+                await InsertCheckinAsync(InCurrentFormat(SyncCodec.DecodeCheckin(row.Payload), row.FormatVersion, isDuration));
             }
             catch (FormatException e)
             {
@@ -377,9 +405,14 @@ internal sealed class SyncApply
         "SELECT EXISTS (SELECT 1 FROM sync_tombstones WHERE goal_id = @Id)",
         new { Id = SqlText.Id(goalId) }, _tx, cancellationToken: _ct));
 
-    private Task<bool> GoalExistsAsync(Guid goalId) => _c.ExecuteScalarAsync<bool>(new CommandDefinition(
-        "SELECT EXISTS (SELECT 1 FROM goals WHERE id = @Id)",
-        new { Id = SqlText.Id(goalId) }, _tx, cancellationToken: _ct));
+    /// <summary>Nulo sem a meta; senão, se ela é de tempo.</summary>
+    private async Task<bool?> IsDurationGoalAsync(Guid goalId) => await _c.ExecuteScalarAsync<long?>(new CommandDefinition(
+        "SELECT measure = 'duration' FROM goals WHERE id = @Id",
+        new { Id = SqlText.Id(goalId) }, _tx, cancellationToken: _ct)) switch
+    {
+        null => null,
+        var value => value == 1,
+    };
 
     private async Task<List<string>> UnconfirmedAsync(string kind) => (await _c.QueryAsync<string>(new CommandDefinition("""
         SELECT record_id FROM sync_records

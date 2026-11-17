@@ -14,18 +14,25 @@ public class GoalFormattingTests
     [InlineData(Measure.Quantity, Recurrence.Daily, 1, "vezes", "1 vez por dia")]
     [InlineData(Measure.Quantity, Recurrence.Daily, 1, "Vezes", "1 Vez por dia")]
     [InlineData(Measure.Quantity, Recurrence.Daily, 1, "copos", "1 copos por dia")]
-    [InlineData(Measure.Duration, Recurrence.Daily, 45, null, "45 min por dia")]
-    [InlineData(Measure.Duration, Recurrence.Weekly, 300, null, "5 h por semana")]
+    [InlineData(Measure.Duration, Recurrence.Daily, 2700, null, "45 min por dia")]
+    [InlineData(Measure.Duration, Recurrence.Weekly, 18000, null, "5 h por semana")]
+    [InlineData(Measure.Duration, Recurrence.Daily, 9000, null, "2 h 30 min por dia")]
     public void Target(Measure m, Recurrence r, int target, string? unit, string expected) =>
         GoalFormatting.Target(Sample() with { Measure = m, Recurrence = r, Target = target, Unit = unit }).Should().Be(expected);
 
     [Theory]
     [InlineData(0, "0 min")]
-    [InlineData(45, "45 min")]
-    [InlineData(120, "2 h")]
-    [InlineData(150, "2 h 30")]
-    [InlineData(-30, "-30 min")]
-    public void Duration(int minutes, string expected) => GoalFormatting.Duration(minutes).Should().Be(expected);
+    [InlineData(40, "40 s")]
+    [InlineData(160, "2 min 40 s")]
+    [InlineData(3600, "1 h")]
+    [InlineData(4360, "1 h 12 min 40 s")]
+    [InlineData(3605, "1 h 5 s")]
+    [InlineData(9000, "2 h 30 min")]
+    [InlineData(2700, "45 min")]
+    [InlineData(-1800, "-30 min")]
+    [InlineData(-160, "-2 min 40 s")]
+    public void Duration_shows_hours_minutes_and_seconds(int seconds, string expected) =>
+        GoalFormatting.Duration(seconds).Should().Be(expected);
 
     [Theory]
     [InlineData(309, "0:05:09")]
@@ -42,8 +49,9 @@ public class GoalFormattingTests
     [InlineData(Measure.Quantity, Recurrence.Weekly, 3, "vezes", 2, "2 de 3 vezes na semana")]
     [InlineData(Measure.Quantity, Recurrence.Daily, 1, "vezes", 1, "1 de 1 vez hoje")]
     [InlineData(Measure.Quantity, Recurrence.Daily, 1, "vezes", 0, "0 de 1 vez hoje")]
-    [InlineData(Measure.Duration, Recurrence.Weekly, 300, null, 150, "2 h 30 de 5 h na semana")]
-    [InlineData(Measure.Duration, Recurrence.Daily, 45, null, 0, "0 min de 45 min hoje")]
+    [InlineData(Measure.Duration, Recurrence.Weekly, 18000, null, 9000, "2 h 30 min de 5 h na semana")]
+    [InlineData(Measure.Duration, Recurrence.Daily, 2700, null, 0, "0 min de 45 min hoje")]
+    [InlineData(Measure.Duration, Recurrence.Daily, 9000, null, 4360, "1 h 12 min 40 s de 2 h 30 min hoje")]
     public void Progress(Measure m, Recurrence r, int target, string? unit, int done, string expected)
     {
         var goal = Sample() with { Measure = m, Recurrence = r, Target = target, Unit = unit };
@@ -95,6 +103,6 @@ public class GoalFormattingTests
 
     [Fact]
     public void Summary_uses_measure_target() =>
-        GoalFormatting.Summary(Sample() with { Measure = Measure.Duration, Target = 150, Unit = null })
-            .Should().StartWith("2 h 30 por semana · ");
+        GoalFormatting.Summary(Sample() with { Measure = Measure.Duration, Target = 9000, Unit = null })
+            .Should().StartWith("2 h 30 min por semana · ");
 }

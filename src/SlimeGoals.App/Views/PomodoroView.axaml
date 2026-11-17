@@ -88,7 +88,7 @@
         </StackPanel>
       </Border>
 
-      <!-- Conferência do foco esquecido (30 min ou mais de extra): o trecho aberto em horas e minutos -->
+      <!-- Conferência do foco esquecido (30 min ou mais de extra): o trecho aberto em h, min e s -->
       <Border Classes="inline-panel" Padding="16" IsVisible="{Binding IsReviewing}">
         <StackPanel Spacing="12">
           <StackPanel Spacing="4">
@@ -106,6 +106,11 @@
               <NumericUpDown Value="{Binding ReviewMinutesInput}" Minimum="0" Maximum="59" Increment="1"
                              FormatString="0" Width="110" AutomationProperties.Name="Minutos do último trecho" />
               <TextBlock Text="min" VerticalAlignment="Center" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <NumericUpDown Value="{Binding ReviewSecondsInput}" Minimum="0" Maximum="59" Increment="1"
+                             FormatString="0" Width="110" AutomationProperties.Name="Segundos do último trecho" />
+              <TextBlock Text="s" VerticalAlignment="Center" />
             </StackPanel>
           </WrapPanel>
           <UniformGrid Rows="1" ColumnSpacing="12">
@@ -367,7 +372,7 @@
             <Border Classes="card" Padding="16">
               <StackPanel Spacing="8">
                 <TextBlock Classes="field-label" Text="Foco feito" />
-                <TextBlock Classes="stat-value" Text="{Binding SummaryText}" FontFeatures="+tnum" />
+                <TextBlock Classes="stat-value" Text="{Binding SummaryText}" FontFeatures="+tnum" TextWrapping="Wrap" />
                 <ItemsControl ItemsSource="{Binding SummaryLines}">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate><StackPanel Spacing="4" /></ItemsPanelTemplate>
@@ -375,7 +380,7 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="x:String">
                       <TextBlock Text="{Binding}" FontSize="14" Foreground="{DynamicResource Muted}"
-                                 FontFeatures="+tnum" TextTrimming="CharacterEllipsis" />
+                                 FontFeatures="+tnum" TextWrapping="Wrap" />
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>

@@ -39,12 +39,13 @@ public class FocusClockTests
     }
 
     [Fact]
-    public void Cut_minutes_floor_mid_session_and_round_at_the_end()
+    public void CutSeconds_truncates_mid_session_and_rounds_last()
     {
-        var open = TimeSpan.FromSeconds(220);
-        FocusClock.CutMinutes(open, false).Should().Be(3);
-        FocusClock.CutMinutes(open, true).Should().Be(4);
-        FocusClock.CutMinutes(TimeSpan.FromSeconds(29), true).Should().Be(0);
-        FocusClock.CutMinutes(TimeSpan.FromSeconds(30), true).Should().Be(1);
+        var open = new TimeSpan(0, 0, 2, 40, 600);
+        FocusClock.CutSeconds(open, false).Should().Be(160);
+        FocusClock.CutSeconds(open, true).Should().Be(161);
+        FocusClock.CutSeconds(new TimeSpan(0, 0, 2, 40, 400), true).Should().Be(160);
+        FocusClock.CutSeconds(TimeSpan.FromMilliseconds(499), true).Should().Be(0);
+        FocusClock.CutSeconds(TimeSpan.FromMilliseconds(500), true).Should().Be(1);
     }
 }

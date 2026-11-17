@@ -38,6 +38,9 @@ if (which is "desktop" or "all")
     Render(false, "desktop", 1100, 720);
 if (which == "narrow")
 {
+    // As páginas do celular também nas larguras mais estreitas (Hoje e Relatórios com os textos longos de tempo)
+    Render(true, "phone-320", 320, 915);
+    Render(true, "phone-360", 360, 915);
     RenderNarrow(320);
     RenderNarrow(360);
     RenderTodayWithTimer(320);
@@ -240,7 +243,7 @@ void RenderTime(int width, int height)
     var vm = page.Pomodoro;
     var clock = sample.Clock;
 
-    // Preparo: a sequência do esboço aprovado (40, 20, 1 h, 30), "Começar · 2 h 30"
+    // Preparo: a sequência do esboço aprovado (40, 20, 1 h, 30), "Começar · 2 h 30 min"
     SetPlan([(FocusBlockKind.Focus, 40), (FocusBlockKind.Break, 20), (FocusBlockKind.Focus, 60), (FocusBlockKind.Break, 30)], 1);
     Pump();
     Capture("time-prepare");
@@ -281,12 +284,12 @@ void RenderTime(int width, int height)
     Reload();
     Capture("time-waiting-break");
     Run(vm.AdvanceCommand.ExecuteAsync(null));
-    // Foco esquecido (35 min de extra): o toque abre a conferência do último trecho
-    clock.Advance(TimeSpan.FromMinutes(75));
+    // Foco esquecido (35 min de extra): o toque abre a conferência do último trecho, com os segundos
+    clock.Advance(new TimeSpan(0, 75, 20));
     Reload();
     Run(vm.AdvanceCommand.ExecuteAsync(null));
     Capture("time-review");
-    (vm.ReviewHoursInput, vm.ReviewMinutesInput) = (0, 45);
+    (vm.ReviewHoursInput, vm.ReviewMinutesInput, vm.ReviewSecondsInput) = (0, 45, 0);
     Run(vm.ConfirmReviewCommand.ExecuteAsync(null));
     // ✕ na pausa: a confirmação, e a tela de fim de uma sessão com meta
     vm.AskEndCommand.Execute(null);
@@ -297,17 +300,17 @@ void RenderTime(int width, int height)
     vm.NewSessionCommand.Execute(null);
     Pump();
 
-    // Sessão sem meta: 58 min em uma subatividade e 44 em outra, encerrada no meio do foco
-    SetPlan([(FocusBlockKind.Focus, 120), (FocusBlockKind.Break, 20)], 1);
+    // Sessão sem meta: 58 min 40 s em uma subatividade e 1 h 12 min 40 s em outra, de nome longo, encerrada no meio do foco
+    SetPlan([(FocusBlockKind.Focus, 200), (FocusBlockKind.Break, 20)], 1);
     Run(vm.StartCommand.ExecuteAsync(null));
     vm.TaskInput = "Revisar capítulo 3";
     Run(vm.SaveTaskCommand.ExecuteAsync(null));
-    clock.Advance(TimeSpan.FromMinutes(58));
+    clock.Advance(new TimeSpan(0, 58, 40));
     Reload();
     Run(vm.BeginSwitchTaskCommand.ExecuteAsync(null));
-    vm.TaskInput = "Exercícios";
+    vm.TaskInput = "Revisar o capítulo 3 do livro de arquitetura";
     Run(vm.SwitchTaskCommand.ExecuteAsync(null));
-    clock.Advance(TimeSpan.FromMinutes(44));
+    clock.Advance(new TimeSpan(1, 12, 40));
     Reload();
     vm.AskEndCommand.Execute(null);
     Run(vm.ConfirmEndCommand.ExecuteAsync(null));
@@ -417,8 +420,8 @@ void RenderTodayWithTimer(int width)
     running = today.Goals.Single(g => g.IsTimerRunning);
     if (!running.HasChunks)
     {
-        sample.Checkins.AdjustAsync(running.Goal.Id, 25, "Inglês").GetAwaiter().GetResult();
-        sample.Checkins.AdjustAsync(running.Goal.Id, 12).GetAwaiter().GetResult();
+        sample.Checkins.AdjustAsync(running.Goal.Id, 25 * 60, "Inglês").GetAwaiter().GetResult();
+        sample.Checkins.AdjustAsync(running.Goal.Id, 160).GetAwaiter().GetResult();
         today.LoadCommand.Execute(null);
         Pump();
         running = today.Goals.Single(g => g.IsTimerRunning);
@@ -430,14 +433,20 @@ void RenderTodayWithTimer(int width)
         .BringIntoView(new Rect(0, 0, 1, 400));
     Pump();
     Capture($"today-chunks-{width}.png");
-    today.EditChunkCommand.Execute(running.Chunks.First(c => c.CanEdit));
+    var edited = running.Chunks.First(c => c.CanEdit);
+    today.EditChunkCommand.Execute(edited);
     Pump();
-    // O cartão do cronômetro, com a lista aberta, fica abaixo da dobra: rola até o começo da lista
+    // O cartão do cronômetro, com a lista aberta, fica abaixo da dobra: rola até o começo da lista e depois até o fim do
+    // editor, para Cancelar e Salvar aparecerem abaixo dos três campos empilhados
     window.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("chunks-toggle") && b.DataContext == running)
         .BringIntoView(new Rect(0, 0, 1, 400));
     Pump();
+    window.GetVisualDescendants().OfType<Border>()
+        .Single(b => b.Classes.Contains("inline-panel") && b.IsEffectivelyVisible && b.DataContext == edited)
+        .BringIntoView();
+    Pump();
     Capture($"today-chunk-edit-{width}.png");
-    today.CancelChunkEditCommand.Execute(running.Chunks.First(c => c.CanEdit));
+    today.CancelChunkEditCommand.Execute(edited);
     today.ToggleChunksCommand.Execute(running);
     // Painel de lançar tempo, para comparar com o editor do trecho na mesma largura
     var idle = today.Goals.First(g => g.IsDuration && !g.IsTimerRunning);
@@ -461,12 +470,12 @@ void RenderTodayWithTimer(int width)
     Capture($"today-timer-switch-{width}.png");
     today.CancelSwitchTaskCommand.Execute(running);
     Pump();
-    // Cronômetro parado: a conferência em horas e minutos. O tempo é de exemplo (o relógio aqui é o real); o cronômetro
+    // Cronômetro parado: a conferência em h, min e s. O tempo é de exemplo (o relógio aqui é o real); o cronômetro
     // é descartado depois, e a próxima largura começa outro.
     today.StopTimerCommand.Execute(running);
     Pump();
     var stopped = today.Goals.Single(g => g.IsTimerStopped);
-    (stopped.StoppedHoursInput, stopped.StoppedMinutesInput) = (1, 25);
+    (stopped.StoppedHoursInput, stopped.StoppedMinutesInput, stopped.StoppedSecondsInput) = (1, 25, 40);
     window.GetVisualDescendants().OfType<TodayView>().Single()
         .GetVisualDescendants().OfType<ScrollViewer>().First().ScrollToHome();
     Pump();

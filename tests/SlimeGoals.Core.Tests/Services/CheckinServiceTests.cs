@@ -154,7 +154,7 @@ public class CheckinServiceTests
     [InlineData(Measure.Quantity, 0)]
     [InlineData(Measure.Quantity, 10000)]
     [InlineData(Measure.Quantity, -10000)]
-    [InlineData(Measure.Duration, 1441)]
+    [InlineData(Measure.Duration, 86_401)]
     [InlineData(Measure.Completion, 2)]
     public async Task Zero_and_out_of_limit_amounts_are_rejected(Measure measure, int amount)
     {
@@ -278,6 +278,32 @@ public class CheckinServiceTests
         return checkin;
     }
 
+    [Fact]
+    public async Task Duration_accepts_up_to_24_hours_in_seconds()
+    {
+        var goal = await Create(Measure.Duration, target: 3600);
+
+        (await Service.AdjustAsync(goal.Id, 86_400)).Should().Be(86_400);
+        var act = () => Service.AdjustAsync(goal.Id, 86_401);
+
+        var error = (await act.Should().ThrowAsync<GoalValidationException>()).Which.Errors.Should().ContainSingle().Which;
+        error.Message.Should().Be("Valor fora do limite.");
+    }
+
+    [Fact]
+    public async Task Replace_accepts_seconds()
+    {
+        var goal = await Timed();
+        var old = await Record(goal, 120);
+
+        await Service.ReplaceAsync(goal.Id, old.Id, 160, null);
+        Live.Should().ContainSingle().Which.Amount.Should().Be(160);
+
+        var act = () => Service.ReplaceAsync(goal.Id, Live.Single().Id, 0, null);
+        (await act.Should().ThrowAsync<GoalValidationException>()).Which.Errors.Should().ContainSingle()
+            .Which.Message.Should().Be("Informe de 1 s a 24 h.");
+    }
+
     private Task<Goal> Timed() => Create(Measure.Duration, target: 60);
 
     private IEnumerable<Checkin> Live => _checkins.All.Where(c => c.DeletedAt is null);
@@ -385,15 +411,15 @@ public class CheckinServiceTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(24 * 60 + 1)]
-    public async Task Minutes_out_of_range_are_refused(int minutes)
+    [InlineData(24 * 3600 + 1)]
+    public async Task Seconds_out_of_range_are_refused(int seconds)
     {
         var goal = await Timed();
         var old = await Record(goal, 25);
 
-        var act = () => Service.ReplaceAsync(goal.Id, old.Id, minutes, null);
+        var act = () => Service.ReplaceAsync(goal.Id, old.Id, seconds, null);
         var error = (await act.Should().ThrowAsync<GoalValidationException>()).Which.Errors.Should().ContainSingle().Which;
-        (error.Field, error.Message).Should().Be(("Amount", "Informe de 1 min a 24 h."));
+        (error.Field, error.Message).Should().Be(("Amount", "Informe de 1 s a 24 h."));
     }
 
     [Fact]

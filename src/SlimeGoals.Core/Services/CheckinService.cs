@@ -14,7 +14,7 @@ public sealed class CheckinService(IGoalRepository goals, ICheckinRepository che
 {
     public const int MaxNoteLength = 200;
     public const int MaxQuantityAmount = 9999;
-    public const int MaxDurationAmount = 24 * 60;
+    public const int MaxDurationAmount = 24 * 3600;
     public const int RecentNotesLimit = 5;
 
     /// <summary>
@@ -89,22 +89,22 @@ public sealed class CheckinService(IGoalRepository goals, ICheckinRepository che
     }
 
     /// <summary>
-    /// Troca os minutos e o nome de um registro de hoje de uma meta de tempo, mantendo o horário e o sinal. O registro
+    /// Troca os segundos e o nome de um registro de hoje de uma meta de tempo, mantendo o horário e o sinal. O registro
     /// antigo é apagado e um novo é gravado numa transação só (a sincronização não altera registros). Devolve o novo total.
     /// </summary>
-    public async Task<int> ReplaceAsync(Guid goalId, Guid checkinId, int minutes, string? note, CancellationToken ct = default)
+    public async Task<int> ReplaceAsync(Guid goalId, Guid checkinId, int seconds, string? note, CancellationToken ct = default)
     {
         var (goal, old) = await EditableAsync(goalId, checkinId, ct);
         note = Normalize(note);
         var errors = new List<ValidationError>();
-        if (minutes < 1 || minutes > MaxDurationAmount)
-            errors.Add(new ValidationError("Amount", "Informe de 1 min a 24 h."));
+        if (seconds < 1 || seconds > MaxDurationAmount)
+            errors.Add(new ValidationError("Amount", "Informe de 1 s a 24 h."));
         if (note is { Length: > MaxNoteLength })
             errors.Add(new ValidationError("Note", $"A nota deve ter até {MaxNoteLength} caracteres."));
         if (errors.Count > 0)
             throw new GoalValidationException(errors);
 
-        var amount = Math.Sign(old.Amount) * minutes;
+        var amount = Math.Sign(old.Amount) * seconds;
         if (amount == old.Amount && note == old.Note)
             return GoalTotals.Effective(goal, await TotalAsync(goal, Today(), ct));
 

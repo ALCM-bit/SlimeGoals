@@ -145,11 +145,14 @@ public sealed partial class AesGcmSyncCrypto : ISyncCrypto, IDisposable
         }
     }
 
-    /// <summary>A versão vem antes do resto: um envelope de versão nova pode ter outra forma e ainda assim dá <see cref="SyncFormatException"/>.</summary>
+    /// <summary>
+    /// A versão vem antes do resto: um envelope de versão nova pode ter outra forma e ainda assim dá <see cref="SyncFormatException"/>.
+    /// Aceita de <see cref="SyncCodec.MinReadableVersion"/> a <see cref="SyncCodec.FormatVersion"/>; o byte de versão do blob não muda.
+    /// </summary>
     private static SyncEnvelope Read(byte[] plain)
     {
         var declared = ReadVersion(plain) ?? throw new CryptographicException("O conteúdo do registro não tem versão.");
-        if (declared != SyncCodec.FormatVersion)
+        if (!IsReadable(declared))
             throw new SyncFormatException(declared);
 
         EnvelopeDto dto;
@@ -164,7 +167,7 @@ public sealed partial class AesGcmSyncCrypto : ISyncCrypto, IDisposable
         }
 
         var version = dto.Version ?? throw new CryptographicException("O conteúdo do registro não tem versão.");
-        if (version != SyncCodec.FormatVersion)
+        if (!IsReadable(version))
             throw new SyncFormatException(version);
         if (!Enum.TryParse<SyncRecordKind>(dto.Kind, ignoreCase: false, out var kind) || !Enum.IsDefined(kind)
             || !string.Equals(kind.ToString(), dto.Kind, StringComparison.Ordinal))
@@ -173,6 +176,8 @@ public sealed partial class AesGcmSyncCrypto : ISyncCrypto, IDisposable
             throw new CryptographicException("O conteúdo do registro está incompleto.");
         return new SyncEnvelope(version, kind, recordId, deviceId, payload);
     }
+
+    private static bool IsReadable(int version) => version is >= SyncCodec.MinReadableVersion and <= SyncCodec.FormatVersion;
 
     /// <summary>Só o campo <c>version</c> do objeto de fora, sem olhar a forma dos outros; nulo se faltar ou não for inteiro.</summary>
     /// <exception cref="CryptographicException">O conteúdo não é um objeto JSON legível.</exception>

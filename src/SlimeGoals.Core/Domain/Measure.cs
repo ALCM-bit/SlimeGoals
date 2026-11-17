@@ -7,6 +7,6 @@ public enum Measure
     Completion,
     /// <summary>Inteiro numa unidade livre (copos, páginas, vezes).</summary>
     Quantity,
-    /// <summary>Tempo em minutos.</summary>
+    /// <summary>Tempo em segundos.</summary>
     Duration,
 }

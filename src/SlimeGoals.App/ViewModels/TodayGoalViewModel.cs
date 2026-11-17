@@ -28,8 +28,8 @@ public sealed partial class TodayGoalViewModel : ObservableObject
         Elapsed = "";
         if (_timer is { StoppedAt: not null })
         {
-            var minutes = TimerService.Minutes(_timer, time.GetUtcNow());
-            (StoppedHoursInput, StoppedMinutesInput) = (minutes / 60, minutes % 60);
+            (StoppedHoursInput, StoppedMinutesInput, StoppedSecondsInput) =
+                DurationFields.Split(TimerService.Seconds(_timer, time.GetUtcNow()));
             PanelNote = _timer.Task; // a tarefa vira a nota do registro, e a pessoa pode editar
         }
         TaskInput = TimerTask;
@@ -86,12 +86,12 @@ public sealed partial class TodayGoalViewModel : ObservableObject
         IsPanelOpen = open;
     }
 
-    /// <summary>Minutos do painel (com sinal), ou null se nada foi digitado.</summary>
+    /// <summary>Segundos do painel (com sinal), ou null se nada foi digitado.</summary>
     public int? PanelAmount()
     {
         if (PanelHoursInput is null && PanelMinutesInput is null)
             return null;
-        var v = (PanelHoursInput ?? 0) * 60 + (PanelMinutesInput ?? 0);
+        var v = (PanelHoursInput ?? 0) * 3600 + (PanelMinutesInput ?? 0) * 60;
         var amount = (int)Math.Round(v, MidpointRounding.AwayFromZero);
         return PanelRemoves ? -amount : amount;
     }
@@ -147,12 +147,10 @@ public sealed partial class TodayGoalViewModel : ObservableObject
     [ObservableProperty] public partial string Elapsed { get; set; }
     [ObservableProperty] public partial decimal? StoppedHoursInput { get; set; }
     [ObservableProperty] public partial decimal? StoppedMinutesInput { get; set; }
+    [ObservableProperty] public partial decimal? StoppedSecondsInput { get; set; }
 
-    /// <summary>Tempo conferido do cronômetro parado, em minutos, com a conta do painel, ou null se horas e minutos estão vazios.</summary>
-    public int? StoppedAmount() =>
-        StoppedHoursInput is null && StoppedMinutesInput is null
-            ? null
-            : (int)Math.Round((StoppedHoursInput ?? 0) * 60 + (StoppedMinutesInput ?? 0), MidpointRounding.AwayFromZero);
+    /// <summary>Tempo conferido do cronômetro parado, em segundos, ou null se horas, minutos e segundos estão vazios.</summary>
+    public int? StoppedAmount() => DurationFields.Seconds(StoppedHoursInput, StoppedMinutesInput, StoppedSecondsInput);
     [ObservableProperty] public partial bool CanStartTimer { get; set; }
 
     /// <summary>Atualiza o tempo exibido do cronômetro rodando (chamado a cada segundo pela página).</summary>
