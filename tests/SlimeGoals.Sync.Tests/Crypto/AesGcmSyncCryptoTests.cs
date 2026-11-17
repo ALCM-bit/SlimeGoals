@@ -110,12 +110,12 @@ public sealed class AesGcmSyncCryptoTests : IDisposable
     {
         var recordKey = _crypto.RecordKey(RecordId);
         var blob = SealRaw(recordKey, $$"""
-            {"version":2,"kind":"Tag","recordId":"{{RecordId}}","deviceId":"{{Guid.NewGuid()}}","payload":"{}","extra":true}
+            {"version":3,"kind":"Tag","recordId":"{{RecordId}}","deviceId":"{{Guid.NewGuid()}}","payload":"{}","extra":true}
             """);
 
         var act = () => _crypto.Open(recordKey, blob);
 
-        act.Should().Throw<SyncFormatException>().Which.Version.Should().Be(2);
+        act.Should().Throw<SyncFormatException>().Which.Version.Should().Be(3);
     }
 
     /// <summary>Uma versão nova pode mudar a forma dos campos: a versão é lida antes do resto, e o aviso é "atualize o app".</summary>
@@ -123,11 +123,30 @@ public sealed class AesGcmSyncCryptoTests : IDisposable
     public void Unknown_envelope_version_with_another_shape_throws_format_exception()
     {
         var recordKey = _crypto.RecordKey(RecordId);
-        var blob = SealRaw(recordKey, """{"version":2,"kind":7,"recordId":123,"payload":{"title":"x"}}""");
+        var blob = SealRaw(recordKey, """{"version":3,"kind":7,"recordId":123,"payload":{"title":"x"}}""");
 
         var act = () => _crypto.Open(recordKey, blob);
 
-        act.Should().Throw<SyncFormatException>().Which.Version.Should().Be(2);
+        act.Should().Throw<SyncFormatException>().Which.Version.Should().Be(3);
+    }
+
+    /// <summary>O formato 1 (minutos) ainda chega de aparelhos antigos; o byte de versão do blob continua 1 nos dois.</summary>
+    [Fact]
+    public void Opens_format_1_and_2_and_rejects_3()
+    {
+        var key = _crypto.RecordKey(RecordId);
+        foreach (var version in new[] { 1, 2 })
+        {
+            var blob = _crypto.Seal(Envelope(version));
+            blob[0].Should().Be(1);
+            _crypto.Open(key, blob).Should().Be(Envelope(version));
+        }
+
+        var newer = () => _crypto.Open(key, _crypto.Seal(Envelope(3)));
+        var older = () => _crypto.Open(key, _crypto.Seal(Envelope(0)));
+
+        newer.Should().Throw<SyncFormatException>().Which.Version.Should().Be(3);
+        older.Should().Throw<SyncFormatException>().Which.Version.Should().Be(0);
     }
 
     private static byte[] SealRaw(string recordKey, string envelopeJson)

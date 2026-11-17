@@ -62,7 +62,7 @@ public class SyncLocalStoreOutboxTests : IDisposable
         items[2].Kind.Should().Be(SyncRecordKind.Checkin);
         items[0].IsDelete.Should().BeFalse();
         items[0].Revision.Should().Be(2);
-        SyncCodec.DecodeGoal(items[0].Payload!).Title.Should().Be("Nova");
+        SyncCodec.DecodeGoal(items[0].Payload!, SyncCodec.FormatVersion).Title.Should().Be("Nova");
         SyncCodec.DecodeCheckin(items[2].Payload!).Amount.Should().Be(2);
 
         (await Store.ReadOutboxAsync(2)).Select(i => i.RecordId).Should().Equal(a.Id, b.Id);

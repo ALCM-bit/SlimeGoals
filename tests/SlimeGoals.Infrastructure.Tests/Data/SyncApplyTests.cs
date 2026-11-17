@@ -42,15 +42,18 @@ public class SyncApplyTests : IDisposable
         Id = Guid.CreateVersion7(), GoalId = goalId, DoneAt = doneAt ?? T0, Amount = amount, UpdatedAt = T0, Compensation = compensation,
     };
 
+    /// <summary>Meta de tempo: o alvo vem na unidade do formato (segundos no 2, minutos no 1).</summary>
+    private static Goal NewDurationGoal(int target = 3600) => NewGoal() with { Measure = Measure.Duration, Unit = null, Target = target };
+
     private static Compensation Compensates(params Guid[] seen) => new(Period, seen);
 
     private static string Key(Guid id) => "k:" + id;
 
-    private static IncomingRecord In(Goal goal, long seq, Guid? device = null) => new(Key(goal.Id), seq,
-        new SyncEnvelope(SyncCodec.FormatVersion, SyncRecordKind.Goal, goal.Id, device ?? Other, SyncCodec.Encode(goal)));
+    private static IncomingRecord In(Goal goal, long seq, Guid? device = null, int version = SyncCodec.FormatVersion) =>
+        new(Key(goal.Id), seq, new SyncEnvelope(version, SyncRecordKind.Goal, goal.Id, device ?? Other, SyncCodec.Encode(goal)));
 
-    private static IncomingRecord In(Checkin checkin, long seq, Guid? device = null) => new(Key(checkin.Id), seq,
-        new SyncEnvelope(SyncCodec.FormatVersion, SyncRecordKind.Checkin, checkin.Id, device ?? Other, SyncCodec.Encode(checkin)));
+    private static IncomingRecord In(Checkin checkin, long seq, Guid? device = null, int version = SyncCodec.FormatVersion) =>
+        new(Key(checkin.Id), seq, new SyncEnvelope(version, SyncRecordKind.Checkin, checkin.Id, device ?? Other, SyncCodec.Encode(checkin)));
 
     private static IncomingRecord Unreadable(Guid id, SyncRecordKind kind, long seq) => new(Key(id), seq,
         new SyncEnvelope(SyncCodec.FormatVersion, kind, id, Other, "{quebrado"));
@@ -69,6 +72,9 @@ public class SyncApplyTests : IDisposable
     private RecordLine? Record(Guid id) => _db.Anchor.QuerySingleOrDefault<RecordLine>(
         "SELECT seq AS Seq, record_key AS RecordKey, kind AS Kind, confirmed AS Confirmed FROM sync_records WHERE record_id = @Id",
         new { Id = id.ToString("D") });
+
+    private long AmountOf(Guid checkinId) => _db.Anchor.ExecuteScalar<long>(
+        "SELECT amount FROM checkins WHERE id = @Id", new { Id = checkinId.ToString("D") });
 
     private long Count(string table) => _db.Anchor.ExecuteScalar<long>($"SELECT COUNT(*) FROM {table}");
 
@@ -247,6 +253,69 @@ public class SyncApplyTests : IDisposable
         Count("sync_pending").Should().Be(0);
         Count("sync_outbox").Should().Be(0);
         Record(checkin.Id)!.Seq.Should().Be(5);
+    }
+
+    // Formato 1 (minutos), de um aparelho ainda não atualizado
+
+    [Fact]
+    public async Task Format_1_checkin_of_a_duration_goal_becomes_seconds()
+    {
+        var timed = NewDurationGoal();
+        var counted = NewGoal();
+        await Goals.AddAsync(timed);
+        await Goals.AddAsync(counted);
+        var (old, current, quantity) = (NewCheckin(timed.Id, 25), NewCheckin(timed.Id, 25), NewCheckin(counted.Id, 3));
+
+        await ApplyAsync(3, In(old, 1, version: 1), In(current, 2, version: 2), In(quantity, 3, version: 1));
+
+        AmountOf(old.Id).Should().Be(1500);
+        AmountOf(current.Id).Should().Be(25);
+        AmountOf(quantity.Id).Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Format_1_checkin_waiting_for_its_goal_is_converted_when_the_goal_arrives()
+    {
+        var goal = NewDurationGoal(target: 60);
+        var checkin = NewCheckin(goal.Id, 25);
+        await ApplyAsync(1, In(checkin, 1, version: 1));
+        Count("sync_pending").Should().Be(1);
+
+        await ApplyAsync(2, In(goal, 2, version: 1));
+
+        AmountOf(checkin.Id).Should().Be(1500);
+        (await Goals.GetAsync(goal.Id))!.Target.Should().Be(3600);
+        Count("sync_pending").Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Format_2_checkin_waiting_for_its_goal_is_not_converted()
+    {
+        var goal = NewDurationGoal(target: 3600);
+        var checkin = NewCheckin(goal.Id, 25);
+        await ApplyAsync(1, In(checkin, 1, version: 2));
+
+        await ApplyAsync(2, In(goal, 2, version: 2));
+
+        AmountOf(checkin.Id).Should().Be(25);
+        (await Goals.GetAsync(goal.Id))!.Target.Should().Be(3600);
+    }
+
+    [Fact]
+    public async Task Format_1_checkin_that_overflows_in_seconds_is_kept_out()
+    {
+        var goal = NewDurationGoal();
+        await Goals.AddAsync(goal);
+        var huge = NewCheckin(goal.Id, int.MaxValue / 60 + 1);
+        var waiting = NewDurationGoal();
+        var hugeWaiting = NewCheckin(waiting.Id, int.MaxValue / 60 + 1);
+
+        await ApplyAsync(2, In(huge, 1, version: 1), In(hugeWaiting, 2, version: 1));
+        await ApplyAsync(3, In(waiting, 3, version: 2));
+
+        Count("checkins").Should().Be(0);
+        Count("sync_pending").Should().Be(0);
+        LastSeq.Should().Be(3);
     }
 
     [Fact]

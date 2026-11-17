@@ -33,21 +33,21 @@ public class SyncCodecTests
     public void Goal_round_trips()
     {
         var goal = FullGoal();
-        SyncCodec.DecodeGoal(SyncCodec.Encode(goal)).Should().BeEquivalentTo(goal);
+        SyncCodec.DecodeGoal(SyncCodec.Encode(goal), SyncCodec.FormatVersion).Should().BeEquivalentTo(goal);
     }
 
     [Fact]
     public void Goal_with_only_required_fields_round_trips()
     {
         var goal = FullGoal() with { Unit = null, StartDate = null, EndDate = null, ArchivedAt = null };
-        SyncCodec.DecodeGoal(SyncCodec.Encode(goal)).Should().BeEquivalentTo(goal);
+        SyncCodec.DecodeGoal(SyncCodec.Encode(goal), SyncCodec.FormatVersion).Should().BeEquivalentTo(goal);
     }
 
     [Fact]
     public void Goal_does_not_carry_DeletedAt()
     {
         var goal = FullGoal() with { DeletedAt = T0 };
-        SyncCodec.DecodeGoal(SyncCodec.Encode(goal)).DeletedAt.Should().BeNull();
+        SyncCodec.DecodeGoal(SyncCodec.Encode(goal), SyncCodec.FormatVersion).DeletedAt.Should().BeNull();
     }
 
     [Fact]
@@ -77,17 +77,61 @@ public class SyncCodecTests
     public void Unknown_enum_value_throws_FormatException()
     {
         var json = SyncCodec.Encode(FullGoal()).Replace("\"Weekly\"", "\"Yearly\"");
-        var act = () => SyncCodec.DecodeGoal(json);
+        var act = () => SyncCodec.DecodeGoal(json, SyncCodec.FormatVersion);
         act.Should().Throw<FormatException>();
     }
 
     [Fact]
     public void Malformed_json_throws_FormatException()
     {
-        var act1 = () => SyncCodec.DecodeGoal("{ não é json");
+        var act1 = () => SyncCodec.DecodeGoal("{ não é json", SyncCodec.FormatVersion);
         var act2 = () => SyncCodec.DecodeCheckin("{}");
         act1.Should().Throw<FormatException>();
         act2.Should().Throw<FormatException>();
+    }
+
+    [Fact]
+    public void Format_1_duration_goal_target_becomes_seconds()
+    {
+        var duration = FullGoal() with { Measure = Measure.Duration, Unit = null, Target = 90 };
+        var quantity = FullGoal() with { Target = 90 };
+
+        SyncCodec.DecodeGoal(SyncCodec.Encode(duration), 1).Target.Should().Be(5400);
+        SyncCodec.DecodeGoal(SyncCodec.Encode(duration), 2).Target.Should().Be(90);
+        SyncCodec.DecodeGoal(SyncCodec.Encode(quantity), 1).Target.Should().Be(90);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3)]
+    public void Goal_of_unreadable_version_throws_FormatException(int version)
+    {
+        var act = () => SyncCodec.DecodeGoal(SyncCodec.Encode(FullGoal()), version);
+        act.Should().Throw<FormatException>();
+    }
+
+    [Fact]
+    public void Format_1_duration_goal_target_that_overflows_throws_FormatException()
+    {
+        var huge = FullGoal() with { Measure = Measure.Duration, Unit = null, Target = int.MaxValue / 60 + 1 };
+        var act = () => SyncCodec.DecodeGoal(SyncCodec.Encode(huge), 1);
+        act.Should().Throw<FormatException>();
+    }
+
+    [Fact]
+    public void Format_1_duration_checkin_becomes_seconds()
+    {
+        var checkin = new Checkin { Id = Guid.NewGuid(), GoalId = Guid.NewGuid(), DoneAt = T0, Amount = -25, UpdatedAt = T0 };
+
+        SyncCodec.FromFormat1Duration(checkin).Should().BeEquivalentTo(checkin with { Amount = -1500 });
+    }
+
+    [Fact]
+    public void Format_1_duration_checkin_that_overflows_throws_FormatException()
+    {
+        var checkin = new Checkin { Id = Guid.NewGuid(), GoalId = Guid.NewGuid(), DoneAt = T0, Amount = int.MinValue / 60 - 1, UpdatedAt = T0 };
+        var act = () => SyncCodec.FromFormat1Duration(checkin);
+        act.Should().Throw<FormatException>();
     }
 
     [Fact]

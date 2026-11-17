@@ -182,7 +182,7 @@ public class SyncEngineTests : IDisposable
     {
         var key = _crypto.RecordKey(id);
         var envelope = _crypto.Open(key, _server.Records.Single(r => r.RecordKey == key).Blob!);
-        return SyncCodec.DecodeGoal(envelope.Payload).Title;
+        return SyncCodec.DecodeGoal(envelope.Payload, envelope.Version).Title;
     }
 
     /// <summary>Envia as metas locais e baixa de volta: <c>last_seq</c> fica no fim do servidor.</summary>
@@ -380,8 +380,8 @@ public class SyncEngineTests : IDisposable
 
         var record = _server.Records.Should().ContainSingle().Subject;
         var envelope = _crypto.Open(record.RecordKey, record.Blob!);
-        envelope.Should().Be(new SyncEnvelope(SyncCodec.FormatVersion, SyncRecordKind.Goal, goal.Id, Me, envelope.Payload));
-        SyncCodec.DecodeGoal(envelope.Payload).Id.Should().Be(goal.Id);
+        envelope.Should().Be(new SyncEnvelope(2, SyncRecordKind.Goal, goal.Id, Me, envelope.Payload));
+        SyncCodec.DecodeGoal(envelope.Payload, envelope.Version).Id.Should().Be(goal.Id);
     }
 
     [Fact]
@@ -664,6 +664,20 @@ public class SyncEngineTests : IDisposable
 
         _transport.BeforePull = null;
         (await engine.RunCycleAsync()).Should().Be(SyncCycleResult.Done);
+    }
+
+    /// <summary>Um aparelho ainda na versão anterior manda o formato 1 (minutos): aplica convertido, sem pausar.</summary>
+    [Fact]
+    public async Task Format_1_from_an_older_device_is_applied_in_seconds()
+    {
+        var goal = NewGoal("Ler") with { Measure = Measure.Duration, Unit = null, Target = 30 };
+        await SendFromOtherAsync(goal, version: 1);
+
+        var result = await Engine().RunCycleAsync();
+
+        result.Should().Be(SyncCycleResult.Done);
+        (await Goals.GetAsync(goal.Id))!.Target.Should().Be(1800);
+        (await Store.GetStatusAsync()).LastError.Should().BeNull();
     }
 
     [Fact]

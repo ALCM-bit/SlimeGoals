@@ -16,7 +16,7 @@ public sealed class PlainSyncCrypto : ISyncCrypto
         var envelope = Read(blob);
         if (RecordKey(envelope.RecordId) != recordKey)
             throw new CryptographicException("O blob não pertence a esta chave.");
-        if (envelope.Version != SyncCodec.FormatVersion)
+        if (envelope.Version is < SyncCodec.MinReadableVersion or > SyncCodec.FormatVersion)
             throw new SyncFormatException(envelope.Version);
         return envelope;
     }

@@ -8,10 +8,18 @@ namespace SlimeGoals.Core.Sync;
 /// <summary>
 /// Converte metas e registros no conteúdo (JSON) que o envelope carrega (spec de sincronização §6).
 /// Formatos invariantes: datas yyyy-MM-dd, horas HH:mm, instantes "O". <c>DeletedAt</c> não entra. Toda falha de leitura é <see cref="FormatException"/>.
+/// Formato 2: metas de tempo e os registros delas em segundos. O formato 1 (minutos) ainda chega de aparelhos antigos e
+/// é lido com conversão ×60 (spec Segundos_nas_metas_de_tempo_v1 §4.5); só se envia o formato 2.
 /// </summary>
 public static partial class SyncCodec
 {
-    public const int FormatVersion = 1;
+    /// <summary>Versão que este aparelho envia.</summary>
+    public const int FormatVersion = 2;
+
+    /// <summary>Versão mais antiga que este aparelho ainda lê.</summary>
+    public const int MinReadableVersion = 1;
+
+    private const int SecondsPerMinute = 60;
 
     private const string DateFormat = "yyyy-MM-dd";
     private const string TimeFormat = "HH:mm";
@@ -38,10 +46,13 @@ public static partial class SyncCodec
         ArchivedAt = FormatInstant(goal.ArchivedAt),
     }, SyncJsonContext.Default.GoalDto);
 
-    public static Goal DecodeGoal(string json) => Read(() =>
+    /// <summary>No formato 1, o alvo da meta de tempo vem em minutos e sai em segundos.</summary>
+    /// <exception cref="FormatException">Conteúdo inválido, versão fora de [<see cref="MinReadableVersion"/>, <see cref="FormatVersion"/>] ou alvo que não cabe em segundos.</exception>
+    public static Goal DecodeGoal(string json, int version) => Read(() =>
     {
+        EnsureReadable(version);
         var dto = JsonSerializer.Deserialize(json, SyncJsonContext.Default.GoalDto) ?? throw new FormatException("Conteúdo vazio.");
-        return new Goal
+        var goal = new Goal
         {
             Id = Required(dto.Id, "id"),
             Title = Required(dto.Title, "title"),
@@ -61,6 +72,9 @@ public static partial class SyncCodec
             UpdatedAt = ParseInstant(Required(dto.UpdatedAt, "updatedAt")),
             ArchivedAt = ParseOptionalInstant(dto.ArchivedAt),
         };
+        return version == 1 && goal.Measure == Measure.Duration
+            ? goal with { Target = ToSeconds(goal.Target) }
+            : goal;
     });
 
     public static string Encode(Checkin checkin) => JsonSerializer.Serialize(new CheckinDto
@@ -98,6 +112,35 @@ public static partial class SyncCodec
                     (dto.Compensation.Seen ?? throw new FormatException("Campo ausente: compensation.seen.")).ToList()),
         };
     });
+
+    /// <summary>
+    /// Registro do formato 1 de uma meta de tempo: minutos para segundos. Só quem conhece a medida da meta sabe chamar;
+    /// <see cref="DecodeCheckin"/> não converte.
+    /// </summary>
+    /// <exception cref="FormatException">O valor não cabe em segundos.</exception>
+    public static Checkin FromFormat1Duration(Checkin checkin)
+    {
+        ArgumentNullException.ThrowIfNull(checkin);
+        return checkin with { Amount = ToSeconds(checkin.Amount) };
+    }
+
+    private static void EnsureReadable(int version)
+    {
+        if (version is < MinReadableVersion or > FormatVersion)
+            throw new FormatException($"Versão de formato desconhecida: {version}.");
+    }
+
+    private static int ToSeconds(int minutes)
+    {
+        try
+        {
+            return checked(minutes * SecondsPerMinute);
+        }
+        catch (OverflowException e)
+        {
+            throw new FormatException("O valor do formato 1 não cabe em segundos.", e);
+        }
+    }
 
     private static T Read<T>(Func<T> read)
     {
