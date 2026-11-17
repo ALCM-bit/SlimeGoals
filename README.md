@@ -195,7 +195,7 @@ O APK de distribuição não tem rede. Para sincronizar, use o APK de desenvolvi
 
 ```bash
 packaging/android/build.sh --dev                    # artifacts/slimegoals-<versão>-android-dev.apk
-adb install -r artifacts/slimegoals-0.9.0-android-dev.apk
+adb install -r artifacts/slimegoals-0.10.0-android-dev.apk
 adb reverse tcp:8080 tcp:8080                       # o 127.0.0.1:8080 do celular passa a ser o do computador
 ```
 
@@ -230,9 +230,9 @@ O APK é assinado com uma chave sua, que fica fora do repositório. Ele traz as 
 
    O script pede a senha da chave (ela não fica no histórico do shell). Para uma chave em outro lugar, aponte `SLIMEGOALS_KEYSTORE`; sem terminal (CI, por exemplo), defina `SLIMEGOALS_KEYSTORE_PASS`. O SDK do Android e o JDK vêm de `ANDROID_HOME` e `JAVA_HOME`, com padrão `~/Android/Sdk` e `/usr/lib/jvm/java-21-openjdk`.
 
-   O resultado é `artifacts/slimegoals-0.9.0-android.apk`. Com `--dev`, o script gera `artifacts/slimegoals-0.9.0-android-dev.apk`, com a sincronização em desenvolvimento (veja [No Android](#no-android)).
+   O resultado é `artifacts/slimegoals-0.10.0-android.apk`. Com `--dev`, o script gera `artifacts/slimegoals-0.10.0-android-dev.apk`, com a sincronização em desenvolvimento (veja [No Android](#no-android)).
 
-3. **Instale no celular:** com a depuração USB ligada, `adb install artifacts/slimegoals-0.9.0-android.apk`; ou copie o APK para o aparelho e abra-o, permitindo "instalar apps desconhecidos" para o app que o abriu.
+3. **Instale no celular:** com a depuração USB ligada, `adb install artifacts/slimegoals-0.10.0-android.apk`; ou copie o APK para o aparelho e abra-o, permitindo "instalar apps desconhecidos" para o app que o abriu.
 
 4. **Primeira abertura:** no aviso do Hoje, toque em "Permitir" (notificações e alarmes exatos). Depois, em Configurações → Bateria, toque em "Liberar" e aceite: sem isso o sistema pode adiar ou suspender os lembretes com o celular parado. Liberar a bateria faz "Alarmes exatos" aparecer como permitido, porque o Android trata assim os apps sem restrição de bateria; se você tirar o app dessa isenção, o bloqueio volta.
 
@@ -249,8 +249,8 @@ O pacote é um `.tar.gz` *self-contained* (não precisa do .NET instalado) para 
 ```bash
 # gerar o pacote
 bash packaging/linux/build.sh
-tar -xzf artifacts/slimegoals-0.9.0-linux-x64.tar.gz
-cd slimegoals-0.9.0
+tar -xzf artifacts/slimegoals-0.10.0-linux-x64.tar.gz
+cd slimegoals-0.10.0
 ./install.sh
 ```
 
