@@ -28,6 +28,9 @@ public class MainActivity : AvaloniaMainActivity
 {
     private bool _resumedBefore;
 
+    /// <summary>Saiu da frente porque a tela apagou, não porque a pessoa foi para outro lugar.</summary>
+    private bool _leftWithScreenOff;
+
     private static AndroidReminderPermissions? Permissions
         => AndroidApplication.Services?.GetService<AndroidReminderPermissions>();
 
@@ -133,5 +136,16 @@ public class MainActivity : AvaloniaMainActivity
         if (_resumedBefore)
             (Application as AndroidApplication)?.NotifyDataChanged();
         _resumedBefore = true;
+        // Voltar ao app avisa a página aberta (na aba Tempo, cala o aviso do Pomodoro). Acender a tela não é voltar: sem
+        // bloqueio de tela, o próprio aviso acende a tela e retoma a Activity, e calaria o som antes de alguém ouvir.
+        if (!_leftWithScreenOff)
+            AndroidApplication.Services?.GetService<ShellViewModel>()?.Resume();
+        _leftWithScreenOff = false;
+    }
+
+    protected override void OnStop()
+    {
+        _leftWithScreenOff = GetSystemService(PowerService) is PowerManager { IsInteractive: false };
+        base.OnStop();
     }
 }

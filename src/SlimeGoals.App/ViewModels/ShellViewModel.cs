@@ -81,6 +81,9 @@ public sealed partial class ShellViewModel : ObservableObject
         return false;
     }
 
+    /// <summary>O app voltou ao primeiro plano: avisa só a página aberta.</summary>
+    public void Resume() => CurrentPage.Resume();
+
     [RelayCommand]
     private void Navigate(PageViewModel page) => CurrentPage = page;
 

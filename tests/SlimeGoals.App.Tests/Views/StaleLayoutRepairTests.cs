@@ -98,6 +98,21 @@ public class StaleLayoutRepairTests
         shell.Inner.Bounds.Height.Should().Be(120);
     }
 
+    /// <summary>Num aparelho mdpi (densidade 1), o pixel da superfície que sumiu mede exatamente 1 unidade.</summary>
+    [Fact]
+    public void A_pass_of_exactly_one_unit_also_counts_as_without_a_surface()
+    {
+        var repair = new StaleLayoutRepair();
+        var shell = new Shell();
+        shell.Root.InvalidateMeasure();
+        shell.Pass(new Size(1, 1));
+        repair.OnLayoutUpdated(shell.Panel).Should().BeFalse();
+        shell.Root.InvalidateMeasure();
+        shell.Pass(Full);
+
+        repair.OnLayoutUpdated(shell.Panel).Should().BeTrue();
+    }
+
     [Fact]
     public void Normal_passes_change_nothing()
     {

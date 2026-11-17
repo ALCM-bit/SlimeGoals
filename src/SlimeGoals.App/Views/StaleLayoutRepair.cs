@@ -15,16 +15,16 @@ public sealed class StaleLayoutRepair
     private bool _stale;
 
     /// <summary>
-    /// Chamado a cada passada de layout. Uma passada que mediu <paramref name="shell"/> com menos de 1 unidade marca o
-    /// layout como velho; a primeira passada com o tamanho de verdade depois dela invalida a árvore toda, para a próxima
-    /// medir e arrumar tudo de novo.
+    /// Chamado a cada passada de layout. Uma passada que mediu <paramref name="shell"/> com até 1 unidade (o pixel da
+    /// superfície que sumiu vale 1 unidade num aparelho de densidade 1) marca o layout como velho; a primeira passada com
+    /// o tamanho de verdade depois dela invalida a árvore toda, para a próxima medir e arrumar tudo de novo.
     /// </summary>
     /// <returns>Se invalidou a árvore.</returns>
     public bool OnLayoutUpdated(Layoutable shell)
     {
         if (LayoutInformation.GetPreviousMeasureConstraint(shell) is not { } constraint)
             return false;
-        if (constraint.Width < 1 || constraint.Height < 1)
+        if (constraint.Width <= 1 || constraint.Height <= 1)
         {
             _stale = true;
             return false;

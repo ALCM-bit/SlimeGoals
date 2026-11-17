@@ -55,7 +55,8 @@ internal sealed class AndroidFocusAlert(Context context) : IFocusAlert
     public void Silence()
     {
         Alarms.Cancel(SilenceIntent());
-        if (Shown() is not { } shown || (shown.Flags & NotificationFlags.Insistent) == 0)
+        FocusAlarmActivity.CloseShown();
+        if (Shown(Manager) is not { } shown || (shown.Flags & NotificationFlags.Insistent) == 0)
             return;
         var silenced = Build(shown.Extras?.GetString(Notification.ExtraTitle) ?? "", ringing: null);
         Manager.Cancel(NotificationId);
@@ -65,8 +66,14 @@ internal sealed class AndroidFocusAlert(Context context) : IFocusAlert
     public void Withdraw()
     {
         Alarms.Cancel(SilenceIntent());
+        FocusAlarmActivity.CloseShown();
         Manager.Cancel(NotificationId);
     }
+
+    /// <summary>Se o aviso está na central e ainda toca (insistente).</summary>
+    internal static bool IsRinging(Context context)
+        => Shown((NotificationManager)context.GetSystemService(Context.NotificationService)!) is { } shown
+            && (shown.Flags & NotificationFlags.Insistent) != 0;
 
     /// <summary>O toque leva à <see cref="MainActivity"/>, que abre a aba Tempo (e cala o som).</summary>
     internal static PendingIntent OpenTempo(Context context, int requestCode)
@@ -152,6 +159,6 @@ internal sealed class AndroidFocusAlert(Context context) : IFocusAlert
     private PendingIntent SilenceIntent()
         => FocusAlarmReceiver.Broadcast(context, SilenceRequestCode, FocusAlarmReceiver.ActionSilence);
 
-    private Notification? Shown()
-        => Manager.GetActiveNotifications()?.FirstOrDefault(n => n.Id == NotificationId && n.Tag is null)?.Notification;
+    private static Notification? Shown(NotificationManager manager)
+        => manager.GetActiveNotifications()?.FirstOrDefault(n => n.Id == NotificationId && n.Tag is null)?.Notification;
 }

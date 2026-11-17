@@ -254,6 +254,18 @@ public class PomodoroViewModelTests
         alert.Silenced.Should().Be(1);
     }
 
+    [Fact]
+    public void Coming_back_to_the_app_on_the_time_page_silences_the_alert()
+    {
+        var alert = new FakeAlert();
+        var alerts = new FocusAlerts(Focus, _sessions, new NoAlarm(), alert, _time, _changes);
+        var page = new TimePageViewModel(new PomodoroViewModel(Focus, GoalService, _time, _changes), alerts);
+
+        page.Resume();
+
+        alert.Silenced.Should().Be(1);
+    }
+
     // ---- Sessão rodando, conferência e tela de fim (spec Pomodoro §4.2–§4.4) ----
 
     private static FocusBlock F(int minutes) => new(FocusBlockKind.Focus, minutes);

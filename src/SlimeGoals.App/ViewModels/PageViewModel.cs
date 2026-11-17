@@ -19,6 +19,9 @@ public abstract class PageViewModel : ObservableObject
     /// <summary>Chamado pelo shell quando a página deixa de ser exibida (ex.: esquecer o que foi digitado de sensível).</summary>
     public virtual void Deactivate() { }
 
+    /// <summary>A pessoa voltou ao app com esta página aberta (o app saiu do segundo plano ou a janela voltou ao foco).</summary>
+    public virtual void Resume() { }
+
     /// <summary>Voltar do sistema: fecha o que a página tem aberto por dentro. Falso se não havia nada a fechar.</summary>
     public virtual bool TryGoBack() => false;
 }

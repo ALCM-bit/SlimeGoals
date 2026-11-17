@@ -69,6 +69,24 @@ public class ShellViewModelTests
     }
 
     [Fact]
+    public void Coming_back_to_the_app_resumes_only_the_current_page()
+    {
+        var (today, time) = (new ResumeCounter("Hoje"), new ResumeCounter("Tempo"));
+        var shell = new ShellViewModel(new PageViewModel[] { today, time }) { CurrentPage = time };
+
+        shell.Resume();
+
+        (today.Resumed, time.Resumed).Should().Be((0, 1));
+    }
+
+    private sealed class ResumeCounter(string title) : PageViewModel
+    {
+        public override string Title => title;
+        public int Resumed { get; private set; }
+        public override void Resume() => Resumed++;
+    }
+
+    [Fact]
     public void Navigator_request_switches_the_current_page()
     {
         var navigator = new PageNavigator();
