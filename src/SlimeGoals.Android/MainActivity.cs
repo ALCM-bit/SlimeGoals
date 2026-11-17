@@ -28,8 +28,13 @@ public class MainActivity : AvaloniaMainActivity
 {
     private bool _resumedBefore;
 
-    /// <summary>Saiu da frente porque a tela apagou, não porque a pessoa foi para outro lugar.</summary>
-    private bool _leftWithScreenOff;
+    /// <summary>Conta as retomadas, para a conferência atrasada de <see cref="OnResume"/> saber se ainda é a dela.</summary>
+    private int _resumes;
+
+    private bool _resumed;
+
+    /// <summary>Quanto esperar para tomar uma retomada como volta da pessoa ao app.</summary>
+    private static readonly TimeSpan ResumeSettle = TimeSpan.FromSeconds(1);
 
     private static AndroidReminderPermissions? Permissions
         => AndroidApplication.Services?.GetService<AndroidReminderPermissions>();
@@ -136,16 +141,21 @@ public class MainActivity : AvaloniaMainActivity
         if (_resumedBefore)
             (Application as AndroidApplication)?.NotifyDataChanged();
         _resumedBefore = true;
+        _resumed = true;
+        var resume = ++_resumes;
         // Voltar ao app avisa a página aberta (na aba Tempo, cala o aviso do Pomodoro). Acender a tela não é voltar: sem
-        // bloqueio de tela, o próprio aviso acende a tela e retoma a Activity, e calaria o som antes de alguém ouvir.
-        if (!_leftWithScreenOff)
-            AndroidApplication.Services?.GetService<ShellViewModel>()?.Resume();
-        _leftWithScreenOff = false;
+        // bloqueio de tela, o próprio aviso acende a tela e retoma a Activity por um instante, antes de a tela de alarme
+        // subir. Só conta a retomada que dura, com a janela em foco (nada por cima: tela de alarme, bloqueio).
+        _ = Task.Delay(ResumeSettle).ContinueWith(_ => RunOnUiThread(() =>
+        {
+            if (resume == _resumes && _resumed && HasWindowFocus)
+                AndroidApplication.Services?.GetService<ShellViewModel>()?.Resume();
+        }), TaskScheduler.Default);
     }
 
-    protected override void OnStop()
+    protected override void OnPause()
     {
-        _leftWithScreenOff = GetSystemService(PowerService) is PowerManager { IsInteractive: false };
-        base.OnStop();
+        _resumed = false;
+        base.OnPause();
     }
 }

@@ -39,9 +39,18 @@ internal sealed class AndroidFocusAlert(Context context) : IFocusAlert
     public void Show(FocusAlertKind kind)
     {
         EnsureChannel();
+        Volatile.Write(ref s_ringing, true);
         Manager.Notify(NotificationId, Build(FocusAlertText.Of(kind), kind));
         ArmSilence();
     }
+
+    /// <summary>
+    /// Se um aviso mostrado por este processo ainda toca. Vale na hora, ao contrário da central, que o sistema atualiza
+    /// depois; serve para a tela de alarme não fechar por um silêncio que um aviso novo já superou.
+    /// </summary>
+    internal static bool RingingHere => Volatile.Read(ref s_ringing);
+
+    private static bool s_ringing;
 
     /// <summary>
     /// Publica o mesmo aviso de novo, sem repetir o som e sem alertar outra vez. Lê o aviso à mostra (o processo pode
@@ -55,6 +64,7 @@ internal sealed class AndroidFocusAlert(Context context) : IFocusAlert
     public void Silence()
     {
         Alarms.Cancel(SilenceIntent());
+        Volatile.Write(ref s_ringing, false);
         FocusAlarmActivity.CloseShown();
         if (Shown(Manager) is not { } shown || (shown.Flags & NotificationFlags.Insistent) == 0)
             return;
@@ -66,6 +76,7 @@ internal sealed class AndroidFocusAlert(Context context) : IFocusAlert
     public void Withdraw()
     {
         Alarms.Cancel(SilenceIntent());
+        Volatile.Write(ref s_ringing, false);
         FocusAlarmActivity.CloseShown();
         Manager.Cancel(NotificationId);
     }

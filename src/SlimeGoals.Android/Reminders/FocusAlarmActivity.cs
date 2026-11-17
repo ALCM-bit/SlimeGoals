@@ -61,11 +61,18 @@ public sealed class FocusAlarmActivity : Activity
         base.OnDestroy();
     }
 
-    /// <summary>O aviso calou ou saiu: a tela aberta, se houver, fecha. Chega de qualquer thread.</summary>
+    /// <summary>
+    /// O aviso calou ou saiu: a tela aberta, se houver, fecha. Chega de qualquer thread; se, até a vez da thread da
+    /// tela, um aviso novo voltou a tocar, ela fica para ele.
+    /// </summary>
     internal static void CloseShown()
     {
         if (s_shown.TryGetTarget(out var shown) && shown is { IsFinishing: false })
-            shown.RunOnUiThread(shown.Finish);
+            shown.RunOnUiThread(() =>
+            {
+                if (!AndroidFocusAlert.RingingHere)
+                    shown.Finish();
+            });
     }
 
     /// <summary>Voltar (até a API 32; da 33 em diante, o <see cref="BackCallback"/>): o mesmo que "Parar som".</summary>
