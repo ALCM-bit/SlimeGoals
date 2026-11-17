@@ -320,7 +320,10 @@ public class FocusServiceTests
         _time.Advance(TimeSpan.FromMinutes(25 + 40));
 
         var unreviewed = () => Service.AdvanceAsync();
-        await unreviewed.Should().ThrowAsync<GoalStateException>().WithMessage("Confira o tempo do último trecho antes de seguir.");
+        // Um tipo próprio: a tela reconhece a recusa sem comparar o texto, e quem só conhece GoalStateException mostra a mensagem.
+        (await unreviewed.Should().ThrowAsync<FocusReviewRequiredException>())
+            .Which.Should().BeAssignableTo<GoalStateException>()
+            .Which.Message.Should().Be("Confira o tempo do último trecho antes de seguir.");
         _checkins.All.Should().BeEmpty();
 
         await Service.AdvanceAsync(30);

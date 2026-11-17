@@ -18,7 +18,6 @@ namespace SlimeGoals.App.ViewModels;
 /// </summary>
 public sealed partial class PomodoroViewModel
 {
-    private const string ReviewRequired = "Confira o tempo do último trecho antes de seguir.";
     private const string NoName = "Sem nome";
 
     // Limite só para o cast de decimal para int não estourar; o de verdade é o do registro (24 h), no serviço.
@@ -370,7 +369,7 @@ public sealed partial class PomodoroViewModel
                     ? await _focus.AdvanceAsync(reviewedMinutes)
                     : await _focus.EndAsync(reviewedMinutes);
             }
-            catch (GoalStateException e) when (e.Message == ReviewRequired)
+            catch (FocusReviewRequiredException)
             {
                 // O relógio passou dos 30 min de extra entre a leitura e o toque.
                 review = true;

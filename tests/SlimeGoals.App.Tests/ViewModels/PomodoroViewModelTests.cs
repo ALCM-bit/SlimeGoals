@@ -440,6 +440,23 @@ public class PomodoroViewModelTests
     }
 
     [Fact]
+    public async Task Review_opens_when_the_service_asks_for_it_after_the_screen_read()
+    {
+        var vm = await Running(new FocusPlan([F(25), B(5)], 1));
+        _time.Advance(TimeSpan.FromMinutes(10));
+        await vm.PauseResumeCommand.ExecuteAsync(null);
+        // Outro processo retoma sem a tela saber: para ela, a sessão segue pausada e sem extra.
+        await new FocusService(_goals, _sessions, _timers, Checkins, new AppSettings(_settings), _time).ResumeAsync();
+        _time.Advance(TimeSpan.FromMinutes(60)); // 45 min de extra na sessão guardada
+
+        await vm.SkipCommand.ExecuteAsync(null);
+
+        (vm.IsReviewing, vm.ReviewHoursInput, vm.ReviewMinutesInput, vm.Error).Should().Be((true, 1m, 10m, (string?)null));
+        _checkins.All.Should().BeEmpty();
+        (await _sessions.GetAsync())!.Step.Should().Be(0);
+    }
+
+    [Fact]
     public async Task Pause_freezes_the_countdown()
     {
         var vm = await Running(new FocusPlan([F(25), B(5)], 1));

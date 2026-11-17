@@ -240,7 +240,7 @@ public sealed class FocusService(IGoalRepository goals, IFocusSessionRepository 
         CancellationToken ct)
     {
         if (reviewedMinutes is null && FocusClock.NeedsReview(session, now))
-            throw new GoalStateException(session.GoalId ?? Guid.Empty, "Confira o tempo do último trecho antes de seguir.");
+            throw new FocusReviewRequiredException(session.GoalId ?? Guid.Empty);
 
         // Um relógio que voltou não deixa um trecho negativo.
         var open = FocusClock.OpenFocus(session, now);
