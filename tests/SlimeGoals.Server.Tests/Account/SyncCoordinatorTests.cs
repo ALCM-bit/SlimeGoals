@@ -210,6 +210,11 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
         await SignUpAsync(a);
         var goal = await a.Goals.CreateAsync(Draft("Ler"));
         (await a.Account.FlushAsync()).Should().Be(0);
+        // Um ciclo que só envia não avança o last_seq: é o ciclo seguinte que recebe o próprio registro de volta. Sem
+        // este segundo ciclo, o seq dependia de o agendador ter rodado um antes da troca de senha (falhava no CI).
+        (await a.Account.FlushAsync()).Should().Be(0);
+        var seqBefore = (await a.State.GetAsync()).LastSeq;
+        seqBefore.Should().BeGreaterThan(0);
 
         var b = NewDevice();
         await b.Account.LoginAsync(Server, _email, Password, "celular");
@@ -232,7 +237,7 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
         expired.Server.Should().Be(Server);
         (await a.State.GetAsync()).Enabled.Should().BeTrue();
         var seq = (await a.State.GetAsync()).LastSeq;
-        seq.Should().BeGreaterThan(0);
+        seq.Should().Be(seqBefore, "a revogação não perde o ponto da leitura");
         (await a.Account.FlushAsync()).Should().Be(1, "sem motor, só conta a fila");
 
         a.Net.Calls.Clear();
