@@ -86,7 +86,8 @@ public sealed class ReminderActionReceiver : BroadcastReceiver
 
 /// <summary>
 /// Eventos do sistema que apagam ou deslocam o alarme (boot, atualização do app, relógio ou fuso alterados,
-/// permissão de alarme exato concedida): reagenda. Exportado só para receber essas ações protegidas.
+/// permissão de alarme exato concedida): reagenda os lembretes e rearma o alarme do Pomodoro. Exportado só para receber
+/// essas ações protegidas.
 /// </summary>
 [BroadcastReceiver(Name = "dev.alcm.slimegoals.SystemEventReceiver", Enabled = true, Exported = true)]
 [IntentFilter([
@@ -115,12 +116,14 @@ public sealed class SystemEventReceiver : BroadcastReceiver
         if (intent?.Action is not { } action || !Actions.Contains(action))
             return;
 
-        Trace.TraceInformation($"Evento do sistema {action}: reagendando lembretes e repondo o cronômetro.");
+        Trace.TraceInformation($"Evento do sistema {action}: reagendando lembretes, o cronômetro e o alarme do Pomodoro.");
         ReceiverWork.Run(this, context!, async services =>
         {
             await services.GetRequiredService<SystemAlarmReminderScheduler>().RescheduleAsync().ConfigureAwait(false);
             // O boot apaga as notificações: com um cronômetro rodando, a dele volta.
             await services.GetRequiredService<TimerNotificationSync>().SyncAsync().ConfigureAwait(false);
+            // O boot e a atualização apagam o alarme do Pomodoro; o fuso e a permissão mudam como armá-lo.
+            await services.GetRequiredService<FocusAlerts>().SyncAsync().ConfigureAwait(false);
         });
     }
 }

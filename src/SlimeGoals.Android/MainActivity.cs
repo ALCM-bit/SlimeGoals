@@ -42,14 +42,34 @@ public class MainActivity : AvaloniaMainActivity
         // Recriada (processo morto) ou aberta pelos recentes, a Activity recebe de novo o intent original: o "Parar"
         // dele já foi atendido e não pode parar um cronômetro iniciado depois.
         if (savedInstanceState is null && (Intent?.Flags & ActivityFlags.LaunchedFromHistory) == 0)
+        {
             HandleStopTimer(Intent);
+            HandleOpenTempo(Intent);
+        }
     }
 
-    /// <summary>O app já estava aberto e o "Parar" da notificação o trouxe para a frente.</summary>
+    /// <summary>O app já estava aberto e o "Parar" da notificação, ou o aviso do Pomodoro, o trouxe para a frente.</summary>
     protected override void OnNewIntent(Intent? intent)
     {
         base.OnNewIntent(intent);
         HandleStopTimer(intent);
+        HandleOpenTempo(intent);
+    }
+
+    /// <summary>
+    /// O toque no aviso de fim de bloco (ou na tela de alarme): cala o som e abre a aba Tempo. Outro app pode mandar o
+    /// mesmo extra, mas ele só troca de página. O extra sai do intent.
+    /// </summary>
+    private static void HandleOpenTempo(Intent? intent)
+    {
+        if (intent?.GetBooleanExtra(AndroidFocusAlert.ExtraOpenTempo, false) != true)
+            return;
+        intent.RemoveExtra(AndroidFocusAlert.ExtraOpenTempo);
+        if (AndroidApplication.Services is not { } services)
+            return;
+        // O shell assina os pedidos de troca de página ao nascer; numa abertura do zero ele pode não existir ainda.
+        services.GetRequiredService<ShellViewModel>();
+        services.GetRequiredService<FocusAlertHost>().Open();
     }
 
     /// <summary>

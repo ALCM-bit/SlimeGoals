@@ -1,4 +1,5 @@
 using Android.Content;
+using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using SlimeGoals.Android.Reminders;
 using SlimeGoals.App.Goals;
@@ -63,6 +64,15 @@ internal static class AndroidCompositionRoot
         services.AddSingleton<ITimerNotification>(sp
             => new AndroidTimerNotification(context, sp.GetRequiredService<StopTimerSecretStore>()));
         services.AddSingleton<TimerNotificationSync>();
+
+        // Aviso de fim de bloco do Pomodoro: alarme de despertador e notificação no canal "Pomodoro". Ligado no
+        // AndroidApplication.OnCreate; o alarme chega pelo FocusAlarmReceiver e o toque no aviso, pela MainActivity.
+        services.AddSingleton<IFocusAlarm>(_ => new AndroidFocusAlarm(context));
+        services.AddSingleton<IFocusAlert>(_ => new AndroidFocusAlert(context));
+        services.AddSingleton<FocusAlerts>();
+        services.AddSingleton(sp => new FocusAlertHost(sp.GetRequiredService<FocusAlerts>(),
+            sp.GetRequiredService<IWindowActivator>(), sp.GetRequiredService<PageNavigator>(),
+            action => Dispatcher.UIThread.Post(action)));
 
 #if SYNC_DEV
         AddSync(services, context);

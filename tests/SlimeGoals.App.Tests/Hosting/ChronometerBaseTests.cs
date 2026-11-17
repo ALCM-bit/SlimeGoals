@@ -19,4 +19,13 @@ public class ChronometerBaseTests
     [Fact]
     public void A_start_before_the_boot_gives_a_negative_base() =>
         ChronometerBase.Of(Now.AddHours(-2), Now, bootClockMs: 60_000).Should().Be(60_000 - 2 * 3_600_000);
+
+    [Fact]
+    public void The_countdown_base_is_the_boot_clock_plus_the_remaining_time() =>
+        ChronometerBase.CountdownOf(Now.AddMinutes(24).AddSeconds(10), Now, bootClockMs: 5_000_000)
+            .Should().Be(5_000_000 + (24 * 60 + 10) * 1000);
+
+    [Fact]
+    public void A_countdown_whose_end_has_passed_stays_at_zero() =>
+        ChronometerBase.CountdownOf(Now.AddSeconds(-30), Now, bootClockMs: 5_000_000).Should().Be(5_000_000);
 }

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tela de alarme do Pomodoro: só a fase, centrada, e os dois botões com a mesma largura (alvos de 48 dp).
+     Espaçamentos em múltiplos de 4, cores do tema escuro do app (Theme.axaml). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/slime_bg"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:id="@+id/focus_alarm_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textColor="@color/slime_text"
+        android:textSize="32sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/focus_alarm_silence"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/focus_alarm_button"
+            android:minHeight="48dp"
+            android:stateListAnimator="@null"
+            android:text="Parar som"
+            android:textAllCaps="false"
+            android:textColor="@color/slime_text"
+            android:textSize="16sp" />
+
+        <Space
+            android:layout_width="12dp"
+            android:layout_height="0dp" />
+
+        <Button
+            android:id="@+id/focus_alarm_open"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/focus_alarm_button_primary"
+            android:minHeight="48dp"
+            android:stateListAnimator="@null"
+            android:text="Abrir"
+            android:textAllCaps="false"
+            android:textColor="@color/slime_on_primary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+</LinearLayout>
