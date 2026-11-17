@@ -6,7 +6,7 @@ namespace SlimeGoals.Core.Services;
 
 /// <summary>
 /// Cronômetro das metas de tempo (spec §5.2): um por vez, gravado no banco para sobreviver ao fechamento
-/// do app. Parar congela os minutos; o registro só acontece quando o usuário confirma.
+/// do app. Parar congela os segundos; o registro só acontece quando o usuário confirma.
 /// </summary>
 public sealed class TimerService(IGoalRepository goals, ITimerRepository timers, CheckinService checkins, TimeProvider time,
     DataChangeNotifier? changes = null, IFocusSessionRepository? focus = null)
@@ -50,7 +50,7 @@ public sealed class TimerService(IGoalRepository goals, ITimerRepository timers,
             throw new GoalStateException(goalId, "Há uma sessão de Pomodoro aberta. Termine-a na aba Tempo.");
     }
 
-    /// <summary>Congela o cronômetro (idempotente) e devolve os minutos.</summary>
+    /// <summary>Congela o cronômetro (idempotente) e devolve os segundos.</summary>
     public async Task<int> StopAsync(CancellationToken ct = default)
     {
         if (await timers.GetAsync(ct) is null)
@@ -59,15 +59,15 @@ public sealed class TimerService(IGoalRepository goals, ITimerRepository timers,
             changes?.NotifyChanged();
         // Relê: uma troca de tarefa de outro processo pode ter mudado o início entre a leitura e a parada.
         var timer = await timers.GetAsync(ct) ?? throw NoTimer();
-        return Minutes(timer, time.GetUtcNow());
+        return Seconds(timer, time.GetUtcNow());
     }
 
-    /// <summary>Registra os minutos (ajustáveis) do cronômetro parado, limpa-o e devolve o novo total do período.</summary>
-    public async Task<int> RegisterAsync(int minutes, string? note = null, CancellationToken ct = default)
+    /// <summary>Registra os segundos (ajustáveis) do cronômetro parado, limpa-o e devolve o novo total do período.</summary>
+    public async Task<int> RegisterAsync(int seconds, string? note = null, CancellationToken ct = default)
     {
         if (await timers.GetAsync(ct) is not { StoppedAt: not null } timer)
             throw new GoalStateException(Guid.Empty, "Pare o cronômetro antes de registrar.");
-        var total = await checkins.AdjustAsync(timer.GoalId, minutes, note, ct);
+        var total = await checkins.AdjustAsync(timer.GoalId, seconds, note, ct);
         await timers.ClearAsync(ct);
         changes?.NotifyChanged();
         return total;
@@ -83,9 +83,10 @@ public sealed class TimerService(IGoalRepository goals, ITimerRepository timers,
     }
 
     /// <summary>
-    /// Registra o trecho da tarefa atual e segue contando com <paramref name="newTask"/>. O trecho leva só os minutos
-    /// inteiros, e o novo início é o antigo mais esses minutos: os segundos que sobram passam para a próxima tarefa, e
-    /// nenhum instante é contado duas vezes nem perdido. Abaixo de um minuto, só o nome muda. Devolve o total do período.
+    /// Registra o trecho da tarefa atual e segue contando com <paramref name="newTask"/>. O trecho leva só os segundos
+    /// inteiros, e o novo início é o antigo mais esses segundos: a fração de segundo que sobra passa para a próxima
+    /// tarefa, e nenhum instante é contado duas vezes nem perdido. Abaixo de um segundo, só o nome muda. Devolve o total
+    /// do período.
     /// </summary>
     public async Task<int> SwitchTaskAsync(string? newTask, CancellationToken ct = default)
     {
@@ -94,8 +95,8 @@ public sealed class TimerService(IGoalRepository goals, ITimerRepository timers,
         if (await timers.GetAsync(ct) is not { StoppedAt: null } timer)
             throw Changed(Guid.Empty);
 
-        var minutes = (int)Math.Floor((time.GetUtcNow() - timer.StartedAt).TotalMinutes);
-        if (minutes <= 0)
+        var seconds = Seconds(timer, time.GetUtcNow());
+        if (seconds <= 0)
         {
             // Sem trecho, só o nome muda, mas pela mesma guarda: um cronômetro parado nesse meio-tempo não é renomeado.
             if (!await timers.SwitchAsync(timer.StartedAt, timer with { Task = newTask }, chunk: null, ct))
@@ -104,8 +105,8 @@ public sealed class TimerService(IGoalRepository goals, ITimerRepository timers,
             return await checkins.PeriodTotalAsync(timer.GoalId, ct);
         }
 
-        var (chunk, total) = await checkins.PrepareAsync(timer.GoalId, minutes, timer.Task, ct);
-        var next = timer with { StartedAt = timer.StartedAt.AddMinutes(minutes), Task = newTask };
+        var (chunk, total) = await checkins.PrepareAsync(timer.GoalId, seconds, timer.Task, ct);
+        var next = timer with { StartedAt = timer.StartedAt.AddSeconds(seconds), Task = newTask };
         if (!await timers.SwitchAsync(timer.StartedAt, next, chunk, ct))
             throw Changed(timer.GoalId);
         changes?.NotifyChanged();
@@ -135,9 +136,9 @@ public sealed class TimerService(IGoalRepository goals, ITimerRepository timers,
         changes?.NotifyChanged();
     }
 
-    /// <summary>Minutos inteiros entre o início e a parada (ou agora), arredondando ao mais próximo.</summary>
-    public static int Minutes(ActiveTimer timer, DateTimeOffset now) =>
-        (int)Math.Round(((timer.StoppedAt ?? now) - timer.StartedAt).TotalMinutes, MidpointRounding.AwayFromZero);
+    /// <summary>Segundos inteiros entre o início e a parada (ou agora), truncando a fração.</summary>
+    public static int Seconds(ActiveTimer timer, DateTimeOffset now) =>
+        (int)Math.Floor(((timer.StoppedAt ?? now) - timer.StartedAt).TotalSeconds);
 
     private static GoalStateException Conflict(Guid goalId, string title) =>
         new(goalId, $"Já há um cronômetro em \"{title}\". Pare-o antes de iniciar outro.");

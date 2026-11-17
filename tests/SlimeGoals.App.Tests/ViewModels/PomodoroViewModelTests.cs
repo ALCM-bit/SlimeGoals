@@ -389,7 +389,7 @@ public class PomodoroViewModelTests
 
         await vm.AdvanceCommand.ExecuteAsync(null);
 
-        (await _sessions.ChunksAsync()).Single().Minutes.Should().Be(27); // o extra de um foco conta como foco
+        (await _sessions.ChunksAsync()).Single().Seconds.Should().Be(27 * 60); // o extra de um foco conta como foco
         (vm.IsWaiting, vm.PhaseText, vm.MinutesText, vm.OvertimeText).Should().Be((false, "Pausa", "05", (string?)null));
         vm.ShowsTaskField.Should().BeFalse(); // a subatividade só aparece no foco
 
@@ -421,7 +421,7 @@ public class PomodoroViewModelTests
 
         await vm.AdvanceCommand.ExecuteAsync(null);
 
-        (vm.IsReviewing, vm.ReviewHoursInput, vm.ReviewMinutesInput).Should().Be((true, 1m, 36m));
+        (vm.IsReviewing, vm.ReviewHoursInput, vm.ReviewMinutesInput).Should().Be((true, 1m, 35m)); // os 40 s ficam de fora
         _checkins.All.Should().BeEmpty();
         (await _sessions.GetAsync())!.Step.Should().Be(0);
 
@@ -434,7 +434,7 @@ public class PomodoroViewModelTests
         await vm.SkipCommand.ExecuteAsync(null); // e o ⏭ também
         vm.IsReviewing.Should().BeTrue();
 
-        vm.ReviewHoursInput = 1441; // em minutos ainda; a tarefa 2 volta para 25 h
+        (vm.ReviewHoursInput, vm.ReviewMinutesInput) = (24, 1);
         await vm.ConfirmReviewCommand.ExecuteAsync(null);
         (vm.IsReviewing, vm.Error).Should().Be((true, "Valor fora do limite."));
         _checkins.All.Should().BeEmpty();
@@ -443,7 +443,7 @@ public class PomodoroViewModelTests
         await vm.ConfirmReviewCommand.ExecuteAsync(null);
 
         (vm.IsReviewing, vm.Error, vm.PhaseText).Should().Be((false, null, "Pausa"));
-        _checkins.All.Single().Should().Match<Checkin>(c => c.GoalId == study.Id && c.Amount == 30);
+        _checkins.All.Single().Should().Match<Checkin>(c => c.GoalId == study.Id && c.Amount == 30 * 60);
         (vm.MinutesText, vm.SecondsText).Should().Be(("05", "00")); // a pausa começa na confirmação
     }
 
@@ -498,7 +498,7 @@ public class PomodoroViewModelTests
 
         (vm.IsReviewing, vm.ReviewHoursInput, vm.ReviewMinutesInput).Should().Be((true, 0m, 40m));
         await vm.ConfirmReviewCommand.ExecuteAsync(null);
-        (await _sessions.ChunksAsync()).Single().Minutes.Should().Be(40);
+        (await _sessions.ChunksAsync()).Single().Seconds.Should().Be(40 * 60);
     }
 
     [Fact]
@@ -551,9 +551,9 @@ public class PomodoroViewModelTests
         await vm.SwitchTaskCommand.ExecuteAsync(null);
 
         _checkins.All.Where(c => c.Note == "Capítulo 3").Should().ContainSingle()
-            .Which.Should().Match<Checkin>(c => c.GoalId == study.Id && c.Amount == 12);
+            .Which.Should().Match<Checkin>(c => c.GoalId == study.Id && c.Amount == 12 * 60 + 30);
         (vm.IsSwitchingTask, vm.TaskLabel, vm.Error).Should().Be((false, "▸ Revisão", null));
-        (await _sessions.GetAsync())!.Carry.Should().Be(TimeSpan.FromSeconds(30));
+        (await _sessions.GetAsync())!.Carry.Should().Be(TimeSpan.Zero);
     }
 
     [Fact]
@@ -646,7 +646,7 @@ public class PomodoroViewModelTests
         await vm.AssignCommand.ExecuteAsync(null);
 
         _checkins.All.Select(c => (c.GoalId, c.Amount, c.Note)).Should()
-            .BeEquivalentTo([(study.Id, 20, "Capítulo 3"), (study.Id, 18, "Revisão")]);
+            .BeEquivalentTo([(study.Id, 20 * 60, "Capítulo 3"), (study.Id, 18 * 60, "Revisão")]);
         (await _sessions.GetAsync()).Should().BeNull();
         (vm.IsFinished, vm.IsAwaitingDestination, vm.GoalText, vm.SummaryText).Should().Be((true, false, "Estudar", "38 min"));
         vm.NewSessionCommand.Execute(null);
@@ -691,7 +691,7 @@ public class PomodoroViewModelTests
 
         var created = (await _goals.ListAsync(includeArchived: false)).Single();
         (created.Title, created.Measure).Should().Be(("Ler", Measure.Duration));
-        _checkins.All.Single().Should().Match<Checkin>(c => c.GoalId == created.Id && c.Amount == 25);
+        _checkins.All.Single().Should().Match<Checkin>(c => c.GoalId == created.Id && c.Amount == 25 * 60);
         vm.Editor.Should().BeNull();
         (vm.IsAwaitingDestination, vm.GoalText, vm.Error).Should().Be((false, "Ler", null));
     }
@@ -753,7 +753,7 @@ public class PomodoroViewModelTests
         var vm = await Running(new FocusPlan([F(25), B(5)], 1));
         _time.Advance(TimeSpan.FromMinutes(60));
         await vm.AdvanceCommand.ExecuteAsync(null);
-        vm.ReviewHoursInput = 1441; // em minutos ainda; a tarefa 2 volta para 25 h
+        (vm.ReviewHoursInput, vm.ReviewMinutesInput) = (24, 1);
         await vm.ConfirmReviewCommand.ExecuteAsync(null);
         vm.Error.Should().Be("Valor fora do limite.");
 
@@ -784,7 +784,7 @@ public class PomodoroViewModelTests
         (vm.IsFinished, vm.IsPreparing, vm.IsAwaitingDestination).Should().Be((true, false, false));
         (vm.SummaryText, vm.GoalText).Should().Be(("25 min", "Estudar"));
         vm.SummaryLines.Should().Equal("Capítulo 3 · 25 min");
-        _checkins.All.Single().Should().Match<Checkin>(c => c.GoalId == study.Id && c.Amount == 25 && c.Note == "Capítulo 3");
+        _checkins.All.Single().Should().Match<Checkin>(c => c.GoalId == study.Id && c.Amount == 25 * 60 && c.Note == "Capítulo 3");
 
         await Reloaded(vm);
         (vm.IsFinished, vm.IsPreparing, vm.SummaryText).Should().Be((true, false, "25 min"));

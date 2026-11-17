@@ -102,19 +102,19 @@ public sealed class FocusService(IGoalRepository goals, IFocusSessionRepository 
 
     /// <summary>
     /// O toque no fim do bloco e o ⏭: fecha o trecho de um foco e começa o próximo bloco agora. No último bloco, termina a
-    /// sessão e devolve o resumo. <paramref name="reviewedMinutes"/> é o tempo conferido do trecho aberto.
+    /// sessão e devolve o resumo. <paramref name="reviewedSeconds"/> é o tempo conferido do trecho aberto.
     /// </summary>
-    public async Task<FocusSummary?> AdvanceAsync(int? reviewedMinutes = null, CancellationToken ct = default)
+    public async Task<FocusSummary?> AdvanceAsync(int? reviewedSeconds = null, CancellationToken ct = default)
     {
         var session = await RunningAsync(ct);
         var now = time.GetUtcNow();
         if (session.IsLastStep)
-            return await FinishAsync(session, reviewedMinutes, now, ct);
+            return await FinishAsync(session, reviewedSeconds, now, ct);
 
-        // Depois de uma pausa nada é cortado: o resto de minuto segue para o próximo foco. O fim do último foco é o
+        // Depois de uma pausa nada é cortado: a fração de segundo segue para o próximo foco. O fim do último foco é o
         // último corte mesmo quando a sessão ainda tem pausas depois dele: arredonda e não deixa resto.
         var cut = session.Block.Kind == FocusBlockKind.Focus
-            ? await CutAsync(session, reviewedMinutes, last: IsLastFocus(session), now, ct)
+            ? await CutAsync(session, reviewedSeconds, last: IsLastFocus(session), now, ct)
             : new Cut(null, null, session.GoalId, session.Carry);
         await SaveAsync(session, session with
         {
@@ -129,8 +129,8 @@ public sealed class FocusService(IGoalRepository goals, IFocusSessionRepository 
     }
 
     /// <summary>O ✕: fecha o último trecho e termina a sessão.</summary>
-    public async Task<FocusSummary> EndAsync(int? reviewedMinutes = null, CancellationToken ct = default) =>
-        await FinishAsync(await RunningAsync(ct), reviewedMinutes, time.GetUtcNow(), ct);
+    public async Task<FocusSummary> EndAsync(int? reviewedSeconds = null, CancellationToken ct = default) =>
+        await FinishAsync(await RunningAsync(ct), reviewedSeconds, time.GetUtcNow(), ct);
 
     /// <summary>O ⇄: fecha o trecho com o nome atual e segue contando o mesmo foco com <paramref name="task"/>.</summary>
     public async Task SwitchTaskAsync(string? task, CancellationToken ct = default)
@@ -140,7 +140,7 @@ public sealed class FocusService(IGoalRepository goals, IFocusSessionRepository 
         if (session.Block.Kind != FocusBlockKind.Focus)
             throw Changed();
         var now = time.GetUtcNow();
-        var cut = await CutAsync(session, reviewedMinutes: null, last: false, now, ct);
+        var cut = await CutAsync(session, reviewedSeconds: null, last: false, now, ct);
         // Pausado, o corte fica no instante da pausa: o retomar o desloca junto com o bloco.
         await SaveAsync(session, session with
         {
@@ -178,7 +178,7 @@ public sealed class FocusService(IGoalRepository goals, IFocusSessionRepository 
             // Um trecho por vez: se um falhar, os já somados ficam ligados aos registros e não entram de novo.
             foreach (var chunk in held)
             {
-                var (checkin, after) = await checkins.PrepareAsync(goalId, chunk.Minutes, chunk.Task, ct);
+                var (checkin, after) = await checkins.PrepareAsync(goalId, chunk.Seconds, chunk.Task, ct);
                 if (!await sessions.AssignChunkAsync(chunk.Id, checkin, ct))
                     continue;
                 wrote = true;
@@ -208,11 +208,11 @@ public sealed class FocusService(IGoalRepository goals, IFocusSessionRepository 
     /// O último corte. Com meta, a sessão some e o resumo sai dos trechos. Sem meta, ela fica terminada, à espera de um
     /// destino para os trechos guardados; sem nada guardado, some também.
     /// </summary>
-    private async Task<FocusSummary> FinishAsync(FocusSession session, int? reviewedMinutes, DateTimeOffset now,
+    private async Task<FocusSummary> FinishAsync(FocusSession session, int? reviewedSeconds, DateTimeOffset now,
         CancellationToken ct)
     {
         var before = await sessions.ChunksAsync(ct);
-        var cut = await CutAsync(session, reviewedMinutes, last: true, now, ct);
+        var cut = await CutAsync(session, reviewedSeconds, last: true, now, ct);
         IReadOnlyList<FocusChunk> chunks = cut.Chunk is null ? before : [.. before, cut.Chunk];
         var held = chunks.Where(c => c.CheckinId is null).ToList();
 
@@ -232,32 +232,32 @@ public sealed class FocusService(IGoalRepository goals, IFocusSessionRepository 
     }
 
     /// <summary>
-    /// Fecha o foco aberto: os minutos (inteiros no meio da sessão, arredondados no último corte, ou os conferidos) viram
-    /// um trecho e o resto de minuto vira o novo <see cref="FocusSession.Carry"/>. Com meta, monta o registro; se a meta
+    /// Fecha o foco aberto: os segundos (inteiros no meio da sessão, arredondados no último corte, ou os conferidos) viram
+    /// um trecho e a fração de segundo vira o novo <see cref="FocusSession.Carry"/>. Com meta, monta o registro; se a meta
     /// deixou de aceitar registros, o trecho fica guardado e a sessão segue sem meta.
     /// </summary>
-    private async Task<Cut> CutAsync(FocusSession session, int? reviewedMinutes, bool last, DateTimeOffset now,
+    private async Task<Cut> CutAsync(FocusSession session, int? reviewedSeconds, bool last, DateTimeOffset now,
         CancellationToken ct)
     {
-        if (reviewedMinutes is null && FocusClock.NeedsReview(session, now))
+        if (reviewedSeconds is null && FocusClock.NeedsReview(session, now))
             throw new FocusReviewRequiredException(session.GoalId ?? Guid.Empty);
 
         // Um relógio que voltou não deixa um trecho negativo.
         var open = FocusClock.OpenFocus(session, now);
         if (open < TimeSpan.Zero) open = TimeSpan.Zero;
-        var minutes = reviewedMinutes ?? FocusClock.CutMinutes(open, last);
-        if (minutes < 0 || minutes > CheckinService.MaxDurationAmount)
+        var seconds = reviewedSeconds ?? FocusClock.CutSeconds(open, last);
+        if (seconds < 0 || seconds > CheckinService.MaxDurationAmount)
             throw new GoalValidationException([new ValidationError("Amount", "Valor fora do limite.")]);
-        var carry = reviewedMinutes is not null || last ? TimeSpan.Zero : open - TimeSpan.FromMinutes(minutes);
+        var carry = reviewedSeconds is not null || last ? TimeSpan.Zero : open - TimeSpan.FromSeconds(seconds);
 
-        if (minutes == 0)
+        if (seconds == 0)
             return new Cut(null, null, session.GoalId, carry);
-        var chunk = new FocusChunk(Guid.CreateVersion7(now), minutes, session.Task, now, CheckinId: null);
+        var chunk = new FocusChunk(Guid.CreateVersion7(now), seconds, session.Task, now, CheckinId: null);
         if (session.GoalId is not { } goalId)
             return new Cut(chunk, null, null, carry);
         try
         {
-            var (checkin, _) = await checkins.PrepareAsync(goalId, minutes, session.Task, ct);
+            var (checkin, _) = await checkins.PrepareAsync(goalId, seconds, session.Task, ct);
             return new Cut(chunk with { CheckinId = checkin.Id }, checkin, goalId, carry);
         }
         catch (Exception e) when (e is GoalNotFoundException or GoalStateException)
@@ -313,24 +313,24 @@ public sealed class FocusService(IGoalRepository goals, IFocusSessionRepository 
 
     private static GoalStateException Changed() => new(Guid.Empty, "A sessão mudou. Confira na aba Tempo.");
 
-    /// <summary>O que um corte grava: o trecho (nulo com zero minutos), o registro na meta e o que a sessão leva adiante.</summary>
+    /// <summary>O que um corte grava: o trecho (nulo com zero segundos), o registro na meta e o que a sessão leva adiante.</summary>
     private sealed record Cut(FocusChunk? Chunk, Checkin? Checkin, Guid? GoalId, TimeSpan Carry);
 }
 
 /// <summary>
-/// Resumo de uma sessão terminada: o foco total e os minutos por subatividade. <see cref="Assigned"/> diz que nada
+/// Resumo de uma sessão terminada: o foco total e os segundos por subatividade. <see cref="Assigned"/> diz que nada
 /// espera destino; falso, o resumo traz só os trechos guardados, que a pessoa soma numa meta ou descarta.
 /// </summary>
-public sealed record FocusSummary(int Minutes, IReadOnlyList<FocusSummaryLine> Lines, bool Assigned)
+public sealed record FocusSummary(int Seconds, IReadOnlyList<FocusSummaryLine> Lines, bool Assigned)
 {
     /// <summary>Agrupa os trechos por subatividade, na ordem da primeira aparição.</summary>
     public static FocusSummary Of(IReadOnlyList<FocusChunk> chunks, bool assigned)
     {
         ArgumentNullException.ThrowIfNull(chunks);
-        var lines = chunks.GroupBy(c => c.Task).Select(g => new FocusSummaryLine(g.Key, g.Sum(c => c.Minutes))).ToList();
-        return new FocusSummary(chunks.Sum(c => c.Minutes), lines, assigned);
+        var lines = chunks.GroupBy(c => c.Task).Select(g => new FocusSummaryLine(g.Key, g.Sum(c => c.Seconds))).ToList();
+        return new FocusSummary(chunks.Sum(c => c.Seconds), lines, assigned);
     }
 }
 
-/// <summary>Minutos de uma subatividade no resumo; <see cref="Task"/> nulo é o foco sem nome.</summary>
-public sealed record FocusSummaryLine(string? Task, int Minutes);
+/// <summary>Segundos de uma subatividade no resumo; <see cref="Task"/> nulo é o foco sem nome.</summary>
+public sealed record FocusSummaryLine(string? Task, int Seconds);

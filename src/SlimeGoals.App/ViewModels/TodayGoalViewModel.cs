@@ -28,8 +28,9 @@ public sealed partial class TodayGoalViewModel : ObservableObject
         Elapsed = "";
         if (_timer is { StoppedAt: not null })
         {
-            var minutes = TimerService.Minutes(_timer, time.GetUtcNow());
-            (StoppedHoursInput, StoppedMinutesInput) = (minutes / 60, minutes % 60);
+            // Os campos ainda são h e min: a fração de minuto fica de fora.
+            var seconds = TimerService.Seconds(_timer, time.GetUtcNow());
+            (StoppedHoursInput, StoppedMinutesInput) = (seconds / 3600, seconds % 3600 / 60);
             PanelNote = _timer.Task; // a tarefa vira a nota do registro, e a pessoa pode editar
         }
         TaskInput = TimerTask;

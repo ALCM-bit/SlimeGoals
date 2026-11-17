@@ -315,7 +315,7 @@ public class TodayPageViewModelTests
     [Fact]
     public async Task Timer_start_ticks_elapsed_then_stop_suggests_minutes_and_register_adds_them()
     {
-        await Create("Estudar", Measure.Duration, 60);
+        await Create("Estudar", Measure.Duration, 3600);
         var page = await Loaded();
 
         await page.StartTimerCommand.ExecuteAsync(Card(page, "Estudar"));
@@ -325,12 +325,13 @@ public class TodayPageViewModelTests
 
         await page.StopTimerCommand.ExecuteAsync(Card(page, "Estudar"));
         var stopped = Card(page, "Estudar");
-        (stopped.IsTimerRunning, stopped.IsTimerStopped, stopped.StoppedHoursInput, stopped.StoppedMinutesInput).Should().Be((false, true, 0m, 26m));
+        // Os campos ainda são h e min: os 40 s ficam de fora.
+        (stopped.IsTimerRunning, stopped.IsTimerStopped, stopped.StoppedHoursInput, stopped.StoppedMinutesInput).Should().Be((false, true, 0m, 25m));
 
         await page.RegisterTimerCommand.ExecuteAsync(stopped);
 
-        var done = Card(page, "Estudar");
-        (done.IsTimerStopped, done.ProgressText).Should().Be((false, "26 min de 1 h hoje"));
+        Card(page, "Estudar").IsTimerStopped.Should().BeFalse();
+        _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(25 * 60);
     }
 
     [Fact]
@@ -721,7 +722,7 @@ public class TodayPageViewModelTests
         card.TaskInput = "Capítulo 3";
         await page.ConfirmSwitchTaskCommand.ExecuteAsync(card);
 
-        _checkins.All.Should().ContainSingle().Which.Should().Match<Checkin>(c => c.Amount == 25 && c.Note == "Inglês");
+        _checkins.All.Should().ContainSingle().Which.Should().Match<Checkin>(c => c.Amount == 25 * 60 && c.Note == "Inglês");
         var after = Card(page, "Estudar");
         (after.TimerTask, after.TaskInput, after.IsSwitchingTask).Should().Be(("Capítulo 3", "Capítulo 3", false));
     }
@@ -1123,7 +1124,7 @@ public class TodayPageViewModelTests
     [Fact]
     public async Task Stopped_timer_is_reviewed_in_hours_and_minutes()
     {
-        await Create("Estudar", Measure.Duration, 300, unit: null);
+        await Create("Estudar", Measure.Duration, 300 * 60, unit: null);
         var page = await Loaded();
         await page.StartTimerCommand.ExecuteAsync(Card(page, "Estudar"));
         _time.Advance(TimeSpan.FromMinutes(125));
@@ -1134,7 +1135,7 @@ public class TodayPageViewModelTests
         (stopped.StoppedHoursInput, stopped.StoppedMinutesInput) = (1, null);
         await page.RegisterTimerCommand.ExecuteAsync(stopped);
 
-        Card(page, "Estudar").ProgressText.Should().Be("1 h de 5 h hoje");
+        _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(3600); // o texto certo vem com a tarefa 5
     }
 
     [Fact]

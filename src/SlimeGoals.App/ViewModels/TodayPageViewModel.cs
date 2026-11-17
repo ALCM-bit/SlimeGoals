@@ -361,7 +361,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             item.PanelError = "Informe um valor.";
             return Task.CompletedTask;
         }
-        return RunAsync(item, _ => timers.RegisterAsync(value, item.PanelNote), panel: true);
+        return RunAsync(item, _ => timers.RegisterAsync(value * 60, item.PanelNote), panel: true);
     }
 
     /// <summary>✓, Enter ou sugestão escolhida: grava o nome digitado e fecha a edição. Sem mudança, só fecha.</summary>
@@ -588,7 +588,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     {
         null => null,
         { StoppedAt: null } t => $"Cronômetro rodando em \"{_offscreenTitle}\" · {GoalFormatting.Elapsed(time.GetUtcNow() - t.StartedAt)}",
-        var t => $"Cronômetro parado em \"{_offscreenTitle}\" · {GoalFormatting.Duration(TimerService.Minutes(t, time.GetUtcNow()))}",
+        var t => $"Cronômetro parado em \"{_offscreenTitle}\" · {GoalFormatting.Duration(TimerService.Seconds(t, time.GetUtcNow()) / 60)}",
     };
 
     private void OnUi(Action action)

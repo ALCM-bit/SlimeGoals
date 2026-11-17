@@ -150,26 +150,26 @@ public class FocusServiceTests
     }
 
     [Fact]
-    public async Task Advancing_a_focus_records_whole_minutes_and_carries_seconds()
+    public async Task Advancing_a_focus_records_whole_seconds_and_carries_the_fraction()
     {
         var goal = await Study();
         await Service.StartAsync(FocusPlan.Default, goal.Id);
-        _time.Advance(TimeSpan.FromSeconds(25 * 60 + 40));
+        _time.Advance(TimeSpan.FromMilliseconds(25 * 60_000 + 40_300));
         var now = _time.GetUtcNow();
 
         (await Service.AdvanceAsync()).Should().BeNull();
 
         var checkin = _checkins.All.Should().ContainSingle().Which;
         checkin.GoalId.Should().Be(goal.Id);
-        checkin.Amount.Should().Be(25);
+        checkin.Amount.Should().Be(25 * 60 + 40);
         var session = await SessionAsync();
         session.Step.Should().Be(1);
-        session.Carry.Should().Be(TimeSpan.FromSeconds(40));
+        session.Carry.Should().Be(TimeSpan.FromMilliseconds(300));
         session.BlockStartedAt.Should().Be(now);
         session.CutAt.Should().Be(now);
         session.Revision.Should().Be(1);
         var chunk = (await Service.ChunksAsync()).Should().ContainSingle().Which;
-        (chunk.Minutes, chunk.Task, chunk.EndedAt, chunk.CheckinId).Should().Be((25, (string?)null, now, (Guid?)checkin.Id));
+        (chunk.Seconds, chunk.Task, chunk.EndedAt, chunk.CheckinId).Should().Be((25 * 60 + 40, (string?)null, now, (Guid?)checkin.Id));
     }
 
     [Fact]
@@ -177,31 +177,31 @@ public class FocusServiceTests
     {
         var goal = await Study();
         await Service.StartAsync(FocusPlan.Default, goal.Id);
-        _time.Advance(TimeSpan.FromSeconds(25 * 60 + 40));
+        _time.Advance(TimeSpan.FromMilliseconds(25 * 60_000 + 40_700));
         await Service.AdvanceAsync();
         _time.Advance(TimeSpan.FromMinutes(5));
         await Service.AdvanceAsync(); // fim da pausa: não corta
-        _time.Advance(TimeSpan.FromSeconds(4 * 60 + 30));
+        _time.Advance(TimeSpan.FromMilliseconds(4 * 60_000 + 30_600));
 
         await Service.SwitchTaskAsync("Revisar");
 
-        _checkins.All.Select(c => c.Amount).Should().Equal(25, 5);
-        (await SessionAsync()).Carry.Should().Be(TimeSpan.FromSeconds(10));
+        _checkins.All.Select(c => c.Amount).Should().Equal(25 * 60 + 40, 4 * 60 + 31);
+        (await SessionAsync()).Carry.Should().Be(TimeSpan.FromMilliseconds(300));
     }
 
     [Theory]
-    [InlineData(25 * 60 + 29, 25)]
-    [InlineData(25 * 60 + 30, 26)]
-    public async Task Last_cut_rounds_to_the_nearest_minute(int seconds, int minutes)
+    [InlineData(25 * 60_000 + 29_499, 25 * 60 + 29)]
+    [InlineData(25 * 60_000 + 29_500, 25 * 60 + 30)]
+    public async Task Last_cut_rounds_to_the_nearest_second(int milliseconds, int seconds)
     {
         var goal = await Study();
         await Service.StartAsync(new FocusPlan([Focus(25)], 1), goal.Id);
-        _time.Advance(TimeSpan.FromSeconds(seconds));
+        _time.Advance(TimeSpan.FromMilliseconds(milliseconds));
 
         var summary = await Service.AdvanceAsync();
 
-        _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(minutes);
-        summary.Should().BeEquivalentTo(new FocusSummary(minutes, [new FocusSummaryLine(null, minutes)], Assigned: true));
+        _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(seconds);
+        summary.Should().BeEquivalentTo(new FocusSummary(seconds, [new FocusSummaryLine(null, seconds)], Assigned: true));
         (await _sessions.GetAsync()).Should().BeNull();
         (await _sessions.ChunksAsync()).Should().BeEmpty();
     }
@@ -211,21 +211,21 @@ public class FocusServiceTests
     {
         var goal = await Study();
         await Service.StartAsync(new FocusPlan([Focus(10), Break(5)], 2), goal.Id);
-        _time.Advance(TimeSpan.FromSeconds(10 * 60 + 20));
-        await Service.AdvanceAsync(); // foco do meio: trunca e guarda 20 s
+        _time.Advance(TimeSpan.FromMilliseconds(10 * 60_000 + 20_600));
+        await Service.AdvanceAsync(); // foco do meio: trunca e guarda 0,6 s
         _time.Advance(TimeSpan.FromMinutes(5));
         await Service.AdvanceAsync();
         _time.Advance(TimeSpan.FromSeconds(10 * 60 + 20));
-        await Service.AdvanceAsync(); // último foco: 10 min 40 s arredondam para 11
+        await Service.AdvanceAsync(); // último foco: 10 min 20,6 s arredondam para 10 min 21 s
 
-        _checkins.All.Select(c => c.Amount).Should().Equal(10, 11);
+        _checkins.All.Select(c => c.Amount).Should().Equal(620, 621);
         (await SessionAsync()).Carry.Should().Be(TimeSpan.Zero);
         _time.Advance(TimeSpan.FromMinutes(5));
 
         var summary = await Service.AdvanceAsync();
 
-        _checkins.All.Select(c => c.Amount).Should().Equal(10, 11);
-        summary.Should().BeEquivalentTo(new FocusSummary(21, [new FocusSummaryLine(null, 21)], Assigned: true));
+        _checkins.All.Select(c => c.Amount).Should().Equal(620, 621);
+        summary.Should().BeEquivalentTo(new FocusSummary(1241, [new FocusSummaryLine(null, 1241)], Assigned: true));
         (await _sessions.GetAsync()).Should().BeNull();
     }
 
@@ -235,21 +235,21 @@ public class FocusServiceTests
         var goal = await Study();
         await Service.StartAsync(FocusPlan.Default, goal.Id);
         await Service.SetTaskAsync("  Ler  ");
-        _time.Advance(TimeSpan.FromSeconds(10 * 60 + 20));
+        _time.Advance(TimeSpan.FromMilliseconds(10 * 60_000 + 20_250));
         var switchedAt = _time.GetUtcNow();
 
         await Service.SwitchTaskAsync("Escrever");
 
         var first = _checkins.All.Should().ContainSingle().Which;
-        (first.Amount, first.Note).Should().Be((10, "Ler"));
+        (first.Amount, first.Note).Should().Be((620, "Ler"));
         var session = await SessionAsync();
         (session.Step, session.Task, session.CutAt, session.BlockStartedAt, session.Carry)
-            .Should().Be((0, "Escrever", switchedAt, T0, TimeSpan.FromSeconds(20)));
+            .Should().Be((0, "Escrever", switchedAt, T0, TimeSpan.FromMilliseconds(250)));
 
         _time.Advance(TimeSpan.FromSeconds(15 * 60 + 20)); // 20 s depois do fim do bloco
         await Service.AdvanceAsync();
 
-        _checkins.All.Select(c => (c.Amount, c.Note)).Should().Equal((10, "Ler"), (15, "Escrever"));
+        _checkins.All.Select(c => (c.Amount, c.Note)).Should().Equal((620, "Ler"), (920, "Escrever"));
     }
 
     [Fact]
@@ -267,14 +267,14 @@ public class FocusServiceTests
 
         await Service.AdvanceAsync();
 
-        _checkins.All.Select(c => (c.Amount, c.Note)).Should().Equal((10, (string?)null), (15, "B"));
+        _checkins.All.Select(c => (c.Amount, c.Note)).Should().Equal((600, (string?)null), (900, "B"));
     }
 
     [Fact]
     public async Task Ending_without_goal_and_without_time_closes_the_session()
     {
         await Service.StartAsync(FocusPlan.Default, null);
-        _time.Advance(TimeSpan.FromSeconds(20));
+        _time.Advance(TimeSpan.FromMilliseconds(499));
 
         var summary = await Service.EndAsync();
 
@@ -297,7 +297,7 @@ public class FocusServiceTests
 
         await Service.AdvanceAsync();
 
-        _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(25);
+        _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(25 * 60);
     }
 
     [Fact]
@@ -326,11 +326,37 @@ public class FocusServiceTests
             .Which.Message.Should().Be("Confira o tempo do último trecho antes de seguir.");
         _checkins.All.Should().BeEmpty();
 
-        await Service.AdvanceAsync(30);
+        await Service.AdvanceAsync(30 * 60);
 
-        _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(30);
+        _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(30 * 60);
         var session = await SessionAsync();
         (session.Step, session.Carry, session.BlockStartedAt).Should().Be((1, TimeSpan.Zero, _time.GetUtcNow()));
+    }
+
+    [Fact]
+    public async Task Reviewed_time_is_in_seconds()
+    {
+        var goal = await Study();
+        await Service.StartAsync(FocusPlan.Default, goal.Id);
+        _time.Advance(TimeSpan.FromHours(2));
+
+        var summary = await Service.EndAsync(reviewedSeconds: 3725);
+
+        _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(3725);
+        summary.Seconds.Should().Be(3725);
+    }
+
+    [Fact]
+    public async Task Task_switch_records_seconds_and_carries_only_the_fraction()
+    {
+        var goal = await Study();
+        await Service.StartAsync(FocusPlan.Default, goal.Id);
+        _time.Advance(TimeSpan.FromMilliseconds(2 * 60_000 + 40_500));
+
+        await Service.SwitchTaskAsync("B");
+
+        _checkins.All.Should().ContainSingle().Which.Amount.Should().Be(160);
+        (await SessionAsync()).Carry.Should().Be(TimeSpan.FromMilliseconds(500));
     }
 
     [Fact]
@@ -366,10 +392,10 @@ public class FocusServiceTests
         var summary = await Service.AdvanceAsync();
 
         _checkins.All.Should().ContainSingle().Which.GoalId.Should().Be(goal.Id);
-        (await Service.ChunksAsync()).Select(c => (c.Minutes, c.CheckinId is null)).Should().Equal((10, false), (10, true));
+        (await Service.ChunksAsync()).Select(c => (c.Seconds, c.CheckinId is null)).Should().Equal((600, false), (600, true));
         var session = await SessionAsync();
         (session.FinishedAt, session.GoalId).Should().Be((_time.GetUtcNow(), null));
-        summary.Should().BeEquivalentTo(new FocusSummary(10, [new FocusSummaryLine(null, 10)], Assigned: false));
+        summary.Should().BeEquivalentTo(new FocusSummary(600, [new FocusSummaryLine(null, 600)], Assigned: false));
     }
 
     [Fact]
@@ -387,17 +413,17 @@ public class FocusServiceTests
 
         var summary = await Service.AdvanceAsync();
 
-        summary.Should().BeEquivalentTo(new FocusSummary(20,
-            [new FocusSummaryLine("Ler", 10), new FocusSummaryLine("Escrever", 10)], Assigned: false));
+        summary.Should().BeEquivalentTo(new FocusSummary(1200,
+            [new FocusSummaryLine("Ler", 600), new FocusSummaryLine("Escrever", 600)], Assigned: false));
         _checkins.All.Should().BeEmpty();
         (await SessionAsync()).FinishedAt.Should().Be(_time.GetUtcNow());
 
         _time.Advance(TimeSpan.FromHours(1));
         var total = await Service.AssignAsync(goal.Id);
 
-        total.Should().Be(20);
+        total.Should().Be(1200);
         _checkins.All.Select(c => (c.GoalId, c.Amount, c.Note, c.DoneAt)).Should().Equal(
-            (goal.Id, 10, "Ler", _time.GetUtcNow()), (goal.Id, 10, "Escrever", _time.GetUtcNow()));
+            (goal.Id, 600, "Ler", _time.GetUtcNow()), (goal.Id, 600, "Escrever", _time.GetUtcNow()));
         (await _sessions.GetAsync()).Should().BeNull();
         (await _sessions.ChunksAsync()).Should().BeEmpty();
     }
@@ -437,7 +463,7 @@ public class FocusServiceTests
     }
 
     [Fact]
-    public async Task Summary_groups_minutes_by_task()
+    public async Task Summary_groups_seconds_by_task()
     {
         await Service.StartAsync(new FocusPlan([Focus(60)], 1), null);
         await Service.SetTaskAsync("A");
@@ -451,8 +477,8 @@ public class FocusServiceTests
 
         var summary = await Service.EndAsync();
 
-        summary.Should().BeEquivalentTo(new FocusSummary(35,
-            [new FocusSummaryLine("A", 20), new FocusSummaryLine("B", 10), new FocusSummaryLine(null, 5)], Assigned: false),
+        summary.Should().BeEquivalentTo(new FocusSummary(2100,
+            [new FocusSummaryLine("A", 1200), new FocusSummaryLine("B", 600), new FocusSummaryLine(null, 300)], Assigned: false),
             o => o.WithStrictOrdering());
     }
 

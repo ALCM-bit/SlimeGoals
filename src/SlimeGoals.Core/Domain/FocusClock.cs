@@ -24,9 +24,9 @@ public static class FocusClock
     public static bool NeedsReview(FocusSession s, DateTimeOffset now) =>
         s.Block.Kind == FocusBlockKind.Focus && Overtime(s, now) >= ReviewThreshold;
 
-    /// <summary>Minutos inteiros de um corte: no último, arredonda ao mais próximo; antes, trunca.</summary>
-    public static int CutMinutes(TimeSpan open, bool last) =>
-        last ? (int)Math.Round(open.TotalMinutes, MidpointRounding.AwayFromZero) : (int)Math.Floor(open.TotalMinutes);
+    /// <summary>Segundos inteiros de um corte: no último, arredonda ao mais próximo; antes, trunca.</summary>
+    public static int CutSeconds(TimeSpan open, bool last) =>
+        last ? (int)Math.Round(open.TotalSeconds, MidpointRounding.AwayFromZero) : (int)Math.Floor(open.TotalSeconds);
 
     private static TimeSpan Max(TimeSpan t) => t < TimeSpan.Zero ? TimeSpan.Zero : t;
 }

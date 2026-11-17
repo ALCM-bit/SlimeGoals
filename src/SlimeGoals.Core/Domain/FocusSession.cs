@@ -1,12 +1,12 @@
 namespace SlimeGoals.Core.Domain;
 
 /// <summary>Trecho de foco já fechado, pronto para virar registro numa meta.</summary>
-public sealed record FocusChunk(Guid Id, int Minutes, string? Task, DateTimeOffset EndedAt, Guid? CheckinId);
+public sealed record FocusChunk(Guid Id, int Seconds, string? Task, DateTimeOffset EndedAt, Guid? CheckinId);
 
 /// <summary>
 /// Sessão de Pomodoro aberta; no máximo uma em todo o app.
 /// <see cref="CutAt"/> marca onde o foco ainda não registrado começa e <see cref="Carry"/> guarda a fração
-/// de minuto que sobrou do corte anterior. <see cref="PausedAt"/> preenchido congela o relógio.
+/// de segundo que sobrou do corte anterior. <see cref="PausedAt"/> preenchido congela o relógio.
 /// </summary>
 public sealed record FocusSession(
     FocusPlan Plan,

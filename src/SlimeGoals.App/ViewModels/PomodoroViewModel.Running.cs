@@ -207,7 +207,7 @@ public sealed partial class PomodoroViewModel
         var minutes = (int)Math.Round(
             Math.Clamp((ReviewHoursInput ?? 0) * 60 + (ReviewMinutesInput ?? 0), -MaxReviewInput, MaxReviewInput),
             MidpointRounding.AwayFromZero);
-        return ActAsync(() => RunCutAsync(_pendingCut, minutes));
+        return ActAsync(() => RunCutAsync(_pendingCut, minutes * 60));
     }
 
     [RelayCommand]
@@ -352,10 +352,10 @@ public sealed partial class PomodoroViewModel
             OpenReview(cut);
             return Task.CompletedTask;
         }
-        return RunCutAsync(cut, reviewedMinutes: null);
+        return RunCutAsync(cut, reviewedSeconds: null);
     }
 
-    private async Task RunCutAsync(PendingCut cut, int? reviewedMinutes)
+    private async Task RunCutAsync(PendingCut cut, int? reviewedSeconds)
     {
         var goalTitle = _sessionGoalTitle;
         var review = false;
@@ -367,8 +367,8 @@ public sealed partial class PomodoroViewModel
                 // Como o ■ do cronômetro: o nome digitado e não confirmado vale para o trecho que fecha agora.
                 await SaveTypedTaskAsync();
                 summary = cut == PendingCut.Advance
-                    ? await _focus.AdvanceAsync(reviewedMinutes)
-                    : await _focus.EndAsync(reviewedMinutes);
+                    ? await _focus.AdvanceAsync(reviewedSeconds)
+                    : await _focus.EndAsync(reviewedSeconds);
             }
             catch (FocusReviewRequiredException)
             {
@@ -390,9 +390,10 @@ public sealed partial class PomodoroViewModel
         if (Live is not { } session)
             return;
         var open = FocusClock.OpenFocus(session, Now);
-        var minutes = Math.Max(0, (int)Math.Round(open.TotalMinutes, MidpointRounding.AwayFromZero));
+        // Os campos ainda são h e min: a fração de minuto fica de fora.
+        var seconds = Math.Max(0, (int)Math.Floor(open.TotalSeconds));
         _pendingCut = cut;
-        (ReviewHoursInput, ReviewMinutesInput) = (minutes / 60, minutes % 60);
+        (ReviewHoursInput, ReviewMinutesInput) = (seconds / 3600, seconds % 3600 / 60);
         Error = null;
         IsConfirmingEnd = false;
         IsReviewing = true;

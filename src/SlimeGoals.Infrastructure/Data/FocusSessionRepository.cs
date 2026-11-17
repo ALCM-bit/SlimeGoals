@@ -46,7 +46,7 @@ public sealed class FocusSessionRepository(SqliteConnectionFactory db) : IFocusS
     {
         await using var c = db.Open();
         return await RowReader.ReadValidAsync<ChunkRow, FocusChunk>(c, new CommandDefinition("""
-            SELECT id AS Id, minutes AS Minutes, task AS Task, ended_at AS EndedAt, checkin_id AS CheckinId
+            SELECT id AS Id, minutes AS Seconds, task AS Task, ended_at AS EndedAt, checkin_id AS CheckinId
             FROM focus_chunk ORDER BY ended_at, id
             """, cancellationToken: ct), "focus_chunk", r => r.ToDomain());
     }
@@ -104,7 +104,7 @@ public sealed class FocusSessionRepository(SqliteConnectionFactory db) : IFocusS
                 if (chunk is not null)
                     await c.ExecuteAsync(new CommandDefinition("""
                         INSERT INTO focus_chunk (id, minutes, task, ended_at, checkin_id)
-                        VALUES (@Id, @Minutes, @Task, @EndedAt, @CheckinId)
+                        VALUES (@Id, @Seconds, @Task, @EndedAt, @CheckinId)
                         """, ChunkParams(chunk), tx, cancellationToken: ct));
             }
 
@@ -166,7 +166,7 @@ public sealed class FocusSessionRepository(SqliteConnectionFactory db) : IFocusS
         s.Step,
         BlockStartedAt = SqlText.Instant(s.BlockStartedAt),
         CutAt = SqlText.Instant(s.CutAt),
-        // Milissegundos inteiros: o que fica abaixo disso não muda um minuto de foco.
+        // Milissegundos inteiros: o que fica abaixo disso não muda um segundo de foco.
         CarryMs = s.Carry.Ticks / TimeSpan.TicksPerMillisecond,
         PausedAt = s.PausedAt is { } p ? SqlText.Instant(p) : null,
         s.Task,
@@ -179,7 +179,7 @@ public sealed class FocusSessionRepository(SqliteConnectionFactory db) : IFocusS
     private static object ChunkParams(FocusChunk chunk) => new
     {
         Id = SqlText.Id(chunk.Id),
-        chunk.Minutes,
+        chunk.Seconds,
         chunk.Task,
         EndedAt = SqlText.Instant(chunk.EndedAt),
         CheckinId = chunk.CheckinId is { } id ? SqlText.Id(id) : null,
@@ -222,12 +222,12 @@ public sealed class FocusSessionRepository(SqliteConnectionFactory db) : IFocusS
     private sealed class ChunkRow
     {
         public required string Id { get; init; }
-        public long Minutes { get; init; }
+        public long Seconds { get; init; }
         public string? Task { get; init; }
         public required string EndedAt { get; init; }
         public string? CheckinId { get; init; }
 
-        public FocusChunk ToDomain() => new(Guid.ParseExact(Id, "D"), checked((int)Minutes), Task,
+        public FocusChunk ToDomain() => new(Guid.ParseExact(Id, "D"), checked((int)Seconds), Task,
             SqlText.ParseInstant(EndedAt), CheckinId is null ? null : Guid.ParseExact(CheckinId, "D"));
     }
 }

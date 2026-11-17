@@ -20,11 +20,11 @@ public sealed partial class PomodoroViewModel
     public bool IsAwaitingDestination => !IsRunning && _summary is { Assigned: false };
 
     /// <summary>O foco total da sessão ("1 h 38"), sob o rótulo "Foco feito".</summary>
-    public string? SummaryText => IsFinished ? GoalFormatting.Duration(_summary!.Minutes) : null;
+    public string? SummaryText => IsFinished ? GoalFormatting.Duration(_summary!.Seconds / 60) : null;
 
     /// <summary>Os minutos por subatividade, na ordem da primeira aparição: "Revisar capítulo 3 · 58 min".</summary>
     public IReadOnlyList<string> SummaryLines => IsFinished
-        ? _summary!.Lines.Select(l => $"{l.Task ?? NoName} · {GoalFormatting.Duration(l.Minutes)}").ToList()
+        ? _summary!.Lines.Select(l => $"{l.Task ?? NoName} · {GoalFormatting.Duration(l.Seconds / 60)}").ToList()
         : [];
 
     /// <summary>"Somar na meta…": as metas de tempo ativas hoje.</summary>
