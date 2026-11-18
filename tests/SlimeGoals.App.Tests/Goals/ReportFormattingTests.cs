@@ -2,6 +2,8 @@ using SlimeGoals.App.Goals;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
 
+using static SlimeGoals.App.Tests.Support.DurationText;
+
 namespace SlimeGoals.App.Tests.Goals;
 
 public class ReportFormattingTests
@@ -36,15 +38,15 @@ public class ReportFormattingTests
     {
         ReportFormatting.DayEntry(new DayGoalEntry(NewGoal(), 8, true)).Should().Be("8 de 8 copos");
         ReportFormatting.DayEntry(new DayGoalEntry(NewGoal(measure: Measure.Duration, target: 1800, unit: null), 2400, true))
-            .Should().Be("40 min de 30 min");
+            .Should().Be(Dur("40 min de 30 min"));
         ReportFormatting.DayEntry(new DayGoalEntry(NewGoal(measure: Measure.Duration, target: 9000, unit: null), 4360, false))
-            .Should().Be("1 h 12 min 40 s de 2 h 30 min");
+            .Should().Be(Dur("1 h 12 min 40 s de 2 h 30 min"));
         ReportFormatting.DayEntry(new DayGoalEntry(NewGoal(measure: Measure.Completion, target: 1, unit: null), 1, true))
             .Should().Be("Feito");
         ReportFormatting.DayEntry(new DayGoalEntry(NewGoal(Recurrence.Weekly, Measure.Duration, 18000, null), 2700, null))
-            .Should().Be("45 min");
+            .Should().Be(Dur("45 min"));
         ReportFormatting.DayEntry(new DayGoalEntry(NewGoal(Recurrence.Weekly, Measure.Duration, 18000, null), 160, null))
-            .Should().Be("2 min 40 s");
+            .Should().Be(Dur("2 min 40 s"));
         ReportFormatting.DayEntry(new DayGoalEntry(NewGoal(Recurrence.Weekly, target: 20), 1, null))
             .Should().Be("1 copos");
         ReportFormatting.DayEntry(new DayGoalEntry(NewGoal(Recurrence.Weekly, target: 20, unit: "vezes"), 1, null))
@@ -83,9 +85,9 @@ public class ReportFormattingTests
         ReportFormatting.WeekDetail(Week(NewGoal(), met: 1, counted: 1)).Should().Be("1 de 1 dia");
         ReportFormatting.WeekDetail(Week(NewGoal(Recurrence.Weekly, target: 8), done: 6)).Should().Be("6 de 8 copos");
         ReportFormatting.WeekDetail(Week(NewGoal(Recurrence.Weekly, Measure.Duration, 18000, null), done: 14400))
-            .Should().Be("4 h de 5 h");
+            .Should().Be(Dur("4 h de 5 h"));
         ReportFormatting.WeekDetail(Week(NewGoal(Recurrence.Weekly, Measure.Duration, 9000, null), done: 4360))
-            .Should().Be("1 h 12 min 40 s de 2 h 30 min");
+            .Should().Be(Dur("1 h 12 min 40 s de 2 h 30 min"));
         var completion = NewGoal(Recurrence.Weekly, Measure.Completion, 1, null);
         ReportFormatting.WeekDetail(Week(completion, done: 1)).Should().Be("Feito");
         ReportFormatting.WeekDetail(Week(completion, done: 0)).Should().Be("Pendente");

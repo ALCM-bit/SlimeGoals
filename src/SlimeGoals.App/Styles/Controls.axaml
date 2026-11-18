@@ -980,10 +980,15 @@
     <Setter Property="Margin" Value="0" />
   </Style>
   <!-- Detalhe da barra nos Relatórios: o valor ("1 h 12 min 40 s de 2 h 30 min") desce para sob o nome e quebra linha.
-       Só na coluna do nome (a *): numa coluna Auto o texto é medido sem limite e não quebra. -->
+       Começa na coluna do nome (a *): só numa coluna Auto o texto seria medido sem limite e não quebraria. Nome e valor
+       ocupam também a coluna do valor, vazia aqui, para o espaçamento dela não roubar largura do texto. -->
+  <Style Selector=".compact TextBlock.bar-detail-title">
+    <Setter Property="Grid.ColumnSpan" Value="2" />
+  </Style>
   <Style Selector=".compact TextBlock.bar-detail-value">
     <Setter Property="Grid.Row" Value="1" />
     <Setter Property="Grid.Column" Value="1" />
+    <Setter Property="Grid.ColumnSpan" Value="2" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
   <!-- Metas: ações do cartão na linha de baixo, sob o texto -->

@@ -235,9 +235,10 @@ internal sealed class SyncApply
         if (rows.Count == 0)
             return;
 
-        // Sem a linha da meta não se sabe a medida: os registros continuam esperando, sem converter nem sair da fila.
-        if (await IsDurationGoalAsync(goalId) is not { } isDuration)
-            return;
+        // Os dois caminhos que chegam aqui deixam a linha da meta: o upsert que acabou de gravar e a edição local que
+        // venceu (QueuedEditAsync só a acha com a linha). Faltar seria quebra dessa garantia, não um caso a tolerar.
+        var isDuration = await IsDurationGoalAsync(goalId)
+            ?? throw new UnreachableException($"Meta {goalId:D} sem linha ao aplicar os registros pendentes.");
         foreach (var row in rows)
         {
             try
