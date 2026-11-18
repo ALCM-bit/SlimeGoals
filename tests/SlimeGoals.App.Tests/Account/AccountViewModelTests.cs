@@ -118,7 +118,7 @@ public class AccountViewModelTests
     }
 
     [Fact]
-    public async Task Register_sends_the_invite_typed_and_clears_it()
+    public async Task Register_sends_the_invite_typed_and_clears_it_on_success()
     {
         var vm = await LoadedAsync();
         vm.OpenRegisterCommand.Execute(null);
@@ -127,7 +127,23 @@ public class AccountViewModelTests
         await vm.SubmitRegisterCommand.ExecuteAsync(null);
 
         _account.LastInviteCode.Should().Be("abc");
-        vm.InviteCode.Should().BeEmpty("o convite é segredo e some a cada envio");
+        vm.InviteCode.Should().BeEmpty("depois do cadastro a página muda e o convite some");
+    }
+
+    [Fact]
+    public async Task Register_keeps_the_invite_when_the_server_refuses()
+    {
+        var vm = await LoadedAsync();
+        _account.Failure = new SlimeGoals.Sync.Account.AccountApiException(SlimeGoals.Sync.Account.AccountErrorKind.RegistrationClosed);
+        vm.OpenRegisterCommand.Execute(null);
+        (vm.Email, vm.Password, vm.PasswordConfirmation, vm.InviteCode) = ("ana@exemplo.com", "senha longa", "senha longa", "abc");
+
+        await vm.SubmitRegisterCommand.ExecuteAsync(null);
+
+        vm.Page.Should().Be(AccountPage.Register);
+        vm.InviteCode.Should().Be("abc");
+        vm.Password.Should().BeEmpty();
+        vm.Error.Should().Be(AccountMessages.For(_account.Failure, AccountAction.Register));
     }
 
     [Fact]

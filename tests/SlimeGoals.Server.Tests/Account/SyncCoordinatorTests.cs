@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Dapper;
 using Microsoft.Extensions.Time.Testing;
 using SlimeGoals.Core;
@@ -251,6 +253,43 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
         b.GoalTitles().Should().Equal("Ler mais");
         a.GoalTitles().Should().Equal("Ler mais");
         (await a.Account.ListDevicesAsync()).Should().HaveCount(2);
+    }
+
+    [Theory]
+    [InlineData("http://exemplo.com/")]
+    [InlineData("http://192.168.0.10:8080/")]
+    public async Task Plain_http_to_a_non_loopback_server_is_refused(string address)
+    {
+        var a = NewDevice();
+
+        var register = () => a.Account.RegisterAsync(new Uri(address), _email, Password, null);
+        var login = () => a.Account.LoginAsync(new Uri(address), _email, Password, "pc");
+
+        await register.Should().ThrowAsync<ArgumentException>();
+        await login.Should().ThrowAsync<ArgumentException>();
+        a.Net.Calls.Should().BeEmpty("nada sai pela rede");
+    }
+
+    [Fact]
+    public async Task Reauth_refuses_a_stored_plain_http_server()
+    {
+        var a = NewDevice();
+        await SignUpAsync(a);
+        var b = NewDevice();
+        await b.Account.LoginAsync(Server, _email, Password, "celular");
+        await b.Account.ChangePasswordAsync(Password, NewPassword);
+        a.Account.SyncNow();
+        await WaitUntilAsync(a.Account, s => s.State == AccountState.SessionExpired);
+
+        // Sessão gravada por uma versão antiga, com http:// fora do loopback.
+        var secret = JsonNode.Parse((await a.Vault.GetAsync("sync-session"))!)!.AsObject();
+        secret["server"] = "http://exemplo.com/";
+        await a.Vault.SetAsync("sync-session", JsonSerializer.SerializeToUtf8Bytes(secret));
+        a.Net.Calls.Clear();
+
+        await FluentActions.Awaiting(() => a.Account.ReauthenticateAsync(NewPassword, "pc")).Should().ThrowAsync<ArgumentException>();
+
+        a.Net.Calls.Should().BeEmpty("a senha não sai por http");
     }
 
     [Fact]

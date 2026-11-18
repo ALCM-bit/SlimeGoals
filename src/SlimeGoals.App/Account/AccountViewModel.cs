@@ -335,7 +335,7 @@ public sealed partial class AccountViewModel : ObservableObject
     private async Task SubmitRegisterAsync()
     {
         var (email, password, confirmation, invite) = (Email, Password, PasswordConfirmation, InviteCode);
-        ClearSecretInputs();
+        ClearSubmittedInputs();
         if (await ServerForSubmitAsync() is not { } server || !PasswordsMatch(password, confirmation))
             return;
         await RunAsync(AccountAction.Register, async () =>
@@ -417,7 +417,7 @@ public sealed partial class AccountViewModel : ObservableObject
     private async Task SubmitLoginAsync()
     {
         var (email, password, deviceName) = (Email, Password, DeviceName);
-        ClearSecretInputs();
+        ClearSubmittedInputs();
         if (await ServerForSubmitAsync() is not { } server)
             return;
         await RunAsync(AccountAction.Login, async () =>
@@ -432,7 +432,7 @@ public sealed partial class AccountViewModel : ObservableObject
     {
         var (email, code, password, confirmation, deviceName) =
             (Email, RecoveryCodeInput, Password, PasswordConfirmation, DeviceName);
-        ClearSecretInputs();
+        ClearSubmittedInputs();
         if (await ServerForSubmitAsync() is not { } server || !PasswordsMatch(password, confirmation))
             return;
         await RunAsync(AccountAction.Recover, async () =>
@@ -454,7 +454,7 @@ public sealed partial class AccountViewModel : ObservableObject
     private Task SubmitReauthenticateAsync()
     {
         var (password, deviceName) = (Password, DeviceName);
-        ClearSecretInputs();
+        ClearSubmittedInputs();
         return RunAsync(AccountAction.Reauthenticate, async () =>
         {
             await _account.ReauthenticateAsync(password, deviceName);
@@ -466,7 +466,7 @@ public sealed partial class AccountViewModel : ObservableObject
     private async Task SubmitChangePasswordAsync()
     {
         var (current, password, confirmation) = (CurrentPassword, Password, PasswordConfirmation);
-        ClearSecretInputs();
+        ClearSubmittedInputs();
         if (!PasswordsMatch(password, confirmation))
             return;
         await RunAsync(AccountAction.ChangePassword, async () =>
@@ -488,7 +488,7 @@ public sealed partial class AccountViewModel : ObservableObject
     private Task SubmitDeleteAccountAsync()
     {
         var password = Password;
-        ClearSecretInputs();
+        ClearSubmittedInputs();
         return RunAsync(AccountAction.DeleteAccount, async () =>
         {
             await _account.DeleteAccountAsync(password);
@@ -617,8 +617,16 @@ public sealed partial class AccountViewModel : ObservableObject
 
     /// <summary>Esvazia os campos de senha, o convite e o código de recuperação digitado (a cada envio, ao trocar de subpágina e ao
     /// sair de Configurações).</summary>
-    public void ClearSecretInputs() =>
-        (CurrentPassword, Password, PasswordConfirmation, RecoveryCodeInput, InviteCode) = ("", "", "", "", "");
+    public void ClearSecretInputs()
+    {
+        ClearSubmittedInputs();
+        InviteCode = "";
+    }
+
+    /// <summary>Os campos de segredo que um envio consome. O convite fica: se o servidor recusar, a pessoa corrige o
+    /// que errou sem redigitá-lo; ele só some ao trocar de página ou sair de Configurações.</summary>
+    private void ClearSubmittedInputs() =>
+        (CurrentPassword, Password, PasswordConfirmation, RecoveryCodeInput) = ("", "", "", "");
 
     partial void OnPageChanged(AccountPage oldValue, AccountPage newValue)
     {

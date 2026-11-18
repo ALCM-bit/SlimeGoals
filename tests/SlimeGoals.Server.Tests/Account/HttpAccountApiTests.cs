@@ -27,6 +27,22 @@ public sealed class HttpAccountApiTests(PostgresFixture postgres)
         await api.RegisterAsync(request with { InviteCode = "convite-certo" });
     }
 
+    [Theory]
+    [InlineData("{\"error\":\"quota_exceeded\"}")]
+    [InlineData("isto não é json")]
+    [InlineData("")]
+    public async Task Other_forbidden_answers_stay_invalid_request(string body)
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.Forbidden)
+        {
+            Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json"),
+        });
+        var api = new HttpAccountApi(new HttpClient(handler) { BaseAddress = new Uri("http://127.0.0.1/") });
+        var request = new RegisterRequest("a@exemplo.com", new byte[16], Kdf, Key(1), Key(2), [1], [1]);
+
+        (await FailureOf(() => api.RegisterAsync(request))).Kind.Should().Be(AccountErrorKind.InvalidRequest);
+    }
+
     [Fact]
     public async Task Each_route_round_trips()
     {

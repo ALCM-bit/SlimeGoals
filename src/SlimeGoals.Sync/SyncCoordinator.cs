@@ -116,7 +116,7 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
             server = session.Server;
         }
 
-        await WithAccountAsync(server, a => a.ReauthenticateAsync(password, deviceName, ct)).ConfigureAwait(false);
+        await WithAccountAsync(RequireServer(server), a => a.ReauthenticateAsync(password, deviceName, ct)).ConfigureAwait(false);
         await OpenAfterServerAsync().ConfigureAwait(false);
     }, ct);
 
@@ -127,7 +127,12 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
     }, ct);
 
     public Task ChangePasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default) =>
-        RunOpAsync(() => RequireRun().Account.ChangePasswordAsync(currentPassword, newPassword, ct), ct);
+        RunOpAsync(() =>
+        {
+            var run = RequireRun();
+            RequireServer(run.Session.Server);
+            return run.Account.ChangePasswordAsync(currentPassword, newPassword, ct);
+        }, ct);
 
     public Task<int> FlushAsync(CancellationToken ct = default) => RunOpAsync(async () =>
     {
@@ -199,7 +204,7 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
     public Task DeleteAccountAsync(string password, CancellationToken ct = default) => RunOpAsync(async () =>
     {
         var run = RequireRun();
-        var server = run.Session.Server;
+        var server = RequireServer(run.Session.Server);
         await StopRunAsync(run).ConfigureAwait(false);
         try
         {
@@ -463,13 +468,18 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
 
     private EngineRun RequireRun() => _run ?? throw new InvalidOperationException(SignInFirst);
 
-    /// <summary>Só endereço absoluto http ou https, sem credenciais, consulta nem fragmento.</summary>
+    /// <summary>
+    /// Só endereço absoluto https, ou http em loopback, sem credenciais, consulta nem fragmento. Vale também para o
+    /// servidor gravado numa sessão antiga: nenhuma chave derivada da senha vai por http a outro endereço.
+    /// </summary>
     private static Uri RequireServer(Uri server)
     {
         if (server is not { IsAbsoluteUri: true }
             || (server.Scheme != Uri.UriSchemeHttp && server.Scheme != Uri.UriSchemeHttps)
             || server.UserInfo.Length > 0 || server.Query.Length > 0 || server.Fragment.Length > 0)
             throw new ArgumentException("Informe um endereço http:// ou https:// completo.", nameof(server));
+        if (server.Scheme == Uri.UriSchemeHttp && !server.IsLoopback)
+            throw new ArgumentException("Use https://. O http:// só vale para 127.0.0.1.", nameof(server));
         return server;
     }
 
