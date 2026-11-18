@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -41,8 +42,15 @@ builder.Services.AddSingleton<RateLimits>();
 builder.Services.AddSingleton<RecordStore>();
 builder.Services.AddSingleton<RecordPurger>();
 builder.Services.AddHostedService<MaintenanceService>();
-builder.Services.TryAddSingleton<IEmailSender, LogEmailSender>();
+builder.Services.AddSingleton<LogEmailSender>();
+builder.Services.AddSingleton<SmtpEmailSender>();
+builder.Services.TryAddSingleton<IEmailSender>(sp =>
+    sp.GetRequiredService<IOptions<ServerOptions>>().Value.Email.Mode == ServerOptions.EmailMode.Smtp
+        ? sp.GetRequiredService<SmtpEmailSender>()
+        : sp.GetRequiredService<LogEmailSender>());
 builder.Services.AddSingleton<IValidateOptions<ServerOptions>, EmailSenderValidator>();
+builder.Services.AddSingleton(_ => new ConfirmationEmailQueue());
+builder.Services.AddHostedService<EmailDispatchService>();
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, SyncJsonContext.Default));
 builder.Services.AddAuthentication(DeviceTokenHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, DeviceTokenHandler>(DeviceTokenHandler.SchemeName, null);
@@ -61,6 +69,20 @@ builder.Services.AddOptions<ForwardedHeadersOptions>().Configure<IOptions<Server
 });
 
 var app = builder.Build();
+
+// Fora de Development, erro inesperado responde só o código genérico: nada de pilha nem nome de exceção.
+// Pedido que o host recusou ao ler (corpo truncado, por exemplo) continua com o status dele. Em Development
+// fica a página de erro do ASP.NET Core.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler(error => error.Run(context =>
+    {
+        var (code, status) = context.Features.Get<IExceptionHandlerFeature>()?.Error is BadHttpRequestException bad
+            ? ("invalid_request", bad.StatusCode)
+            : ("internal_error", StatusCodes.Status500InternalServerError);
+        return Results.Json(new ErrorResponse(code), SyncJsonContext.Default.ErrorResponse, statusCode: status).ExecuteAsync(context);
+    }));
+}
 
 // Antes de ler as opções: ler IOptions<ServerOptions>.Value roda todos os validadores.
 if (!app.Environment.IsDevelopment())

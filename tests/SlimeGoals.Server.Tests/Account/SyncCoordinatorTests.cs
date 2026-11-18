@@ -435,7 +435,7 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
     private async Task SignUpAsync(Device device)
     {
         using var pending = await device.Account.RegisterAsync(Server, _email, Password);
-        await device.Account.ConfirmAsync(pending, _factory.Email.LastToken, "pc");
+        await device.Account.ConfirmAsync(pending, await _factory.Email.WaitForTokenAsync(pending.Email), "pc");
     }
 
     /// <summary>Conta pronta no servidor, sem aparelho nenhum ligado a ela.</summary>

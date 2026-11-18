@@ -10,7 +10,7 @@ using SlimeGoals.Sync.Contracts;
 namespace SlimeGoals.Server.Accounts;
 
 /// <summary>Rotas de cadastro, entrada e saída: <c>/auth/*</c>.</summary>
-public static class AccountEndpoints
+public static partial class AccountEndpoints
 {
     private const int KeyBytes = 32;
     private const int MaxKdfParamsLength = 256;
@@ -94,7 +94,8 @@ public static class AccountEndpoints
         HttpRequest request,
         AccountStore store,
         RateLimits limits,
-        IEmailSender emailSender,
+        ConfirmationEmailQueue emailQueue,
+        ILoggerFactory loggers,
         IOptions<ServerOptions> options,
         IHostEnvironment environment,
         TimeProvider time,
@@ -144,23 +145,19 @@ public static class AccountEndpoints
             cancellationToken);
 
         // Mesma resposta para e-mail novo, pendente e confirmado (decisão 6). A conta nova ou substituída manda
-        // e-mail; a confirmada fica como está e não manda nada.
-        if (sendEmail)
+        // e-mail, em segundo plano; a confirmada fica como está e não manda nada. Fila cheia: sem e-mail não fica
+        // conta pendente, e a resposta continua 202.
+        if (sendEmail && !emailQueue.TryEnqueue(new ConfirmationEmail(email, token, tokenHash)))
         {
-            try
-            {
-                // Sem o token do pedido: desconectar o cliente não pode deixar conta sem e-mail.
-                await emailSender.SendConfirmationAsync(email, token, CancellationToken.None);
-            }
-            catch
-            {
-                await store.DeleteUnconfirmedAsync(tokenHash, CancellationToken.None);
-                throw;
-            }
+            await store.DeleteUnconfirmedAsync(tokenHash, CancellationToken.None);
+            LogQueueFull(loggers.CreateLogger(typeof(AccountEndpoints)), RateLimits.MaskEmail(email));
         }
 
         return Results.Accepted();
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Fila de e-mails de confirmação cheia; o cadastro pendente de {MaskedEmail} foi apagado.")]
+    private static partial void LogQueueFull(ILogger logger, string maskedEmail);
 
     /// <summary>
     /// Sem convite configurado, só Development deixa o cadastro aberto. Com convite, o enviado (sem as pontas)

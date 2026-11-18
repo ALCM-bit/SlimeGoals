@@ -31,6 +31,7 @@ public sealed class InviteTests(PostgresFixture postgres)
         using var client = factory.CreateClient();
 
         await AssertClosedAsync(await RegisterAsync(client, null));
+        await factory.WaitForEmailQueueAsync();
         factory.Email.Count.Should().Be(0);
     }
 
@@ -42,6 +43,7 @@ public sealed class InviteTests(PostgresFixture postgres)
 
         await AssertClosedAsync(await RegisterAsync(client, "errado"));
         await AssertClosedAsync(await RegisterAsync(client, Invite + "x"));
+        await factory.WaitForEmailQueueAsync();
         factory.Email.Count.Should().Be(0);
     }
 

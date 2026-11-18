@@ -31,7 +31,7 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
     private static async Task<string> RegisterAndConfirmAsync(ServerFactory factory, Device device, string email, string name = "pc")
     {
         using var pending = await device.Service.RegisterAsync(email, Password);
-        await device.Service.ConfirmAsync(pending, factory.Email.LastToken, name);
+        await device.Service.ConfirmAsync(pending, await factory.Email.WaitForTokenAsync(pending.Email), name);
         return pending.RecoveryCode;
     }
 
@@ -62,7 +62,7 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
             device.Vault.Names.Should().BeEmpty();
             (await device.State.GetAsync()).Enabled.Should().BeFalse();
 
-            await device.Service.ConfirmAsync(pending, factory.Email.LastToken, "pc");
+            await device.Service.ConfirmAsync(pending, await factory.Email.WaitForTokenAsync(pending.Email), "pc");
         }
 
         using var secret = await device.SecretAsync();
@@ -257,7 +257,8 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
         using var pending = await device.Service.RegisterAsync(NewEmail(), Password);
         device.Vault.FailWritesWith = new SecretVaultUnavailableException("desbloqueio recusado");
 
-        await FluentActions.Awaiting(() => device.Service.ConfirmAsync(pending, factory.Email.LastToken, "pc"))
+        var token = await factory.Email.WaitForTokenAsync(pending.Email);
+        await FluentActions.Awaiting(() => device.Service.ConfirmAsync(pending, token, "pc"))
             .Should().ThrowAsync<SecretVaultUnavailableException>();
 
         device.Vault.Names.Should().BeEmpty();
@@ -273,7 +274,7 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
         await using var factory = new ServerFactory(postgres);
         using var device = new Device(factory);
         using var pending = await device.Service.RegisterAsync(NewEmail(), Password);
-        var code = factory.Email.LastToken;
+        var code = await factory.Email.WaitForTokenAsync(pending.Email);
         device.Vault.FailWritesWith = new SecretVaultUnavailableException("desbloqueio recusado");
         await FluentActions.Awaiting(() => device.Service.ConfirmAsync(pending, code, "pc"))
             .Should().ThrowAsync<SecretVaultUnavailableException>();
@@ -710,7 +711,8 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
         using var pending = await otherService.RegisterAsync(NewEmail(), Password);
         var sent = device.Handler.Sent.Count;
 
-        await FluentActions.Awaiting(() => device.Service.ConfirmAsync(pending, factory.Email.LastToken, "pc"))
+        var token = await factory.Email.WaitForTokenAsync(pending.Email);
+        await FluentActions.Awaiting(() => device.Service.ConfirmAsync(pending, token, "pc"))
             .Should().ThrowAsync<ArgumentException>().WithMessage("Este cadastro é de outro servidor.");
 
         device.Handler.Sent.Should().HaveCount(sent);

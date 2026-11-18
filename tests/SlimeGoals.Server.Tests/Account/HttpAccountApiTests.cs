@@ -26,7 +26,7 @@ public sealed class HttpAccountApiTests(PostgresFixture postgres)
         // Cadastro, confirmação e entrada.
         var register = new RegisterRequest(email, salt, Kdf, Key(1), Key(2), [1, 2, 3], [4, 5, 6]);
         await api.RegisterAsync(register);
-        await api.ConfirmAsync(factory.Email.LastToken!, Key(1));
+        await api.ConfirmAsync(await factory.Email.WaitForTokenAsync(email), Key(1));
         var prelogin = await api.PreloginAsync(email);
         prelogin.KdfSalt.Should().Equal(salt);
         prelogin.KdfParams.Should().Be(Kdf);

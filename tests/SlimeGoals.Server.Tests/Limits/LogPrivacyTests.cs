@@ -30,7 +30,7 @@ public sealed class LogPrivacyTests(PostgresFixture postgres)
 
         using var anonymous = factory.CreateClient();
         (await anonymous.PostAsJsonAsync("/auth/register", registerRequest, SyncJsonContext.Default.RegisterRequest)).EnsureSuccessStatusCode();
-        var confirmToken = factory.Email.LastToken;
+        var confirmToken = await factory.Email.WaitForTokenAsync(email);
         secrets.Add(confirmToken);
         (await anonymous.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(confirmToken, registerRequest.AuthKey), SyncJsonContext.Default.ConfirmRequest))
             .EnsureSuccessStatusCode();

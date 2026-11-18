@@ -128,6 +128,8 @@ public sealed class RecordPurgerTests(PostgresFixture postgres)
         using var client = factory.CreateClient();
         var request = TestAccount.NewRegisterRequest("ana@exemplo.com");
         (await client.PostAsJsonAsync("/auth/register", request, SyncJsonContext.Default.RegisterRequest)).EnsureSuccessStatusCode();
+        // O código deste cadastro morre na limpeza; lido aqui, o próximo é o do cadastro novo.
+        await factory.Email.WaitForTokenAsync("ana@exemplo.com");
 
         factory.Time.Advance(TimeSpan.FromHours(23));
         var early = await PurgerOf(factory).RunAsync(CancellationToken.None);
@@ -135,7 +137,7 @@ public sealed class RecordPurgerTests(PostgresFixture postgres)
         var late = await PurgerOf(factory).RunAsync(CancellationToken.None);
         var again = await client.PostAsJsonAsync("/auth/register", request, SyncJsonContext.Default.RegisterRequest);
         again.EnsureSuccessStatusCode();
-        await client.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(factory.Email.LastToken, request.AuthKey), SyncJsonContext.Default.ConfirmRequest);
+        await client.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(await factory.Email.WaitForTokenAsync("ana@exemplo.com"), request.AuthKey), SyncJsonContext.Default.ConfirmRequest);
 
         early.Accounts.Should().Be(0);
         late.Accounts.Should().Be(1);

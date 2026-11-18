@@ -29,6 +29,7 @@ Os componentes abaixo mantêm suas próprias licenças.
 | AwesomeAssertions | Apache-2.0 |
 | Microsoft.Extensions.TimeProvider.Testing | MIT |
 | Npgsql (servidor) | PostgreSQL License |
+| MailKit (servidor, e-mail por SMTP) e as dependências dele: MimeKit, BouncyCastle.Cryptography e System.Security.Cryptography.Pkcs | MIT |
 | Testcontainers.PostgreSql (testes do servidor) | MIT |
 | [Konscious.Security.Cryptography.Argon2](https://github.com/kmaragon/Konscious.Security.Cryptography) (Argon2id da sincronização) e a dependência dele, Konscious.Security.Cryptography.Blake2 | MIT |
 
@@ -86,6 +87,7 @@ O servidor de sincronização (`src/SlimeGoals.Server`) é montado numa imagem D
 | Runtime .NET e ASP.NET Core (imagem `aspnet:10.0-alpine`, com o Alpine Linux e seus pacotes) | MIT; licenças variadas no Alpine |
 | Npgsql | PostgreSQL License |
 | Dapper | Apache-2.0 |
+| MailKit, MimeKit, BouncyCastle.Cryptography e System.Security.Cryptography.Pkcs | MIT |
 | PostgreSQL (imagem `postgres:18-alpine` usada no Compose, não distribuída por este repositório) | PostgreSQL License |
 
 ## Onde ver os textos no app

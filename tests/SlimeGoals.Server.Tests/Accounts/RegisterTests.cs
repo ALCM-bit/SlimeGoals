@@ -1,8 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Dapper;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using SlimeGoals.Sync.Contracts;
 
@@ -31,7 +29,7 @@ public sealed class RegisterTests(PostgresFixture postgres)
         using var client = factory.CreateClient();
         var request = TestAccount.NewRegisterRequest("ana@exemplo.com");
         (await RegisterAsync(client, request)).StatusCode.Should().Be(HttpStatusCode.Accepted);
-        await ConfirmAsync(client, factory.Email.LastToken, request.AuthKey);
+        await ConfirmAsync(client, await factory.Email.WaitForTokenAsync("ana@exemplo.com"), request.AuthKey);
 
         var response = await PreloginAsync(client, "ana@exemplo.com");
 
@@ -67,7 +65,7 @@ public sealed class RegisterTests(PostgresFixture postgres)
         await RegisterAsync(client, request);
 
         var pending = await (await PreloginAsync(client, "ana@exemplo.com")).Content.ReadFromJsonAsync(SyncJsonContext.Default.PreloginResponse);
-        await ConfirmAsync(client, factory.Email.LastToken, request.AuthKey);
+        await ConfirmAsync(client, await factory.Email.WaitForTokenAsync("ana@exemplo.com"), request.AuthKey);
         var confirmed = await (await PreloginAsync(client, "ana@exemplo.com")).Content.ReadFromJsonAsync(SyncJsonContext.Default.PreloginResponse);
 
         pending!.KdfSalt.Should().Equal(expected!.KdfSalt);
@@ -98,6 +96,7 @@ public sealed class RegisterTests(PostgresFixture postgres)
             (await response.Content.ReadFromJsonAsync(SyncJsonContext.Default.ErrorResponse))!.Error.Should().Be("invalid_request");
         }
 
+        await factory.WaitForEmailQueueAsync();
         factory.Email.Count.Should().Be(0);
     }
 
@@ -116,45 +115,6 @@ public sealed class RegisterTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Failed_email_send_removes_the_account_so_the_email_can_register_again()
-    {
-        await using var factory = new ServerFactory(postgres);
-        var sender = new ThrowingSender { Fail = true };
-        await using var failing = factory.WithWebHostBuilder(builder => builder.ConfigureServices(
-            services => services.AddSingleton<SlimeGoals.Server.Accounts.IEmailSender>(sender)));
-        using var client = failing.CreateClient();
-
-        var first = await RegisterAsync(client, TestAccount.NewRegisterRequest("ana@exemplo.com"));
-        var afterFailure = await CountAccountsAsync(factory);
-        sender.Fail = false;
-        var second = await RegisterAsync(client, TestAccount.NewRegisterRequest("ana@exemplo.com"));
-
-        first.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
-        afterFailure.Should().Be(0);
-        second.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        sender.Sent.Should().Be(1);
-        (await CountAccountsAsync(factory)).Should().Be(1);
-    }
-
-    private sealed class ThrowingSender : SlimeGoals.Server.Accounts.IEmailSender
-    {
-        public bool Fail { get; set; }
-
-        public int Sent { get; private set; }
-
-        public Task SendConfirmationAsync(string email, string token, CancellationToken cancellationToken)
-        {
-            if (Fail)
-            {
-                throw new InvalidOperationException("falha simulada");
-            }
-
-            Sent++;
-            return Task.CompletedTask;
-        }
-    }
-
-    [Fact]
     public async Task Register_answers_202_and_sends_confirmation()
     {
         await using var factory = new ServerFactory(postgres);
@@ -163,9 +123,9 @@ public sealed class RegisterTests(PostgresFixture postgres)
         var response = await RegisterAsync(client, TestAccount.NewRegisterRequest("ana@exemplo.com"));
 
         response.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        (await factory.Email.WaitForTokenAsync("ana@exemplo.com")).Should().NotBeNullOrWhiteSpace();
+        await factory.WaitForEmailQueueAsync();
         factory.Email.Count.Should().Be(1);
-        factory.Email.LastEmail.Should().Be("ana@exemplo.com");
-        factory.Email.LastToken.Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -180,6 +140,7 @@ public sealed class RegisterTests(PostgresFixture postgres)
         var response = await RegisterAsync(client, second);
 
         response.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        await factory.WaitForEmailQueueAsync();
         factory.Email.Count.Should().Be(2);
         factory.Email.LastEmail.Should().Be("ana@exemplo.com");
         var after = await ReadAccountAsync(factory, "ana@exemplo.com");
@@ -199,9 +160,9 @@ public sealed class RegisterTests(PostgresFixture postgres)
         var victim = TestAccount.NewRegisterRequest("vitima@exemplo.com");
 
         await RegisterAsync(client, attacker);
-        var attackerToken = factory.Email.LastToken;
+        var attackerToken = await factory.Email.WaitForTokenAsync("vitima@exemplo.com");
         (await RegisterAsync(client, victim)).StatusCode.Should().Be(HttpStatusCode.Accepted);
-        var victimToken = factory.Email.LastToken;
+        var victimToken = await factory.Email.WaitForTokenAsync("vitima@exemplo.com");
 
         victimToken.Should().NotBe(attackerToken);
         (await ConfirmAsync(client, attackerToken, attacker.AuthKey)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -219,7 +180,7 @@ public sealed class RegisterTests(PostgresFixture postgres)
         using var client = factory.CreateClient();
         var request = TestAccount.NewRegisterRequest("ana@exemplo.com");
         await RegisterAsync(client, request);
-        var token = factory.Email.LastToken;
+        var token = await factory.Email.WaitForTokenAsync("ana@exemplo.com");
 
         var wrong = await ConfirmAsync(client, token, System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
@@ -238,7 +199,7 @@ public sealed class RegisterTests(PostgresFixture postgres)
         using var client = factory.CreateClient();
         var first = TestAccount.NewRegisterRequest("ana@exemplo.com");
         await RegisterAsync(client, first);
-        var oldToken = factory.Email.LastToken;
+        var oldToken = await factory.Email.WaitForTokenAsync("ana@exemplo.com");
         var second = TestAccount.NewRegisterRequest("ana@exemplo.com");
         await RegisterAsync(client, second);
 
@@ -257,7 +218,7 @@ public sealed class RegisterTests(PostgresFixture postgres)
         await using var factory = new ServerFactory(postgres);
         using var client = factory.CreateClient();
         await RegisterAsync(client, TestAccount.NewRegisterRequest("ana@exemplo.com"));
-        var token = factory.Email.LastToken;
+        var token = await factory.Email.WaitForTokenAsync("ana@exemplo.com");
 
         foreach (var key in new[] { null, new byte[5] })
         {
@@ -279,6 +240,7 @@ public sealed class RegisterTests(PostgresFixture postgres)
         var response = await RegisterAsync(client, TestAccount.NewRegisterRequest(account.Email));
 
         response.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        await factory.WaitForEmailQueueAsync();
         factory.Email.Count.Should().Be(sent);
         var after = await ReadAccountAsync(factory, account.Email);
         ((byte[])after.auth_hash).Should().Equal((byte[])before.auth_hash);
@@ -298,6 +260,7 @@ public sealed class RegisterTests(PostgresFixture postgres)
 
         responses.Should().OnlyContain(r => r.StatusCode == HttpStatusCode.Accepted);
         (await CountAccountsAsync(factory)).Should().Be(1);
+        await factory.WaitForEmailQueueAsync();
         factory.Email.Count.Should().Be(8);
 
         // A linha final é inteira de um só cadastro: o sal e a auth_key são do mesmo pedido.
@@ -314,7 +277,7 @@ public sealed class RegisterTests(PostgresFixture postgres)
         using var client = factory.CreateClient();
         var request = TestAccount.NewRegisterRequest("ana@exemplo.com");
         await RegisterAsync(client, request);
-        await ConfirmAsync(client, factory.Email.LastToken, request.AuthKey);
+        await ConfirmAsync(client, await factory.Email.WaitForTokenAsync("ana@exemplo.com"), request.AuthKey);
 
         var prelogin = await PreloginAsync(client, "  Ana@Exemplo.COM ");
         var login = await client.PostAsJsonAsync(
@@ -334,7 +297,7 @@ public sealed class RegisterTests(PostgresFixture postgres)
         using var client = factory.CreateClient();
         var request = TestAccount.NewRegisterRequest("ana@exemplo.com");
         await RegisterAsync(client, request);
-        var token = factory.Email.LastToken;
+        var token = await factory.Email.WaitForTokenAsync("ana@exemplo.com");
 
         var unknown = await ConfirmAsync(client, "nada", request.AuthKey);
         factory.Time.Advance(TimeSpan.FromHours(24) + TimeSpan.FromSeconds(1));
@@ -353,7 +316,7 @@ public sealed class RegisterTests(PostgresFixture postgres)
         using var client = factory.CreateClient();
         var request = TestAccount.NewRegisterRequest("ana@exemplo.com");
         await RegisterAsync(client, request);
-        var token = factory.Email.LastToken;
+        var token = await factory.Email.WaitForTokenAsync("ana@exemplo.com");
 
         var first = await ConfirmAsync(client, token, request.AuthKey);
         var second = await ConfirmAsync(client, token, request.AuthKey);
@@ -396,19 +359,6 @@ public sealed class RegisterTests(PostgresFixture postgres)
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             (await response.Content.ReadFromJsonAsync(SyncJsonContext.Default.ErrorResponse))!.Error.Should().Be("invalid_request");
         }
-    }
-
-    [Fact]
-    public async Task Production_refuses_to_start_with_only_the_log_email_sender()
-    {
-        await using var factory = new ServerFactory(
-            postgres,
-            new Dictionary<string, string?> { ["Server:PreloginSecret"] = "segredo" },
-            environment: "Production");
-
-        var act = () => factory.CreateClient();
-
-        act.Should().Throw<Exception>().Which.Message.Should().Contain("IEmailSender");
     }
 
     private static async Task<dynamic> ReadAccountAsync(ServerFactory factory, string email)

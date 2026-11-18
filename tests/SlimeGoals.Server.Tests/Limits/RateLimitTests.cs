@@ -157,6 +157,7 @@ public sealed class RateLimitTests(PostgresFixture postgres)
                 .StatusCode.Should().Be(HttpStatusCode.Accepted);
         }
 
+        await proxied.WaitForEmailQueueAsync();
         factory.Email.Count.Should().Be(3);
     }
 

@@ -16,6 +16,8 @@ public sealed class ServerOptions
 
     public MaintenanceSection Maintenance { get; set; } = new();
 
+    public EmailSection Email { get; set; } = new();
+
     public sealed class ServerSection
     {
         /// <summary>Segredo do sal falso do prelogin; obrigatório fora de Development.</summary>
@@ -84,6 +86,57 @@ public sealed class ServerOptions
     public sealed class MaintenanceSection
     {
         public bool Enabled { get; set; } = true;
+    }
+
+    /// <summary>Como sai o e-mail de confirmação: no log (só Development) ou por SMTP.</summary>
+    public enum EmailMode
+    {
+        Log,
+        Smtp,
+    }
+
+    /// <summary>Proteção da conexão SMTP. Nunca <c>Auto</c>, que cairia sem aviso para texto puro.</summary>
+    public enum SmtpSecurity
+    {
+        /// <summary>Conecta em texto puro e exige o STARTTLS (porta 587).</summary>
+        StartTls,
+
+        /// <summary>TLS desde o primeiro byte (porta 465).</summary>
+        SslOnConnect,
+
+        /// <summary>Sem TLS; só Development, contra um servidor de teste.</summary>
+        None,
+    }
+
+    public sealed class EmailSection
+    {
+        public EmailMode Mode { get; set; } = EmailMode.Log;
+
+        /// <summary>
+        /// Espera, em segundos, antes da 2ª e da 3ª tentativa de envio; o padrão <c>[2, 10]</c> fica no appsettings.json
+        /// (lista na configuração soma à do código em vez de trocar). Sem valor para a tentativa, usa o último; lista vazia, nenhuma espera.
+        /// </summary>
+        public int[] RetryDelaySeconds { get; set; } = [];
+
+        public SmtpSection Smtp { get; set; } = new();
+    }
+
+    public sealed class SmtpSection
+    {
+        public string Host { get; set; } = "";
+
+        public int Port { get; set; } = 587;
+
+        /// <summary>Vazio: envia sem autenticar.</summary>
+        public string Username { get; set; } = "";
+
+        /// <summary>Segredo: vem de <c>/run/secrets</c> e nunca vai para log ou mensagem de erro.</summary>
+        public string Password { get; set; } = "";
+
+        /// <summary>Remetente, com ou sem nome (<c>SlimeGoals &lt;nao-responda@exemplo.com&gt;</c>).</summary>
+        public string From { get; set; } = "";
+
+        public SmtpSecurity Security { get; set; } = SmtpSecurity.StartTls;
     }
 }
 

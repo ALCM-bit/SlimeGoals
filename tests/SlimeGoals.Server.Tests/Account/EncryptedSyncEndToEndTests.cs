@@ -345,7 +345,7 @@ public sealed class EncryptedSyncEndToEndTests(PostgresFixture postgres) : IAsyn
         public async Task<string> RegisterAsync(string email, string password)
         {
             using var pending = await Service.RegisterAsync(email, password);
-            await Service.ConfirmAsync(pending, _factory.Email.LastToken, "pc");
+            await Service.ConfirmAsync(pending, await _factory.Email.WaitForTokenAsync(pending.Email), "pc");
             await OpenAsync();
             return pending.RecoveryCode;
         }
