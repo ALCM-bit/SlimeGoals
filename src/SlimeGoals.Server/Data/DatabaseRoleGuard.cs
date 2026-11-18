@@ -10,7 +10,8 @@ public static class DatabaseRoleGuard
         await using var app = await db.OpenAsync(cancellationToken);
         var role = await app.QuerySingleAsync<RoleInfo>(new CommandDefinition(
             """
-            SELECT current_user::text AS Name, r.rolsuper AS Super, r.rolcreaterole AS CreateRole, r.rolcreatedb AS CreateDb
+            SELECT current_user::text AS Name, r.rolsuper AS Super, r.rolcreaterole AS CreateRole, r.rolcreatedb AS CreateDb,
+                   r.rolreplication AS Replication, r.rolbypassrls AS BypassRls
             FROM pg_roles r WHERE r.rolname = current_user
             """,
             cancellationToken: cancellationToken));
@@ -19,12 +20,12 @@ public static class DatabaseRoleGuard
         var migrationsRole = await migrations.ExecuteScalarAsync<string>(new CommandDefinition(
             "SELECT current_user::text", cancellationToken: cancellationToken));
 
-        if (role.Super || role.CreateRole || role.CreateDb || role.Name == migrationsRole)
+        if (role.Super || role.CreateRole || role.CreateDb || role.Replication || role.BypassRls || role.Name == migrationsRole)
         {
             throw new InvalidOperationException(
                 "O papel do banco do servidor não pode ser superusuário, criar papéis ou bancos, nem ser o das migrações.");
         }
     }
 
-    private sealed record RoleInfo(string Name, bool Super, bool CreateRole, bool CreateDb);
+    private sealed record RoleInfo(string Name, bool Super, bool CreateRole, bool CreateDb, bool Replication, bool BypassRls);
 }

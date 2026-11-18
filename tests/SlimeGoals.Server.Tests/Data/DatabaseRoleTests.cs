@@ -62,6 +62,42 @@ public sealed class DatabaseRoleTests(PostgresFixture postgres)
         message.Should().NotContain(new NpgsqlConnectionStringBuilder(superuser).Host!);
     }
 
+    [Theory]
+    [InlineData("REPLICATION")]
+    [InlineData("BYPASSRLS")]
+    public async Task Production_refuses_app_role_with_extra_privileges(string attribute)
+    {
+        var database = await postgres.NewDatabaseAsync();
+        var appRole = new NpgsqlConnectionStringBuilder(database.App).Username!;
+        await using (var admin = new NpgsqlConnection(postgres.ConnectionString))
+        {
+            await admin.ExecuteAsync($"ALTER ROLE \"{appRole}\" {attribute}");
+        }
+
+        await using var factory = ServerFactory.Production(postgres, new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:Postgres"] = database.App,
+            ["ConnectionStrings:PostgresMigrations"] = database.Owner,
+        });
+
+        var act = () => factory.CreateClient();
+
+        act.Should().Throw<InvalidOperationException>().Which.Message.Should().Contain("não pode ser superusuário");
+    }
+
+    [Fact]
+    public async Task Public_cannot_connect_to_the_database()
+    {
+        var database = await postgres.NewDatabaseAsync();
+        var name = new NpgsqlConnectionStringBuilder(database.App).Database!;
+        await using var admin = new NpgsqlConnection(postgres.ConnectionString);
+
+        var publicCanConnect = await admin.ExecuteScalarAsync<bool>(
+            "SELECT has_database_privilege('public', @name, 'CONNECT')", new { name });
+
+        publicCanConnect.Should().BeFalse();
+    }
+
     [Fact]
     public async Task Production_refuses_same_role_for_app_and_migrations()
     {

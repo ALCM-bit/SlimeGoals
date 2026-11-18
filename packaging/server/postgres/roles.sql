@@ -7,12 +7,12 @@ CREATE ROLE :"app_role" LOGIN PASSWORD :'app_password' NOSUPERUSER NOCREATEDB NO
 
 ALTER DATABASE :"db_name" OWNER TO :"owner_role";
 
--- Ninguém além do dono cria objetos nem tabelas temporárias.
-REVOKE CREATE, TEMPORARY ON DATABASE :"db_name" FROM PUBLIC;
+-- Ninguém além dos dois papéis conecta, cria objetos ou cria tabelas temporárias.
+REVOKE CONNECT, CREATE, TEMPORARY ON DATABASE :"db_name" FROM PUBLIC;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 ALTER SCHEMA public OWNER TO :"owner_role";
 
-GRANT CONNECT ON DATABASE :"db_name" TO :"app_role";
+GRANT CONNECT ON DATABASE :"db_name" TO :"owner_role", :"app_role";
 GRANT USAGE ON SCHEMA public TO :"app_role";
 
 -- Tudo que o dono criar daqui em diante (as migrações) já nasce com o acesso mínimo do app.
