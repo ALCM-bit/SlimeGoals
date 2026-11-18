@@ -22,9 +22,13 @@ export SLIMEGOALS_DOMAIN="${SLIMEGOALS_DOMAIN:-localhost}"
 # Recria o banco com a configuração nova, que monta as senhas em /run/secrets. Os dados ficam no volume.
 docker compose up -d --wait db
 
-# As senhas são lidas dentro do contêiner, pelo \set com crase: não passam pela linha de comando.
+# As senhas são lidas dentro do contêiner, pelo \set com crase: não passam pela linha de comando. Um
+# CREATE/ALTER ROLE ... PASSWORD que falhe não vai para o log do banco (log_min_error_statement) nem tem o
+# texto repetido na saída do psql (VERBOSITY terse).
 {
   cat <<'SQL'
+SET log_min_error_statement = panic;
+\set VERBOSITY terse
 \set owner_role slimegoals_owner
 \set app_role slimegoals_app
 \set db_name slimegoals

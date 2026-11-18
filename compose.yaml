@@ -63,8 +63,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       AllowedHosts: ${SLIMEGOALS_DOMAIN:?defina SLIMEGOALS_DOMAIN no .env}
-      # A sub-rede fixa da rede edge: só o Caddy fala por X-Forwarded-For.
-      Server__TrustedProxyNetworks__0: 10.89.0.0/24
+      # Só o IP fixo do Caddy fala por X-Forwarded-For. A sub-rede inteira incluiria o gateway (10.89.0.1),
+      # por onde entram os processos do host e as portas publicadas, que poderiam forjar o cabeçalho.
+      Server__TrustedProxyNetworks__0: 10.89.0.2/32
       Email__Mode: smtp
       Email__Smtp__Host: ${SMTP_HOST:-}
       Email__Smtp__Port: ${SMTP_PORT:-587}
@@ -99,10 +100,11 @@ services:
     environment:
       SLIMEGOALS_DOMAIN: ${SLIMEGOALS_DOMAIN:?defina SLIMEGOALS_DOMAIN no .env}
       ACME_EMAIL: ${ACME_EMAIL:-}
-    # A única porta publicada: 80 só redireciona para 443.
+    # As únicas portas publicadas: 80 só redireciona para 443. Só IPv4: a edge não tem IPv6, e um cliente IPv6
+    # chegaria pelo gateway, todos no mesmo balde do limite por IP. IPv6 fica para a 9.6.
     ports:
-      - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
+      - "0.0.0.0:${HTTP_PORT:-80}:80"
+      - "0.0.0.0:${HTTPS_PORT:-443}:443"
     volumes:
       - ./packaging/server/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -112,7 +114,9 @@ services:
     cap_add:
       - NET_BIND_SERVICE
     networks:
-      - edge
+      edge:
+        # O único proxy em que o servidor confia (Server__TrustedProxyNetworks__0).
+        ipv4_address: 10.89.0.2
     healthcheck:
       test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:2019/config/ || exit 1"]
       interval: 5s
@@ -120,11 +124,14 @@ services:
       retries: 10
 
 networks:
-  # Caddy <-> servidor. Sub-rede fixa para o servidor confiar só no proxy.
+  # Caddy <-> servidor. O Caddy tem o IP fixo 10.89.0.2; os outros recebem IP só de 10.89.0.128/25, para nenhum
+  # contêiner ocupar o IP do Caddy antes dele. O gateway é fixo: com ip_range, o Docker o poria no início da faixa.
   edge:
     ipam:
       config:
         - subnet: 10.89.0.0/24
+          ip_range: 10.89.0.128/25
+          gateway: 10.89.0.1
   # Servidor <-> banco, sem saída para fora.
   data:
     internal: true
