@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.Options;
 
 namespace SlimeGoals.Server;
@@ -23,6 +24,9 @@ public sealed class ServerOptions
         public string DefaultKdfParams { get; set; } = "{\"v\":1,\"m\":65536,\"t\":3,\"p\":1}";
 
         public bool MigrateOnStart { get; set; } = true;
+
+        /// <summary>Redes (CIDR) do proxy reverso de confiança; só dele se aceita <c>X-Forwarded-For</c>. Vazio: nenhum proxy.</summary>
+        public string[] TrustedProxyNetworks { get; set; } = [];
     }
 
     public sealed class SyncSection
@@ -46,6 +50,12 @@ public sealed class ServerOptions
         public int AuthPerIpPerMinute { get; set; } = 20;
 
         public int AuthPerEmailPerMinute { get; set; } = 10;
+
+        /// <summary>Pedidos por IP e por minuto em todas as rotas, menos <c>/health</c>.</summary>
+        public int RequestsPerIpPerMinute { get; set; } = 600;
+
+        /// <summary>Pedidos por aparelho e por minuto em <c>/sync</c>.</summary>
+        public int SyncPerDevicePerMinute { get; set; } = 300;
 
         /// <summary>Falhas de <c>auth_key</c> por conta e por minuto em <c>DELETE /account</c> e <c>POST /auth/password</c>.</summary>
         public int AuthKeyFailuresPerAccountPerMinute { get; set; } = 10;
@@ -72,6 +82,11 @@ public sealed class ServerOptionsValidator(IHostEnvironment environment) : IVali
         if (!environment.IsDevelopment() && string.IsNullOrWhiteSpace(options.Server.PreloginSecret))
         {
             return ValidateOptionsResult.Fail("Server:PreloginSecret é obrigatório fora de Development.");
+        }
+
+        if (options.Server.TrustedProxyNetworks.Any(n => !IPNetwork.TryParse(n, out _)))
+        {
+            return ValidateOptionsResult.Fail("Server:TrustedProxyNetworks tem uma rede em CIDR inválida.");
         }
 
         return ValidateOptionsResult.Success;

@@ -9,16 +9,24 @@ namespace SlimeGoals.Server.Limits;
 /// Os contadores usam o <see cref="TimeProvider"/> do servidor (o <c>AddRateLimiter</c> do ASP.NET não aceita um relógio próprio), o que
 /// deixa o teste de reinício da janela determinístico. Os contadores ficam na memória do processo, como as janelas do ASP.NET.
 /// </summary>
-public sealed class AuthRateLimits(TimeProvider time, IOptions<ServerOptions> options, ILogger<AuthRateLimits> logger)
+public sealed class RateLimits(TimeProvider time, IOptions<ServerOptions> options, ILogger<RateLimits> logger)
 {
-    private static readonly TimeSpan Window = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan Minute = TimeSpan.FromMinutes(1);
 
-    private readonly Counter _ips = new(time);
-    private readonly Counter _emails = new(time);
-    private readonly Counter _accountFailures = new(time);
+    private readonly Counter _ips = new(time, Minute);
+    private readonly Counter _requests = new(time, Minute);
+    private readonly Counter _devices = new(time, Minute);
+    private readonly Counter _emails = new(time, Minute);
+    private readonly Counter _accountFailures = new(time, Minute);
 
     /// <summary>Conta um pedido do IP; devolve quanto esperar se passou do limite.</summary>
     public TimeSpan? HitIp(string ip) => _ips.Hit(ip, options.Value.Limits.AuthPerIpPerMinute);
+
+    /// <summary>Conta um pedido do IP em qualquer rota (menos <c>/health</c>); devolve quanto esperar se passou do limite.</summary>
+    public TimeSpan? HitRequest(string ip) => _requests.Hit(ip, options.Value.Limits.RequestsPerIpPerMinute);
+
+    /// <summary>Conta um pedido de <c>/sync</c> do aparelho; devolve quanto esperar se passou do limite.</summary>
+    public TimeSpan? HitDevice(Guid deviceId) => _devices.Hit(deviceId.ToString("N"), options.Value.Limits.SyncPerDevicePerMinute);
 
     /// <summary>Conta um pedido do e-mail (já normalizado), de qualquer IP; a chave é o SHA-256 do e-mail.</summary>
     public TimeSpan? HitEmail(string email)
@@ -58,7 +66,7 @@ public sealed class AuthRateLimits(TimeProvider time, IOptions<ServerOptions> op
         return at <= 0 ? "***" : $"{email[0]}***{email[at..]}";
     }
 
-    private sealed class Counter(TimeProvider time)
+    private sealed class Counter(TimeProvider time, TimeSpan window)
     {
         private readonly Lock _gate = new();
         private readonly Dictionary<string, (DateTimeOffset Start, int Count)> _entries = [];
@@ -97,7 +105,7 @@ public sealed class AuthRateLimits(TimeProvider time, IOptions<ServerOptions> op
         {
             var now = time.GetUtcNow();
             Prune(now);
-            if (!_entries.TryGetValue(key, out entry) || now - entry.Start >= Window)
+            if (!_entries.TryGetValue(key, out entry) || now - entry.Start >= window)
             {
                 entry = (now, 0);
             }
@@ -107,18 +115,18 @@ public sealed class AuthRateLimits(TimeProvider time, IOptions<ServerOptions> op
 
         private void Prune(DateTimeOffset now)
         {
-            if (now - _lastPrune < Window)
+            if (now - _lastPrune < window)
             {
                 return;
             }
 
             _lastPrune = now;
-            foreach (var key in _entries.Where(e => now - e.Value.Start >= Window).Select(e => e.Key).ToList())
+            foreach (var key in _entries.Where(e => now - e.Value.Start >= window).Select(e => e.Key).ToList())
             {
                 _entries.Remove(key);
             }
         }
 
-        private static TimeSpan Remaining(DateTimeOffset start, DateTimeOffset now) => start + Window - now;
+        private TimeSpan Remaining(DateTimeOffset start, DateTimeOffset now) => start + window - now;
     }
 }

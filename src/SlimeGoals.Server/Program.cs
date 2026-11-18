@@ -1,4 +1,6 @@
+using System.Net;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Npgsql;
@@ -35,7 +37,7 @@ builder.Services.AddSingleton(sp =>
 });
 builder.Services.AddSingleton<ServerMigrator>();
 builder.Services.AddSingleton<AccountStore>();
-builder.Services.AddSingleton<AuthRateLimits>();
+builder.Services.AddSingleton<RateLimits>();
 builder.Services.AddSingleton<RecordStore>();
 builder.Services.AddSingleton<RecordPurger>();
 builder.Services.AddHostedService<MaintenanceService>();
@@ -45,6 +47,18 @@ builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResol
 builder.Services.AddAuthentication(DeviceTokenHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, DeviceTokenHandler>(DeviceTokenHandler.SchemeName, null);
 builder.Services.AddAuthorization();
+// Só o proxy configurado fala por `X-Forwarded-For`; de qualquer outro o cabeçalho é ignorado.
+builder.Services.AddOptions<ForwardedHeadersOptions>().Configure<IOptions<ServerOptions>>((forwarded, server) =>
+{
+    forwarded.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    forwarded.ForwardLimit = 1;
+    forwarded.KnownProxies.Clear();
+    forwarded.KnownIPNetworks.Clear();
+    foreach (var network in server.Value.Server.TrustedProxyNetworks)
+    {
+        forwarded.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
+    }
+});
 
 var app = builder.Build();
 
@@ -59,7 +73,25 @@ if (app.Services.GetRequiredService<IOptions<ServerOptions>>().Value.Server.Migr
     await app.Services.GetRequiredService<ServerMigrator>().RunAsync(CancellationToken.None);
 }
 
+// Sem rede configurada o middleware confiaria em qualquer origem (lista vazia = sem checagem), então nem entra no pipeline.
+if (app.Services.GetRequiredService<IOptions<ServerOptions>>().Value.Server.TrustedProxyNetworks.Length > 0)
+{
+    app.UseForwardedHeaders();
+}
+
 app.UseBodyLimits();
+app.UseWhen(
+    context => !context.Request.Path.Equals("/health", StringComparison.Ordinal),
+    branch => branch.Use(async (context, next) =>
+    {
+        if (context.RequestServices.GetRequiredService<RateLimits>().HitRequest(ClientIp.Of(context)) is { } retry)
+        {
+            await new RateLimitedResult(retry).ExecuteAsync(context);
+            return;
+        }
+
+        await next(context);
+    }));
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapAccountEndpoints();

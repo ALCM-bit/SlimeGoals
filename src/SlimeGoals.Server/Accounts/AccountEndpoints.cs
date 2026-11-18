@@ -63,7 +63,7 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> PreloginAsync(
-        HttpRequest request, AccountStore store, AuthRateLimits limits, IOptions<ServerOptions> options, CancellationToken cancellationToken)
+        HttpRequest request, AccountStore store, RateLimits limits, IOptions<ServerOptions> options, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.PreloginRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
@@ -92,7 +92,7 @@ public static class AccountEndpoints
     private static async Task<IResult> RegisterAsync(
         HttpRequest request,
         AccountStore store,
-        AuthRateLimits limits,
+        RateLimits limits,
         IEmailSender emailSender,
         IOptions<ServerOptions> options,
         TimeProvider time,
@@ -173,7 +173,7 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> LoginAsync(
-        HttpRequest request, AccountStore store, AuthRateLimits limits, TimeProvider time, CancellationToken cancellationToken)
+        HttpRequest request, AccountStore store, RateLimits limits, TimeProvider time, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.LoginRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
@@ -227,7 +227,7 @@ public static class AccountEndpoints
         HttpRequest request,
         System.Security.Claims.ClaimsPrincipal user,
         AccountStore store,
-        AuthRateLimits limits,
+        RateLimits limits,
         TimeProvider time,
         CancellationToken cancellationToken)
     {
@@ -280,7 +280,7 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> RecoverBeginAsync(
-        HttpRequest request, AccountStore store, AuthRateLimits limits, CancellationToken cancellationToken)
+        HttpRequest request, AccountStore store, RateLimits limits, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.RecoverBeginRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
@@ -301,7 +301,7 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> RecoverAsync(
-        HttpRequest request, AccountStore store, AuthRateLimits limits, TimeProvider time, CancellationToken cancellationToken)
+        HttpRequest request, AccountStore store, RateLimits limits, TimeProvider time, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.RecoverRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
@@ -358,7 +358,7 @@ public static class AccountEndpoints
         HttpRequest request,
         System.Security.Claims.ClaimsPrincipal user,
         AccountStore store,
-        AuthRateLimits limits,
+        RateLimits limits,
         CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.DeleteAccountRequest, cancellationToken);

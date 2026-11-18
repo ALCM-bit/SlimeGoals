@@ -78,6 +78,37 @@ public sealed class RateLimitTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task All_routes_answer_429_past_the_request_ip_limit()
+    {
+        await using var factory = new ServerFactory(postgres, new Dictionary<string, string?> { ["Limits:RequestsPerIpPerMinute"] = "3" });
+        using var client = factory.CreateClient();
+
+        for (var i = 0; i < 3; i++)
+        {
+            (await client.GetAsync("/devices")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        }
+
+        await ShouldBeRateLimitedAsync(await client.GetAsync("/devices"));
+        (await client.GetAsync("/health")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Sync_answers_429_past_the_device_limit()
+    {
+        await using var factory = new ServerFactory(postgres, new Dictionary<string, string?> { ["Limits:SyncPerDevicePerMinute"] = "2" });
+        var account = await TestAccount.CreateAsync(factory);
+        var second = await account.LoginAsync("segundo");
+
+        for (var i = 0; i < 2; i++)
+        {
+            (await account.Client.GetAsync("/sync/pull")).StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        await ShouldBeRateLimitedAsync(await account.Client.GetAsync("/sync/pull"));
+        (await second.Client.GetAsync("/sync/pull")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task Sync_routes_have_no_auth_rate_limit()
     {
         await using var factory = new ServerFactory(postgres, new Dictionary<string, string?> { ["Limits:AuthPerIpPerMinute"] = "3" });

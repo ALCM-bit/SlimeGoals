@@ -35,6 +35,8 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
             ["Limits:MaxBatchItems"] = "100000",
             ["Limits:MaxBlobBytes"] = "10000000",
             ["Limits:AuthKeyFailuresPerAccountPerMinute"] = "100000",
+            ["Limits:RequestsPerIpPerMinute"] = "100000",
+            ["Limits:SyncPerDevicePerMinute"] = "100000",
         };
         if (overrides is not null)
         {
