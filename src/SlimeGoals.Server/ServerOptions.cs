@@ -27,6 +27,9 @@ public sealed class ServerOptions
 
         /// <summary>Redes (CIDR) do proxy reverso de confiança; só dele se aceita <c>X-Forwarded-For</c>. Vazio: nenhum proxy.</summary>
         public string[] TrustedProxyNetworks { get; set; } = [];
+
+        /// <summary>Convite do cadastro. Em Development, vazio deixa o cadastro aberto; fora dele, vazio o fecha.</summary>
+        public string InviteCode { get; set; } = "";
     }
 
     public sealed class SyncSection
@@ -36,7 +39,7 @@ public sealed class ServerOptions
         public int MaxLimit { get; set; } = 500;
 
         /// <summary>Cota de registros por conta; nula desliga.</summary>
-        public int? MaxRecordsPerAccount { get; set; }
+        public int? MaxRecordsPerAccount { get; set; } = 100000;
     }
 
     public sealed class LimitsSection

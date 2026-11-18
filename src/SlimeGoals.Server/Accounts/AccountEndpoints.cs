@@ -96,10 +96,18 @@ public static class AccountEndpoints
         RateLimits limits,
         IEmailSender emailSender,
         IOptions<ServerOptions> options,
+        IHostEnvironment environment,
         TimeProvider time,
         CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.RegisterRequest, cancellationToken);
+
+        // O convite vem antes de tudo o mais: convite errado não chega à validação, ao limite por e-mail nem ao banco.
+        if (!InviteAccepted(options.Value.Server.InviteCode, body?.InviteCode, environment.IsDevelopment()))
+        {
+            return Error("registration_closed", StatusCodes.Status403Forbidden);
+        }
+
         var email = NormalizeEmail(body?.Email);
         if (body is null || email is null || !IsValid(body))
         {
@@ -152,6 +160,22 @@ public static class AccountEndpoints
         }
 
         return Results.Accepted();
+    }
+
+    /// <summary>
+    /// Sem convite configurado, só Development deixa o cadastro aberto. Com convite, o enviado (sem as pontas)
+    /// tem de ser igual ao configurado, byte a byte e em tempo constante; tamanhos diferentes também falham.
+    /// </summary>
+    private static bool InviteAccepted(string configured, string? submitted, bool isDevelopment)
+    {
+        var expected = configured.Trim();
+        if (expected.Length == 0)
+        {
+            return isDevelopment;
+        }
+
+        var actual = Encoding.UTF8.GetBytes(submitted?.Trim() ?? "");
+        return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), actual);
     }
 
     private static bool IsValid(RegisterRequest body) =>

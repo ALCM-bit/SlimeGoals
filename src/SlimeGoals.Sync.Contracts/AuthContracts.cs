@@ -5,7 +5,7 @@ public sealed record PreloginRequest(string? Email);
 
 public sealed record PreloginResponse(byte[] KdfSalt, string KdfParams);
 
-/// <summary>Cadastro: o servidor só recebe a auth_key, a chave de recuperação e chaves já cifradas.</summary>
+/// <summary>Cadastro: o servidor só recebe a auth_key, a chave de recuperação e chaves já cifradas, mais o convite (<c>invite_code</c>) quando o servidor o exige.</summary>
 public sealed record RegisterRequest(
     string? Email,
     byte[]? KdfSalt,
@@ -13,7 +13,8 @@ public sealed record RegisterRequest(
     byte[]? AuthKey,
     byte[]? RecoveryKey,
     byte[]? WrappedKeyPassword,
-    byte[]? WrappedKeyRecovery);
+    byte[]? WrappedKeyRecovery,
+    string? InviteCode = null);
 
 /// <summary>Confirmação do e-mail: o código do e-mail mais a auth_key de quem cadastrou.</summary>
 public sealed record ConfirmRequest(string? Token, byte[]? AuthKey);

@@ -23,9 +23,9 @@ public sealed class QuotaTests(PostgresFixture postgres)
     private static Dictionary<string, string?> Quota(string value) => new() { ["Sync:MaxRecordsPerAccount"] = value };
 
     [Fact]
-    public async Task Quota_is_off_by_default()
+    public async Task Quota_can_be_switched_off()
     {
-        await using var factory = new ServerFactory(postgres);
+        await using var factory = new ServerFactory(postgres, Quota(""));
         var account = await TestAccount.CreateAsync(factory);
 
         var response = await PushAsync(account.Client, Enumerable.Range(0, 50).Select(i => Upsert($"k{i}")).ToArray());
