@@ -73,6 +73,9 @@ public sealed class ServerOptions
         public int TombstoneDays { get; set; } = 180;
 
         public int UnconfirmedAccountHours { get; set; } = 24;
+
+        /// <summary>Dias sem uso (por <c>last_seen_at</c>) até o token do aparelho vencer.</summary>
+        public int DeviceIdleDays { get; set; } = 30;
     }
 
     public sealed class MaintenanceSection

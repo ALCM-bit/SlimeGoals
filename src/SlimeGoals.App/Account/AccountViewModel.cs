@@ -73,8 +73,8 @@ public sealed partial class AccountViewModel : ObservableObject
     public const string DeleteAccountText = "Isto apaga a conta e todos os dados dela no servidor, para todos os aparelhos. " +
         "As metas e registros deste aparelho continuam aqui.";
     public const string DeleteAccountLabel = "Apagar conta";
-    public const string SessionExpiredText = "A sessão deste aparelho foi encerrada (a senha mudou ou o aparelho foi " +
-        "removido). Entre de novo para continuar sincronizando. Nada do que está na fila se perde.";
+    public const string SessionExpiredText = "A sessão deste aparelho foi encerrada (a senha mudou, o aparelho foi " +
+        "removido ou ficou 30 dias sem sincronizar). Entre de novo para continuar sincronizando. Nada do que está na fila se perde.";
     public const string ReauthenticateLabel = "Entrar de novo";
     public const string VaultLockedText = "O chaveiro do sistema está travado ou indisponível. Destrave-o para continuar " +
         "sincronizando.";

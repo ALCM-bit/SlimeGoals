@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using Dapper;
 using SlimeGoals.Server.Data;
 
@@ -37,9 +38,11 @@ internal sealed record PendingAccount(Guid Id, byte[] AuthHash);
 internal sealed record DeviceRow(Guid AccountId, Guid DeviceId, DateTime LastSeenAt);
 
 /// <summary>Consultas de conta e aparelho. Todo e-mail chega aqui já normalizado (decisão 15).</summary>
-public sealed class AccountStore(Db db)
+public class AccountStore(Db db, IOptions<ServerOptions> options)
 {
     private static readonly TimeSpan LastSeenInterval = TimeSpan.FromHours(1);
+
+    private TimeSpan IdleLimit => TimeSpan.FromDays(options.Value.Retention.DeviceIdleDays);
 
     public async Task<AccountKdf?> FindKdfAsync(string email, CancellationToken cancellationToken)
     {
@@ -315,7 +318,23 @@ public sealed class AccountStore(Db db)
             cancellationToken: cancellationToken));
     }
 
-    /// <summary>Acha o aparelho ativo do token, sem cache, e atualiza last_seen_at no máximo uma vez por hora.</summary>
+    /// <summary>
+    /// Revoga os aparelhos parados há <c>DeviceIdleDays</c> ou mais (<c>now - last_seen_at &gt;= prazo</c>) e devolve quantos.
+    /// </summary>
+    public virtual async Task<int> RevokeIdleDevicesAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var cutoff = now - IdleLimit;
+        await using var connection = await db.OpenAsync(cancellationToken);
+        return await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE devices SET revoked_at = @now WHERE revoked_at IS NULL AND last_seen_at <= @cutoff",
+            new { now, cutoff },
+            cancellationToken: cancellationToken));
+    }
+
+    /// <summary>
+    /// Acha o aparelho ativo do token, sem cache, e atualiza last_seen_at no máximo uma vez por hora.
+    /// Quem ficou parado por <c>DeviceIdleDays</c> ou mais não é mais ativo.
+    /// </summary>
     public async Task<DeviceIdentity?> FindActiveDeviceAsync(byte[] tokenHash, DateTimeOffset now, CancellationToken cancellationToken)
     {
         await using var connection = await db.OpenAsync(cancellationToken);
@@ -328,7 +347,13 @@ public sealed class AccountStore(Db db)
             return null;
         }
 
-        if (now - new DateTimeOffset(device.LastSeenAt, TimeSpan.Zero) >= LastSeenInterval)
+        var idle = now - new DateTimeOffset(device.LastSeenAt, TimeSpan.Zero);
+        if (idle >= IdleLimit)
+        {
+            return null;
+        }
+
+        if (idle >= LastSeenInterval)
         {
             await connection.ExecuteAsync(new CommandDefinition(
                 "UPDATE devices SET last_seen_at = @now WHERE id = @id AND last_seen_at < @now",

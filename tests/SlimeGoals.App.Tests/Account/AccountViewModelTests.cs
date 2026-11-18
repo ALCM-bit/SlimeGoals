@@ -597,7 +597,9 @@ public class AccountViewModelTests
         var vm = await LoadedAsync();
 
         vm.IsSessionExpired.Should().BeTrue();
-        AccountViewModel.SessionExpiredText.Should().EndWith("Nada do que está na fila se perde.");
+        AccountViewModel.SessionExpiredText.Should().Be(
+            "A sessão deste aparelho foi encerrada (a senha mudou, o aparelho foi removido ou ficou 30 dias sem sincronizar). " +
+            "Entre de novo para continuar sincronizando. Nada do que está na fila se perde.");
         vm.OpenReauthenticateCommand.Execute(null);
         vm.Page.Should().Be(AccountPage.Reauthenticate);
         vm.DeviceName.Should().Be("notebook-da-ana");
