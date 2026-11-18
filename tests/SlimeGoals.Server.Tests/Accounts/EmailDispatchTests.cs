@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Npgsql;
 using SlimeGoals.Server.Accounts;
 using SlimeGoals.Server.Limits;
@@ -91,6 +92,29 @@ public sealed class EmailDispatchTests(PostgresFixture postgres)
         sender.Finished.Should().Be(1);
     }
 
+    [Fact]
+    public async Task Send_failure_after_shutdown_starts_is_logged_masked_without_faulting_the_service()
+    {
+        await using var factory = new ServerFactory(postgres);
+        var sender = new FailsOnShutdownSender();
+        var server = WithSender(factory, sender);
+        using var client = server.CreateClient();
+        (await RegisterAsync(client, "ana@exemplo.com")).StatusCode.Should().Be(HttpStatusCode.Accepted);
+        await sender.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var service = server.Services.GetServices<IHostedService>().OfType<EmailDispatchService>().Single();
+
+        // Parar o host dispara o token de parada; o envio em curso falha com um erro que não é cancelamento.
+        await server.DisposeAsync();
+        await service.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        service.ExecuteTask.IsCompleted.Should().BeTrue();
+        service.ExecuteTask.IsFaulted.Should().BeFalse();
+        sender.Thrown.Should().BeTrue();
+        var logs = string.Join('\n', factory.Logs.Lines);
+        logs.Should().Contain(RateLimits.MaskEmail("ana@exemplo.com"));
+        logs.Should().NotContain("ana@exemplo.com");
+    }
+
     private static async Task<int> CountAccountsAsync(ServerFactory factory, string? email = null)
     {
         await using var connection = new NpgsqlConnection(factory.ConnectionString);
@@ -138,6 +162,27 @@ public sealed class EmailDispatchTests(PostgresFixture postgres)
 
             Interlocked.Increment(ref _attempts);
             throw new InvalidOperationException($"falha simulada para {email}");
+        }
+    }
+
+    /// <summary>
+    /// Espera o token de parada disparar e então lança um erro que não é cancelamento, com o e-mail na mensagem,
+    /// como o MailKit faz quando o servidor SMTP recusa o destinatário.
+    /// </summary>
+    private sealed class FailsOnShutdownSender : IEmailSender
+    {
+        private int _thrown;
+
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool Thrown => Volatile.Read(ref _thrown) == 1;
+
+        public async Task SendConfirmationAsync(string email, string token, CancellationToken cancellationToken)
+        {
+            Started.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            Volatile.Write(ref _thrown, 1);
+            throw new InvalidOperationException($"5.1.1 <{email}>: destinatário recusado");
         }
     }
 }

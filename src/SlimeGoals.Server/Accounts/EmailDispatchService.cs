@@ -27,7 +27,7 @@ public sealed partial class EmailDispatchService(
             {
                 await DispatchAsync(email, stoppingToken);
             }
-            catch (Exception exception) when (!stoppingToken.IsCancellationRequested)
+            catch (Exception exception) when (!IsShutdown(exception, stoppingToken))
             {
                 // Em geral, o banco recusou apagar: a conta pendente vence sozinha em Retention:UnconfirmedAccountHours.
                 LogFailed(RateLimits.MaskEmail(email.Email), exception.GetType().Name);
@@ -48,7 +48,7 @@ public sealed partial class EmailDispatchService(
                 await sender.SendConfirmationAsync(email.Email, email.Token, stoppingToken);
                 return;
             }
-            catch (Exception exception) when (!stoppingToken.IsCancellationRequested)
+            catch (Exception exception) when (!IsShutdown(exception, stoppingToken))
             {
                 if (attempt == MaxAttempts)
                 {
@@ -63,6 +63,13 @@ public sealed partial class EmailDispatchService(
             await Task.Delay(DelayBefore(attempt + 1), time, stoppingToken);
         }
     }
+
+    /// <summary>
+    /// Só o cancelamento da parada sobe. Qualquer outro erro, mesmo depois de a parada começar, vai para o log
+    /// mascarado: se escapasse, o host registraria a exceção inteira, e a mensagem do MailKit pode trazer o e-mail.
+    /// </summary>
+    private static bool IsShutdown(Exception exception, CancellationToken stoppingToken) =>
+        exception is OperationCanceledException && stoppingToken.IsCancellationRequested;
 
     /// <summary>A espera antes da tentativa dada (a 2ª usa o primeiro valor); faltando valor, repete o último.</summary>
     private TimeSpan DelayBefore(int attempt)
