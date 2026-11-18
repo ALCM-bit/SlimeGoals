@@ -140,7 +140,10 @@ public sealed class ServerOptions
     }
 }
 
-/// <summary>Recusa a partida fora de Development sem o segredo do prelogin.</summary>
+/// <summary>
+/// Recusa a partida fora de Development sem o segredo do prelogin e, em qualquer ambiente, com proxy em CIDR
+/// inválido ou <c>Retention:DeviceIdleDays</c> menor que 1 (que revogaria todos os aparelhos).
+/// </summary>
 public sealed class ServerOptionsValidator(IHostEnvironment environment) : IValidateOptions<ServerOptions>
 {
     public ValidateOptionsResult Validate(string? name, ServerOptions options)
@@ -153,6 +156,11 @@ public sealed class ServerOptionsValidator(IHostEnvironment environment) : IVali
         if (options.Server.TrustedProxyNetworks.Any(n => !IPNetwork.TryParse(n, out _)))
         {
             return ValidateOptionsResult.Fail("Server:TrustedProxyNetworks tem uma rede em CIDR inválida.");
+        }
+
+        if (options.Retention.DeviceIdleDays < 1)
+        {
+            return ValidateOptionsResult.Fail("Retention:DeviceIdleDays precisa ser pelo menos 1.");
         }
 
         return ValidateOptionsResult.Success;

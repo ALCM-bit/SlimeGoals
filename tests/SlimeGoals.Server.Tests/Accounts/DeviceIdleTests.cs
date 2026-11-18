@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Dapper;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using SlimeGoals.Server.Accounts;
 using SlimeGoals.Sync.Contracts;
@@ -17,6 +18,18 @@ public sealed class DeviceIdleTests(PostgresFixture postgres)
         await using var connection = new NpgsqlConnection(factory.ConnectionString);
         await connection.ExecuteAsync(
             "UPDATE devices SET last_seen_at = @lastSeen WHERE id = @deviceId", new { lastSeen, deviceId });
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1")]
+    public async Task Startup_rejects_device_idle_days_below_one(string days)
+    {
+        await using var factory = new ServerFactory(postgres, new Dictionary<string, string?> { ["Retention:DeviceIdleDays"] = days });
+
+        var act = () => factory.CreateClient();
+
+        act.Should().Throw<OptionsValidationException>().Which.Message.Should().Contain("Retention:DeviceIdleDays");
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using MimeKit;
 
 namespace SlimeGoals.Server.Accounts;
 
@@ -9,11 +10,15 @@ public interface IEmailSender
 }
 
 /// <summary>
-/// Recusa a partida fora de Development com o e-mail simulado, SMTP sem servidor ou remetente, SMTP sem TLS ou
-/// usuário sem senha (D11). As mensagens são fixas: nunca repetem um valor da configuração.
+/// Recusa a partida fora de Development com o e-mail simulado, SMTP sem servidor ou remetente, remetente que não é
+/// um endereço com domínio, porta fora de 1 a 65535, SMTP sem TLS ou usuário sem senha (D11). As mensagens são
+/// fixas: nunca repetem um valor da configuração.
 /// </summary>
 public sealed class EmailSenderValidator(IHostEnvironment environment) : IValidateOptions<ServerOptions>
 {
+    /// <summary>Mais estrito que o <c>MailboxAddress.Parse</c> do envio: o que passa aqui também passa lá.</summary>
+    private static readonly ParserOptions FromParser = new() { AllowAddressesWithoutDomain = false };
+
     public ValidateOptionsResult Validate(string? name, ServerOptions options)
     {
         if (environment.IsDevelopment())
@@ -31,6 +36,15 @@ public sealed class EmailSenderValidator(IHostEnvironment environment) : IValida
         if (string.IsNullOrWhiteSpace(email.Smtp.Host) || string.IsNullOrWhiteSpace(email.Smtp.From))
         {
             failures.Add("Com Email:Mode=smtp, Email:Smtp:Host e Email:Smtp:From são obrigatórios.");
+        }
+        else if (!MailboxAddress.TryParse(FromParser, email.Smtp.From, out _))
+        {
+            failures.Add("Email:Smtp:From precisa ser um endereço com domínio (Nome <usuario@dominio>).");
+        }
+
+        if (email.Smtp.Port is not (> 0 and <= 65535))
+        {
+            failures.Add("Email:Smtp:Port precisa estar entre 1 e 65535.");
         }
 
         if (email.Smtp.Security is not (ServerOptions.SmtpSecurity.StartTls or ServerOptions.SmtpSecurity.SslOnConnect))

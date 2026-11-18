@@ -88,6 +88,28 @@ public sealed partial class SmtpEmailSenderTests(PostgresFixture postgres)
         ShouldRefuse(factory).Should().Contain("Email:Smtp:Host");
     }
 
+    [Theory]
+    [InlineData("isto não é um endereço")]
+    [InlineData("nao-responda")]
+    [InlineData("SlimeGoals <nao-responda@>")]
+    public async Task Production_rejects_unparsable_from(string from)
+    {
+        await using var factory = ServerFactory.Production(postgres, new Dictionary<string, string?> { ["Email:Smtp:From"] = from });
+
+        ShouldRefuse(factory).Should().Contain("Email:Smtp:From").And.NotContain(from);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1")]
+    [InlineData("65536")]
+    public async Task Production_rejects_smtp_port_out_of_range(string port)
+    {
+        await using var factory = ServerFactory.Production(postgres, new Dictionary<string, string?> { ["Email:Smtp:Port"] = port });
+
+        ShouldRefuse(factory).Should().Contain("Email:Smtp:Port");
+    }
+
     [Fact]
     public async Task Production_accepts_smtp_with_tls_and_credentials()
     {
