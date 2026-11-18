@@ -4,10 +4,11 @@ namespace SlimeGoals.App.Account;
 public static class ServerAddress
 {
     public const string InvalidText = "Informe um endereço http:// ou https:// completo.";
+    public const string HttpsRequiredText = "Use https://. O http:// só vale para 127.0.0.1.";
 
     /// <summary>
-    /// Aceita só URL absoluta <c>http</c> ou <c>https</c>, sem credenciais embutidas, consulta nem fragmento. Espaços nas
-    /// pontas são ignorados.
+    /// Aceita só URL absoluta <c>https</c>, ou <c>http</c> apenas em endereço de loopback (<c>localhost</c>, 127.0.0.0/8 e
+    /// <c>::1</c>), sem credenciais embutidas, consulta nem fragmento. Espaços nas pontas são ignorados.
     /// </summary>
     public static bool TryParse(string? text, out Uri? server, out string? error)
     {
@@ -17,6 +18,12 @@ public static class ServerAddress
             && (parsed.Scheme == Uri.UriSchemeHttp || parsed.Scheme == Uri.UriSchemeHttps)
             && parsed.UserInfo.Length == 0 && parsed.Host.Length > 0)
         {
+            if (parsed.Scheme == Uri.UriSchemeHttp && !parsed.IsLoopback)
+            {
+                (server, error) = (null, HttpsRequiredText);
+                return false;
+            }
+
             (server, error) = (parsed, null);
             return true;
         }

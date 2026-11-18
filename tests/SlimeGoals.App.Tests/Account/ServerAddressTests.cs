@@ -17,6 +17,43 @@ public class ServerAddressTests
     }
 
     [Theory]
+    [InlineData("http://127.0.0.1:8080")]
+    [InlineData("http://localhost:8080")]
+    [InlineData("http://[::1]:8080")]
+    public void Http_on_loopback_is_accepted(string text)
+    {
+        ServerAddress.TryParse(text, out var server, out var error).Should().BeTrue();
+
+        server.Should().Be(new Uri(text));
+        error.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("http://exemplo.com")]
+    [InlineData("http://192.168.0.10:8080")]
+    [InlineData("http://sync.exemplo.com:8080/")]
+    public void Http_elsewhere_requires_https(string text)
+    {
+        ServerAddress.TryParse(text, out var server, out var error).Should().BeFalse();
+
+        server.Should().BeNull();
+        error.Should().Be(ServerAddress.HttpsRequiredText);
+        ServerAddress.HttpsRequiredText.Should().Be("Use https://. O http:// só vale para 127.0.0.1.");
+    }
+
+    [Theory]
+    [InlineData("https://exemplo.com")]
+    [InlineData("https://192.168.0.10:8443/")]
+    [InlineData("https://127.0.0.1:8443")]
+    public void Https_anywhere_is_accepted(string text)
+    {
+        ServerAddress.TryParse(text, out var server, out var error).Should().BeTrue();
+
+        server.Should().Be(new Uri(text));
+        error.Should().BeNull();
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("   ")]
     [InlineData("ftp://x")]

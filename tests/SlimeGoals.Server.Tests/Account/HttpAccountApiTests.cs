@@ -16,6 +16,18 @@ public sealed class HttpAccountApiTests(PostgresFixture postgres)
         (await FluentActions.Awaiting(call).Should().ThrowAsync<AccountApiException>()).Which;
 
     [Fact]
+    public async Task Closed_registration_maps_to_its_own_kind()
+    {
+        await using var factory = new ServerFactory(postgres, new Dictionary<string, string?> { ["Server:InviteCode"] = "convite-certo" });
+        var api = new HttpAccountApi(factory.CreateClient());
+        var request = new RegisterRequest($"user{Guid.NewGuid():N}@exemplo.com", new byte[16], Kdf, Key(1), Key(2), [1], [1]);
+
+        (await FailureOf(() => api.RegisterAsync(request))).Kind.Should().Be(AccountErrorKind.RegistrationClosed);
+        (await FailureOf(() => api.RegisterAsync(request with { InviteCode = "errado" }))).Kind.Should().Be(AccountErrorKind.RegistrationClosed);
+        await api.RegisterAsync(request with { InviteCode = "convite-certo" });
+    }
+
+    [Fact]
     public async Task Each_route_round_trips()
     {
         await using var factory = new ServerFactory(postgres);

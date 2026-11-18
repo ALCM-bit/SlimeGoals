@@ -17,11 +17,12 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
     private const int SaltSize = 16;
 
     /// <summary>Cadastra a conta e devolve as chaves para a confirmação; nada vai ao cofre antes de confirmar (decisão 2).</summary>
+    /// <param name="inviteCode">Convite do servidor; vai com as pontas aparadas, e vazio vai como <c>null</c>.</param>
     /// <exception cref="ArgumentException">E-mail ou senha inválidos.</exception>
     /// <exception cref="InvalidOperationException">A sincronização já está ligada.</exception>
     /// <exception cref="SecretVaultUnavailableException">Sem cofre; nenhum pedido sai.</exception>
     /// <exception cref="AccountApiException">O servidor recusou ou não respondeu.</exception>
-    public async Task<PendingRegistration> RegisterAsync(string email, string password, CancellationToken ct = default)
+    public async Task<PendingRegistration> RegisterAsync(string email, string password, string? inviteCode, CancellationToken ct = default)
     {
         email = NormalizeEmail(email);
         PasswordKeys.Validate(password);
@@ -39,7 +40,10 @@ public sealed class AccountService(HttpAccountApi api, ISecretVault vault, ISync
             var request = new RegisterRequest(
                 email, salt, KdfParams.Default.ToJson(), passwordKeys.AuthKey, recoveryKeys.RecoveryKey,
                 KeyWrap.Wrap(dataKey, passwordKeys.WrapKey, WrapPurpose.Password),
-                KeyWrap.Wrap(dataKey, recoveryKeys.WrapKey, WrapPurpose.Recovery));
+                KeyWrap.Wrap(dataKey, recoveryKeys.WrapKey, WrapPurpose.Recovery))
+            {
+                InviteCode = string.IsNullOrWhiteSpace(inviteCode) ? null : inviteCode.Trim(),
+            };
             await api.RegisterAsync(request, ct);
             return new PendingRegistration(server, email, code.Display, passwordKeys.AuthKey.ToArray(), passwordKeys.WrapKey.ToArray());
         }

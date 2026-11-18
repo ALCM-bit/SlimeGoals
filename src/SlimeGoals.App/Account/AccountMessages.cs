@@ -63,6 +63,8 @@ public static class AccountMessages
             : "Muitas tentativas. Tente de novo daqui a um minuto.",
         AccountErrorKind.Unavailable => "Não foi possível falar com o servidor. Confira o endereço e a conexão.",
         AccountErrorKind.InvalidRequest or AccountErrorKind.TooLarge => "O servidor recusou os dados. Confira os campos.",
+        AccountErrorKind.RegistrationClosed =>
+            "Este servidor não aceita cadastro sem um convite válido. Peça o código a quem cuida do servidor.",
         AccountErrorKind.NotFound => "Não encontrado no servidor. Atualize a lista.",
         _ => Generic,
     };

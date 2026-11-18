@@ -113,6 +113,8 @@ public sealed class HttpAccountApi(HttpClient http)
         return status switch
         {
             HttpStatusCode.Unauthorized => new AccountApiException(AccountErrorKind.Unauthorized),
+            HttpStatusCode.Forbidden when await ErrorCodeAsync(response, ct) == "registration_closed" =>
+                new AccountApiException(AccountErrorKind.RegistrationClosed),
             HttpStatusCode.NotFound => new AccountApiException(AccountErrorKind.NotFound),
             HttpStatusCode.RequestEntityTooLarge => new AccountApiException(AccountErrorKind.TooLarge),
             HttpStatusCode.TooManyRequests => new AccountApiException(AccountErrorKind.RateLimited, RetryAfterOf(response)),

@@ -74,8 +74,8 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
         }
     }
 
-    public Task<PendingRegistration> RegisterAsync(Uri server, string email, string password, CancellationToken ct = default) =>
-        RunOpAsync(() => WithAccountAsync(RequireServer(server), a => a.RegisterAsync(email, password, ct)), ct);
+    public Task<PendingRegistration> RegisterAsync(Uri server, string email, string password, string? inviteCode, CancellationToken ct = default) =>
+        RunOpAsync(() => WithAccountAsync(RequireServer(server), a => a.RegisterAsync(email, password, inviteCode, ct)), ct);
 
     public Task ConfirmAsync(PendingRegistration pending, string code, string deviceName, CancellationToken ct = default) =>
         RunOpAsync(async () =>

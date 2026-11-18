@@ -64,6 +64,7 @@ public sealed partial class AccountViewModel : ObservableObject
     public const int MaxEmailLength = AccountRules.MaxEmailLength;
     public const int MaxDeviceNameLength = AccountRules.MaxDeviceNameLength;
     public const int MaxServerLength = 512;
+    public const int MaxInviteLength = 256;
     public const int MaxConfirmationCodeLength = 128;
     public const int MaxRecoveryCodeLength = 64;
     public const string ContinueLabel = "Continuar";
@@ -149,6 +150,9 @@ public sealed partial class AccountViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SubmitRegisterCommand), nameof(SubmitRecoverCommand), nameof(SubmitChangePasswordCommand))]
     public partial string PasswordConfirmation { get; set; } = "";
+
+    /// <summary>Convite do servidor no cadastro; opcional, e esvaziado como as senhas.</summary>
+    [ObservableProperty] public partial string InviteCode { get; set; } = "";
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SubmitChangePasswordCommand))]
     public partial string CurrentPassword { get; set; } = "";
@@ -330,13 +334,13 @@ public sealed partial class AccountViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSubmitRegister))]
     private async Task SubmitRegisterAsync()
     {
-        var (email, password, confirmation) = (Email, Password, PasswordConfirmation);
+        var (email, password, confirmation, invite) = (Email, Password, PasswordConfirmation, InviteCode);
         ClearSecretInputs();
         if (await ServerForSubmitAsync() is not { } server || !PasswordsMatch(password, confirmation))
             return;
         await RunAsync(AccountAction.Register, async () =>
         {
-            var pending = await _account.RegisterAsync(server, email, password);
+            var pending = await _account.RegisterAsync(server, email, password, invite);
             _pending?.Dispose();
             _pending = pending;
             ShowRecoveryCode(pending.RecoveryCode, AccountPage.RecoveryCode);
@@ -611,10 +615,10 @@ public sealed partial class AccountViewModel : ObservableObject
         OnPropertyChanged(nameof(RecoveryCodePageText));
     }
 
-    /// <summary>Esvazia os campos de senha e o código de recuperação digitado (a cada envio, ao trocar de subpágina e ao
+    /// <summary>Esvazia os campos de senha, o convite e o código de recuperação digitado (a cada envio, ao trocar de subpágina e ao
     /// sair de Configurações).</summary>
     public void ClearSecretInputs() =>
-        (CurrentPassword, Password, PasswordConfirmation, RecoveryCodeInput) = ("", "", "", "");
+        (CurrentPassword, Password, PasswordConfirmation, RecoveryCodeInput, InviteCode) = ("", "", "", "", "");
 
     partial void OnPageChanged(AccountPage oldValue, AccountPage newValue)
     {

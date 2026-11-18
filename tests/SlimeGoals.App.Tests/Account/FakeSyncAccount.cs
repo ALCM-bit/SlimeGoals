@@ -29,6 +29,7 @@ public sealed class FakeSyncAccount : ISyncAccount
     public Uri? LastServer { get; private set; }
     public string? LastEmail { get; private set; }
     public string? LastPassword { get; private set; }
+    public string? LastInviteCode { get; private set; }
     public string? LastNewPassword { get; private set; }
     public string? LastCode { get; private set; }
     public string? LastDeviceName { get; private set; }
@@ -54,9 +55,9 @@ public sealed class FakeSyncAccount : ISyncAccount
 
     public Task StopAsync() => OpAsync("stop");
 
-    public async Task<PendingRegistration> RegisterAsync(Uri server, string email, string password, CancellationToken ct = default)
+    public async Task<PendingRegistration> RegisterAsync(Uri server, string email, string password, string? inviteCode, CancellationToken ct = default)
     {
-        (LastServer, LastEmail, LastPassword) = (server, email, password);
+        (LastServer, LastEmail, LastPassword, LastInviteCode) = (server, email, password, inviteCode);
         await OpAsync("register");
         return Pending;
     }

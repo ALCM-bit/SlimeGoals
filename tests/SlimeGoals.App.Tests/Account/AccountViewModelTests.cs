@@ -118,6 +118,19 @@ public class AccountViewModelTests
     }
 
     [Fact]
+    public async Task Register_sends_the_invite_typed_and_clears_it()
+    {
+        var vm = await LoadedAsync();
+        vm.OpenRegisterCommand.Execute(null);
+        (vm.Email, vm.Password, vm.PasswordConfirmation, vm.InviteCode) = ("ana@exemplo.com", "senha longa", "senha longa", "abc");
+
+        await vm.SubmitRegisterCommand.ExecuteAsync(null);
+
+        _account.LastInviteCode.Should().Be("abc");
+        vm.InviteCode.Should().BeEmpty("o convite é segredo e some a cada envio");
+    }
+
+    [Fact]
     public async Task Leaving_confirm_disposes_the_pending_registration()
     {
         var vm = await LoadedAsync();

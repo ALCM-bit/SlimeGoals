@@ -434,7 +434,7 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
     /// <summary>Cadastra e confirma pelo coordenador do aparelho, que fica com a conta ligada.</summary>
     private async Task SignUpAsync(Device device)
     {
-        using var pending = await device.Account.RegisterAsync(Server, _email, Password);
+        using var pending = await device.Account.RegisterAsync(Server, _email, Password, null);
         await device.Account.ConfirmAsync(pending, await _factory.Email.WaitForTokenAsync(pending.Email), "pc");
     }
 
