@@ -12,6 +12,10 @@ using SlimeGoals.Sync.Contracts;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Segredos do Docker Compose: um arquivo por chave (`__` vira `:`). Entra por último para
+// valer mais que `environment:`; a pasta ausente (máquina de desenvolvimento) é normal.
+builder.Configuration.AddKeyPerFile(builder.Configuration["SecretsDirectory"] ?? "/run/secrets", optional: true);
+
 builder.Services.AddOptions<ServerOptions>().Bind(builder.Configuration).ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<ServerOptions>, ServerOptionsValidator>();
 builder.Services.TryAddSingleton(TimeProvider.System);
