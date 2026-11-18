@@ -63,7 +63,7 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> PreloginAsync(
-        HttpRequest request, AccountStore store, RateLimits limits, IOptions<ServerOptions> options, CancellationToken cancellationToken)
+        HttpContext context, HttpRequest request, AccountStore store, RateLimits limits, IOptions<ServerOptions> options, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.PreloginRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
@@ -72,7 +72,7 @@ public static class AccountEndpoints
             return InvalidRequest();
         }
 
-        if (limits.HitEmail(email) is { } retry)
+        if (limits.HitEmailFromIp(email, ClientIp.Of(context)) is { } retry)
         {
             return new RateLimitedResult(retry);
         }
@@ -90,6 +90,7 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> RegisterAsync(
+        HttpContext context,
         HttpRequest request,
         AccountStore store,
         RateLimits limits,
@@ -105,9 +106,16 @@ public static class AccountEndpoints
             return InvalidRequest();
         }
 
-        if (limits.HitEmail(email) is { } retry)
+        if (limits.HitEmailFromIp(email, ClientIp.Of(context)) is { } retry)
         {
             return new RateLimitedResult(retry);
+        }
+
+        // O teto de e-mails vem antes de tocar no banco: passou dele, a conta pendente e o código ficam como estavam
+        // e a resposta é a mesma 202, para o limite não revelar nada nem deixar um terceiro invalidar o código da vítima.
+        if (limits.HitConfirmationEmail(email) is not null)
+        {
+            return Results.Accepted();
         }
 
         var now = time.GetUtcNow();
@@ -173,7 +181,7 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> LoginAsync(
-        HttpRequest request, AccountStore store, RateLimits limits, TimeProvider time, CancellationToken cancellationToken)
+        HttpContext context, HttpRequest request, AccountStore store, RateLimits limits, TimeProvider time, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.LoginRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
@@ -183,9 +191,15 @@ public static class AccountEndpoints
             return InvalidRequest();
         }
 
-        if (limits.HitEmail(email) is { } retry)
+        if (limits.HitEmailFromIp(email, ClientIp.Of(context)) is { } retry)
         {
             return new RateLimitedResult(retry);
+        }
+
+        // Reserva antes de comparar, também para e-mail desconhecido; só o acerto devolve.
+        if (limits.ReserveLoginAttempt(email) is { } failureRetry)
+        {
+            return new RateLimitedResult(failureRetry);
         }
 
         var account = await store.FindForLoginAsync(email, cancellationToken);
@@ -202,6 +216,8 @@ public static class AccountEndpoints
         {
             return Error("unauthorized", StatusCodes.Status401Unauthorized);
         }
+
+        limits.RefundLoginAttempt(email);
 
         var token = SecretHash.NewToken();
         var deviceId = await store.CreateDeviceAsync(account.Id, account.AuthHash, deviceName, SecretHash.Of(token), time.GetUtcNow(), cancellationToken);
@@ -280,7 +296,7 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> RecoverBeginAsync(
-        HttpRequest request, AccountStore store, RateLimits limits, CancellationToken cancellationToken)
+        HttpContext context, HttpRequest request, AccountStore store, RateLimits limits, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.RecoverBeginRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
@@ -289,7 +305,7 @@ public static class AccountEndpoints
             return InvalidRequest();
         }
 
-        if (limits.HitEmail(email) is { } retry)
+        if (limits.HitEmailFromIp(email, ClientIp.Of(context)) is { } retry)
         {
             return new RateLimitedResult(retry);
         }
@@ -301,7 +317,7 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> RecoverAsync(
-        HttpRequest request, AccountStore store, RateLimits limits, TimeProvider time, CancellationToken cancellationToken)
+        HttpContext context, HttpRequest request, AccountStore store, RateLimits limits, TimeProvider time, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.RecoverRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
@@ -315,9 +331,14 @@ public static class AccountEndpoints
             return InvalidRequest();
         }
 
-        if (limits.HitEmail(email) is { } retry)
+        if (limits.HitEmailFromIp(email, ClientIp.Of(context)) is { } retry)
         {
             return new RateLimitedResult(retry);
+        }
+
+        if (limits.ReserveLoginAttempt(email) is { } failureRetry)
+        {
+            return new RateLimitedResult(failureRetry);
         }
 
         // Confere o código aqui mesmo: nunca confia em que o begin tenha rodado antes.
@@ -326,6 +347,8 @@ public static class AccountEndpoints
         {
             return Unauthorized();
         }
+
+        limits.RefundLoginAttempt(email);
 
         // O código só vale uma vez: se outro pedido com o mesmo código chegou antes, este não muda nada.
         var recovered = await store.RecoverAsync(

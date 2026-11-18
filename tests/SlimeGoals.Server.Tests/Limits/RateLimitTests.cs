@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using Dapper;
 using Npgsql;
 using SlimeGoals.Server.Tests.Accounts;
+using SlimeGoals.Server.Tests.Support;
 using SlimeGoals.Sync.Contracts;
 
 namespace SlimeGoals.Server.Tests.Limits;
@@ -16,11 +17,11 @@ public sealed class RateLimitTests(PostgresFixture postgres)
     private static Task<HttpResponseMessage> LoginAsync(HttpClient client, string email, byte[] key) =>
         client.PostAsJsonAsync("/auth/login", new LoginRequest(email, key, "pc"), SyncJsonContext.Default.LoginRequest);
 
-    private static async Task ShouldBeRateLimitedAsync(HttpResponseMessage response)
+    private static async Task ShouldBeRateLimitedAsync(HttpResponseMessage response, int maxSeconds = 60)
     {
         response.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
         response.Headers.RetryAfter.Should().NotBeNull();
-        response.Headers.RetryAfter!.Delta!.Value.TotalSeconds.Should().BeInRange(1, 60);
+        response.Headers.RetryAfter!.Delta!.Value.TotalSeconds.Should().BeInRange(1, maxSeconds);
         (await response.Content.ReadFromJsonAsync(SyncJsonContext.Default.ErrorResponse))!.Error.Should().Be("rate_limited");
     }
 
@@ -39,26 +40,124 @@ public sealed class RateLimitTests(PostgresFixture postgres)
         await ShouldBeRateLimitedAsync(await LoginAsync(client, "outro@exemplo.com", RandomNumberGenerator.GetBytes(32)));
     }
 
-    [Fact]
-    public async Task Login_answers_429_past_the_email_limit_from_any_ip()
+    private static Dictionary<string, string?> ProxiedSettings(params (string Key, string Value)[] more)
     {
-        await using var factory = new ServerFactory(postgres, new Dictionary<string, string?> { ["Limits:AuthPerEmailPerMinute"] = "5" });
-        // Cadastro e primeira entrada já gastaram 2 dos 5 pedidos do e-mail.
+        var settings = new Dictionary<string, string?> { ["Server:TrustedProxyNetworks:0"] = "10.9.0.0/24" };
+        foreach (var (key, value) in more)
+        {
+            settings[key] = value;
+        }
+
+        return settings;
+    }
+
+    /// <summary>Um cliente que chega pelo proxy confiável como se fosse o IP dado.</summary>
+    private static HttpClient ClientFrom(HttpClient proxied, string ip)
+    {
+        proxied.DefaultRequestHeaders.Remove("X-Forwarded-For");
+        proxied.DefaultRequestHeaders.Add("X-Forwarded-For", ip);
+        return proxied;
+    }
+
+    [Fact]
+    public async Task Prelogin_flood_from_other_ips_does_not_block_victim_login()
+    {
+        await using var factory = new ServerFactory(postgres, ProxiedSettings());
+        var victim = await TestAccount.CreateAsync(factory);
+        using var proxied = factory.WithRemoteIp("10.9.0.2");
+
+        for (var i = 0; i < 20; i++)
+        {
+            using var attacker = proxied.CreateClient();
+            (await PreloginAsync(ClientFrom(attacker, $"203.0.113.{i + 1}"), victim.Email)).StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        using var home = proxied.CreateClient();
+        (await LoginAsync(ClientFrom(home, "198.51.100.50"), victim.Email, victim.AuthKey)).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Email_ip_limit_is_per_pair()
+    {
+        await using var factory = new ServerFactory(postgres, new Dictionary<string, string?> { ["Limits:AuthPerEmailPerIpPerMinute"] = "2" });
+        using var client = factory.CreateClient();
+
+        for (var i = 0; i < 2; i++)
+        {
+            (await PreloginAsync(client, "a@exemplo.com")).StatusCode.Should().Be(HttpStatusCode.OK);
+            (await PreloginAsync(client, "b@exemplo.com")).StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        await ShouldBeRateLimitedAsync(await PreloginAsync(client, "a@exemplo.com"));
+    }
+
+    [Fact]
+    public async Task Login_failures_per_email_lock_after_limit_from_any_ip()
+    {
+        await using var factory = new ServerFactory(postgres, ProxiedSettings(("Limits:LoginFailuresPerEmailPerHour", "3")));
         var account = await TestAccount.CreateAsync(factory);
+        using var proxied = factory.WithRemoteIp("10.9.0.2");
         var wrong = RandomNumberGenerator.GetBytes(32);
 
         for (var i = 0; i < 3; i++)
         {
-            // Cada pedido sai de um IP diferente: o limite por e-mail não olha o IP.
-            using var client = factory.CreateClient();
-            client.DefaultRequestHeaders.Add("X-Forwarded-For", $"10.0.0.{i}");
-            (await LoginAsync(client, account.Email.ToUpperInvariant(), wrong)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+            using var attacker = proxied.CreateClient();
+            (await LoginAsync(ClientFrom(attacker, $"203.0.113.{i + 1}"), account.Email.ToUpperInvariant(), wrong))
+                .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         }
 
-        using var another = factory.CreateClient();
-        await ShouldBeRateLimitedAsync(await LoginAsync(another, account.Email, account.AuthKey));
-        await ShouldBeRateLimitedAsync(await PreloginAsync(another, account.Email));
-        (await LoginAsync(another, "outra@exemplo.com", wrong)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        using var home = proxied.CreateClient();
+        ClientFrom(home, "198.51.100.50");
+        await ShouldBeRateLimitedAsync(await LoginAsync(home, account.Email, account.AuthKey), maxSeconds: 3600);
+
+        factory.Time.Advance(TimeSpan.FromHours(1));
+        (await LoginAsync(home, account.Email, account.AuthKey)).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Unknown_email_spends_the_login_failure_budget_too()
+    {
+        await using var factory = new ServerFactory(postgres, new Dictionary<string, string?> { ["Limits:LoginFailuresPerEmailPerHour"] = "2" });
+        using var client = factory.CreateClient();
+        var wrong = RandomNumberGenerator.GetBytes(32);
+
+        for (var i = 0; i < 2; i++)
+        {
+            (await LoginAsync(client, "ninguem@exemplo.com", wrong)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        }
+
+        await ShouldBeRateLimitedAsync(await LoginAsync(client, "ninguem@exemplo.com", wrong), maxSeconds: 3600);
+    }
+
+    [Fact]
+    public async Task Successful_login_does_not_spend_failure_budget()
+    {
+        await using var factory = new ServerFactory(postgres, new Dictionary<string, string?> { ["Limits:LoginFailuresPerEmailPerHour"] = "2" });
+        var account = await TestAccount.CreateAsync(factory);
+        using var client = factory.CreateClient();
+
+        for (var i = 0; i < 5; i++)
+        {
+            (await LoginAsync(client, account.Email, account.AuthKey)).StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+    }
+
+    [Fact]
+    public async Task Confirmation_email_capped_per_address_per_hour()
+    {
+        await using var factory = new ServerFactory(postgres, ProxiedSettings(("Limits:ConfirmationEmailsPerAddressPerHour", "3")));
+        using var proxied = factory.WithRemoteIp("10.9.0.2");
+        var email = $"alvo{Guid.NewGuid():N}@exemplo.com";
+
+        for (var i = 0; i < 4; i++)
+        {
+            using var client = proxied.CreateClient();
+            ClientFrom(client, $"203.0.113.{i + 1}");
+            (await client.PostAsJsonAsync("/auth/register", TestAccount.NewRegisterRequest(email), SyncJsonContext.Default.RegisterRequest))
+                .StatusCode.Should().Be(HttpStatusCode.Accepted);
+        }
+
+        factory.Email.Count.Should().Be(3);
     }
 
     [Fact]

@@ -5,18 +5,21 @@ using Microsoft.Extensions.Options;
 namespace SlimeGoals.Server.Limits;
 
 /// <summary>
-/// Limites de taxa em janela fixa de um minuto: por IP e por e-mail nas rotas de <c>/auth</c>, e de falhas de <c>auth_key</c> por conta.
+/// Limites de taxa em janela fixa: por IP, por par e-mail e IP e por aparelho (um minuto); falhas de <c>auth_key</c> por conta (um minuto); falhas de login e e-mails de confirmação por endereço (uma hora).
 /// Os contadores usam o <see cref="TimeProvider"/> do servidor (o <c>AddRateLimiter</c> do ASP.NET não aceita um relógio próprio), o que
 /// deixa o teste de reinício da janela determinístico. Os contadores ficam na memória do processo, como as janelas do ASP.NET.
 /// </summary>
 public sealed class RateLimits(TimeProvider time, IOptions<ServerOptions> options, ILogger<RateLimits> logger)
 {
     private static readonly TimeSpan Minute = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan Hour = TimeSpan.FromHours(1);
 
     private readonly Counter _ips = new(time, Minute);
     private readonly Counter _requests = new(time, Minute);
     private readonly Counter _devices = new(time, Minute);
-    private readonly Counter _emails = new(time, Minute);
+    private readonly Counter _emailIps = new(time, Minute);
+    private readonly Counter _loginFailures = new(time, Hour);
+    private readonly Counter _confirmationEmails = new(time, Hour);
     private readonly Counter _accountFailures = new(time, Minute);
 
     /// <summary>Conta um pedido do IP; devolve quanto esperar se passou do limite.</summary>
@@ -28,18 +31,48 @@ public sealed class RateLimits(TimeProvider time, IOptions<ServerOptions> option
     /// <summary>Conta um pedido de <c>/sync</c> do aparelho; devolve quanto esperar se passou do limite.</summary>
     public TimeSpan? HitDevice(Guid deviceId) => _devices.Hit(deviceId.ToString("N"), options.Value.Limits.SyncPerDevicePerMinute);
 
-    /// <summary>Conta um pedido do e-mail (já normalizado), de qualquer IP; a chave é o SHA-256 do e-mail.</summary>
-    public TimeSpan? HitEmail(string email)
+    /// <summary>Conta um pedido do par e-mail (já normalizado) e IP; a chave é o SHA-256 do par, sem o e-mail em claro.</summary>
+    public TimeSpan? HitEmailFromIp(string email, string ip)
     {
-        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(email)));
-        var retry = _emails.Hit(key, options.Value.Limits.AuthPerEmailPerMinute);
+        var retry = _emailIps.Hit(HashOf(email + "\n" + ip), options.Value.Limits.AuthPerEmailPerIpPerMinute);
         if (retry is not null)
         {
-            logger.LogWarning("Limite de pedidos por e-mail atingido para {Email}.", MaskEmail(email));
+            logger.LogWarning("Limite de pedidos por e-mail e IP atingido para {Email}.", MaskEmail(email));
         }
 
         return retry;
     }
+
+    /// <summary>
+    /// Reserva uma falha de login do e-mail (de qualquer IP) antes de comparar a chave; devolve quanto esperar se o limite já foi usado.
+    /// Vale também para e-mail desconhecido, para a resposta não revelar quem tem conta. Quem acerta devolve com <see cref="RefundLoginAttempt"/>.
+    /// </summary>
+    public TimeSpan? ReserveLoginAttempt(string email)
+    {
+        var retry = _loginFailures.Hit(HashOf(email), options.Value.Limits.LoginFailuresPerEmailPerHour);
+        if (retry is not null)
+        {
+            logger.LogWarning("Limite de falhas de login atingido para {Email}.", MaskEmail(email));
+        }
+
+        return retry;
+    }
+
+    public void RefundLoginAttempt(string email) => _loginFailures.Remove(HashOf(email));
+
+    /// <summary>Conta um e-mail de confirmação a mandar para o endereço; devolve quanto esperar se passou do limite.</summary>
+    public TimeSpan? HitConfirmationEmail(string email)
+    {
+        var retry = _confirmationEmails.Hit(HashOf(email), options.Value.Limits.ConfirmationEmailsPerAddressPerHour);
+        if (retry is not null)
+        {
+            logger.LogWarning("Limite de e-mails de confirmação atingido para {Email}.", MaskEmail(email));
+        }
+
+        return retry;
+    }
+
+    private static string HashOf(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
 
     /// <summary>
     /// Reserva uma tentativa de <c>auth_key</c> da conta antes de comparar a chave; devolve quanto esperar se o limite já foi usado.

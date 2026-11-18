@@ -49,7 +49,14 @@ public sealed class ServerOptions
 
         public int AuthPerIpPerMinute { get; set; } = 20;
 
-        public int AuthPerEmailPerMinute { get; set; } = 10;
+        /// <summary>Pedidos por par e-mail e IP e por minuto nas rotas de <c>/auth</c> que citam um e-mail.</summary>
+        public int AuthPerEmailPerIpPerMinute { get; set; } = 10;
+
+        /// <summary>Falhas de <c>login</c> e <c>recover</c> por e-mail (de qualquer IP) e por hora; e-mail desconhecido também gasta.</summary>
+        public int LoginFailuresPerEmailPerHour { get; set; } = 50;
+
+        /// <summary>E-mails de confirmação por endereço e por hora; passou do limite, o cadastro responde 202 sem mandar nada.</summary>
+        public int ConfirmationEmailsPerAddressPerHour { get; set; } = 3;
 
         /// <summary>Pedidos por IP e por minuto em todas as rotas, menos <c>/health</c>.</summary>
         public int RequestsPerIpPerMinute { get; set; } = 600;

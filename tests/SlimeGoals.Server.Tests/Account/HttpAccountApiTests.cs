@@ -63,7 +63,7 @@ public sealed class HttpAccountApiTests(PostgresFixture postgres)
     {
         await using var factory = new ServerFactory(postgres, new Dictionary<string, string?>
         {
-            ["Limits:AuthPerEmailPerMinute"] = "6",
+            ["Limits:AuthPerEmailPerIpPerMinute"] = "6",
         });
         var account = await TestAccount.CreateAsync(factory);
         var api = new HttpAccountApi(factory.CreateClient());

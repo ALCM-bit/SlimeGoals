@@ -19,7 +19,7 @@ public sealed class LogPrivacyTests(PostgresFixture postgres)
             ["Logging:LogLevel:Microsoft"] = "Trace",
             ["Logging:LogLevel:System"] = "Trace",
             ["Logging:LogLevel:Npgsql"] = "Trace",
-            ["Limits:AuthPerEmailPerMinute"] = "4",
+            ["Limits:AuthPerEmailPerIpPerMinute"] = "4",
             ["Limits:MaxBlobBytes"] = "65536",
             ["Limits:AuthKeyFailuresPerAccountPerMinute"] = "1",
         });

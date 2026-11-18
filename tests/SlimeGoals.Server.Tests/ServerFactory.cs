@@ -31,7 +31,9 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
         {
             ["Maintenance:Enabled"] = "false",
             ["Limits:AuthPerIpPerMinute"] = "100000",
-            ["Limits:AuthPerEmailPerMinute"] = "100000",
+            ["Limits:AuthPerEmailPerIpPerMinute"] = "100000",
+            ["Limits:LoginFailuresPerEmailPerHour"] = "100000",
+            ["Limits:ConfirmationEmailsPerAddressPerHour"] = "100000",
             ["Limits:MaxBatchItems"] = "100000",
             ["Limits:MaxBlobBytes"] = "10000000",
             ["Limits:AuthKeyFailuresPerAccountPerMinute"] = "100000",
