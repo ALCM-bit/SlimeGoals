@@ -148,7 +148,7 @@ Acréscimos da 9.3 ao esquema: `purge_point` (ponto da limpeza, começa em 0), `
 
 Acordos feitos ao implementar o servidor. Onde diferem do texto acima, valem estes.
 
-**Token do aparelho.** 256 bits aleatórios, enviado em `Authorization: Bearer` e guardado como SHA-256 em `devices.token_hash`. Não expira: dura até sair, revogar, trocar a senha ou recuperar. `last_seen_at` é atualizado no máximo uma vez por hora.
+**Token do aparelho.** 256 bits aleatórios, enviado em `Authorization: Bearer` e guardado como SHA-256 em `devices.token_hash`. Vence depois de 30 dias sem uso (`Retention:DeviceIdleDays`, contados por `last_seen_at`; a manutenção diária revoga o aparelho vencido) e dura até sair, revogar, trocar a senha ou recuperar. `last_seen_at` é atualizado no máximo uma vez por hora.
 
 **Hash de `auth_key` e do código.** SHA-256, sem Argon2id no servidor, comparado com `CryptographicOperations.FixedTimeEquals`. O custo de testar senhas já está no Argon2id do aparelho, e a `auth_key` tem 256 bits. Um hash lento no servidor só abriria espaço para negação de serviço.
 
@@ -164,7 +164,7 @@ Acordos feitos ao implementar o servidor. Onde diferem do texto acima, valem est
 
 **E-mail de confirmação.** `IEmailSender`, com `LogEmailSender`, que escreve o token no log, com o e-mail mascarado (`a***@exemplo.com`), e só existe em `Development`. É a exceção à regra 8 da §5, prevista na §10. Fora de `Development`, o servidor recusa iniciar sem um envio real e sem `Server:PreloginSecret`.
 
-**Obrigação para a 9.6: envio em segundo plano.** O envio real precisa rodar em segundo plano, para um e-mail novo e um já usado levarem o mesmo tempo para responder. Enviar na própria requisição revelaria quem tem conta pelo tempo da resposta.
+**Obrigação para a 9.6: envio em segundo plano (resolvida em `specs/Endurecimento_do_servidor_v1.md`, D11).** O envio real precisa rodar em segundo plano, para um e-mail novo e um já usado levarem o mesmo tempo para responder. Enviar na própria requisição revelaria quem tem conta pelo tempo da resposta.
 
 **Apagar a conta e trocar a senha pedem a `auth_key` no corpo**, além do token. Um token roubado lê os blobs cifrados, mas não apaga a cópia da nuvem nem troca a senha. As duas rotas têm limite de 10 falhas de `auth_key` por minuto por conta, para o token roubado não testar senhas sem o limite que o login tem.
 
@@ -172,7 +172,7 @@ Acordos feitos ao implementar o servidor. Onde diferem do texto acima, valem est
 
 **E-mail normalizado.** `Trim()` e `ToLowerInvariant()` antes de qualquer uso, com índice único na coluna.
 
-**Cota.** Só `Sync:MaxRecordsPerAccount`, nula por padrão. Passar dela recusa o lote inteiro com `403 quota_exceeded`.
+**Cota.** `Sync:MaxRecordsPerAccount`, 100000 por padrão (um valor vazio desliga). Passar dela recusa o lote inteiro com `403 quota_exceeded`.
 
 **`limit` acima do máximo é reduzido, não recusado.** `has_more` continua correto, então o aparelho não percebe diferença.
 
@@ -184,7 +184,10 @@ Acordos feitos ao implementar o servidor. Onde diferem do texto acima, valem est
 | Lote do `push` | até 100 itens |
 | Blob | até 64 KiB |
 | Corpo | até 64 KiB nas rotas que não são `/sync/push`; até 10 MiB no `/sync/push`; acima disso, `413 too_large` |
-| `/auth` | 20 pedidos por minuto por IP e 10 por minuto por e-mail |
+| `/auth` | 20 pedidos por minuto por IP e 10 por minuto por par e-mail + IP; 50 falhas de `login` e `recover` por hora por e-mail |
+| Limite geral | 600 pedidos por minuto por IP (menos `/health`) e 300 por minuto por aparelho em `/sync` |
+| E-mail de confirmação | até 3 por hora para o mesmo endereço |
+| Token do aparelho | vence em 30 dias sem uso |
 | Falhas de `auth_key` | 10 por minuto por conta, em `DELETE /account` e `POST /auth/password` |
 | `record_key` | de 1 a 128 caracteres |
 | E-mail | até 254 caracteres |
@@ -195,7 +198,7 @@ Acordos feitos ao implementar o servidor. Onde diferem do texto acima, valem est
 | Token de confirmação | vale 24 h |
 | Marcas de exclusão | 180 dias |
 
-**Limites de taxa e proxy reverso (obrigação para a 9.6).** O limite por IP usa `RemoteIpAddress`. Atrás de um proxy reverso, todos os pedidos pareceriam vir do proxy; é preciso configurar `ForwardedHeaders` com os proxies conhecidos. Os contadores ficam na memória do processo: reiniciar o servidor os zera, e só há uma instância.
+**Limites de taxa e proxy reverso (obrigação da 9.6, resolvida em `specs/Endurecimento_do_servidor_v1.md`, D3).** O limite por IP usa `RemoteIpAddress`. O servidor confia no `X-Forwarded-For` só da rede em `Server:TrustedProxyNetworks` (no Compose, a rede do Caddy). Os contadores ficam na memória do processo: reiniciar o servidor os zera, e só há uma instância.
 
 **Respostas de erro.** Corpo `{"error":"<código>"}`, em minúsculas e sem detalhes internos.
 
@@ -205,12 +208,16 @@ Acordos feitos ao implementar o servidor. Onde diferem do texto acima, valem est
 | 400 | `invalid_token` | Confirmação desconhecida, vencida, substituída por um novo cadastro ou com `auth_key` de outro cadastro |
 | 401 | `unauthorized` | Token ausente, desconhecido ou revogado; credencial errada; e-mail desconhecido ou não confirmado no login |
 | 403 | `quota_exceeded` | Cota da conta |
+| 403 | `registration_closed` | Cadastro sem convite válido, com o convite errado ou com o cadastro fechado. Mesma resposta para qualquer e-mail |
 | 404 | `not_found` | Aparelho que não existe nesta conta |
 | 410 | `reset_required` | Regra 5 |
 | 413 | `too_large` | Blob ou corpo acima do máximo |
 | 429 | `rate_limited` | Limite de taxa, com `Retry-After` |
+| 500 | `internal_error` | Exceção não tratada fora de `Development`, sem detalhe |
 
-**Docker Compose.** `docker compose up -d --build --wait` sobe o PostgreSQL (`postgres:18-alpine`, sem porta publicada) e a API em `http://127.0.0.1:8080`, em modo `Development`, com o processo rodando como usuário `app`. O servidor aplica as migrações ao iniciar.
+**Cadastro com convite.** `POST /auth/register` recebe também `invite_code` (opcional). Veja D5 em `specs/Endurecimento_do_servidor_v1.md`.
+
+**Docker Compose.** O `compose.yaml` é produção (`Production`): Caddy com HTTPS à frente, PostgreSQL e API sem porta publicada, segredos em arquivo e contêineres endurecidos. O desenvolvimento usa `docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait`: `Development`, e-mail simulado e a API em `http://127.0.0.1:8080`, sem Caddy. O processo roda como usuário `app` e o servidor aplica as migrações ao iniciar, com o papel `slimegoals_owner`. Detalhes em `specs/Endurecimento_do_servidor_v1.md`.
 
 ## 6. Criptografia e conta
 
@@ -326,7 +333,7 @@ Acordos feitos ao ligar a conta e a sincronização no Linux (`SyncCoordinator`,
 
 **Build de desenvolvimento.** A seção "Conta e sincronização" e tudo o que ela usa só entram no head Linux com a constante `SYNC_DEV`, definida em Debug ou com `-p:SyncDev=true`. O Release (`packaging/linux/build.sh`) não registra cofre, coordenador nem tela, e continua sem rede. O Android compila o `SlimeGoals.Sync`, mas não registra nada dele até a 9.5b.
 
-**Endereço do servidor.** Fica em `settings` (`sync_server`), com padrão `http://127.0.0.1:8080`, e só pode ser editado com a conta desligada; com a conta ligada, vale o servidor gravado na sessão do cofre. Aceita só URL absoluta `http` ou `https`, sem credenciais embutidas (`usuario:senha@`), consulta nem fragmento. O `http` é tolerado porque a seção só existe no build de desenvolvimento; a 9.6 exige `https`.
+**Endereço do servidor.** Fica em `settings` (`sync_server`), com padrão `http://127.0.0.1:8080`, e só pode ser editado com a conta desligada; com a conta ligada, vale o servidor gravado na sessão do cofre. Aceita só URL absoluta `http` ou `https`, sem credenciais embutidas (`usuario:senha@`), consulta nem fragmento. Desde o endurecimento do servidor, o `https` é exigido em qualquer endereço; o `http` só vale para `127.0.0.1`, `::1` e `localhost`.
 
 **Aparelho revogado não perde a fila.** O `401` no ciclo vira `SyncUnauthorizedException`, o motor devolve `SyncCycleResult.Unauthorized` e grava "A sessão deste aparelho foi encerrada. Entre de novo." em `last_error`. O coordenador para o motor, descarta a sessão e passa a `SessionExpired`, sem tocar na fila, em `last_seq` nem em `sync_state.enabled`.
 - `ReauthenticateAsync(senha, nome do aparelho)` (o nome, como ao entrar, para o servidor não ver um aparelho genérico) usa o e-mail e o servidor da sessão do cofre, entra, abre a chave de dados e regrava o segredo com o token e o aparelho novos, sem `EnableAsync`. O motor volta e envia a fila; a chave de dados não muda com a troca de senha, então a fila continua válida.
@@ -365,7 +372,7 @@ Acordos feitos ao ligar a conta e a sincronização no Linux (`SyncCoordinator`,
 
 Fica para a 9.6: gerar um código novo com a conta ligada, para quem perdeu o papel ou ficou em dúvida sobre qual código vale.
 
-**Segredos do servidor em desenvolvimento.** `packaging/server/init-env.sh` cria o `.env` do Compose com valores aleatórios quando ele não existe, com permissão só para o dono. Em produção (9.6), os segredos entram como segredos do Docker Compose, em arquivos sob `/run/secrets`, e não como variáveis de ambiente.
+**Segredos do servidor em desenvolvimento.** `packaging/server/init-env.sh` cria o `.env` do Compose com valores aleatórios quando ele não existe, com permissão só para o dono. Em produção, e hoje também em desenvolvimento, os segredos entram como segredos do Docker Compose, em arquivos sob `/run/secrets` (`secrets/` no host), e não como variáveis de ambiente.
 
 **Diagnóstico sem mensagens de exceção.** No Linux, o `Trace` do app vai para o journal do sistema e fica gravado. Por isso nenhuma chamada grava a exceção inteira nem a mensagem dela: `TraceText.Of` dá os tipos da cadeia, o status HTTP e a pilha; `TraceText.Types`, só os tipos. Um teste varre o código e falha se alguma chamada voltar a interpolar a exceção. O caminho do banco também saiu dessas mensagens.
 
@@ -468,7 +475,7 @@ O código do spike é descartável, como em `specs/spikes/`.
 | 9.5 | Interface, permissão de internet, Linux e Android sincronizando |
 | 9.6 | Publicação, depois de decidir grátis ou pago: domínio, TLS, backup, e-mail, política de privacidade, nova auditoria |
 
-Até a 9.6, a confirmação de e-mail é simulada: o código sai no log do servidor local, e a pessoa o cola no app.
+Em desenvolvimento, a confirmação de e-mail é simulada: o código sai no log do servidor local, e a pessoa o cola no app. Em produção, sai por SMTP (`specs/Endurecimento_do_servidor_v1.md`).
 
 ## 11. Decisões em aberto
 

@@ -40,7 +40,7 @@ public sealed class ServerOptions
 
         public int MaxLimit { get; set; } = 500;
 
-        /// <summary>Cota de registros por conta; nula desliga.</summary>
+        /// <summary>Cota de registros por conta. Um valor vazio desliga; um JSON nulo mantém o padrão.</summary>
         public int? MaxRecordsPerAccount { get; set; } = 100000;
     }
 

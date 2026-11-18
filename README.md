@@ -132,22 +132,70 @@ adb shell am kill dev.alcm.slimegoals
 
 Para conferir os layouts sem emulador, `dotnet run --project tools/SlimeGoals.Render -- /tmp/render [phone|desktop|all]` grava PNGs de cada página em 412×915 (celular) e 1100×720 (desktop).
 
-## Servidor de sincronização (desenvolvimento)
+## Servidor de sincronização
 
-O servidor da fase 9 (`src/SlimeGoals.Server`, ASP.NET Core + PostgreSQL) só é usado pelo build de desenvolvimento do Linux (veja [Sincronização (em desenvolvimento)](#sincronização-em-desenvolvimento)); o app instalado não fala com ele. Pré-requisito: Docker com o plugin Compose.
+O servidor da fase 9 (`src/SlimeGoals.Server`, ASP.NET Core + PostgreSQL) só é usado pelo build de desenvolvimento (veja [Sincronização (em desenvolvimento)](#sincronização-em-desenvolvimento)); o app instalado não fala com ele. Pré-requisito: Docker com o plugin Compose. O desenho do endurecimento está em [specs/Endurecimento_do_servidor_v1.md](specs/Endurecimento_do_servidor_v1.md).
+
+O `init-env.sh` cria dois itens fora do repositório: `secrets/` (pasta 700, um arquivo por segredo) e `.env` (só valores que não são segredo). Os segredos nunca vão em variável de ambiente. Para fazer o `.env` à mão, copie o `.env.example`.
+
+### Desenvolvimento
 
 ```bash
-packaging/server/init-env.sh        # cria o .env com segredos aleatórios, se ainda não existir
-docker compose up -d --build --wait
+packaging/server/init-env.sh
+docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait
 curl -fsS http://127.0.0.1:8080/health
 ```
 
-- A API responde em `http://127.0.0.1:8080`, publicada só no seu computador. O PostgreSQL não tem porta publicada.
-- O servidor sobe em `Development`, com o e-mail simulado: o código de confirmação do cadastro aparece no log (`docker compose logs server`), ao lado do e-mail mascarado (`a***@exemplo.com`), nunca do endereço completo. A confirmação pede também a `auth_key` de quem cadastrou.
-- O `.env` fica fora do repositório, legível só pelo seu usuário. Sem as duas variáveis, o `docker compose` recusa subir. Para preencher à mão, copie o `.env.example`.
+- O `compose.dev.yaml` vai por cima do `compose.yaml`: o servidor sobe em `Development`, com o e-mail simulado, e a API fica em `http://127.0.0.1:8080`, publicada só no seu computador. Não há Caddy. O PostgreSQL não tem porta publicada. Não existe `compose.override.yaml`, de propósito: o modo de desenvolvimento nunca entra sem querer.
+- O cadastro pede o convite, mesmo em desenvolvimento: ele está em `secrets/Server__InviteCode`. Cole o valor no campo "Código de convite" do app.
+- O código de confirmação do cadastro aparece no log (`docker compose -f compose.yaml -f compose.dev.yaml logs server`), ao lado do e-mail mascarado (`a***@exemplo.com`), nunca do endereço completo. A confirmação pede também a `auth_key` de quem cadastrou.
 - Use sempre `--build`: sem ele, o Compose reaproveita a imagem antiga do servidor, e o app novo pode não conversar com ela.
 - Os dados ficam no volume `slimegoals_pgdata`. `docker compose down` mantém o volume; `docker compose down -v` apaga o banco.
 - As rotas, os limites e os códigos de erro estão em [specs/Sincronizacao_v1.md](specs/Sincronizacao_v1.md), seção 5.
+
+**Já tem um banco de desenvolvimento de antes do endurecimento?** O volume antigo tem tabelas de um superusuário. Faça nesta ordem, sem apagar dados:
+
+1. `packaging/server/init-env.sh`. Se o `.env` for do formato antigo (tem `POSTGRES_PASSWORD`), ele avisa: troque o conteúdo pelo do `.env.example`. As duas variáveis antigas não são mais lidas.
+2. `packaging/server/upgrade-roles.sh`. Cria os papéis `slimegoals_owner` e `slimegoals_app` e passa as tabelas para o dono. Pode rodar de novo sem problema. Ele recria o contêiner `db` com a configuração nova; o volume fica.
+3. `docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait`.
+
+### Produção
+
+O `compose.yaml` sozinho sobe em `Production`: o Caddy na frente, com HTTPS automático (Let's Encrypt), o servidor e o PostgreSQL. Só o Caddy publica portas (80 e 443). O servidor e o banco rodam com sistema de arquivos somente leitura, sem capacidades extras e como usuário sem privilégio.
+
+1. **DNS.** Aponte o domínio para a máquina e deixe as portas 80 e 443 livres para a internet. O Let's Encrypt precisa delas.
+2. **Segredos.** `packaging/server/init-env.sh` cria `secrets/` e o `.env`. Edite o `.env` e ponha o seu domínio em `SLIMEGOALS_DOMAIN`.
+3. **SMTP (obrigatório antes do `up`).** Em produção o servidor se recusa a subir com o SMTP vazio. Preencha `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME` e `SMTP_FROM` no `.env` e grave a senha em `secrets/Email__Smtp__Password`. Exemplo com o [Resend](https://resend.com):
+
+   ```bash
+   # no .env
+   SMTP_HOST=smtp.resend.com
+   SMTP_PORT=587
+   SMTP_USERNAME=resend
+   SMTP_FROM=SlimeGoals <nao-responda@seudominio.com.br>
+   ```
+
+   A chave da API do Resend é a senha: grave-a em `secrets/Email__Smtp__Password`, sem quebra de linha no fim (`printf '%s' 'CHAVE' > secrets/Email__Smtp__Password`; prefira um editor, para a chave não ficar no histórico do terminal). O domínio do remetente precisa estar verificado no Resend. O e-mail exige TLS (`StartTls` na 587).
+4. **Subir.**
+
+   ```bash
+   docker compose up -d --build --wait
+   curl -fsS https://seudominio.com.br/health
+   ```
+
+5. **Convite.** O cadastro só aceita quem tem o convite, em `secrets/Server__InviteCode`. Passe-o só a quem você quer que crie conta. Para trocar, edite o arquivo e reinicie o servidor (`docker compose up -d --force-recreate server`).
+6. **Atualizar.** `git pull` e `docker compose up -d --build --wait`. Um banco de antes do endurecimento passa antes pelo `upgrade-roles.sh` (veja acima).
+
+Para testar a produção no seu computador, use `SLIMEGOALS_DOMAIN=localhost`: o Caddy usa a própria CA interna (o navegador e o `curl` reclamam do certificado; use `curl -k`). O SMTP também precisa estar preenchido; um host fictício basta para subir, e o e-mail falha no envio.
+
+Observações:
+
+- O servidor só confia no cabeçalho `X-Forwarded-For` vindo do Caddy (a rede interna fixa, `10.89.0.0/24`). **Nunca defina `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`:** isso faria o servidor confiar em qualquer proxy e desligaria o limite por IP.
+- O código de confirmação do cadastro vai por e-mail e não aparece em log. Se o SMTP falhar 3 vezes, a conta pendente é apagada, e o log registra a falha com o e-mail mascarado. E-mails ainda na fila quando o servidor para não são enviados; a conta pendente vence em 24 h.
+- O token do aparelho vence depois de 30 dias sem sincronizar; é preciso entrar de novo.
+- O log do servidor traz avisos do `DataProtection` sobre chaves na memória. São inofensivos: o servidor não usa nada que dependa delas.
+- A resposta de redirecionamento da porta 80 ainda traz `Server: Caddy`. É conhecido e só revela o proxy.
+- Backup do banco, política de privacidade e a seção de conta no app de Release continuam na fase 9.6.
 
 **Os testes do servidor usam Docker.** Os testes de integração sobem um PostgreSQL de verdade com Testcontainers, então `dotnet test --solution SlimeGoals.slnx` agora precisa do Docker rodando. Se o Testcontainers falhar ao subir o contêiner auxiliar (ryuk), por exemplo por uma credencial antiga do Docker, baixe as imagens à mão e rode de novo:
 
@@ -165,18 +213,18 @@ docker pull testcontainers/ryuk:0.14.0   # use a versão que o erro indicar
 No build de desenvolvimento do Linux (Debug, ou qualquer build com `-p:SyncDev=true`), Configurações ganha, no topo, a seção **Conta e sincronização**: criar conta, confirmar, entrar, recuperar, trocar a senha, ver e remover aparelhos, sair e apagar a conta. O app instalado (Release, `packaging/linux/build.sh`) não tem a seção, nem cofre, nem rede. No Android, vale o mesmo: só o APK de desenvolvimento sincroniza (veja "No Android", abaixo).
 
 ```bash
-# 1. suba o servidor (veja a seção anterior para o .env)
-docker compose up -d --build --wait
+# 1. suba o servidor (veja "Servidor de sincronização > Desenvolvimento")
+docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait
 
 # 2. rode o app em Debug, com dados e configuração de teste
 XDG_DATA_HOME=/tmp/sg-a/data XDG_CONFIG_HOME=/tmp/sg-a/config dotnet run --project src/SlimeGoals.Desktop
 ```
 
-- O servidor padrão é `http://127.0.0.1:8080`, o do `compose.yaml`. O endereço só pode ser trocado com a conta desligada.
-- Ao criar a conta, o código de confirmação não chega por e-mail: ele aparece no log do servidor.
+- O servidor padrão é `http://127.0.0.1:8080`, o do `compose.dev.yaml`. O endereço só aceita `https://`, exceto para `127.0.0.1`, `::1` e `localhost`. Para um servidor em produção, use o `https://` do seu domínio. O endereço só pode ser trocado com a conta desligada.
+- Ao criar a conta, preencha o "Código de convite" (`secrets/Server__InviteCode`). O código de confirmação não chega por e-mail: ele aparece no log do servidor.
 
   ```bash
-  docker compose logs server
+  docker compose -f compose.yaml -f compose.dev.yaml logs server
   ```
 
 - A sessão fica no chaveiro do sistema (Secret Service, por exemplo o gnome-keyring), separada por banco de dados. Sem chaveiro, a sincronização não liga.

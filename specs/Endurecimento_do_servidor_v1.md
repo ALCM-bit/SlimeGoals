@@ -1,6 +1,6 @@
 # Endurecimento do servidor (v1)
 
-> Rascunho de 17/11/2026, para o autor revisar. Fecha os 9 itens da auditoria de 13/11/2026 que bloqueiam expor o servidor, mais a obrigação da 9.6 de enviar o e-mail em segundo plano. Vale junto com `specs/Sincronizacao_v1.md`: onde as duas divergem, esta vale.
+> Construído em 18/11/2026 (tarefas 1 a 10 do plano). Rascunho de 17/11/2026, para o autor revisar. Fecha os 9 itens da auditoria de 13/11/2026 que bloqueiam expor o servidor, mais a obrigação da 9.6 de enviar o e-mail em segundo plano. Vale junto com `specs/Sincronizacao_v1.md`: onde as duas divergem, esta vale.
 
 ## 1. Para que serve
 
@@ -52,7 +52,7 @@ Hoje o servidor só é seguro porque fica preso ao 127.0.0.1. Este desenho deixa
 | `ConnectionStrings:PostgresMigrations` | vazio (usa `Postgres`) | Fora de `Development`, é obrigatória e precisa ser diferente de `Postgres` |
 | `Server:InviteCode` | vazio | Em `Development`, vazio deixa o cadastro aberto. Fora dele, vazio deixa o cadastro fechado |
 | `Server:TrustedProxyNetworks` | vazio | Lista em CIDR |
-| `Sync:MaxRecordsPerAccount` | 100000 | Nulo desliga, só por decisão de quem opera |
+| `Sync:MaxRecordsPerAccount` | 100000 | Um valor vazio desliga, só por decisão de quem opera. Um JSON `null` mantém 100000 |
 | `Limits:AuthPerEmailPerIpPerMinute` | 10 | Substitui `AuthPerEmailPerMinute` |
 | `Limits:LoginFailuresPerEmailPerHour` | 50 | |
 | `Limits:ConfirmationEmailsPerAddressPerHour` | 3 | |
@@ -60,9 +60,9 @@ Hoje o servidor só é seguro porque fica preso ao 127.0.0.1. Este desenho deixa
 | `Limits:SyncPerDevicePerMinute` | 300 | |
 | `Retention:DeviceIdleDays` | 30 | |
 | `Email:Mode` | `log` | `log` ou `smtp`. `log` só em `Development` |
-| `Email:Smtp:Host`, `Port`, `Username`, `Password`, `From`, `Security` | vazio, 587, vazio, vazio, vazio, `StartTls` | Com `Mode = smtp`, `Host` e `From` são obrigatórios. A `Password` vem de `/run/secrets` |
+| `Email:Smtp:Host`, `Port`, `Username`, `Password`, `From`, `Security` | vazio, 587, vazio, vazio, vazio, `StartTls` | Com `Mode = smtp`, `Host` e `From` são obrigatórios; em produção, o servidor não sobe sem eles. A `Password` vem de `/run/secrets`. No Compose, `Host`, `Port`, `Username` e `From` vêm do `.env` (`SMTP_*`) e viram `Email__Smtp__*` |
 
-**Respostas novas:** `403 registration_closed` no cadastro. No app, vira "Este servidor não aceita cadastro sem um convite válido. Peça o código a quem cuida do servidor."
+**Respostas novas:** `403 registration_closed` no cadastro e `500 internal_error` (`{"error":"internal_error"}`) para qualquer exceção não tratada fora de `Development`, sem detalhe. No app, o primeiro vira "Este servidor não aceita cadastro sem um convite válido. Peça o código a quem cuida do servidor."
 
 ## 4. Comportamento no app
 
@@ -72,12 +72,19 @@ Hoje o servidor só é seguro porque fica preso ao 127.0.0.1. Este desenho deixa
 
 ## 5. Como conferir à mão
 
-1. `packaging/server/init-env.sh` cria `secrets/` (700, arquivos 644) e o `.env`, este só com valores que não são segredo. Depois, `SLIMEGOALS_DOMAIN=localhost docker compose up -d --build --wait` sobe o banco, o servidor e o Caddy, todos saudáveis.
+1. `packaging/server/init-env.sh` cria `secrets/` (700, arquivos 644) e o `.env`, este só com valores que não são segredo. Em produção o servidor não sobe com o SMTP vazio: preencha `SMTP_HOST` e `SMTP_FROM` no `.env` (um host fictício basta para o teste local). Depois, `SLIMEGOALS_DOMAIN=localhost docker compose up -d --build --wait` sobe o banco, o servidor e o Caddy, todos saudáveis.
 2. `curl -sk https://localhost/health` devolve 200. `curl -sI http://localhost/health` devolve 308 para `https`. `curl http://127.0.0.1:8080` não conecta.
 3. `docker inspect` dos três contêineres não mostra nenhum segredo em `Env`.
 4. `docker compose exec db psql -U slimegoals_app -d slimegoals -c 'CREATE TABLE x(i int)'` é recusado.
-5. Com `compose.dev.yaml`, o fluxo de hoje continua: cadastro, código no log e confirmação no app.
+5. Com `compose.dev.yaml`, o fluxo de hoje continua: cadastro (com o convite de `secrets/Server__InviteCode`), código no log e confirmação no app.
 
 ## 6. Banco do servidor de desenvolvimento que já existe
 
 As tabelas de hoje pertencem a `slimegoals`, o superusuário. `packaging/server/upgrade-roles.sh` cria os dois papéis e passa as tabelas para `slimegoals_owner`, sem apagar dados. Rodar `docker compose down -v` só com pedido explícito.
+
+## 7. Notas de operação
+
+- **E-mail na fila ao parar.** Os e-mails de confirmação ainda na fila quando o servidor para não são enviados. A conta pendente vence em 24 h e a limpeza diária a remove.
+- **`ASPNETCORE_FORWARDEDHEADERS_ENABLED`.** Nunca defina como `true`: reativaria a confiança em qualquer proxy e anularia D3.
+- **DataProtection.** Com a raiz somente leitura, o servidor loga avisos de chaves em memória. O servidor não usa nada que dependa delas (o token é próprio, sem cookie).
+- **Porta 80.** O redirecionamento 308 do Caddy ainda traz `Server: Caddy`; só o site HTTPS remove o cabeçalho. Conhecido, de baixo impacto.
