@@ -16,10 +16,17 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
 {
     private readonly Dictionary<string, string?> _settings;
     private readonly string _environment;
+    private readonly bool _fakeEmail;
 
     public ServerFactory(PostgresFixture postgres, IDictionary<string, string?>? overrides = null, string environment = "Development")
+        : this(postgres, overrides, environment, fakeEmail: environment == "Development")
+    {
+    }
+
+    private ServerFactory(PostgresFixture postgres, IDictionary<string, string?>? overrides, string environment, bool fakeEmail)
     {
         _environment = environment;
+        _fakeEmail = fakeEmail;
         _settings = new Dictionary<string, string?>
         {
             ["Maintenance:Enabled"] = "false",
@@ -39,8 +46,28 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
 
         if (!_settings.ContainsKey("ConnectionStrings:Postgres"))
         {
-            _settings["ConnectionStrings:Postgres"] = postgres.NewDatabaseAsync().GetAwaiter().GetResult();
+            var database = postgres.NewDatabaseAsync().GetAwaiter().GetResult();
+            _settings["ConnectionStrings:Postgres"] = database.App;
+            _settings["ConnectionStrings:PostgresMigrations"] = database.Owner;
         }
+    }
+
+    /// <summary>
+    /// Um servidor em Production com configuração válida (segredo do prelogin, papéis distintos e e-mail falso).
+    /// Os testes de recusa partem dele e estragam uma chave só.
+    /// </summary>
+    public static ServerFactory Production(PostgresFixture postgres, IDictionary<string, string?>? overrides = null)
+    {
+        var settings = new Dictionary<string, string?> { ["Server:PreloginSecret"] = "segredo-de-teste" };
+        if (overrides is not null)
+        {
+            foreach (var (key, value) in overrides)
+            {
+                settings[key] = value;
+            }
+        }
+
+        return new ServerFactory(postgres, settings, "Production", fakeEmail: true);
     }
 
     public FakeTimeProvider Time { get; } = new(new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero));
@@ -53,7 +80,11 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
     /// <summary>Tudo que o servidor registrou; o nível vem da configuração <c>Logging</c>.</summary>
     public CapturingLoggerProvider Logs { get; } = new();
 
+    /// <summary>A cadeia do papel do app (só linhas).</summary>
     public string ConnectionString => _settings["ConnectionStrings:Postgres"]!;
+
+    /// <summary>A cadeia do papel dono (DDL); cai na do app quando o teste não configurou outra.</summary>
+    public string OwnerConnectionString => _settings.GetValueOrDefault("ConnectionStrings:PostgresMigrations") ?? ConnectionString;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -67,7 +98,7 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
         {
             services.Replace(ServiceDescriptor.Singleton<TimeProvider>(Time));
             services.AddSingleton<ILoggerProvider>(Logs);
-            if (_environment == "Development")
+            if (_fakeEmail)
             {
                 services.Replace(ServiceDescriptor.Singleton<IEmailSender>(Email));
             }

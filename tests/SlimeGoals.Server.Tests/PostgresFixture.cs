@@ -5,29 +5,67 @@ using Testcontainers.PostgreSql;
 
 namespace SlimeGoals.Server.Tests;
 
+/// <summary>As duas cadeias de conexão de um banco de teste: o papel do app e o papel dono.</summary>
+public sealed record PostgresTestDatabase(string App, string Owner);
+
 /// <summary>Um PostgreSQL descartável por execução; cada teste pede o seu banco novo.</summary>
 public sealed class PostgresFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine").Build();
 
+    /// <summary>A cadeia do superusuário do contêiner, no banco padrão.</summary>
     public string ConnectionString => _container.GetConnectionString();
 
     public async ValueTask InitializeAsync() => await _container.StartAsync();
 
     public async ValueTask DisposeAsync() => await _container.DisposeAsync();
 
-    /// <summary>Cria um banco vazio e devolve a cadeia de conexão dele.</summary>
-    public async Task<string> NewDatabaseAsync()
+    /// <summary>
+    /// Cria um banco vazio e aplica o <c>roles.sql</c> de produção com papéis de nome único (os papéis valem
+    /// para o cluster inteiro e os testes rodam em paralelo).
+    /// </summary>
+    public async Task<PostgresTestDatabase> NewDatabaseAsync()
     {
-        var name = "t_" + Guid.NewGuid().ToString("N");
-        await using (var admin = new NpgsqlConnection(ConnectionString))
+        var suffix = Guid.NewGuid().ToString("N");
+        var database = "t_" + suffix;
+        var owner = "owner_" + suffix;
+        var app = "app_" + suffix;
+        var ownerPassword = Guid.NewGuid().ToString("N");
+        var appPassword = Guid.NewGuid().ToString("N");
+
+        await ExecuteAsync(ConnectionString, $"CREATE DATABASE \"{database}\"");
+
+        var script = (await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "roles.sql")))
+            .Replace(":\"owner_role\"", $"\"{owner}\"", StringComparison.Ordinal)
+            .Replace(":\"app_role\"", $"\"{app}\"", StringComparison.Ordinal)
+            .Replace(":\"db_name\"", $"\"{database}\"", StringComparison.Ordinal)
+            .Replace(":'owner_password'", $"'{ownerPassword}'", StringComparison.Ordinal)
+            .Replace(":'app_password'", $"'{appPassword}'", StringComparison.Ordinal);
+        await ExecuteAsync(For(ConnectionString, database), script);
+
+        return new PostgresTestDatabase(
+            For(ConnectionString, database, app, appPassword),
+            For(ConnectionString, database, owner, ownerPassword));
+    }
+
+    private static string For(string baseConnection, string database, string? user = null, string? password = null)
+    {
+        var builder = new NpgsqlConnectionStringBuilder(baseConnection) { Database = database, Pooling = false };
+        if (user is not null)
         {
-            await admin.OpenAsync();
-            await using var command = admin.CreateCommand();
-            command.CommandText = $"CREATE DATABASE \"{name}\"";
-            await command.ExecuteNonQueryAsync();
+            builder.Username = user;
+            builder.Password = password;
         }
 
-        return new NpgsqlConnectionStringBuilder(ConnectionString) { Database = name, Pooling = false }.ConnectionString;
+        return builder.ConnectionString;
+    }
+
+    private static async Task ExecuteAsync(string connectionString, string sql)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        await command.ExecuteNonQueryAsync();
     }
 }

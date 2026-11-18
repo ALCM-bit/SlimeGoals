@@ -16,9 +16,19 @@ builder.Services.AddOptions<ServerOptions>().Bind(builder.Configuration).Validat
 builder.Services.AddSingleton<IValidateOptions<ServerOptions>, ServerOptionsValidator>();
 builder.Services.TryAddSingleton(TimeProvider.System);
 builder.Services.AddSingleton(sp =>
-    NpgsqlDataSource.Create(sp.GetRequiredService<IConfiguration>().GetConnectionString("Postgres")
-        ?? throw new InvalidOperationException("ConnectionStrings:Postgres não configurada.")));
-builder.Services.AddSingleton<Db>();
+{
+    var configuration = sp.GetRequiredService<IConfiguration>();
+    var appConnection = configuration.GetConnectionString("Postgres");
+    if (string.IsNullOrWhiteSpace(appConnection))
+    {
+        throw new InvalidOperationException("ConnectionStrings:Postgres não configurada.");
+    }
+
+    var migrations = configuration.GetConnectionString("PostgresMigrations");
+    return new Db(
+        NpgsqlDataSource.Create(appConnection),
+        string.IsNullOrWhiteSpace(migrations) ? null : NpgsqlDataSource.Create(migrations));
+});
 builder.Services.AddSingleton<ServerMigrator>();
 builder.Services.AddSingleton<AccountStore>();
 builder.Services.AddSingleton<AuthRateLimits>();
@@ -33,6 +43,12 @@ builder.Services.AddAuthentication(DeviceTokenHandler.SchemeName)
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+// Antes de ler as opções: ler IOptions<ServerOptions>.Value roda todos os validadores.
+if (!app.Environment.IsDevelopment())
+{
+    await DatabaseRoleGuard.EnsureSafeAsync(app.Services.GetRequiredService<Db>(), CancellationToken.None);
+}
 
 if (app.Services.GetRequiredService<IOptions<ServerOptions>>().Value.Server.MigrateOnStart)
 {

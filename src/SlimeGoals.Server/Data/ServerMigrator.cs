@@ -14,7 +14,7 @@ public sealed class ServerMigrator(Db db)
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
-        await using var connection = await db.OpenAsync(cancellationToken);
+        await using var connection = await db.OpenForMigrationsAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
         await connection.ExecuteAsync(new CommandDefinition(
