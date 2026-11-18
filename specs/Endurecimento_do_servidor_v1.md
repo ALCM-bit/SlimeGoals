@@ -35,7 +35,7 @@ Hoje o servidor só é seguro porque fica preso ao 127.0.0.1. Este desenho deixa
 |---|---|---|
 | D1 | 1. Sem TLS | Caddy no Compose, à frente do servidor, com HTTPS automático para `SLIMEGOALS_DOMAIN` (Let's Encrypt) e redirecionamento de 80 para 443. Com `SLIMEGOALS_DOMAIN=localhost`, o Caddy usa a própria CA interna, o que basta para o teste local. O servidor não publica porta nenhuma. O app só aceita `https://`. O `http://` continua valendo só para `127.0.0.1`, `::1` e `localhost` |
 | D2 | 2. Compose em `Development` | O `compose.yaml` sobe em `Production`. O desenvolvimento usa `compose.dev.yaml` por cima: `Development`, e-mail simulado e porta `127.0.0.1:8080` direto no servidor, sem o Caddy. Não existe `compose.override.yaml`, para o modo de desenvolvimento nunca entrar sem querer |
-| D3 | 3. IP do proxy | `ForwardedHeaders` só com `X-Forwarded-For` e `X-Forwarded-Proto`, `ForwardLimit = 1` e confiança só na rede `Server:TrustedProxyNetworks`. No Compose, essa rede é a sub-rede fixa da rede interna entre o Caddy e o servidor. Fora dessa rede, o cabeçalho é ignorado |
+| D3 | 3. IP do proxy | `ForwardedHeaders` só com `X-Forwarded-For` e `X-Forwarded-Proto`, `ForwardLimit = 1` e confiança só na rede `Server:TrustedProxyNetworks`. No Compose, é só o IP fixo do Caddy, `10.89.0.2/32`, na rede interna `edge` (sub-rede `10.89.0.0/24`, IPs automáticos só em `10.89.0.128/25`). A sub-rede inteira não: ela inclui o gateway `10.89.0.1`, por onde entram os processos do host e as portas publicadas, que poderiam forjar o cabeçalho. Fora desse IP, o cabeçalho é ignorado |
 | D4 | 4. Superusuário | Três papéis. `postgres` (o superusuário da imagem) só existe para criar os outros dois. `slimegoals_owner` é dono do banco e das tabelas e só roda as migrações (`ConnectionStrings:PostgresMigrations`). `slimegoals_app` só lê e grava linhas (`ConnectionStrings:Postgres`). Fora de `Development`, o servidor se recusa a subir se o papel do app for superusuário, puder criar papéis ou bancos, ou for o mesmo das migrações |
 | D5 | 5. Cadastro aberto | Cadastro só com convite: `Server:InviteCode`. Fora de `Development` e sem convite configurado, o cadastro fica fechado. Convite ausente ou errado, ou cadastro fechado, dão a mesma resposta `403 registration_closed`, conferida em tempo constante e antes de qualquer acesso ao banco. A resposta não revela quem tem conta, porque é a mesma para qualquer e-mail. O `init-env.sh` gera um convite de 128 bits. A cota passa a vir ligada: `Sync:MaxRecordsPerAccount = 100000` |
 | D6 | 6. Senha padrão | O `appsettings.json` não traz string de conexão. Sem ela, o servidor não sobe, com uma mensagem que não ecoa nenhum valor |
@@ -58,9 +58,9 @@ Hoje o servidor só é seguro porque fica preso ao 127.0.0.1. Este desenho deixa
 | `Limits:ConfirmationEmailsPerAddressPerHour` | 3 | |
 | `Limits:RequestsPerIpPerMinute` | 600 | |
 | `Limits:SyncPerDevicePerMinute` | 300 | |
-| `Retention:DeviceIdleDays` | 30 | |
+| `Retention:DeviceIdleDays` | 30 | Pelo menos 1, em qualquer ambiente: 0 revogaria todos os aparelhos |
 | `Email:Mode` | `log` | `log` ou `smtp`. `log` só em `Development` |
-| `Email:Smtp:Host`, `Port`, `Username`, `Password`, `From`, `Security` | vazio, 587, vazio, vazio, vazio, `StartTls` | Com `Mode = smtp`, `Host` e `From` são obrigatórios; em produção, o servidor não sobe sem eles. A `Password` vem de `/run/secrets`. No Compose, `Host`, `Port`, `Username` e `From` vêm do `.env` (`SMTP_*`) e viram `Email__Smtp__*` |
+| `Email:Smtp:Host`, `Port`, `Username`, `Password`, `From`, `Security` | vazio, 587, vazio, vazio, vazio, `StartTls` | Com `Mode = smtp`, `Host` e `From` são obrigatórios, `From` precisa ser um endereço com domínio e `Port` fica entre 1 e 65535; em produção, o servidor não sobe sem isso. A `Password` vem de `/run/secrets`. No Compose, `Host`, `Port`, `Username` e `From` vêm do `.env` (`SMTP_*`) e viram `Email__Smtp__*` |
 
 **Respostas novas:** `403 registration_closed` no cadastro e `500 internal_error` (`{"error":"internal_error"}`) para qualquer exceção não tratada fora de `Development`, sem detalhe. No app, o primeiro vira "Este servidor não aceita cadastro sem um convite válido. Peça o código a quem cuida do servidor."
 
@@ -88,3 +88,11 @@ As tabelas de hoje pertencem a `slimegoals`, o superusuário. `packaging/server/
 - **`ASPNETCORE_FORWARDEDHEADERS_ENABLED`.** Nunca defina como `true`: reativaria a confiança em qualquer proxy e anularia D3.
 - **DataProtection.** Com a raiz somente leitura, o servidor loga avisos de chaves em memória. O servidor não usa nada que dependa delas (o token é próprio, sem cookie).
 - **Porta 80.** O redirecionamento 308 do Caddy ainda traz `Server: Caddy`; só o site HTTPS remove o cabeçalho. Conhecido, de baixo impacto.
+- **Só IPv4 até a 9.6.** O Caddy publica as portas só em `0.0.0.0`, e o domínio não deve ter registro `AAAA`. A rede `edge` não tem IPv6: num host com as duas pilhas, o Docker atenderia o IPv6 em `[::]`, e todo cliente IPv6 chegaria ao servidor como o gateway, num balde só do limite por IP. Bastariam poucos pedidos para travar a entrada de todos os clientes IPv6, o que fere a seção 2.
+
+## 8. Obrigações para a 9.6
+
+Antes de expor o servidor na 9.6, além do que a seção 2 deixa de fora:
+
+1. **IPv6.** `enable_ipv6` na rede `edge`, com uma sub-rede ULA fixa; o Caddy com IP fixo nela, que entra em `Server:TrustedProxyNetworks`; e o limite por IP agrupando os endereços IPv6 por `/64`, porque um cliente IPv6 costuma controlar o `/64` inteiro. Só então publicar as portas em `[::]` e o registro `AAAA`.
+2. **Sessão gravada com `http://` fora do loopback.** O motor de sincronização se recusa a partir com uma sessão gravada que aponte para `http://` fora de `127.0.0.1`, `::1` e `localhost`, e o app mostra "sessão encerrada". Sair continua possível. Hoje só a sessão nova e a reautenticação recusam.

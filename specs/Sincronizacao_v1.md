@@ -198,7 +198,7 @@ Acordos feitos ao implementar o servidor. Onde diferem do texto acima, valem est
 | Token de confirmação | vale 24 h |
 | Marcas de exclusão | 180 dias |
 
-**Limites de taxa e proxy reverso (obrigação da 9.6, resolvida em `specs/Endurecimento_do_servidor_v1.md`, D3).** O limite por IP usa `RemoteIpAddress`. O servidor confia no `X-Forwarded-For` só da rede em `Server:TrustedProxyNetworks` (no Compose, a rede do Caddy). Os contadores ficam na memória do processo: reiniciar o servidor os zera, e só há uma instância.
+**Limites de taxa e proxy reverso (obrigação da 9.6, resolvida em `specs/Endurecimento_do_servidor_v1.md`, D3).** O limite por IP usa `RemoteIpAddress`. O servidor confia no `X-Forwarded-For` só da rede em `Server:TrustedProxyNetworks` (no Compose, só o IP fixo do Caddy, `10.89.0.2/32`). Os contadores ficam na memória do processo: reiniciar o servidor os zera, e só há uma instância.
 
 **Respostas de erro.** Corpo `{"error":"<código>"}`, em minúsculas e sem detalhes internos.
 
@@ -474,6 +474,8 @@ O código do spike é descartável, como em `specs/spikes/`.
 | 9.4 | Criptografia e conta |
 | 9.5 | Interface, permissão de internet, Linux e Android sincronizando |
 | 9.6 | Publicação, depois de decidir grátis ou pago: domínio, TLS, backup, e-mail, política de privacidade, nova auditoria |
+
+Antes de publicar, a 9.6 também precisa cumprir as obrigações da seção 8 de `specs/Endurecimento_do_servidor_v1.md`: IPv6 na rede do Caddy, com o limite por IP agrupando IPv6 por `/64` (até lá, o servidor atende só IPv4, sem registro `AAAA`); e o motor de sincronização recusando partir com uma sessão gravada em `http://` fora do loopback, mostrando "sessão encerrada".
 
 Em desenvolvimento, a confirmação de e-mail é simulada: o código sai no log do servidor local, e a pessoa o cola no app. Em produção, sai por SMTP (`specs/Endurecimento_do_servidor_v1.md`).
 

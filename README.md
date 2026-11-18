@@ -163,7 +163,7 @@ curl -fsS http://127.0.0.1:8080/health
 
 O `compose.yaml` sozinho sobe em `Production`: o Caddy na frente, com HTTPS automático (Let's Encrypt), o servidor e o PostgreSQL. Só o Caddy publica portas (80 e 443). O servidor e o banco rodam com sistema de arquivos somente leitura, sem capacidades extras e como usuário sem privilégio.
 
-1. **DNS.** Aponte o domínio para a máquina e deixe as portas 80 e 443 livres para a internet. O Let's Encrypt precisa delas.
+1. **DNS.** Aponte o domínio para a máquina só com registro `A` (IPv4), sem registro `AAAA`, e deixe as portas 80 e 443 livres para a internet. O Let's Encrypt precisa delas. O servidor atende só IPv4 até a fase 9.6 (veja as observações abaixo).
 2. **Segredos.** `packaging/server/init-env.sh` cria `secrets/` e o `.env`. Edite o `.env` e ponha o seu domínio em `SLIMEGOALS_DOMAIN`.
 3. **SMTP (obrigatório antes do `up`).** Em produção o servidor se recusa a subir com o SMTP vazio. Preencha `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME` e `SMTP_FROM` no `.env` e grave a senha em `secrets/Email__Smtp__Password`. Exemplo com o [Resend](https://resend.com):
 
@@ -190,11 +190,12 @@ Para testar a produção no seu computador, use `SLIMEGOALS_DOMAIN=localhost`: o
 
 Observações:
 
-- O servidor só confia no cabeçalho `X-Forwarded-For` vindo do Caddy (a rede interna fixa, `10.89.0.0/24`). **Nunca defina `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`:** isso faria o servidor confiar em qualquer proxy e desligaria o limite por IP.
+- O servidor só confia no cabeçalho `X-Forwarded-For` vindo do Caddy, pelo IP fixo dele na rede interna (`10.89.0.2`; a rede é `10.89.0.0/24`). O resto da rede, o gateway incluso, não é de confiança. **Nunca defina `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`:** isso faria o servidor confiar em qualquer proxy e desligaria o limite por IP.
 - O código de confirmação do cadastro vai por e-mail e não aparece em log. Se o SMTP falhar 3 vezes, a conta pendente é apagada, e o log registra a falha com o e-mail mascarado. E-mails ainda na fila quando o servidor para não são enviados; a conta pendente vence em 24 h.
 - O token do aparelho vence depois de 30 dias sem sincronizar; é preciso entrar de novo.
 - O log do servidor traz avisos do `DataProtection` sobre chaves na memória. São inofensivos: o servidor não usa nada que dependa delas.
 - A resposta de redirecionamento da porta 80 ainda traz `Server: Caddy`. É conhecido e só revela o proxy.
+- Só IPv4: o Caddy publica as portas em `0.0.0.0`. Com IPv6, todo cliente IPv6 chegaria ao servidor com o mesmo endereço e dividiria um único limite por IP; por isso, não crie registro `AAAA` até a 9.6.
 - Backup do banco, política de privacidade e a seção de conta no app de Release continuam na fase 9.6.
 
 **Os testes do servidor usam Docker.** Os testes de integração sobem um PostgreSQL de verdade com Testcontainers, então `dotnet test --solution SlimeGoals.slnx` agora precisa do Docker rodando. Se o Testcontainers falhar ao subir o contêiner auxiliar (ryuk), por exemplo por uma credencial antiga do Docker, baixe as imagens à mão e rode de novo:
