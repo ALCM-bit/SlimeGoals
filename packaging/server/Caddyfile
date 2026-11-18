@@ -1,0 +1,14 @@
+# Proxy HTTPS do servidor de sincronização. Certificado automático do Let's Encrypt para SLIMEGOALS_DOMAIN;
+# com localhost, a CA interna do Caddy. A porta 80 só redireciona para a 443.
+{
+	# Opcional. Entre aspas, ACME_EMAIL vazio vira um e-mail vazio: o certificado sai sem contato.
+	email "{$ACME_EMAIL}"
+	# A CA interna (localhost) não entra no repositório de confiança do contêiner, que é só de leitura.
+	skip_install_trust
+}
+
+{$SLIMEGOALS_DOMAIN} {
+	header Strict-Transport-Security "max-age=31536000"
+	header -Server
+	reverse_proxy server:8080
+}
