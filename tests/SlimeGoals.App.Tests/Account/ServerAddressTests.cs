@@ -37,8 +37,7 @@ public class ServerAddressTests
         ServerAddress.TryParse(text, out var server, out var error).Should().BeFalse();
 
         server.Should().BeNull();
-        error.Should().Be(ServerAddress.HttpsRequiredText);
-        ServerAddress.HttpsRequiredText.Should().Be("Use https://. O http:// só vale para 127.0.0.1.");
+        error.Should().Be("Use https://. O http:// só vale para 127.0.0.1.");
     }
 
     [Theory]
