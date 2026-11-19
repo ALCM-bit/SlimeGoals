@@ -1,10 +1,10 @@
 # SlimeGoals
 
-Gestor de metas pessoais com lembretes para Linux (GNOME) e Android. .NET 10, Avalonia 12 + CommunityToolkit.Mvvm, SQLite (Microsoft.Data.Sqlite + Dapper). O `README.md` é a fonte da verdade dos comandos; se um daqui falhar, confira lá antes de improvisar.
+Gestor de metas pessoais com lembretes para Linux (GNOME) e Android. .NET 10, Avalonia 12 + CommunityToolkit.Mvvm, SQLite (Microsoft.Data.Sqlite + Dapper). O `README.md` e os guias de `docs/` são a fonte da verdade dos comandos; se um daqui falhar, confira lá antes de improvisar.
 
 ## Arquitetura
 
-Hexagonal. `SlimeGoals.Core` (domínio, serviços, portas) não depende de nada. `Infrastructure` (SQLite) e `Platform.Linux` (D-Bus, XDG, autostart, agendador) implementam as portas. `SlimeGoals.App` tem Views e ViewModels. A injeção de dependência acontece só nos heads `Desktop` e `Android`. Um teste de arquitetura reprova o Core que referenciar UI, banco ou plataforma.
+Hexagonal. `SlimeGoals.Core` (domínio, serviços, portas) não depende de nada. `Infrastructure` (SQLite) e `Platform.Linux` (D-Bus, XDG, autostart, agendador) implementam as portas. `SlimeGoals.App` tem Views e ViewModels. A injeção de dependência acontece só nos heads `Desktop` e `Android`. Um teste de arquitetura reprova o Core que referenciar UI, banco ou plataforma. Mapa dos projetos e das pastas em `docs/arquitetura.md`.
 
 Servidor de sincronização em `src/SlimeGoals.Server` (ASP.NET Core + PostgreSQL), motor em `src/SlimeGoals.Sync`, contratos em `src/SlimeGoals.Sync.Contracts`. Especificações e planos em `specs/`: leia a spec da funcionalidade antes de mexer nela.
 
@@ -30,18 +30,18 @@ XDG_DATA_HOME=/tmp/slimegoals-dev/data XDG_CONFIG_HOME=/tmp/slimegoals-dev/confi
 
 O `XDG_CONFIG_HOME` próprio impede que "Iniciar com o sistema" grave a entrada de autostart de verdade.
 
-Para conferir telas sem abrir o app: `dotnet run --project tools/SlimeGoals.Render -- /tmp/render all` (ou `phone`, `desktop`) grava um PNG por página. Leia os PNGs para verificar uma mudança visual.
+Para conferir telas sem abrir o app: `dotnet run --project tools/SlimeGoals.Render -- /tmp/render all` (ou `phone`, `desktop`) grava um PNG por página; os outros modos estão em `docs/desenvolvimento.md`. Leia os PNGs para verificar uma mudança visual.
 
 ## Android
 
-Fora de `SlimeGoals.slnx`; usa `SlimeGoals.Android.slnx`. Precisa do workload `android`, JDK 21, Android SDK em `~/Android/Sdk` e do AVD `slimegoals-api36`. Comandos de build, instalação e `adb` no README, seção "Rodar no Android".
+Fora de `SlimeGoals.slnx`; usa `SlimeGoals.Android.slnx`. Precisa do workload `android`, JDK 21, Android SDK em `~/Android/Sdk` e do AVD `slimegoals-api36`. Comandos de build, instalação e `adb` em `docs/android.md`.
 
 Alarmes exatos na API 36: `adb shell appops set --uid dev.alcm.slimegoals SCHEDULE_EXACT_ALARM allow`. A forma por pacote não tem efeito.
 
 ## Empacotar e servidor
 
 - Linux: `bash packaging/linux/build.sh`. Android: `packaging/android/build.sh` (pede a senha da chave). A versão vem de `Directory.Build.props`.
-- Servidor: `packaging/server/init-env.sh`, depois, em desenvolvimento, `docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait`. O `compose.yaml` sozinho é produção (Caddy, HTTPS, SMTP obrigatório). Use sempre `--build`. Em desenvolvimento, o código de confirmação do cadastro aparece em `docker compose -f compose.yaml -f compose.dev.yaml logs server`, e o cadastro pede o convite de `secrets/Server__InviteCode`. Volume antigo: `packaging/server/upgrade-roles.sh` (ordem no README).
+- Servidor: `packaging/server/init-env.sh`, depois, em desenvolvimento, `docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait`. O `compose.yaml` sozinho é produção (Caddy, HTTPS, SMTP obrigatório). Use sempre `--build`. Em desenvolvimento, o código de confirmação do cadastro aparece em `docker compose -f compose.yaml -f compose.dev.yaml logs server`, e o cadastro pede o convite de `secrets/Server__InviteCode`. Volume antigo: `packaging/server/upgrade-roles.sh` (ordem em `docs/servidor.md`).
 
 ## Regras
 
@@ -54,5 +54,5 @@ Alarmes exatos na API 36: `adb shell appops set --uid dev.alcm.slimegoals SCHEDU
 ## Fluxo
 
 - Uma branch por mudança (`feat/…`, `fix/…`, `docs/…`), integrada na `main` por Pull Request com merge commit. A `main` é protegida.
-- Conventional Commits em português, com escopo por camada: `core`, `infra`, `app`, `linux`, `desktop`, `android`, `specs`, `plans`, `build`.
+- Conventional Commits em português, com escopo por camada: `core`, `infra`, `app`, `linux`, `desktop`, `android`, `sync`, `server`, `specs`, `plans`, `build`.
 - TDD: comportamento novo começa por um teste que falha. A `main` compila sem warnings e passa nos testes.
