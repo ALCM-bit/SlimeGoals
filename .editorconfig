@@ -1,4 +1,5 @@
-# Formato dos arquivos, conferido no CI por `dotnet format whitespace --folder --verify-no-changes`.
+# Formato dos arquivos e exceções às regras de análise. As regras em si vêm do AnalysisLevel em Directory.Build.props
+# e quebram o build (TreatWarningsAsErrors); cada exceção abaixo diz por que não vale aqui.
 root = true
 
 [*]
@@ -28,3 +29,29 @@ csharp_preserve_single_line_statements = true
 csharp_style_namespace_declarations = file_scoped:warning
 dotnet_sort_system_directives_first = true
 
+# Palavras reservadas de outras linguagens .NET (Get, Set, Next, Step, Error): o projeto é só C#, e trocar nomes de
+# portas e parâmetros por causa do VB só pioraria a leitura.
+dotnet_diagnostic.CA1716.severity = none
+
+# Custo dos argumentos de log com o nível desligado: os logs ficam em caminhos raros (limite atingido, falha de envio)
+# e os argumentos são baratos (o e-mail mascarado, o nome do tipo da exceção). Um IsEnabled em volta de cada um só
+# esconderia a chamada.
+dotnet_diagnostic.CA1873.severity = none
+
+# Tipo concreto em membro privado para evitar chamada virtual: o ganho não aparece num app de tela nem neste servidor,
+# e seguir a regra troca IReadOnlyList por List ou faz um Task devolver um bool que ninguém lê.
+dotnet_diagnostic.CA1859.severity = none
+
+# O XAML se liga a propriedades de instância, mesmo as que não leem estado (textos fixos, listas de licenças). Só os
+# membros privados e internos precisam ser estáticos quando podem.
+[src/SlimeGoals.App/**.cs]
+dotnet_code_quality.CA1822.api_surface = private, internal
+
+[tests/**.cs]
+# Nome de teste é uma frase: Pages_come_in_navigation_order_with_every_dependency_registered
+dotnet_diagnostic.CA1707.severity = none
+# Classe de teste não tem finalizador nem herdeiro: o GC.SuppressFinalize no Dispose não faria nada
+dotnet_diagnostic.CA1816.severity = none
+# Desempenho (Enumerable em lista indexável, array constante como argumento): no teste vale a leitura
+dotnet_diagnostic.CA1826.severity = none
+dotnet_diagnostic.CA1861.severity = none

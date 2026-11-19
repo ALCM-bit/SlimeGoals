@@ -89,7 +89,7 @@ public class AndroidApplication : AvaloniaAndroidApplication<AndroidApplication.
     }
 
     /// <summary>Avisa as telas de que os dados podem ter mudado (ao voltar ao app, por exemplo).</summary>
-    internal void NotifyDataChanged() => Services?.GetService<DataChangeNotifier>()?.NotifyChanged();
+    internal static void NotifyDataChanged() => Services?.GetService<DataChangeNotifier>()?.NotifyChanged();
 
     protected override AppBuilder CreateAppBuilder()
         => AppBuilder.Configure(() => new SlimeGoals.App.App((Services ?? _failureServices)!)).UseAndroid();

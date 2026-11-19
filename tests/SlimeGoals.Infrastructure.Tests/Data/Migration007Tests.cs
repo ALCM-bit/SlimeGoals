@@ -1,3 +1,4 @@
+using System.Globalization;
 using Dapper;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Infrastructure.Data;
@@ -26,6 +27,6 @@ public class Migration007Tests
         MigrationRunner.Migrate(c).Should().Be(9);
 
         (await new TimerRepository(db.Factory).GetAsync())
-            .Should().Be(new ActiveTimer(goal, DateTimeOffset.Parse(Now)));
+            .Should().Be(new ActiveTimer(goal, DateTimeOffset.Parse(Now, CultureInfo.InvariantCulture)));
     }
 }

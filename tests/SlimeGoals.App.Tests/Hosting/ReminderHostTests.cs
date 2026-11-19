@@ -8,7 +8,7 @@ using SlimeGoals.Testing;
 
 namespace SlimeGoals.App.Tests.Hosting;
 
-public class ReminderHostTests
+public sealed class ReminderHostTests : IDisposable
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 4, 15, 0, 0, TimeSpan.Zero);
     private readonly FakeTimeProvider _time = new(Now);
@@ -21,6 +21,8 @@ public class ReminderHostTests
     private readonly FakeWindow _window = new();
 
     public ReminderHostTests() => _time.SetLocalTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
+
+    public void Dispose() => _scheduler.Dispose();
 
     private GoalService Goals => new(_goals, _checkins, _timers, _time);
     private CheckinService Checkins => new(_goals, _checkins, _time);

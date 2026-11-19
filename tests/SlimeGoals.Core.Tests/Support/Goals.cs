@@ -1,3 +1,4 @@
+using System.Globalization;
 using SlimeGoals.Core.Domain;
 
 namespace SlimeGoals.Core.Tests.Support;
@@ -5,7 +6,7 @@ namespace SlimeGoals.Core.Tests.Support;
 /// <summary>Construtores de dados de teste.</summary>
 internal static class Goals
 {
-    public static DateOnly D(string iso) => DateOnly.Parse(iso);
+    public static DateOnly D(string iso) => DateOnly.Parse(iso, CultureInfo.InvariantCulture);
 
     public static Goal G(Recurrence r, string? start = null, string? end = null, WeekDays days = WeekDays.All) => new()
     {

@@ -120,7 +120,7 @@ public class MainActivity : AvaloniaMainActivity
         [GeneratedEnum] Permission[] grantResults)
     {
         base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
-        (Application as AndroidApplication)?.NotifyDataChanged();
+        AndroidApplication.NotifyDataChanged();
     }
 
     /// <summary>
@@ -139,7 +139,7 @@ public class MainActivity : AvaloniaMainActivity
         AndroidApplication.Services?.GetService<SlimeGoals.Sync.ISyncAccount>()?.SyncNow();
 #endif
         if (_resumedBefore)
-            (Application as AndroidApplication)?.NotifyDataChanged();
+            AndroidApplication.NotifyDataChanged();
         _resumedBefore = true;
         _resumed = true;
         var resume = ++_resumes;

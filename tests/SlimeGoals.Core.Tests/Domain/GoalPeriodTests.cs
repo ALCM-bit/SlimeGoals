@@ -1,3 +1,4 @@
+using System.Globalization;
 using SlimeGoals.Core.Domain;
 using static SlimeGoals.Core.Tests.Support.Goals;
 
@@ -46,6 +47,6 @@ public class GoalPeriodTests
 
     [Fact]
     public void Weekly_ending_on_max_date_does_not_overflow() =>
-        GoalPeriod.EvaluationPeriod(G(Recurrence.Weekly, end: DateOnly.MaxValue.ToString("yyyy-MM-dd")), D("2026-11-05"))
+        GoalPeriod.EvaluationPeriod(G(Recurrence.Weekly, end: DateOnly.MaxValue.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), D("2026-11-05"))
             .Should().Be(new DateRange(D("2026-11-02"), D("2026-11-09")));
 }

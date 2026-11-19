@@ -20,12 +20,12 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
 
     private const string UpdateAppMessage = "Atualize o app para continuar sincronizando.";
 
-    private readonly SemaphoreSlim _running = new(1, 1);
-    private bool _resetInCycle; // só muda com _running na mão
+    private int _running; // 1 durante um ciclo: quem chega no meio pula em vez de esperar
+    private bool _resetInCycle; // só muda dentro do ciclo, com _running em 1
 
     public async Task<SyncCycleResult> RunCycleAsync(CancellationToken ct = default)
     {
-        if (!_running.Wait(0))
+        if (Interlocked.Exchange(ref _running, 1) == 1)
             return SyncCycleResult.Skipped;
         try
         {
@@ -56,7 +56,7 @@ public sealed class SyncEngine(ISyncStateStore state, ISyncLocalStore store, ISy
         }
         finally
         {
-            _running.Release();
+            Volatile.Write(ref _running, 0);
         }
     }
 
