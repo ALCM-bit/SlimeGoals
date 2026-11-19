@@ -29,16 +29,17 @@ public sealed class ReminderLogRepository(SqliteConnectionFactory db) : IReminde
     public async Task<bool> RespondAsync(Guid id, ReminderResponse response, DateTimeOffset respondedAt, CancellationToken ct = default)
     {
         await using var c = db.Open();
+        var parameters = new
+        {
+            Id = SqlText.Id(id),
+            Response = Row.ResponseText(response),
+            RespondedAt = SqlText.Instant(respondedAt),
+        };
         // Só grava se ainda não há resposta: a segunda chamada não altera a primeira.
         return await c.ExecuteAsync(new CommandDefinition("""
             UPDATE reminder_log SET response = @Response, responded_at = @RespondedAt
             WHERE id = @Id AND response IS NULL
-            """, new
-            {
-                Id = SqlText.Id(id),
-                Response = Row.ResponseText(response),
-                RespondedAt = SqlText.Instant(respondedAt),
-            }, cancellationToken: ct)) == 1;
+            """, parameters, cancellationToken: ct)) == 1;
     }
 
     public async Task<IReadOnlyList<ReminderLogEntry>> ListAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken ct = default)

@@ -35,8 +35,14 @@ public sealed class RunningTimerWatcherTests : IDisposable
 
     private Task<Goal> Study() => new GoalService(_goals, _checkins, _timers, _time).CreateAsync(GoalValidatorTests.Valid() with
     {
-        Title = "Estudar", Icon = "book", Color = GoalColor.Green, Measure = Measure.Duration, Unit = null,
-        Recurrence = Recurrence.Daily, Target = 60, ActiveDays = WeekDays.All,
+        Title = "Estudar",
+        Icon = "book",
+        Color = GoalColor.Green,
+        Measure = Measure.Duration,
+        Unit = null,
+        Recurrence = Recurrence.Daily,
+        Target = 60,
+        ActiveDays = WeekDays.All,
     });
 
     [Fact]

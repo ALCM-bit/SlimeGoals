@@ -102,11 +102,17 @@ public class GoalServiceTimeNormalizationTests
     public async Task Seconds_are_truncated_before_validation_and_storage()
     {
         var sameMinute = () => _service.CreateAsync(GoalValidatorTests.Valid() with
-            { ActiveFrom = new TimeOnly(9, 0, 10), ActiveUntil = new TimeOnly(9, 0, 50) });
+        {
+            ActiveFrom = new TimeOnly(9, 0, 10),
+            ActiveUntil = new TimeOnly(9, 0, 50),
+        });
         await sameMinute.Should().ThrowAsync<GoalValidationException>();
 
         var goal = await _service.CreateAsync(GoalValidatorTests.Valid() with
-            { ActiveFrom = new TimeOnly(9, 0, 30), ActiveUntil = new TimeOnly(18, 0, 59) });
+        {
+            ActiveFrom = new TimeOnly(9, 0, 30),
+            ActiveUntil = new TimeOnly(18, 0, 59),
+        });
         goal.ActiveFrom.Should().Be(new TimeOnly(9, 0));
         goal.ActiveUntil.Should().Be(new TimeOnly(18, 0));
     }

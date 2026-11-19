@@ -40,7 +40,10 @@ public class GoalDeletionTests
     {
         var goal = G(Recurrence.Daily) with
         {
-            Title = title, ReminderEveryMinutes = 60, ActiveFrom = new TimeOnly(8, 0), ActiveUntil = new TimeOnly(20, 0),
+            Title = title,
+            ReminderEveryMinutes = 60,
+            ActiveFrom = new TimeOnly(8, 0),
+            ActiveUntil = new TimeOnly(20, 0),
         };
         await _goals.AddAsync(goal);
         return goal;

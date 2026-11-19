@@ -35,7 +35,14 @@ public class FocusServiceTests
     private static FocusBlock Break(int minutes) => new(FocusBlockKind.Break, minutes);
 
     private Task<Goal> Study(string title = "Estudar") => Goals.CreateAsync(GoalValidatorTests.Valid() with
-        { Title = title, Measure = Measure.Duration, Unit = null, Recurrence = Recurrence.Daily, Target = 60, ActiveDays = WeekDays.All });
+    {
+        Title = title,
+        Measure = Measure.Duration,
+        Unit = null,
+        Recurrence = Recurrence.Daily,
+        Target = 60,
+        ActiveDays = WeekDays.All,
+    });
 
     private async Task<FocusSession> SessionAsync() => (await _sessions.GetAsync())!;
 

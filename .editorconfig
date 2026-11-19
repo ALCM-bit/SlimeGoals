@@ -1,0 +1,30 @@
+# Formato dos arquivos, conferido no CI por `dotnet format whitespace --folder --verify-no-changes`.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{axaml,csproj,props,targets,slnx,xml,json,yml,yaml,sh}]
+indent_size = 2
+
+# Dois espaços no fim da linha são quebra de linha no Markdown
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{cs,axaml}]
+max_line_length = 140
+
+[*.cs]
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_members_in_object_initializers = false
+csharp_new_line_before_members_in_anonymous_types = false
+csharp_preserve_single_line_blocks = true
+csharp_preserve_single_line_statements = true
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_sort_system_directives_first = true
+

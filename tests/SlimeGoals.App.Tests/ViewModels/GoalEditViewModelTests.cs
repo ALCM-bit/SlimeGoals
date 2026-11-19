@@ -468,7 +468,13 @@ public class GoalEditViewModelTests
     {
         var goal = await Existing(); // começa em 05/11: o registro entra direto no repositório
         await _checkins.AddAsync(new Checkin
-            { Id = Guid.NewGuid(), GoalId = goal.Id, DoneAt = _time.GetUtcNow(), Amount = 1, UpdatedAt = _time.GetUtcNow() });
+        {
+            Id = Guid.NewGuid(),
+            GoalId = goal.Id,
+            DoneAt = _time.GetUtcNow(),
+            Amount = 1,
+            UpdatedAt = _time.GetUtcNow(),
+        });
 
         var locked = Edit(goal, locked: true);
         locked.IsMeasureLocked.Should().BeTrue();

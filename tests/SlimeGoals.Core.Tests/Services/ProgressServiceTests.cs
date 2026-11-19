@@ -30,8 +30,13 @@ public class ProgressServiceTests
     {
         var goal = await Goals.CreateAsync(GoalValidatorTests.Valid() with
         {
-            Title = title, Recurrence = recurrence, Target = target, ActiveDays = days, StartDate = start,
-            Measure = measure, Unit = measure == Measure.Quantity ? "vezes" : null,
+            Title = title,
+            Recurrence = recurrence,
+            Target = target,
+            ActiveDays = days,
+            StartDate = start,
+            Measure = measure,
+            Unit = measure == Measure.Quantity ? "vezes" : null,
         });
         var day = createdOn ?? Today.AddDays(-7);
         goal = goal with { CreatedAt = new DateTimeOffset(day.ToDateTime(new TimeOnly(13, 0)), TimeSpan.Zero) + (goal.CreatedAt - Now) };

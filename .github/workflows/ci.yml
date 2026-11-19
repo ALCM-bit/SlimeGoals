@@ -32,6 +32,11 @@ jobs:
       - name: Instala dbus e gnome-keyring
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends dbus gnome-keyring
 
+      # Espaços, recuo e quebras de linha segundo o .editorconfig. O modo pasta não carrega os projetos, então dispensa
+      # o restore e cobre também o head Android e as ferramentas, que ficam fora da solução.
+      - name: Confere o formato
+        run: dotnet format whitespace --folder --verify-no-changes
+
       - name: Compila em Release (avisos são erros)
         run: dotnet build SlimeGoals.slnx -c Release
 

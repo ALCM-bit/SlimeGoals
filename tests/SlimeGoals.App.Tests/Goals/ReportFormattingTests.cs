@@ -10,12 +10,12 @@ public class ReportFormattingTests
 {
     private static Goal NewGoal(Recurrence recurrence = Recurrence.Daily, Measure measure = Measure.Quantity,
         int target = 8, string? unit = "copos") => new()
-    {
-        Id = Guid.NewGuid(), Title = "Meta", Recurrence = recurrence, Target = target, Measure = measure, Unit = unit,
-        Icon = "water", Color = GoalColor.Green, ReminderEveryMinutes = 60, ActiveFrom = new TimeOnly(8, 0),
-        ActiveUntil = new TimeOnly(20, 0), ActiveDays = WeekDays.All, CreatedAt = DateTimeOffset.UnixEpoch,
-        UpdatedAt = DateTimeOffset.UnixEpoch,
-    };
+        {
+            Id = Guid.NewGuid(), Title = "Meta", Recurrence = recurrence, Target = target, Measure = measure, Unit = unit,
+            Icon = "water", Color = GoalColor.Green, ReminderEveryMinutes = 60, ActiveFrom = new TimeOnly(8, 0),
+            ActiveUntil = new TimeOnly(20, 0), ActiveDays = WeekDays.All, CreatedAt = DateTimeOffset.UnixEpoch,
+            UpdatedAt = DateTimeOffset.UnixEpoch,
+        };
 
     private static WeekGoalRow Week(Goal goal, int done = 0, int met = 0, int counted = 0, DateOnly? best = null) =>
         new(goal, done, met, counted, null, best);
