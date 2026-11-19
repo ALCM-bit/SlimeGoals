@@ -1,6 +1,5 @@
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
-using SlimeGoals.App.Goals;
 using SlimeGoals.App.Hosting;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.Core.Abstractions;
@@ -12,11 +11,8 @@ using SlimeGoals.Platform.Linux.Notifications;
 using SlimeGoals.Platform.Linux.Power;
 using SlimeGoals.Platform.Linux.Scheduling;
 #if SYNC_DEV
-using SlimeGoals.App.Account;
-using SlimeGoals.Core.Sync;
 using SlimeGoals.Platform.Linux.Secrets;
 using SlimeGoals.Platform.Linux.SingleInstance;
-using SlimeGoals.Sync;
 #endif
 
 namespace SlimeGoals.Desktop;
@@ -28,28 +24,16 @@ internal static class CompositionRoot
     {
         var services = new ServiceCollection();
 
-        // Core — os serviços que escrevem recebem o DataChangeNotifier único (parâmetro opcional preenchido pelo container)
 #if SYNC_DEV
         services.AddSingleton(PlatformCapabilities.Desktop with { Sync = true });
 #else
         services.AddSingleton(PlatformCapabilities.Desktop);
 #endif
-        services.AddSingleton(TimeProvider.System);
-        services.AddSingleton<DataChangeNotifier>();
-        services.AddSingleton<GoalService>();
-        services.AddSingleton<CheckinService>();
-        services.AddSingleton<TimerService>();
-        services.AddSingleton<FocusService>();
-        services.AddSingleton<AppSettings>();
-        services.AddSingleton<ProgressService>();
-        services.AddSingleton<ReportService>();
-        services.AddSingleton<ReminderPause>();
-        services.AddSingleton<ReminderService>();
-        services.AddSingleton<ReminderResponseHandler>();
+        // Core, formatador dos lembretes e páginas: os mesmos do Android
+        services.AddSlimeGoalsApp();
 
         // Adaptadores
         services.AddSlimeGoalsInfrastructure(databasePath);
-        services.AddSingleton<IReminderFormatter, ReminderFormatter>();
         services.AddSingleton<INotificationBus, TmdsNotificationBus>();
         services.AddSingleton<INotificationService, DbusNotificationService>();
         services.AddSingleton<IReminderScheduler, ProcessTimerReminderScheduler>();
@@ -59,7 +43,6 @@ internal static class CompositionRoot
         services.AddSingleton<IFocusAlarm>(sp => sp.GetRequiredService<ProcessFocusAlarm>());
         services.AddSingleton<DbusFocusAlert>();
         services.AddSingleton<IFocusAlert>(sp => sp.GetRequiredService<DbusFocusAlert>());
-        services.AddSingleton<FocusAlerts>();
 
         // Ciclo de vida do app — a mesma instância do ativador é a que a App preenche com a janela
         services.AddSingleton<MainWindowActivator>();
@@ -91,7 +74,6 @@ internal static class CompositionRoot
         services.AddSingleton<IAppHostedService, SleepResumeHost>();
 
         // Janelinha do cronômetro: a janela e o ViewModel nascem no primeiro "mostrar" (MiniTimerWindowHost)
-        services.AddSingleton<RunningTimerWatcher>();
         services.AddSingleton<MainWindowPresence>();
         services.AddSingleton<MiniTimerViewModel>();
         services.AddSingleton(sp => new MiniTimerWindowHost(sp.GetRequiredService<MiniTimerViewModel>));
@@ -106,25 +88,12 @@ internal static class CompositionRoot
         AddSync(services, databasePath);
 #endif
 
-        // Pedidos de troca de página feitos por dentro das páginas (ex.: Tempo → Hoje); o shell assina
-        services.AddSingleton<PageNavigator>();
-
-        // UI — ordem de registro = ordem na navegação (spec §7)
-        services.AddSingleton<PageViewModel, TodayPageViewModel>();
-        services.AddSingleton<PageViewModel, GoalsPageViewModel>();
-        services.AddSingleton<PomodoroViewModel>();
-        services.AddSingleton<PageViewModel, TimePageViewModel>();
-        services.AddSingleton<PageViewModel, ReportsPageViewModel>();
-        services.AddSingleton<PageViewModel, SettingsPageViewModel>();
-        services.AddSingleton<ShellViewModel>();
         services.AddSingleton<TrayMenuViewModel>();
 
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true });
     }
 
 #if SYNC_DEV
-    private static readonly TimeSpan SyncHttpTimeout = TimeSpan.FromSeconds(30);
-
     /// <summary>
     /// Conta e sincronização, só no build de desenvolvimento (decisões 2 e 14 da 9.5a). O cofre usa como perfil o mesmo
     /// hash do caminho do banco da instância única; o caminho em claro não vai ao chaveiro.
@@ -132,25 +101,7 @@ internal static class CompositionRoot
     private static void AddSync(IServiceCollection services, string databasePath)
     {
         var profile = SingleInstanceGuard.KeyHash(Path.GetFullPath(databasePath));
-        services.AddSingleton<ISecretVault>(_ => SecretServiceVault.ForSessionBus(profile));
-        services.AddSingleton(sp => new SyncCoordinator(
-            sp.GetRequiredService<ISecretVault>(),
-            sp.GetRequiredService<ISyncStateStore>(),
-            sp.GetRequiredService<ISyncLocalStore>(),
-            sp.GetRequiredService<ReminderService>(),
-            sp.GetRequiredService<DataChangeNotifier>(),
-            sp.GetRequiredService<TimeProvider>(),
-            CreateSyncHttp));
-        services.AddSingleton<ISyncAccount>(sp => sp.GetRequiredService<SyncCoordinator>());
-        services.AddSingleton(new AccountDefaults(Environment.MachineName));
-        services.AddSingleton<AccountViewModel>();
-        services.AddSingleton<IAppHostedService, SyncHost>();
+        services.AddSlimeGoalsSync(_ => SecretServiceVault.ForSessionBus(profile), Environment.MachineName);
     }
-
-    /// <summary>
-    /// Cliente de um servidor. Não segue redirecionamento: um 3xx para outro host levaria o token junto.
-    /// </summary>
-    private static HttpClient CreateSyncHttp(Uri server) =>
-        new(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = server, Timeout = SyncHttpTimeout };
 #endif
 }

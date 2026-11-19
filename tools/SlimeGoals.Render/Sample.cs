@@ -63,7 +63,7 @@ public sealed class Sample : IDisposable
 
     public ShellViewModel CreateShell(bool phone, AccountViewModel? account = null)
     {
-        var capabilities = phone ? new PlatformCapabilities(true, false, false, false) : PlatformCapabilities.Desktop;
+        var capabilities = phone ? PlatformCapabilities.Android : PlatformCapabilities.Desktop;
         if (account is not null)
             capabilities = capabilities with { Sync = true };
         IReminderPermissions? permissions = phone ? new DeniedPermissions() : null;
