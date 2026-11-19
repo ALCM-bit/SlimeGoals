@@ -13,7 +13,7 @@ COPY src/SlimeGoals.Server/ src/SlimeGoals.Server/
 COPY src/SlimeGoals.Sync.Contracts/ src/SlimeGoals.Sync.Contracts/
 RUN dotnet publish src/SlimeGoals.Server/SlimeGoals.Server.csproj -c Release --no-restore -o /out
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine@sha256:21c3f9798416cba4c0576a947c286231cb71ea2884896cb968253f5c9668f930 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:11.0-alpine@sha256:d39b72ad1534fa0faf52b488bffb0762df7ba269d120f0338713d4dda2a41bf5 AS runtime
 WORKDIR /app
 COPY --from=build /out .
 USER app
