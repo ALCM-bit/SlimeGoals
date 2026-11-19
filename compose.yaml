@@ -1,42 +1,161 @@
-# Servidor de sincronização local. Uso: copie .env.example para .env, preencha e rode docker compose up -d --build --wait
+# Servidor de sincronização em produção: Caddy (HTTPS) -> servidor -> PostgreSQL.
+# Uso: packaging/server/init-env.sh (cria secrets/ e o .env), preencha o .env e rode
+#   docker compose up -d --build --wait
+# Desenvolvimento (e-mail simulado, porta 127.0.0.1:8080, sem o Caddy):
+#   docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait
 name: slimegoals
+
+# Endurecimento comum aos três serviços: raiz só de leitura, sem capacidades, sem ganhar privilégio.
+x-hardening: &hardening
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  pids_limit: 200
+  restart: unless-stopped
 
 services:
   db:
-    image: postgres:18-alpine
+    <<: *hardening
+    image: postgres:18-alpine@sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015
     environment:
-      POSTGRES_USER: slimegoals
+      # O superusuário é o padrão da imagem, postgres; só existe para criar os papéis do servidor.
       POSTGRES_DB: slimegoals
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+      - owner_password
+      - app_password
     volumes:
       - pgdata:/var/lib/postgresql
+      # Roda só na criação do volume: cria slimegoals_owner e slimegoals_app com o roles.sql.
+      - ./packaging/server/postgres/10-roles.sh:/docker-entrypoint-initdb.d/10-roles.sh:ro
+      - ./packaging/server/postgres/roles.sql:/etc/slimegoals/roles.sql:ro
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+    # O entrypoint ajusta o dono e a permissão da pasta de dados e do socket e troca para o usuário postgres.
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    networks:
+      - data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U slimegoals -d slimegoals"]
+      # Pelo TCP: durante a criação do volume, o servidor temporário só escuta no socket.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U slimegoals_app -d slimegoals"]
       interval: 5s
       timeout: 3s
       retries: 10
-    restart: unless-stopped
 
   server:
+    <<: *hardening
     build:
       context: .
       dockerfile: src/SlimeGoals.Server/Dockerfile
     depends_on:
       db:
         condition: service_healthy
+    # Só o que não é segredo. Os segredos chegam em /run/secrets, um arquivo por chave.
     environment:
-      # Development liga o e-mail simulado: o token de confirmação sai no log.
-      ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__Postgres: Host=db;Port=5432;Database=slimegoals;Username=slimegoals;Password=${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env};GSS Encryption Mode=Disable
-      Server__PreloginSecret: ${SERVER_PRELOGIN_SECRET:?defina SERVER_PRELOGIN_SECRET no .env}
-    ports:
-      - "127.0.0.1:8080:8080"
+      ASPNETCORE_ENVIRONMENT: Production
+      AllowedHosts: ${SLIMEGOALS_DOMAIN:?defina SLIMEGOALS_DOMAIN no .env}
+      # Só o IP fixo do Caddy fala por X-Forwarded-For. A sub-rede inteira incluiria o gateway (10.89.0.1),
+      # por onde entram os processos do host e as portas publicadas, que poderiam forjar o cabeçalho.
+      Server__TrustedProxyNetworks__0: 10.89.0.2/32
+      Email__Mode: smtp
+      Email__Smtp__Host: ${SMTP_HOST:-}
+      Email__Smtp__Port: ${SMTP_PORT:-587}
+      Email__Smtp__Username: ${SMTP_USERNAME:-}
+      Email__Smtp__From: ${SMTP_FROM:-}
+      # Sem o canal de diagnóstico (dotnet-dump, dotnet-trace) nem o socket dele em /tmp.
+      DOTNET_EnableDiagnostics: "0"
+    secrets:
+      - ConnectionStrings__Postgres
+      - ConnectionStrings__PostgresMigrations
+      - Server__PreloginSecret
+      - Server__InviteCode
+      - Email__Smtp__Password
+    tmpfs:
+      - /tmp
+    networks:
+      - edge
+      - data
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:8080/health || exit 1"]
+      # O Host precisa estar em AllowedHosts.
+      test: ["CMD-SHELL", "wget -qO /dev/null --header 'Host: ${SLIMEGOALS_DOMAIN}' http://127.0.0.1:8080/health || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 10
-    restart: unless-stopped
+
+  caddy:
+    <<: *hardening
+    image: caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      SLIMEGOALS_DOMAIN: ${SLIMEGOALS_DOMAIN:?defina SLIMEGOALS_DOMAIN no .env}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    # As únicas portas publicadas: 80 só redireciona para 443. Só IPv4: a edge não tem IPv6, e um cliente IPv6
+    # chegaria pelo gateway, todos no mesmo balde do limite por IP. IPv6 fica para a 9.6.
+    ports:
+      - "0.0.0.0:${HTTP_PORT:-80}:80"
+      - "0.0.0.0:${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./packaging/server/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    tmpfs:
+      - /tmp
+    cap_add:
+      - NET_BIND_SERVICE
+    networks:
+      edge:
+        # O único proxy em que o servidor confia (Server__TrustedProxyNetworks__0).
+        ipv4_address: 10.89.0.2
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:2019/config/ || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+networks:
+  # Caddy <-> servidor. O Caddy tem o IP fixo 10.89.0.2; os outros recebem IP só de 10.89.0.128/25, para nenhum
+  # contêiner ocupar o IP do Caddy antes dele. O gateway é fixo: com ip_range, o Docker o poria no início da faixa.
+  edge:
+    ipam:
+      config:
+        - subnet: 10.89.0.0/24
+          ip_range: 10.89.0.128/25
+          gateway: 10.89.0.1
+  # Servidor <-> banco, sem saída para fora.
+  data:
+    internal: true
+
+# Arquivos criados pelo packaging/server/init-env.sh, fora do repositório. O nome é a chave da configuração.
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password
+  owner_password:
+    file: ./secrets/owner_password
+  app_password:
+    file: ./secrets/app_password
+  ConnectionStrings__Postgres:
+    file: ./secrets/ConnectionStrings__Postgres
+  ConnectionStrings__PostgresMigrations:
+    file: ./secrets/ConnectionStrings__PostgresMigrations
+  Server__PreloginSecret:
+    file: ./secrets/Server__PreloginSecret
+  Server__InviteCode:
+    file: ./secrets/Server__InviteCode
+  Email__Smtp__Password:
+    file: ./secrets/Email__Smtp__Password
 
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:

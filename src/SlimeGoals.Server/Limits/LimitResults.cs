@@ -1,3 +1,4 @@
+using SlimeGoals.Server.Auth;
 using SlimeGoals.Sync.Contracts;
 
 namespace SlimeGoals.Server.Limits;
@@ -27,9 +28,16 @@ public static class LimitResults
     public static RouteGroupBuilder WithIpRateLimit(this RouteGroupBuilder group) =>
         group.AddEndpointFilter(async (context, next) =>
         {
-            var ip = context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "desconhecido";
-            return context.HttpContext.RequestServices.GetRequiredService<AuthRateLimits>().HitIp(ip) is { } retry
+            var ip = ClientIp.Of(context.HttpContext);
+            return context.HttpContext.RequestServices.GetRequiredService<RateLimits>().HitIp(ip) is { } retry
                 ? new RateLimitedResult(retry)
                 : await next(context);
         });
+
+    /// <summary>Limite por aparelho no grupo <c>/sync</c>; vai depois da autorização, porque lê o aparelho do token.</summary>
+    public static RouteGroupBuilder WithDeviceRateLimit(this RouteGroupBuilder group) =>
+        group.AddEndpointFilter(async (context, next) =>
+            context.HttpContext.RequestServices.GetRequiredService<RateLimits>().HitDevice(context.HttpContext.User.DeviceId()) is { } retry
+                ? new RateLimitedResult(retry)
+                : await next(context));
 }

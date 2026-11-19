@@ -10,6 +10,9 @@ public enum AccountErrorKind
     TooLarge,
     NotFound,
 
+    /// <summary>O servidor só cadastra com convite válido (<c>403 registration_closed</c>).</summary>
+    RegistrationClosed,
+
     /// <summary>Rede, erro 5xx ou resposta ilegível.</summary>
     Unavailable,
 }

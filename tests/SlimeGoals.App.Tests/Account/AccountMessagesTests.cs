@@ -25,6 +25,8 @@ public class AccountMessagesTests
             { "unauthorized", AccountAction.SignOut, SessionEnded },
             { "unauthorized", AccountAction.Devices, SessionEnded },
             { "unauthorized", AccountAction.Register, Generic },
+            { "registration-closed", AccountAction.Register,
+                "Este servidor não aceita cadastro sem um convite válido. Peça o código a quem cuida do servidor." },
             { "invalid-token", AccountAction.Devices, SessionEnded },
             { "rate-limited-2.1", AccountAction.Login, "Muitas tentativas. Tente de novo em 3 s." },
             { "rate-limited", AccountAction.Login, "Muitas tentativas. Tente de novo daqui a um minuto." },
@@ -46,6 +48,7 @@ public class AccountMessagesTests
     {
         "unauthorized" => Api(AccountErrorKind.Unauthorized),
         "invalid-token" => Api(AccountErrorKind.InvalidToken),
+        "registration-closed" => Api(AccountErrorKind.RegistrationClosed),
         "rate-limited-2.1" => Api(AccountErrorKind.RateLimited, TimeSpan.FromSeconds(2.1)),
         "rate-limited" => Api(AccountErrorKind.RateLimited),
         "unavailable" => Api(AccountErrorKind.Unavailable),

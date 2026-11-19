@@ -15,7 +15,7 @@ public static class SyncEndpoints
 
     public static void MapSyncEndpoints(this IEndpointRouteBuilder routes)
     {
-        var sync = routes.MapGroup("/sync").RequireAuthorization();
+        var sync = routes.MapGroup("/sync").RequireAuthorization().WithDeviceRateLimit();
         sync.MapGet("/pull", PullAsync);
         sync.MapPost("/push", PushAsync);
     }

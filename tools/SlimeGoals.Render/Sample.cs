@@ -270,7 +270,7 @@ public sealed class SampleAccount : ISyncAccount
 
     public Task StopAsync() => Task.CompletedTask;
 
-    public async Task<PendingRegistration> RegisterAsync(Uri server, string email, string password, CancellationToken ct = default)
+    public async Task<PendingRegistration> RegisterAsync(Uri server, string email, string password, string? inviteCode, CancellationToken ct = default)
     {
         await OpAsync();
         return new PendingRegistration(server, email, "K7QM-3XRT-9PWD-HB2C-VN6F-YJ8L-4S", new byte[32], new byte[32]);

@@ -47,7 +47,8 @@ public interface ISyncAccount
     /// <summary>Para o motor e espera o ciclo em andamento terminar. A conta continua como está.</summary>
     Task StopAsync();
 
-    Task<PendingRegistration> RegisterAsync(Uri server, string email, string password, CancellationToken ct = default);
+    /// <param name="inviteCode">Convite do servidor, opcional; vazio vai como <c>null</c>.</param>
+    Task<PendingRegistration> RegisterAsync(Uri server, string email, string password, string? inviteCode, CancellationToken ct = default);
 
     Task ConfirmAsync(PendingRegistration pending, string code, string deviceName, CancellationToken ct = default);
 

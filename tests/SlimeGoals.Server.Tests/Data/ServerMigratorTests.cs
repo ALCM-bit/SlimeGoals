@@ -11,7 +11,7 @@ public sealed class ServerMigratorTests(PostgresFixture postgres)
     [Fact]
     public async Task Migrator_creates_the_tables_and_is_idempotent()
     {
-        var connectionString = await postgres.NewDatabaseAsync();
+        var connectionString = (await postgres.NewDatabaseAsync()).Owner;
         var migrator = MigratorFor(connectionString);
 
         await migrator.RunAsync(CancellationToken.None);
@@ -27,7 +27,7 @@ public sealed class ServerMigratorTests(PostgresFixture postgres)
     [Fact]
     public async Task Two_migrators_at_once_run_the_script_once()
     {
-        var connectionString = await postgres.NewDatabaseAsync();
+        var connectionString = (await postgres.NewDatabaseAsync()).Owner;
 
         var act = () => Task.WhenAll(
             MigratorFor(connectionString).RunAsync(CancellationToken.None),
@@ -48,7 +48,7 @@ public sealed class ServerMigratorTests(PostgresFixture postgres)
     [InlineData("wrapped_key_recovery", "''::bytea")]
     public async Task Database_refuses_account_fields_outside_the_limits(string column, string value)
     {
-        var connectionString = await postgres.NewDatabaseAsync();
+        var connectionString = (await postgres.NewDatabaseAsync()).Owner;
         await MigratorFor(connectionString).RunAsync(CancellationToken.None);
         await using var connection = new NpgsqlConnection(connectionString);
         const string Insert = """
@@ -69,7 +69,7 @@ public sealed class ServerMigratorTests(PostgresFixture postgres)
     [InlineData("token_hash", "decode(repeat('00', 31), 'hex')")]
     public async Task Database_refuses_device_fields_outside_the_limits(string column, string value)
     {
-        var connectionString = await postgres.NewDatabaseAsync();
+        var connectionString = (await postgres.NewDatabaseAsync()).Owner;
         await MigratorFor(connectionString).RunAsync(CancellationToken.None);
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.ExecuteAsync("""

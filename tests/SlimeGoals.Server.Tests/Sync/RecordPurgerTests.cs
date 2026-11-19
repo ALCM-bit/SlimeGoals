@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using SlimeGoals.Server.Accounts;
 using SlimeGoals.Server.Sync;
 using SlimeGoals.Server.Tests.Accounts;
 using SlimeGoals.Sync.Contracts;
@@ -127,6 +128,8 @@ public sealed class RecordPurgerTests(PostgresFixture postgres)
         using var client = factory.CreateClient();
         var request = TestAccount.NewRegisterRequest("ana@exemplo.com");
         (await client.PostAsJsonAsync("/auth/register", request, SyncJsonContext.Default.RegisterRequest)).EnsureSuccessStatusCode();
+        // O código deste cadastro morre na limpeza; lido aqui, o próximo é o do cadastro novo.
+        await factory.Email.WaitForTokenAsync("ana@exemplo.com");
 
         factory.Time.Advance(TimeSpan.FromHours(23));
         var early = await PurgerOf(factory).RunAsync(CancellationToken.None);
@@ -134,7 +137,7 @@ public sealed class RecordPurgerTests(PostgresFixture postgres)
         var late = await PurgerOf(factory).RunAsync(CancellationToken.None);
         var again = await client.PostAsJsonAsync("/auth/register", request, SyncJsonContext.Default.RegisterRequest);
         again.EnsureSuccessStatusCode();
-        await client.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(factory.Email.LastToken, request.AuthKey), SyncJsonContext.Default.ConfirmRequest);
+        await client.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(await factory.Email.WaitForTokenAsync("ana@exemplo.com"), request.AuthKey), SyncJsonContext.Default.ConfirmRequest);
 
         early.Accounts.Should().Be(0);
         late.Accounts.Should().Be(1);
@@ -153,6 +156,12 @@ public sealed class RecordPurgerTests(PostgresFixture postgres)
         await PushAsync(account, Delete("a", 1));
         await PushAsync(account, Upsert("c"));
         factory.Time.Advance(TimeSpan.FromDays(181));
+        await using (var connection = new NpgsqlConnection(factory.ConnectionString))
+        {
+            // O aparelho segue ativo: o teste é da limpeza, não do vencimento por inatividade.
+            await connection.ExecuteAsync("UPDATE devices SET last_seen_at = @now", new { now = factory.Time.GetUtcNow() });
+        }
+
         var store = factory.Services.GetRequiredService<RecordStore>();
         store.AfterPointRead = async () =>
         {
@@ -177,7 +186,7 @@ public sealed class RecordPurgerTests(PostgresFixture postgres)
         var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
         var purger = new FlakyPurger();
         var service = new MaintenanceService(
-            purger, Options.Create(new ServerOptions()), time, NullLogger<MaintenanceService>.Instance);
+            purger, new NoIdleAccounts(), Options.Create(new ServerOptions()), time, NullLogger<MaintenanceService>.Instance);
 
         await service.StartAsync(CancellationToken.None);
         await purger.WaitForRunsAsync(1);
@@ -186,6 +195,11 @@ public sealed class RecordPurgerTests(PostgresFixture postgres)
         await service.StopAsync(CancellationToken.None);
 
         purger.Runs.Should().Be(2);
+    }
+
+    private sealed class NoIdleAccounts() : AccountStore(null!, Options.Create(new ServerOptions()))
+    {
+        public override Task<int> RevokeIdleDevicesAsync(DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult(0);
     }
 
     private sealed class FlakyPurger() : RecordPurger(null!, TimeProvider.System, Options.Create(new ServerOptions()))

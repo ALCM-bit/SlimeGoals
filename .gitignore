@@ -21,6 +21,8 @@ publish/
 # Dados e ambiente locais: o repositório é público
 .env*
 !.env.example
+# Segredos do Compose, criados pelo packaging/server/init-env.sh
+secrets/
 *.db
 *.binlog
 

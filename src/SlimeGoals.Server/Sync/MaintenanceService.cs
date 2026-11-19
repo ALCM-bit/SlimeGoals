@@ -1,10 +1,11 @@
 using Microsoft.Extensions.Options;
+using SlimeGoals.Server.Accounts;
 
 namespace SlimeGoals.Server.Sync;
 
 /// <summary>Roda a limpeza ao iniciar e a cada 24 h. Uma falha vai para o log e o laço continua.</summary>
 public sealed partial class MaintenanceService(
-    RecordPurger purger, IOptions<ServerOptions> options, TimeProvider time, ILogger<MaintenanceService> logger) : BackgroundService
+    RecordPurger purger, AccountStore accounts, IOptions<ServerOptions> options, TimeProvider time, ILogger<MaintenanceService> logger) : BackgroundService
 {
     private static readonly TimeSpan Interval = TimeSpan.FromHours(24);
 
@@ -22,6 +23,7 @@ public sealed partial class MaintenanceService(
             {
                 var result = await purger.RunAsync(stoppingToken);
                 LogPurged(result.Marks, result.Accounts);
+                LogIdleRevoked(await accounts.RevokeIdleDevicesAsync(time.GetUtcNow(), stoppingToken));
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -45,6 +47,9 @@ public sealed partial class MaintenanceService(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Limpeza: {Marks} marcas e {Accounts} contas não confirmadas removidas.")]
     private partial void LogPurged(int marks, int accounts);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Limpeza: {Devices} aparelhos parados revogados.")]
+    private partial void LogIdleRevoked(int devices);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "A limpeza diária falhou; tenta de novo no próximo ciclo.")]
     private partial void LogFailed(Exception exception);

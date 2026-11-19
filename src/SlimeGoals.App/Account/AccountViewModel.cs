@@ -64,6 +64,7 @@ public sealed partial class AccountViewModel : ObservableObject
     public const int MaxEmailLength = AccountRules.MaxEmailLength;
     public const int MaxDeviceNameLength = AccountRules.MaxDeviceNameLength;
     public const int MaxServerLength = 512;
+    public const int MaxInviteLength = 256;
     public const int MaxConfirmationCodeLength = 128;
     public const int MaxRecoveryCodeLength = 64;
     public const string ContinueLabel = "Continuar";
@@ -73,8 +74,8 @@ public sealed partial class AccountViewModel : ObservableObject
     public const string DeleteAccountText = "Isto apaga a conta e todos os dados dela no servidor, para todos os aparelhos. " +
         "As metas e registros deste aparelho continuam aqui.";
     public const string DeleteAccountLabel = "Apagar conta";
-    public const string SessionExpiredText = "A sessão deste aparelho foi encerrada (a senha mudou ou o aparelho foi " +
-        "removido). Entre de novo para continuar sincronizando. Nada do que está na fila se perde.";
+    public const string SessionExpiredText = "A sessão deste aparelho foi encerrada (a senha mudou, o aparelho foi " +
+        "removido ou ficou 30 dias sem sincronizar). Entre de novo para continuar sincronizando. Nada do que está na fila se perde.";
     public const string ReauthenticateLabel = "Entrar de novo";
     public const string VaultLockedText = "O chaveiro do sistema está travado ou indisponível. Destrave-o para continuar " +
         "sincronizando.";
@@ -149,6 +150,9 @@ public sealed partial class AccountViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SubmitRegisterCommand), nameof(SubmitRecoverCommand), nameof(SubmitChangePasswordCommand))]
     public partial string PasswordConfirmation { get; set; } = "";
+
+    /// <summary>Convite do servidor no cadastro; opcional, e esvaziado como as senhas.</summary>
+    [ObservableProperty] public partial string InviteCode { get; set; } = "";
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SubmitChangePasswordCommand))]
     public partial string CurrentPassword { get; set; } = "";
@@ -330,13 +334,13 @@ public sealed partial class AccountViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSubmitRegister))]
     private async Task SubmitRegisterAsync()
     {
-        var (email, password, confirmation) = (Email, Password, PasswordConfirmation);
-        ClearSecretInputs();
+        var (email, password, confirmation, invite) = (Email, Password, PasswordConfirmation, InviteCode);
+        ClearSubmittedInputs();
         if (await ServerForSubmitAsync() is not { } server || !PasswordsMatch(password, confirmation))
             return;
         await RunAsync(AccountAction.Register, async () =>
         {
-            var pending = await _account.RegisterAsync(server, email, password);
+            var pending = await _account.RegisterAsync(server, email, password, invite);
             _pending?.Dispose();
             _pending = pending;
             ShowRecoveryCode(pending.RecoveryCode, AccountPage.RecoveryCode);
@@ -413,7 +417,7 @@ public sealed partial class AccountViewModel : ObservableObject
     private async Task SubmitLoginAsync()
     {
         var (email, password, deviceName) = (Email, Password, DeviceName);
-        ClearSecretInputs();
+        ClearSubmittedInputs();
         if (await ServerForSubmitAsync() is not { } server)
             return;
         await RunAsync(AccountAction.Login, async () =>
@@ -428,7 +432,7 @@ public sealed partial class AccountViewModel : ObservableObject
     {
         var (email, code, password, confirmation, deviceName) =
             (Email, RecoveryCodeInput, Password, PasswordConfirmation, DeviceName);
-        ClearSecretInputs();
+        ClearSubmittedInputs();
         if (await ServerForSubmitAsync() is not { } server || !PasswordsMatch(password, confirmation))
             return;
         await RunAsync(AccountAction.Recover, async () =>
@@ -450,7 +454,7 @@ public sealed partial class AccountViewModel : ObservableObject
     private Task SubmitReauthenticateAsync()
     {
         var (password, deviceName) = (Password, DeviceName);
-        ClearSecretInputs();
+        ClearSubmittedInputs();
         return RunAsync(AccountAction.Reauthenticate, async () =>
         {
             await _account.ReauthenticateAsync(password, deviceName);
@@ -462,7 +466,7 @@ public sealed partial class AccountViewModel : ObservableObject
     private async Task SubmitChangePasswordAsync()
     {
         var (current, password, confirmation) = (CurrentPassword, Password, PasswordConfirmation);
-        ClearSecretInputs();
+        ClearSubmittedInputs();
         if (!PasswordsMatch(password, confirmation))
             return;
         await RunAsync(AccountAction.ChangePassword, async () =>
@@ -484,7 +488,7 @@ public sealed partial class AccountViewModel : ObservableObject
     private Task SubmitDeleteAccountAsync()
     {
         var password = Password;
-        ClearSecretInputs();
+        ClearSubmittedInputs();
         return RunAsync(AccountAction.DeleteAccount, async () =>
         {
             await _account.DeleteAccountAsync(password);
@@ -611,9 +615,17 @@ public sealed partial class AccountViewModel : ObservableObject
         OnPropertyChanged(nameof(RecoveryCodePageText));
     }
 
-    /// <summary>Esvazia os campos de senha e o código de recuperação digitado (a cada envio, ao trocar de subpágina e ao
+    /// <summary>Esvazia os campos de senha, o convite e o código de recuperação digitado (a cada envio, ao trocar de subpágina e ao
     /// sair de Configurações).</summary>
-    public void ClearSecretInputs() =>
+    public void ClearSecretInputs()
+    {
+        ClearSubmittedInputs();
+        InviteCode = "";
+    }
+
+    /// <summary>Os campos de segredo que um envio consome. O convite fica: se o servidor recusar, a pessoa corrige o
+    /// que errou sem redigitá-lo; ele só some ao trocar de página ou sair de Configurações.</summary>
+    private void ClearSubmittedInputs() =>
         (CurrentPassword, Password, PasswordConfirmation, RecoveryCodeInput) = ("", "", "", "");
 
     partial void OnPageChanged(AccountPage oldValue, AccountPage newValue)

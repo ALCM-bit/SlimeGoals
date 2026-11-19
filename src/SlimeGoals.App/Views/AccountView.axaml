@@ -32,6 +32,11 @@
             <TextBox Text="{Binding PasswordConfirmation}" PasswordChar="•" RevealPassword="False"
                      AutomationProperties.Name="Confirmar senha" />
           </StackPanel>
+          <StackPanel Classes="field">
+            <TextBlock Classes="field-label" Text="Código de convite" />
+            <TextBox Text="{Binding InviteCode}" MaxLength="{x:Static acc:AccountViewModel.MaxInviteLength}"
+                     PlaceholderText="Peça a quem cuida do servidor." AutomationProperties.Name="Código de convite" />
+          </StackPanel>
         </StackPanel>
         <Button Classes="primary" HorizontalAlignment="Left" Content="Criar conta" Command="{Binding SubmitRegisterCommand}" />
       </StackPanel>

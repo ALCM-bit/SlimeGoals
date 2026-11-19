@@ -41,12 +41,12 @@ Alarmes exatos na API 36: `adb shell appops set --uid dev.alcm.slimegoals SCHEDU
 ## Empacotar e servidor
 
 - Linux: `bash packaging/linux/build.sh`. Android: `packaging/android/build.sh` (pede a senha da chave). A versão vem de `Directory.Build.props`.
-- Servidor: `packaging/server/init-env.sh`, depois `docker compose up -d --build --wait`. Use sempre `--build`. O código de confirmação do cadastro aparece em `docker compose logs server`.
+- Servidor: `packaging/server/init-env.sh`, depois, em desenvolvimento, `docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait`. O `compose.yaml` sozinho é produção (Caddy, HTTPS, SMTP obrigatório). Use sempre `--build`. Em desenvolvimento, o código de confirmação do cadastro aparece em `docker compose -f compose.yaml -f compose.dev.yaml logs server`, e o cadastro pede o convite de `secrets/Server__InviteCode`. Volume antigo: `packaging/server/upgrade-roles.sh` (ordem no README).
 
 ## Regras
 
 - **Chave de assinatura:** `*.keystore` e a senha nunca entram em commit, log ou comando com a senha em texto. Não rode `make-keystore.sh` nem troque a chave: perder ou trocar a chave impede atualizar o app instalado.
-- **`.env`:** fica fora do repositório; não exiba o conteúdo nem copie para outro lugar.
+- **`.env` e `secrets/`:** ficam fora do repositório; não exiba o conteúdo nem copie para outro lugar.
 - **Dados reais:** não abra, apague nem migre `~/.local/share/SlimeGoals/` em desenvolvimento.
 - **`docker compose down -v`** apaga o banco do servidor: só com pedido explícito.
 - **Repositório público:** nada de segredo, dado pessoal ou caminho privado em commits, PRs ou issues.

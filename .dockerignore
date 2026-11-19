@@ -5,6 +5,7 @@
 .superpowers/
 .env*
 !.env.example
+secrets/
 docs/
 specs/
 tests/

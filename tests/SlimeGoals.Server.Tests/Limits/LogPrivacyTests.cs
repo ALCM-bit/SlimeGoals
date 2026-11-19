@@ -19,7 +19,7 @@ public sealed class LogPrivacyTests(PostgresFixture postgres)
             ["Logging:LogLevel:Microsoft"] = "Trace",
             ["Logging:LogLevel:System"] = "Trace",
             ["Logging:LogLevel:Npgsql"] = "Trace",
-            ["Limits:AuthPerEmailPerMinute"] = "4",
+            ["Limits:AuthPerEmailPerIpPerMinute"] = "4",
             ["Limits:MaxBlobBytes"] = "65536",
             ["Limits:AuthKeyFailuresPerAccountPerMinute"] = "1",
         });
@@ -30,7 +30,7 @@ public sealed class LogPrivacyTests(PostgresFixture postgres)
 
         using var anonymous = factory.CreateClient();
         (await anonymous.PostAsJsonAsync("/auth/register", registerRequest, SyncJsonContext.Default.RegisterRequest)).EnsureSuccessStatusCode();
-        var confirmToken = factory.Email.LastToken;
+        var confirmToken = await factory.Email.WaitForTokenAsync(email);
         secrets.Add(confirmToken);
         (await anonymous.PostAsJsonAsync("/auth/confirm", new ConfirmRequest(confirmToken, registerRequest.AuthKey), SyncJsonContext.Default.ConfirmRequest))
             .EnsureSuccessStatusCode();

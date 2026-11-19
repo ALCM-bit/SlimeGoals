@@ -10,7 +10,7 @@ using SlimeGoals.Sync.Contracts;
 namespace SlimeGoals.Server.Accounts;
 
 /// <summary>Rotas de cadastro, entrada e saída: <c>/auth/*</c>.</summary>
-public static class AccountEndpoints
+public static partial class AccountEndpoints
 {
     private const int KeyBytes = 32;
     private const int MaxKdfParamsLength = 256;
@@ -63,7 +63,7 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> PreloginAsync(
-        HttpRequest request, AccountStore store, AuthRateLimits limits, IOptions<ServerOptions> options, CancellationToken cancellationToken)
+        HttpContext context, HttpRequest request, AccountStore store, RateLimits limits, IOptions<ServerOptions> options, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.PreloginRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
@@ -72,7 +72,7 @@ public static class AccountEndpoints
             return InvalidRequest();
         }
 
-        if (limits.HitEmail(email) is { } retry)
+        if (limits.HitEmailFromIp(email, ClientIp.Of(context)) is { } retry)
         {
             return new RateLimitedResult(retry);
         }
@@ -90,24 +90,41 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> RegisterAsync(
+        HttpContext context,
         HttpRequest request,
         AccountStore store,
-        AuthRateLimits limits,
-        IEmailSender emailSender,
+        RateLimits limits,
+        ConfirmationEmailQueue emailQueue,
+        ILoggerFactory loggers,
         IOptions<ServerOptions> options,
+        IHostEnvironment environment,
         TimeProvider time,
         CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.RegisterRequest, cancellationToken);
+
+        // O convite vem antes de tudo o mais: convite errado não chega à validação, ao limite por e-mail nem ao banco.
+        if (!InviteAccepted(options.Value.Server.InviteCode, body?.InviteCode, environment.IsDevelopment()))
+        {
+            return Error("registration_closed", StatusCodes.Status403Forbidden);
+        }
+
         var email = NormalizeEmail(body?.Email);
         if (body is null || email is null || !IsValid(body))
         {
             return InvalidRequest();
         }
 
-        if (limits.HitEmail(email) is { } retry)
+        if (limits.HitEmailFromIp(email, ClientIp.Of(context)) is { } retry)
         {
             return new RateLimitedResult(retry);
+        }
+
+        // O teto de e-mails vem antes de tocar no banco: passou dele, a conta pendente e o código ficam como estavam
+        // e a resposta é a mesma 202, para o limite não revelar nada nem deixar um terceiro invalidar o código da vítima.
+        if (limits.HitConfirmationEmail(email) is not null)
+        {
+            return Results.Accepted();
         }
 
         var now = time.GetUtcNow();
@@ -128,22 +145,34 @@ public static class AccountEndpoints
             cancellationToken);
 
         // Mesma resposta para e-mail novo, pendente e confirmado (decisão 6). A conta nova ou substituída manda
-        // e-mail; a confirmada fica como está e não manda nada.
-        if (sendEmail)
+        // e-mail, em segundo plano; a confirmada fica como está e não manda nada. Fila cheia: sem e-mail não fica
+        // conta pendente, e a resposta continua 202.
+        if (sendEmail && !emailQueue.TryEnqueue(new ConfirmationEmail(email, token, tokenHash)))
         {
-            try
-            {
-                // Sem o token do pedido: desconectar o cliente não pode deixar conta sem e-mail.
-                await emailSender.SendConfirmationAsync(email, token, CancellationToken.None);
-            }
-            catch
-            {
-                await store.DeleteUnconfirmedAsync(tokenHash, CancellationToken.None);
-                throw;
-            }
+            await store.DeleteUnconfirmedAsync(tokenHash, CancellationToken.None);
+            LogQueueFull(loggers.CreateLogger(typeof(AccountEndpoints)), RateLimits.MaskEmail(email));
         }
 
         return Results.Accepted();
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Fila de e-mails de confirmação cheia; o cadastro pendente de {MaskedEmail} foi apagado.")]
+    private static partial void LogQueueFull(ILogger logger, string maskedEmail);
+
+    /// <summary>
+    /// Sem convite configurado, só Development deixa o cadastro aberto. Com convite, o enviado (sem as pontas)
+    /// tem de ser igual ao configurado, byte a byte e em tempo constante; tamanhos diferentes também falham.
+    /// </summary>
+    private static bool InviteAccepted(string configured, string? submitted, bool isDevelopment)
+    {
+        var expected = configured.Trim();
+        if (expected.Length == 0)
+        {
+            return isDevelopment;
+        }
+
+        var actual = Encoding.UTF8.GetBytes(submitted?.Trim() ?? "");
+        return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), actual);
     }
 
     private static bool IsValid(RegisterRequest body) =>
@@ -173,7 +202,7 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> LoginAsync(
-        HttpRequest request, AccountStore store, AuthRateLimits limits, TimeProvider time, CancellationToken cancellationToken)
+        HttpContext context, HttpRequest request, AccountStore store, RateLimits limits, TimeProvider time, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.LoginRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
@@ -183,9 +212,15 @@ public static class AccountEndpoints
             return InvalidRequest();
         }
 
-        if (limits.HitEmail(email) is { } retry)
+        if (limits.HitEmailFromIp(email, ClientIp.Of(context)) is { } retry)
         {
             return new RateLimitedResult(retry);
+        }
+
+        // Reserva antes de comparar, também para e-mail desconhecido; só o acerto devolve.
+        if (limits.ReserveLoginAttempt(email) is { } failureRetry)
+        {
+            return new RateLimitedResult(failureRetry);
         }
 
         var account = await store.FindForLoginAsync(email, cancellationToken);
@@ -202,6 +237,8 @@ public static class AccountEndpoints
         {
             return Error("unauthorized", StatusCodes.Status401Unauthorized);
         }
+
+        limits.RefundLoginAttempt(email);
 
         var token = SecretHash.NewToken();
         var deviceId = await store.CreateDeviceAsync(account.Id, account.AuthHash, deviceName, SecretHash.Of(token), time.GetUtcNow(), cancellationToken);
@@ -227,7 +264,7 @@ public static class AccountEndpoints
         HttpRequest request,
         System.Security.Claims.ClaimsPrincipal user,
         AccountStore store,
-        AuthRateLimits limits,
+        RateLimits limits,
         TimeProvider time,
         CancellationToken cancellationToken)
     {
@@ -280,7 +317,7 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> RecoverBeginAsync(
-        HttpRequest request, AccountStore store, AuthRateLimits limits, CancellationToken cancellationToken)
+        HttpContext context, HttpRequest request, AccountStore store, RateLimits limits, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.RecoverBeginRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
@@ -289,7 +326,7 @@ public static class AccountEndpoints
             return InvalidRequest();
         }
 
-        if (limits.HitEmail(email) is { } retry)
+        if (limits.HitEmailFromIp(email, ClientIp.Of(context)) is { } retry)
         {
             return new RateLimitedResult(retry);
         }
@@ -301,7 +338,7 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> RecoverAsync(
-        HttpRequest request, AccountStore store, AuthRateLimits limits, TimeProvider time, CancellationToken cancellationToken)
+        HttpContext context, HttpRequest request, AccountStore store, RateLimits limits, TimeProvider time, CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.RecoverRequest, cancellationToken);
         var email = NormalizeEmail(body?.Email);
@@ -315,9 +352,14 @@ public static class AccountEndpoints
             return InvalidRequest();
         }
 
-        if (limits.HitEmail(email) is { } retry)
+        if (limits.HitEmailFromIp(email, ClientIp.Of(context)) is { } retry)
         {
             return new RateLimitedResult(retry);
+        }
+
+        if (limits.ReserveLoginAttempt(email) is { } failureRetry)
+        {
+            return new RateLimitedResult(failureRetry);
         }
 
         // Confere o código aqui mesmo: nunca confia em que o begin tenha rodado antes.
@@ -326,6 +368,8 @@ public static class AccountEndpoints
         {
             return Unauthorized();
         }
+
+        limits.RefundLoginAttempt(email);
 
         // O código só vale uma vez: se outro pedido com o mesmo código chegou antes, este não muda nada.
         var recovered = await store.RecoverAsync(
@@ -358,7 +402,7 @@ public static class AccountEndpoints
         HttpRequest request,
         System.Security.Claims.ClaimsPrincipal user,
         AccountStore store,
-        AuthRateLimits limits,
+        RateLimits limits,
         CancellationToken cancellationToken)
     {
         var body = await ReadBodyAsync(request, SyncJsonContext.Default.DeleteAccountRequest, cancellationToken);

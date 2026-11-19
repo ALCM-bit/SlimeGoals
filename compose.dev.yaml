@@ -1,0 +1,16 @@
+# Desenvolvimento, por cima do compose.yaml: e-mail simulado (o código de confirmação sai no log),
+# servidor direto em 127.0.0.1:8080 e sem o Caddy. Nunca vira compose.override.yaml, para não entrar sem querer.
+#   docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait
+services:
+  server:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Email__Mode: log
+      AllowedHosts: "*"
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  caddy:
+    # Só sobe com --profile proxy.
+    profiles:
+      - proxy

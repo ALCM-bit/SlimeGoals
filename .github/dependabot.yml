@@ -1,0 +1,24 @@
+# Atualizações semanais de pacotes NuGet, ações do GitHub e imagens Docker (as tags com digest também).
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # As imagens do Dockerfile do servidor (SDK e runtime do .NET).
+  - package-ecosystem: docker
+    directory: /src/SlimeGoals.Server
+    schedule:
+      interval: weekly
+
+  # As imagens do compose.yaml (PostgreSQL e Caddy).
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly

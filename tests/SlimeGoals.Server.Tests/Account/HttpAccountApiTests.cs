@@ -16,6 +16,34 @@ public sealed class HttpAccountApiTests(PostgresFixture postgres)
         (await FluentActions.Awaiting(call).Should().ThrowAsync<AccountApiException>()).Which;
 
     [Fact]
+    public async Task Closed_registration_maps_to_its_own_kind()
+    {
+        await using var factory = new ServerFactory(postgres, new Dictionary<string, string?> { ["Server:InviteCode"] = "convite-certo" });
+        var api = new HttpAccountApi(factory.CreateClient());
+        var request = new RegisterRequest($"user{Guid.NewGuid():N}@exemplo.com", new byte[16], Kdf, Key(1), Key(2), [1], [1]);
+
+        (await FailureOf(() => api.RegisterAsync(request))).Kind.Should().Be(AccountErrorKind.RegistrationClosed);
+        (await FailureOf(() => api.RegisterAsync(request with { InviteCode = "errado" }))).Kind.Should().Be(AccountErrorKind.RegistrationClosed);
+        await api.RegisterAsync(request with { InviteCode = "convite-certo" });
+    }
+
+    [Theory]
+    [InlineData("{\"error\":\"quota_exceeded\"}")]
+    [InlineData("isto não é json")]
+    [InlineData("")]
+    public async Task Other_forbidden_answers_stay_invalid_request(string body)
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.Forbidden)
+        {
+            Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json"),
+        });
+        var api = new HttpAccountApi(new HttpClient(handler) { BaseAddress = new Uri("http://127.0.0.1/") });
+        var request = new RegisterRequest("a@exemplo.com", new byte[16], Kdf, Key(1), Key(2), [1], [1]);
+
+        (await FailureOf(() => api.RegisterAsync(request))).Kind.Should().Be(AccountErrorKind.InvalidRequest);
+    }
+
+    [Fact]
     public async Task Each_route_round_trips()
     {
         await using var factory = new ServerFactory(postgres);
@@ -26,7 +54,7 @@ public sealed class HttpAccountApiTests(PostgresFixture postgres)
         // Cadastro, confirmação e entrada.
         var register = new RegisterRequest(email, salt, Kdf, Key(1), Key(2), [1, 2, 3], [4, 5, 6]);
         await api.RegisterAsync(register);
-        await api.ConfirmAsync(factory.Email.LastToken!, Key(1));
+        await api.ConfirmAsync(await factory.Email.WaitForTokenAsync(email), Key(1));
         var prelogin = await api.PreloginAsync(email);
         prelogin.KdfSalt.Should().Equal(salt);
         prelogin.KdfParams.Should().Be(Kdf);
@@ -63,7 +91,7 @@ public sealed class HttpAccountApiTests(PostgresFixture postgres)
     {
         await using var factory = new ServerFactory(postgres, new Dictionary<string, string?>
         {
-            ["Limits:AuthPerEmailPerMinute"] = "6",
+            ["Limits:AuthPerEmailPerIpPerMinute"] = "6",
         });
         var account = await TestAccount.CreateAsync(factory);
         var api = new HttpAccountApi(factory.CreateClient());

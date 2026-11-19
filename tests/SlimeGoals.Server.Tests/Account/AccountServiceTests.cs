@@ -30,9 +30,26 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
     /// <summary>Cadastra e confirma pelo serviço; devolve o código de recuperação.</summary>
     private static async Task<string> RegisterAndConfirmAsync(ServerFactory factory, Device device, string email, string name = "pc")
     {
-        using var pending = await device.Service.RegisterAsync(email, Password);
-        await device.Service.ConfirmAsync(pending, factory.Email.LastToken, name);
+        using var pending = await device.Service.RegisterAsync(email, Password, null);
+        await device.Service.ConfirmAsync(pending, await factory.Email.WaitForTokenAsync(pending.Email), name);
         return pending.RecoveryCode;
+    }
+
+    [Theory]
+    [InlineData("  abc \n", "abc")]
+    [InlineData("   ", null)]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    public async Task Register_sends_trimmed_invite_or_null(string? typed, string? sent)
+    {
+        await using var factory = new ServerFactory(postgres);
+        using var device = new Device(factory);
+
+        using var pending = await device.Service.RegisterAsync(NewEmail(), Password, typed);
+
+        using var body = JsonDocument.Parse(device.Handler.Sent.Single(s => s.Path == "/auth/register").Body);
+        var invite = body.RootElement.GetProperty("invite_code");
+        (invite.ValueKind == JsonValueKind.Null ? null : invite.GetString()).Should().Be(sent);
     }
 
     private static SyncEnvelope Envelope() =>
@@ -55,14 +72,14 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
         using var device = new Device(factory);
         var email = NewEmail();
 
-        using (var pending = await device.Service.RegisterAsync($"  {email.ToUpperInvariant()} ", Password))
+        using (var pending = await device.Service.RegisterAsync($"  {email.ToUpperInvariant()} ", Password, null))
         {
             pending.Email.Should().Be(email);
             pending.RecoveryCode.Should().MatchRegex("^([0-9A-HJKMNP-TV-Z]{4}-){6}[0-9A-HJKMNP-TV-Z]{2}$");
             device.Vault.Names.Should().BeEmpty();
             (await device.State.GetAsync()).Enabled.Should().BeFalse();
 
-            await device.Service.ConfirmAsync(pending, factory.Email.LastToken, "pc");
+            await device.Service.ConfirmAsync(pending, await factory.Email.WaitForTokenAsync(pending.Email), "pc");
         }
 
         using var secret = await device.SecretAsync();
@@ -215,7 +232,7 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
         using var device = new Device(factory);
         device.Vault.Available = false;
 
-        await FluentActions.Awaiting(() => device.Service.RegisterAsync(NewEmail(), Password))
+        await FluentActions.Awaiting(() => device.Service.RegisterAsync(NewEmail(), Password, null))
             .Should().ThrowAsync<SecretVaultUnavailableException>();
         await FluentActions.Awaiting(() => device.Service.LoginAsync(NewEmail(), Password, "pc"))
             .Should().ThrowAsync<SecretVaultUnavailableException>();
@@ -254,10 +271,11 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
     {
         await using var factory = new ServerFactory(postgres);
         using var device = new Device(factory);
-        using var pending = await device.Service.RegisterAsync(NewEmail(), Password);
+        using var pending = await device.Service.RegisterAsync(NewEmail(), Password, null);
         device.Vault.FailWritesWith = new SecretVaultUnavailableException("desbloqueio recusado");
 
-        await FluentActions.Awaiting(() => device.Service.ConfirmAsync(pending, factory.Email.LastToken, "pc"))
+        var token = await factory.Email.WaitForTokenAsync(pending.Email);
+        await FluentActions.Awaiting(() => device.Service.ConfirmAsync(pending, token, "pc"))
             .Should().ThrowAsync<SecretVaultUnavailableException>();
 
         device.Vault.Names.Should().BeEmpty();
@@ -272,8 +290,8 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
     {
         await using var factory = new ServerFactory(postgres);
         using var device = new Device(factory);
-        using var pending = await device.Service.RegisterAsync(NewEmail(), Password);
-        var code = factory.Email.LastToken;
+        using var pending = await device.Service.RegisterAsync(NewEmail(), Password, null);
+        var code = await factory.Email.WaitForTokenAsync(pending.Email);
         device.Vault.FailWritesWith = new SecretVaultUnavailableException("desbloqueio recusado");
         await FluentActions.Awaiting(() => device.Service.ConfirmAsync(pending, code, "pc"))
             .Should().ThrowAsync<SecretVaultUnavailableException>();
@@ -300,7 +318,7 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
 
         await FluentActions.Awaiting(() => device.Service.LoginAsync(email, Password, "pc"))
             .Should().ThrowAsync<InvalidOperationException>().WithMessage(message);
-        await FluentActions.Awaiting(() => device.Service.RegisterAsync(NewEmail(), Password))
+        await FluentActions.Awaiting(() => device.Service.RegisterAsync(NewEmail(), Password, null))
             .Should().ThrowAsync<InvalidOperationException>().WithMessage(message);
         await FluentActions.Awaiting(() => device.Service.RecoverAsync(email, code, NewPassword, "pc"))
             .Should().ThrowAsync<InvalidOperationException>().WithMessage(message);
@@ -707,10 +725,11 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
         using var device = new Device(factory);
         using var other = new Device(factory);
         var otherService = new AccountService(new HttpAccountApi(factory.CreateClient()), other.Vault, other.State, new Uri("http://outro.exemplo/"));
-        using var pending = await otherService.RegisterAsync(NewEmail(), Password);
+        using var pending = await otherService.RegisterAsync(NewEmail(), Password, null);
         var sent = device.Handler.Sent.Count;
 
-        await FluentActions.Awaiting(() => device.Service.ConfirmAsync(pending, factory.Email.LastToken, "pc"))
+        var token = await factory.Email.WaitForTokenAsync(pending.Email);
+        await FluentActions.Awaiting(() => device.Service.ConfirmAsync(pending, token, "pc"))
             .Should().ThrowAsync<ArgumentException>().WithMessage("Este cadastro é de outro servidor.");
 
         device.Handler.Sent.Should().HaveCount(sent);
@@ -777,11 +796,11 @@ public sealed class AccountServiceTests(PostgresFixture postgres)
 
         foreach (var email in new[] { "", "   ", longEmail, "sem-arroba" })
         {
-            await FluentActions.Awaiting(() => device.Service.RegisterAsync(email, Password)).Should().ThrowAsync<ArgumentException>();
+            await FluentActions.Awaiting(() => device.Service.RegisterAsync(email, Password, null)).Should().ThrowAsync<ArgumentException>();
             await FluentActions.Awaiting(() => device.Service.LoginAsync(email, Password, "pc")).Should().ThrowAsync<ArgumentException>();
         }
 
-        await FluentActions.Awaiting(() => device.Service.RegisterAsync(NewEmail(), "curta")).Should().ThrowAsync<ArgumentException>();
+        await FluentActions.Awaiting(() => device.Service.RegisterAsync(NewEmail(), "curta", null)).Should().ThrowAsync<ArgumentException>();
         await FluentActions.Awaiting(() => device.Service.LoginAsync(NewEmail(), Password, " ")).Should().ThrowAsync<ArgumentException>();
         await FluentActions.Awaiting(() => device.Service.LoginAsync(NewEmail(), Password, new string('x', 101)))
             .Should().ThrowAsync<ArgumentException>();

@@ -91,6 +91,6 @@ public sealed class DeleteAccountTests(PostgresFixture postgres)
         var again = await client.PostAsJsonAsync(
             "/auth/register", TestAccount.NewRegisterRequest(account.Email), SyncJsonContext.Default.RegisterRequest);
         again.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        factory.Email.LastEmail.Should().Be(account.Email);
+        (await factory.Email.WaitForTokenAsync(account.Email)).Should().NotBeNullOrWhiteSpace();
     }
 }

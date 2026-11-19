@@ -11,7 +11,7 @@ public sealed partial class LogEmailSender(ILogger<LogEmailSender> logger) : IEm
 {
     public Task SendConfirmationAsync(string email, string token, CancellationToken cancellationToken)
     {
-        LogConfirmation(logger, AuthRateLimits.MaskEmail(email), token);
+        LogConfirmation(logger, RateLimits.MaskEmail(email), token);
         return Task.CompletedTask;
     }
 
