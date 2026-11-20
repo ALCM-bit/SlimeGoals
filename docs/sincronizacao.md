@@ -42,7 +42,7 @@ XDG_DATA_HOME=/tmp/sg-a/data XDG_CONFIG_HOME=/tmp/sg-a/config dotnet run --proje
 XDG_DATA_HOME=/tmp/sg-b/data XDG_CONFIG_HOME=/tmp/sg-b/config dotnet run --project src/SlimeGoals.Desktop   # em outro terminal
 ```
 
-Com o app aberto, uma edição feita num chega ao outro em até uns 20 s.
+Uma edição sai do aparelho uns 5 s depois de feita, mas o outro só a busca no próximo ciclo dele. O app sincroniza ao abrir, 5 s depois de uma mudança local e a cada 15 min com o app aberto; no Android, também ao voltar ao primeiro plano. No Linux, ganhar foco não dispara um ciclo, e não há botão de sincronizar. Para ver a mudança no outro aparelho sem esperar os 15 min, feche e abra o app ou altere algo nele. As regras estão na [spec](../specs/Sincronizacao_v1.md), §4, "Quando roda".
 
 ## No Android
 
