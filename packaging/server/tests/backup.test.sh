@@ -22,7 +22,11 @@ setup() {
   cat > "$work/bin/docker" <<'FAKE'
 #!/usr/bin/env bash
 echo "docker $*" >> "$FAKE_LOG"
+case " $* " in
+  *" pg_restore "*) head -c 5 | grep -q PGDMP; exit $? ;;
+esac
 if [ "${FAKE_EMPTY:-0}" = 1 ]; then exit 0; fi
+[ "${FAKE_BAD:-0}" = 1 ] && { printf 'lixo'; exit 0; }
 printf 'PGDMP-FALSO'
 [ "${FAKE_FAIL:-0}" = 1 ] && exit 1
 exit 0
@@ -49,7 +53,8 @@ f="$(find "$dest" -name 'slimegoals-*.dump')"
 [[ "$(basename "$f")" =~ ^slimegoals-[0-9]{8}-[0-9]{6}\.dump$ ]] || fail "writes: nome fora do padrão ($f)"
 [ "$(mode "$f")" = 600 ] || fail "writes: o .dump devia ser 600"
 [ "$(cat "$f")" = "PGDMP-FALSO" ] || fail "writes: conteúdo errado"
-[ -z "$(find "$dest" -mindepth 1 -not -name 'slimegoals-*.dump')" ] || fail "writes: sobrou arquivo temporário"
+[ -z "$(find "$dest" -mindepth 1 -not -name 'slimegoals-*.dump' -not -name .lock)" ] || fail "writes: sobrou arquivo temporário"
+grep -q ' pg_restore -l' "$work/log" || fail "writes: faltou a conferência com pg_restore -l"
 grep -q 'compose -f .*/compose.yaml -f .*/compose.tailnet.yaml --project-directory .* exec -T db pg_dump -U postgres -d slimegoals -Fc' "$work/log" \
   || fail "writes: comando do docker inesperado ($(cat "$work/log"))"
 grep -q 'PGDMP' "$out" && fail "writes: o dump não pode ir para a saída"
@@ -73,7 +78,7 @@ mkdir -p "$dest"; chmod 700 "$dest"
 for i in 01 02 03; do printf 'velho' > "$dest/slimegoals-202601$i-030000.dump"; done
 FAKE_FAIL=1 run && fail "failed: o script devia sair diferente de 0"
 [ "$(dumps)" = 3 ] || fail "failed: nenhum .dump novo, sobraram $(dumps)"
-[ -z "$(find "$dest" -mindepth 1 -name '.*')" ] || fail "failed: sobrou temporário"
+[ -z "$(find "$dest" -mindepth 1 -name '.novo.*')" ] || fail "failed: sobrou temporário"
 [ "$(cat "$dest/slimegoals-20260101-030000.dump")" = velho ] || fail "failed: o antigo mudou"
 
 # 4
@@ -82,12 +87,37 @@ mkdir -p "$dest"; chmod 700 "$dest"
 printf 'velho' > "$dest/slimegoals-20260101-030000.dump"
 FAKE_EMPTY=1 run && fail "empty: o script devia sair diferente de 0"
 [ "$(dumps)" = 1 ] || fail "empty: não devia criar .dump"
-[ -z "$(find "$dest" -mindepth 1 -name '.*')" ] || fail "empty: sobrou temporário"
+[ -z "$(find "$dest" -mindepth 1 -name '.novo.*')" ] || fail "empty: sobrou temporário"
+
+# 4b
+setup invalid_dump_is_rejected
+mkdir -p "$dest"; chmod 700 "$dest"
+for i in 01 02; do printf 'velho' > "$dest/slimegoals-202601$i-030000.dump"; done
+FAKE_BAD=1 run && fail "invalid: o script devia sair diferente de 0"
+[ "$(dumps)" = 2 ] || fail "invalid: não devia criar .dump, há $(dumps)"
+[ "$(cat "$dest/slimegoals-20260101-030000.dump")" = velho ] || fail "invalid: o antigo mudou"
+[ -z "$(find "$dest" -mindepth 1 -name '.novo.*')" ] || fail "invalid: sobrou temporário"
+
+# 4c
+setup new_dump_survives_clock_stepping_back
+mkdir -p "$dest"; chmod 700 "$dest"
+for i in $(seq -w 1 16); do : > "$dest/slimegoals-299901$i-030000.dump"; done
+run || fail "clock: o script devia sair 0"
+[ "$(dumps)" = 14 ] || fail "clock: devia sobrar 14, sobraram $(dumps)"
+[ -n "$(find "$dest" -name "slimegoals-$(date +%Y)*.dump")" ] || fail "clock: o dump novo foi apagado"
+
+# 4d
+setup concurrent_run_is_refused
+mkdir -p "$dest"; chmod 700 "$dest"
+( exec 9> "$dest/.lock"; flock -n 9 && sleep 3 ) &
+sleep 0.5
+run && fail "lock: devia recusar com outro backup rodando"
+[ "$(dumps)" = 0 ] || fail "lock: não devia gravar"
+wait
 
 # 5
 setup refuses_unsafe_dirs
 for bad in /etc /usr/lib/../x relativa "/tmp/com espaco" /var; do
-  dest="$bad"
   FAKE_LOG="$work/log" DOCKER_BIN="$work/bin/docker" bash "$work/root/packaging/server/backup.sh" "$bad" > "$out" 2>&1 \
     && fail "unsafe: devia recusar $bad"
 done
@@ -105,6 +135,17 @@ setup compose_files_override
 FAKE_LOG="$work/log" DOCKER_BIN="$work/bin/docker" COMPOSE_FILES="compose.yaml compose.dev.yaml" \
   bash "$work/root/packaging/server/backup.sh" "$dest" > "$out" 2>&1 || fail "override: devia sair 0"
 grep -q -- '-f .*/compose.yaml -f .*/compose.dev.yaml ' "$work/log" || fail "override: COMPOSE_FILES ignorado"
+
+# 8: o systemd executa os scripts direto (ExecStart), então o git precisa guardá-los como 100755.
+if git -C "$src" rev-parse --git-dir > /dev/null 2>&1; then
+  for unit in "$src"/systemd/*.service; do
+    while IFS= read -r line; do
+      script="${line#ExecStart=@ROOT@/}"
+      [ "$script" != "$line" ] || continue
+      git -C "$src" ls-files -s -- "../../$script" | grep -q '^100755 ' || fail "exec: $script não é 100755 no git"
+    done < <(grep '^ExecStart=' "$unit")
+  done
+fi
 
 if [ "$failures" -gt 0 ]; then echo "$failures falha(s)." >&2; exit 1; fi
 echo "OK: todos os testes do backup passaram."

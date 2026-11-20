@@ -17,7 +17,7 @@ safe_dir_error() {
     *//* | */../* | */./*) echo "$name não pode ter componentes vazios, '.' ou '..'."; return 1 ;;
   esac
   if ! [[ "$dir" =~ ^/[^/]+/[^/]+ ]]; then
-    echo "$name precisa de pelo menos dois componentes (por exemplo /etc/slimegoals/tls)."
+    echo "$name precisa de pelo menos dois componentes."
     return 1
   fi
   for comp in / /etc /usr /var /root /home /boot /opt /srv /tmp /bin /sbin /lib /run /proc /sys /dev; do
