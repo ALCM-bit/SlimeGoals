@@ -38,9 +38,9 @@ get() { cat "$secrets/$1"; }
 put postgres_password "$(hex 32)"
 put owner_password "$(hex 32)"
 put app_password "$(hex 32)"
-connection="Host=db;Port=5432;Database=slimegoals;Username=%s;Password=%s;GSS Encryption Mode=Disable"
-put ConnectionStrings__PostgresMigrations "$(printf "$connection" slimegoals_owner "$(get owner_password)")"
-put ConnectionStrings__Postgres "$(printf "$connection" slimegoals_app "$(get app_password)")"
+connection() { printf 'Host=db;Port=5432;Database=slimegoals;Username=%s;Password=%s;GSS Encryption Mode=Disable' "$1" "$2"; }
+put ConnectionStrings__PostgresMigrations "$(connection slimegoals_owner "$(get owner_password)")"
+put ConnectionStrings__Postgres "$(connection slimegoals_app "$(get app_password)")"
 put Server__PreloginSecret "$(hex 32)"
 put Server__InviteCode "$(hex 16)"
 put Email__Smtp__Password ""

@@ -43,7 +43,10 @@ if ! "$tailscale_bin" cert --cert-file "$tmp/tailnet.crt" --key-file "$tmp/tailn
   echo "tailnet-cert: o tailscale cert falhou; o certificado atual foi mantido." >&2
   exit 1
 fi
-[ -s "$tmp/tailnet.crt" ] && [ -s "$tmp/tailnet.key" ] || { echo "tailnet-cert: o tailscale cert não gerou os arquivos." >&2; exit 1; }
+if [ ! -s "$tmp/tailnet.crt" ] || [ ! -s "$tmp/tailnet.key" ]; then
+  echo "tailnet-cert: o tailscale cert não gerou os arquivos." >&2
+  exit 1
+fi
 chmod 600 "$tmp/tailnet.crt" "$tmp/tailnet.key"
 
 changed=0
