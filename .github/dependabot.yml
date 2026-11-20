@@ -5,6 +5,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Os pacotes do Avalonia saem juntos e precisam da mesma versão: um PR só para todos.
+    groups:
+      avalonia:
+        patterns:
+          - "Avalonia*"
 
   - package-ecosystem: github-actions
     directory: /
