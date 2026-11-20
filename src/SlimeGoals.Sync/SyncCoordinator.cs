@@ -155,7 +155,7 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
 
     /// <summary>
     /// Para o motor e espera o ciclo antes de sair: nenhum pedido do ciclo sai depois de limpar a fila. Com o segredo
-    /// ilegível (ou faltando, ou com uma falha inesperada do cofre ao ler), não há servidor nem token: só a limpeza
+    /// ilegível (ou faltando, ou com uma falha inesperada do cofre ao ler, ou com servidor http:// fora do loopback), não há servidor nem token: só a limpeza
     /// local, sem rede. Só o cofre indisponível (trancado) impede sair.
     /// </summary>
     public Task SignOutAsync(CancellationToken ct = default) => RunOpAsync(async () =>
@@ -181,7 +181,8 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
                 Trace.TraceWarning($"Sessão ilegível ao sair; só a limpeza local: {TraceText.Types(e)}");
             }
 
-            if (server is not null)
+            // http:// fora do loopback: o token iria em texto puro, então sai sem rede, como com o segredo ilegível.
+            if (server is not null && ServerUrlRules.Check(server) is null)
             {
                 await WithAccountAsync(server, a => a.SignOutAsync(ct)).ConfigureAwait(false);
             }
@@ -311,6 +312,16 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
             if (session is null)
             {
                 SetState(AccountState.SessionUnreadable);
+                return;
+            }
+
+            if (ServerUrlRules.Check(session.Server) is not null)
+            {
+                // Sessão de uma versão antiga: o token e a chave iriam em texto puro. O motor não liga.
+                var email = session.Email;
+                var server = session.Server;
+                session.Dispose();
+                SetState(AccountState.InsecureSession, email, server);
                 return;
             }
 

@@ -20,6 +20,9 @@ public enum AccountState
 
     /// <summary>A sincronização está ligada, mas o segredo do cofre falta ou está corrompido: só sair funciona.</summary>
     SessionUnreadable,
+
+    /// <summary>A sessão gravada aponta para http:// fora do loopback: o motor não liga, e só sair funciona, sem rede.</summary>
+    InsecureSession,
 }
 
 /// <summary>O que a tela mostra da conta e da sincronização.</summary>
