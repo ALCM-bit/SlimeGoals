@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SlimeGoals.App.Account;
 using SlimeGoals.App.Goals;
 using SlimeGoals.App.Hosting;
 using SlimeGoals.Core.Diagnostics;
@@ -10,6 +11,7 @@ using SlimeGoals.Core;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Core.Validation;
+using SlimeGoals.Sync;
 
 namespace SlimeGoals.App.ViewModels;
 
@@ -24,7 +26,8 @@ public sealed record UpcomingReminderViewModel(string Time, string Title);
 public sealed partial class TodayPageViewModel(ProgressService progress, CheckinService checkins, TimerService timers,
     GoalService goals, TimeProvider time, ReminderService reminders, DataChangeNotifier changes,
     ReminderPause? pause = null, ReportService? reports = null, PlatformCapabilities? capabilities = null,
-    IReminderPermissions? permissions = null, FocusService? focus = null, PageNavigator? navigator = null) : PageViewModel
+    IReminderPermissions? permissions = null, FocusService? focus = null, PageNavigator? navigator = null,
+    ISyncAccount? account = null) : PageViewModel
 {
     private readonly bool _reminders = (capabilities ?? PlatformCapabilities.Desktop).Reminders;
 
@@ -113,6 +116,33 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
 
     public bool HasFocusBand => FocusBandText is not null;
 
+    /// <summary>Aviso de sincronização parada (<see cref="SyncStaleWarning"/>); nulo se tudo certo ou sem conta.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSyncWarning))]
+    public partial string? SyncWarning { get; set; }
+
+    public bool HasSyncWarning => SyncWarning is not null;
+
+    /// <summary>Botão "Abrir" do aviso: vai para as configurações, no grupo de sincronização.</summary>
+    [RelayCommand]
+    private void OpenSync() => navigator?.ShowSettings(SettingsSection.Sync);
+
+    private async Task RefreshSyncWarningAsync()
+    {
+        if (account is null)
+            return;
+        try
+        {
+            var status = await account.GetStatusAsync();
+            SyncWarning = SyncStaleWarning.IsStale(status, time.GetUtcNow()) ? SyncStaleWarning.Text : null;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // O aviso é só um complemento: se a conta não responde, a tela Hoje segue sem ele.
+            SyncWarning = null;
+        }
+    }
+
     [RelayCommand]
     private void OpenTimePage() => navigator?.Show<TimePageViewModel>();
 
@@ -138,10 +168,13 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             // Assina uma vez (a página vive com o app); pode chegar de qualquer thread, recarrega na da interface.
             _subscribed = true;
             changes.Changed += (_, _) => OnUi(() => LoadCommand.Execute(null));
+            if (account is not null)
+                account.StatusChanged += (_, _) => OnUi(() => _ = RefreshSyncWarningAsync());
         }
         var version = ++_loadVersion;
         ErrorMessage = null;
         RefreshPermissions();
+        await RefreshSyncWarningAsync();
         try
         {
             await goals.ArchiveExpiredAsync();

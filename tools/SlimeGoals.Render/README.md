@@ -5,7 +5,7 @@ Ferramenta de desenvolvimento que renderiza as telas do app sem janela (Avalonia
 ## Uso
 
 ```
-dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini]
+dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning]
 ```
 
 Sem o segundo argumento, vale `all`. Grava um PNG por tela e tamanho, sempre o `ShellView` inteiro:

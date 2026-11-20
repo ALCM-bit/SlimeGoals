@@ -791,6 +791,19 @@ public class AccountViewModelTests
     }
 
     [Fact]
+    public async Task Navigator_request_opens_the_sync_group()
+    {
+        var account = await LoadedAsync();
+        var navigator = new PageNavigator();
+        var vm = new SettingsPageViewModel(new AppSettings(_repo),
+            capabilities: PlatformCapabilities.Desktop with { Sync = true }, account: account, navigator: navigator);
+
+        navigator.ShowSettings(SettingsSection.Sync);
+
+        vm.IsSyncOpen.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Settings_back_closes_account_page_first()
     {
         var account = await LoadedAsync();

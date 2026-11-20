@@ -15,9 +15,9 @@ using SlimeGoals.Sync;
 using ScrollViewer = Avalonia.Controls.ScrollViewer;
 using Window = Avalonia.Controls.Window;
 
-if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini")))
+if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini" or "sync-warning")))
 {
-    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini]");
+    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning]");
     return 1;
 }
 
@@ -67,6 +67,13 @@ if (which == "mini")
     RenderMini("mini-focus-goal-task", () => sample.CreateMiniFocus("Leitura", "Revisar capítulo 3"));
     RenderMini("mini-focus-paused-hover", () => sample.CreateMiniFocus("Leitura", null, paused: true), hover: true);
     sample.ClearFocus();
+}
+if (which == "sync-warning")
+{
+    RenderSyncWarning(320, 700, true);
+    RenderSyncWarning(360, 700, true);
+    RenderSyncWarning(412, 915, true);
+    RenderSyncWarning(1100, 720, false);
 }
 if (which == "account")
 {
@@ -166,6 +173,31 @@ void RenderAccount(int width, int height)
         Console.WriteLine(path);
         window.Close();
     }
+}
+
+// Hoje com a conta ligada e sem sincronizar há 4 dias; no celular, junto do aviso de permissões (os dois empilhados).
+void RenderSyncWarning(int width, int height, bool phone)
+{
+    var server = new Uri("https://sync.exemplo.com/");
+    var stale = new SampleAccount
+    {
+        Status = new AccountStatus(AccountState.SignedIn, "ana@exemplo.com", server, DateTimeOffset.UtcNow.AddDays(-4), 0, null),
+    };
+    var shell = sample.CreateShell(phone, syncAccount: stale);
+    var window = new Window { Width = width, Height = height, Content = new ShellView { DataContext = shell } };
+    window.Show();
+    shell.CurrentPage = shell.Pages.OfType<TodayPageViewModel>().Single();
+    Pump();
+    var path = Path.Combine(outDir, $"today-sync-warning-{width}.png");
+    var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para o aviso de sincronização.");
+    using (var stream = File.Create(path))
+    {
+#pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
+        frame.Save(stream);
+#pragma warning restore CS0618
+    }
+    Console.WriteLine(path);
+    window.Close();
 }
 
 void RenderMascot()
