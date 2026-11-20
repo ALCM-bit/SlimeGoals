@@ -4,13 +4,18 @@
 # O dump vai para um temporário na própria pasta e só vira .dump (mv, atômico) se o pg_dump saiu com 0 e não está vazio.
 # Uso: packaging/server/backup.sh [PASTA]
 # COMPOSE_FILES (padrão "compose.yaml compose.tailnet.yaml") escolhe os arquivos do Compose, relativos à raiz do
-# repositório; COMPOSE_PROJECT_NAME, se definido, vale para o docker compose. DOCKER_BIN existe para o teste.
+# repositório; COMPOSE_PROJECT_NAME, se definido, vale para o docker compose. Antes do dump, espera o banco aceitar
+# conexões (pg_isready) por até READY_WAIT_SECONDS (padrão 120), de READY_POLL_SECONDS em READY_POLL_SECONDS (padrão 5):
+# o timer com Persistent=true pode disparar na partida da VM, antes do db subir. DOCKER_BIN e os dois tempos existem
+# para o teste.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 root="$(cd "$here/../.." && pwd -P)"
 docker_bin="${DOCKER_BIN:-docker}"
 keep=14
+ready_wait="${READY_WAIT_SECONDS:-120}"
+ready_poll="${READY_POLL_SECONDS:-5}"
 
 # shellcheck source=packaging/server/lib/cert-dir.sh
 . "$here/lib/cert-dir.sh"
@@ -51,14 +56,23 @@ trap 'rm -f "$tmp"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
+# Espera o banco: o db pode ainda estar subindo (backup perdido na partida da VM).
+waited=0
+until "${compose[@]}" exec -T db pg_isready -U postgres > /dev/null 2>&1; do
+  [ "$waited" -lt "$ready_wait" ] || die "o banco não ficou pronto em ${ready_wait}s; nenhum backup novo foi gravado."
+  sleep "$ready_poll"
+  waited=$((waited + ready_poll))
+done
+
 # O dump vai direto para o arquivo, nunca para a saída nem para o log. Só o estado de saída do pg_dump decide o sucesso.
 if ! "${compose[@]}" exec -T db pg_dump -U postgres -d slimegoals -Fc > "$tmp"; then
   die "o pg_dump falhou; nenhum backup novo foi gravado."
 fi
 [ -s "$tmp" ] || die "o pg_dump não gerou dados; nenhum backup novo foi gravado."
 # Um dump cortado (disco cheio, escrita falha) sairia 0 e seria guardado, e giraria as cópias boas para fora.
-# O pg_restore -l lê o índice do arquivo (pelo stdin, dentro do contêiner) e falha se estiver truncado ou corrompido.
-if ! "${compose[@]}" exec -T db pg_restore -l < "$tmp" > /dev/null; then
+# O pg_restore -f /dev/null lê o arquivo inteiro (pelo stdin, dentro do contêiner), índice e blocos de dados, e falha se
+# estiver truncado ou corrompido. O -l leria só o índice e deixaria passar um dump cortado na parte dos dados.
+if ! "${compose[@]}" exec -T db pg_restore -f /dev/null < "$tmp" > /dev/null; then
   die "o dump gerado não passou na conferência do pg_restore; nenhum backup novo foi gravado."
 fi
 final="$dest/slimegoals-$(date +%Y%m%d-%H%M%S).dump"

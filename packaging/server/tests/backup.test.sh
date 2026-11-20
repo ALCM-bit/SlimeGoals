@@ -18,17 +18,25 @@ setup() {
   cp "$src/lib/cert-dir.sh" "$work/root/packaging/server/lib/"
   : > "$work/root/compose.yaml"
   : > "$work/root/compose.tailnet.yaml"
-  # FAKE_FAIL=1: pg_dump falha depois de escrever parte; FAKE_EMPTY=1: sai 0 sem escrever nada.
+  # FAKE_FAIL=1: pg_dump falha depois de escrever parte; FAKE_EMPTY=1: sai 0 sem escrever nada; FAKE_BAD=1: lixo;
+  # FAKE_TRUNCATED=1: cabeçalho certo mas sem o final (o pg_restore -l, que só lê o índice, deixaria passar).
+  # FAKE_NOT_READY=N: o pg_isready falha nas N primeiras chamadas (999 = nunca fica pronto).
   cat > "$work/bin/docker" <<'FAKE'
 #!/usr/bin/env bash
 echo "docker $*" >> "$FAKE_LOG"
 case " $* " in
-  *" pg_restore "*) head -c 5 | grep -q PGDMP; exit $? ;;
+  *" pg_isready "*)
+    n="$(cat "$FAKE_LOG.ready" 2>/dev/null || echo 0)"; echo $((n + 1)) > "$FAKE_LOG.ready"
+    [ "$n" -ge "${FAKE_NOT_READY:-0}" ]; exit $? ;;
+  # Só "-f /dev/null" lê o arquivo inteiro; o falso exige o cabeçalho e o final. Com "-l" (só o índice) aceitaria tudo.
+  *" pg_restore -f /dev/null "*) c="$(cat)"; [[ "$c" == PGDMP*FIM ]]; exit $? ;;
+  *" pg_restore "*) cat > /dev/null; exit 0 ;;
 esac
 if [ "${FAKE_EMPTY:-0}" = 1 ]; then exit 0; fi
 [ "${FAKE_BAD:-0}" = 1 ] && { printf 'lixo'; exit 0; }
 printf 'PGDMP-FALSO'
 [ "${FAKE_FAIL:-0}" = 1 ] && exit 1
+[ "${FAKE_TRUNCATED:-0}" = 1 ] || printf 'FIM'
 exit 0
 FAKE
   chmod +x "$work/bin/docker"
@@ -38,7 +46,7 @@ FAKE
 }
 
 run() { # roda o script com a pasta $dest; saída em $out
-  FAKE_LOG="$work/log" DOCKER_BIN="$work/bin/docker" \
+  FAKE_LOG="$work/log" DOCKER_BIN="$work/bin/docker" READY_WAIT_SECONDS=2 READY_POLL_SECONDS=1 \
     bash "$work/root/packaging/server/backup.sh" "$dest" > "$out" 2>&1
 }
 mode() { stat -c %a "$1"; }
@@ -52,9 +60,11 @@ run || fail "writes: o script devia sair 0"
 f="$(find "$dest" -name 'slimegoals-*.dump')"
 [[ "$(basename "$f")" =~ ^slimegoals-[0-9]{8}-[0-9]{6}\.dump$ ]] || fail "writes: nome fora do padrão ($f)"
 [ "$(mode "$f")" = 600 ] || fail "writes: o .dump devia ser 600"
-[ "$(cat "$f")" = "PGDMP-FALSO" ] || fail "writes: conteúdo errado"
+[ "$(cat "$f")" = "PGDMP-FALSOFIM" ] || fail "writes: conteúdo errado"
 [ -z "$(find "$dest" -mindepth 1 -not -name 'slimegoals-*.dump' -not -name .lock)" ] || fail "writes: sobrou arquivo temporário"
-grep -q ' pg_restore -l' "$work/log" || fail "writes: faltou a conferência com pg_restore -l"
+grep -q ' pg_restore -f /dev/null' "$work/log" || fail "writes: faltou a conferência com pg_restore -f /dev/null"
+grep -q ' pg_restore -l' "$work/log" && fail "writes: pg_restore -l só lê o índice; não pode ser a conferência"
+grep -q ' exec -T db pg_isready -U postgres' "$work/log" || fail "writes: faltou esperar o banco com pg_isready"
 grep -q 'compose -f .*/compose.yaml -f .*/compose.tailnet.yaml --project-directory .* exec -T db pg_dump -U postgres -d slimegoals -Fc' "$work/log" \
   || fail "writes: comando do docker inesperado ($(cat "$work/log"))"
 grep -q 'PGDMP' "$out" && fail "writes: o dump não pode ir para a saída"
@@ -97,6 +107,28 @@ FAKE_BAD=1 run && fail "invalid: o script devia sair diferente de 0"
 [ "$(dumps)" = 2 ] || fail "invalid: não devia criar .dump, há $(dumps)"
 [ "$(cat "$dest/slimegoals-20260101-030000.dump")" = velho ] || fail "invalid: o antigo mudou"
 [ -z "$(find "$dest" -mindepth 1 -name '.novo.*')" ] || fail "invalid: sobrou temporário"
+
+# 4b2: dump cortado na parte dos dados (o índice está inteiro): sai 0 do pg_dump, mas o pg_restore -f /dev/null reprova
+setup truncated_dump_is_rejected
+mkdir -p "$dest"; chmod 700 "$dest"
+for i in 01 02; do printf 'velho' > "$dest/slimegoals-202601$i-030000.dump"; done
+FAKE_TRUNCATED=1 run && fail "truncated: o script devia sair diferente de 0"
+[ "$(dumps)" = 2 ] || fail "truncated: não devia criar .dump, há $(dumps)"
+[ -z "$(find "$dest" -mindepth 1 -name '.novo.*')" ] || fail "truncated: sobrou temporário"
+
+# 4b3: o banco ainda sobe (partida da VM): o backup espera o pg_isready e depois grava
+setup waits_for_db
+FAKE_NOT_READY=2 READY_WAIT_SECONDS=10 run || fail "wait: devia esperar o banco e sair 0 ($(cat "$out"))"
+[ "$(cat "$work/log.ready")" = 3 ] || fail "wait: devia consultar o pg_isready 3 vezes"
+[ "$(dumps)" = 1 ] || fail "wait: devia gravar o dump"
+
+# 4b4: o banco não sobe a tempo: falha clara, nada é gravado e o pg_dump nem roda
+setup db_never_ready
+mkdir -p "$dest"; chmod 700 "$dest"
+FAKE_NOT_READY=999 run && fail "not_ready: devia sair diferente de 0"
+grep -q 'banco' "$out" || fail "not_ready: a mensagem devia falar do banco ($(cat "$out"))"
+grep -q ' pg_dump ' "$work/log" && fail "not_ready: não devia rodar o pg_dump"
+[ "$(dumps)" = 0 ] || fail "not_ready: não devia gravar"
 
 # 4c
 setup new_dump_survives_clock_stepping_back
