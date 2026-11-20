@@ -43,3 +43,8 @@ jobs:
       # Os testes do servidor sobem um PostgreSQL no Docker (Testcontainers).
       - name: Testa
         run: dotnet test --solution SlimeGoals.slnx
+
+      # A imagem compila com só os arquivos que o Dockerfile copia e com o SDK da imagem, não o do runner: um arquivo de
+      # configuração esquecido ou um bump de imagem incompatível só aparece aqui.
+      - name: Monta a imagem do servidor
+        run: docker build -f src/SlimeGoals.Server/Dockerfile .
