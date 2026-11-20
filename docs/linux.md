@@ -8,8 +8,8 @@ Ainda não há pacote pronto para baixar. Gere-o com o `build.sh`, que precisa d
 
 ```bash
 bash packaging/linux/build.sh
-tar -xzf artifacts/slimegoals-0.10.0-linux-x64.tar.gz
-cd slimegoals-0.10.0
+tar -xzf artifacts/slimegoals-0.11.0-linux-x64.tar.gz
+cd slimegoals-0.11.0
 ./install.sh
 ```
 
