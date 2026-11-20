@@ -10,6 +10,11 @@ updates:
       avalonia:
         patterns:
           - "Avalonia*"
+    # O ASP.NET Core de versão maior só roda nela (o 11 exige net11.0). Os Microsoft.Extensions.* e o
+    # Microsoft.Data.Sqlite novos também suportam a versão anterior do .NET e continuam vindo.
+    ignore:
+      - dependency-name: "Microsoft.AspNetCore.*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
