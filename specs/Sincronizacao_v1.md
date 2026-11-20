@@ -331,7 +331,7 @@ Falha de rede ou da API no passo 1 não impede os outros dois. Cofre indisponív
 
 Acordos feitos ao ligar a conta e a sincronização no Linux (`SyncCoordinator`, `AccountViewModel`, `AccountView` e a composição do head). Onde diferem do texto acima, valem estes.
 
-**Build de desenvolvimento.** A seção "Conta e sincronização" e tudo o que ela usa só entram no head Linux com a constante `SYNC_DEV`, definida em Debug ou com `-p:SyncDev=true`. O Release (`packaging/linux/build.sh`) não registra cofre, coordenador nem tela, e continua sem rede. O Android compila o `SlimeGoals.Sync`, mas não registra nada dele até a 9.5b.
+**Build de desenvolvimento.** A seção "Conta e sincronização" e tudo o que ela usa só entram no head Linux com a constante `SYNC_DEV`, definida em Debug ou com `-p:SyncDev=true`. O Release (`packaging/linux/build.sh`) não registra cofre, coordenador nem tela, e continua sem rede *(superado na 9.6: o Release passou a ter a conta e a rede, e só os extras de desenvolvimento ficam sob `SYNC_DEV`; veja `specs/Publicacao_na_tailnet_v1.md`, T10)*. O Android compila o `SlimeGoals.Sync`, mas não registra nada dele até a 9.5b.
 
 **Endereço do servidor.** Fica em `settings` (`sync_server`), com padrão `http://127.0.0.1:8080`, e só pode ser editado com a conta desligada; com a conta ligada, vale o servidor gravado na sessão do cofre. Aceita só URL absoluta `http` ou `https`, sem credenciais embutidas (`usuario:senha@`), consulta nem fragmento. Desde o endurecimento do servidor, o `https` é exigido em qualquer endereço; o `http` só vale para `127.0.0.1`, `::1` e `localhost`.
 
@@ -391,7 +391,7 @@ O custo é investigar sem a mensagem: o tipo e a pilha dizem onde falhou, mas à
 
 Conta e sincronização no Android, só no APK de desenvolvimento. Onde diferem do texto acima, valem estes.
 
-**Build de desenvolvimento.** Como no Linux, tudo entra com `SYNC_DEV`: Debug, ou Release com `-p:SyncDev=true` (`packaging/android/build.sh --dev`, que gera `slimegoals-<versão>-android-dev.apk` com a mesma chave de assinatura). Só esse APK declara `INTERNET`, registra cofre, coordenador e tela, e tem o receptor de conferência. O APK de distribuição continua sem `INTERNET` e sem o receptor, conferido no manifesto com `aapt2`.
+**Build de desenvolvimento.** Como no Linux, tudo entra com `SYNC_DEV`: Debug, ou Release com `-p:SyncDev=true` (`packaging/android/build.sh --dev`, que gera `slimegoals-<versão>-android-dev.apk` com a mesma chave de assinatura). Só esse APK declara `INTERNET`, registra cofre, coordenador e tela, e tem o receptor de conferência. O APK de distribuição continua sem `INTERNET` e sem o receptor, conferido no manifesto com `aapt2` *(superado na 9.6: o APK de distribuição declara `INTERNET` e tem a conta, sem texto puro; só o receptor continua exclusivo do APK de desenvolvimento)*.
 
 **Rede.** O APK de desenvolvimento usa `network_security_config_dev.xml`: texto puro só para `127.0.0.1` e `localhost`, sem subdomínios. O de distribuição usa `network_security_config.xml`, sem texto puro. O servidor continua preso ao `127.0.0.1` do computador, e o aparelho chega a ele por `adb reverse tcp:8080 tcp:8080`. O cliente HTTP é o do Linux: 30 s de prazo e sem seguir redirecionamento.
 

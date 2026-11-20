@@ -74,7 +74,9 @@ tests/                      um projeto de teste por projeto de src; SlimeGoals.T
 tools/SlimeGoals.Render/    grava PNGs das telas sem abrir o app
 packaging/linux/            pacote .tar.gz, install.sh e uninstall.sh
 packaging/android/          APK assinado (build.sh) e criação da chave (make-keystore.sh)
-packaging/server/           init-env.sh, upgrade-roles.sh, Caddyfile e os papéis do PostgreSQL
+packaging/server/           init-env.sh, upgrade-roles.sh, Caddyfile e Caddyfile.tailnet, os papéis do PostgreSQL; na tailnet:
+                            install-systemd.sh, tailnet-cert.sh, tailnet-firewall.sh, backup.sh, check-tailnet-compose.sh,
+                            lib/ (funções comuns), systemd/ (unidades e sysctl) e tests/ (testes dos scripts)
 specs/                      especificações, protótipos, planos e conclusões dos spikes
 docs/                       estes guias e as imagens do README
 ```

@@ -105,6 +105,8 @@ git pull
 docker compose -f compose.yaml -f compose.tailnet.yaml up -d --build --wait
 ```
 
+Nunca use `docker compose down -v` ao atualizar: ele apaga o banco. `down` sem `-v` mantém o volume.
+
 Se a atualização mexeu nas unidades do systemd, rode o `sudo packaging/server/install-systemd.sh` de novo; ele pode repetir sem problema. Depois de atualizar o Docker em si, confira a regra do firewall (passo 3).
 
 ### Backup e restauração
@@ -113,24 +115,34 @@ O timer `slimegoals-backup.timer` roda o `packaging/server/backup.sh` todo dia. 
 
 O backup fica só na VM. Os aparelhos guardam os próprios dados, e o servidor guarda só blobs cifrados; copiar os arquivos para fora da VM fica por sua conta.
 
-**Conferir um backup** (o caminho testado). Num PostgreSQL descartável, os papéis precisam existir antes, porque o dump dá permissões ao `slimegoals_app`:
+Os comandos abaixo supõem que o seu usuário está no grupo `docker`; sem isso, ponha `sudo` na frente de cada `docker`. O `sudo cat` é só para ler o dump, que é do root (600).
+
+**O backup guarda só o banco.** Guarde uma cópia de `secrets/` e do `.env` fora da VM, num lugar seguro e só seu: sem eles, um volume novo não abre com os mesmos segredos. Se perder `secrets/`, o banco restaurado continua válido, mas as senhas dos papéis e o convite precisam ser refeitos.
+
+**Conferir um backup** (sem tocar na pilha). Num PostgreSQL descartável, os papéis precisam existir antes, porque o dump dá permissões ao `slimegoals_app`:
 
 ```bash
 docker run -d --name restore -e POSTGRES_PASSWORD=x postgres:18-alpine
 docker exec restore psql -U postgres -c "CREATE ROLE slimegoals_owner NOLOGIN" -c "CREATE ROLE slimegoals_app NOLOGIN"
 docker exec restore createdb -U postgres slimegoals
-sudo cat /var/backups/slimegoals/slimegoals-AAAAMMDD-HHMMSS.dump | docker exec -i restore pg_restore -U postgres -d slimegoals --no-owner
+sudo cat /var/backups/slimegoals/slimegoals-AAAAMMDD-HHMMSS.dump | docker exec -i restore pg_restore -U postgres -d slimegoals
 docker exec restore psql -U postgres -d slimegoals -Atc "select count(*) from accounts"
 docker rm -f restore
 ```
 
-**Restaurar depois de um desastre** (não foi ensaiado como a conferência acima: ensaie antes de precisar). Num volume novo, o `db` já cria os papéis na primeira partida. Pare o `server`, restaure por cima do banco da pilha e suba de novo:
+**Restaurar depois de um desastre** (ensaiado numa pilha descartável: backup, `down -v`, restauração, `/health` 200, mesma contagem e tabelas do dono `slimegoals_owner`). Antes, tenha um backup conferido pelo passo acima. Este é o **único** caso em que se usa `docker compose down -v`, que apaga o volume do banco: ele só serve para recomeçar com um volume novo, e só depois de conferir o backup. A ordem importa: o banco sobe sozinho, para o servidor não criar as tabelas antes, e a restauração não usa `--no-owner`, para as tabelas continuarem do `slimegoals_owner` (os papéis são criados pela primeira partida do `db`).
 
 ```bash
-docker compose -f compose.yaml -f compose.tailnet.yaml stop server
-sudo cat /var/backups/slimegoals/slimegoals-AAAAMMDD-HHMMSS.dump | docker compose -f compose.yaml -f compose.tailnet.yaml exec -T db pg_restore -U postgres -d slimegoals --clean --if-exists --no-owner
-docker compose -f compose.yaml -f compose.tailnet.yaml up -d --wait
+F="-f compose.yaml -f compose.tailnet.yaml"
+docker compose $F down -v                    # só aqui; apaga o banco atual
+docker compose $F up -d --wait db            # volume novo: só o banco, com os papéis
+sudo cat /var/backups/slimegoals/slimegoals-AAAAMMDD-HHMMSS.dump | docker compose $F exec -T db pg_restore -U postgres -d slimegoals --clean --if-exists
+docker compose $F up -d --build --wait       # agora o servidor e o Caddy
+curl -fsS https://servidor.exemplo.ts.net/health
+docker compose $F exec -T db psql -U postgres -d slimegoals -Atc "select count(*) from accounts" -c "select tablename||' '||tableowner from pg_tables where schemaname='public'"
 ```
+
+As contas devem aparecer, e todas as tabelas devem ser de `slimegoals_owner`.
 
 ### Outros passos na VM e no Umbrel
 
