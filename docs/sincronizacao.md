@@ -53,7 +53,7 @@ O APK de distribuição não tem rede. Para sincronizar, use um APK de desenvolv
 
 ```bash
 packaging/android/build.sh --dev                    # artifacts/slimegoals-<versão>-android-dev.apk
-adb install -r artifacts/slimegoals-0.10.0-android-dev.apk
+adb install -r artifacts/slimegoals-0.11.0-android-dev.apk
 adb reverse tcp:8080 tcp:8080                       # o 127.0.0.1:8080 do celular passa a ser o do computador
 ```
 
