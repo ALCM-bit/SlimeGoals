@@ -80,6 +80,60 @@ public class TodayPageViewModelTests
     }
 
     [Fact]
+    public async Task An_older_status_read_finishing_last_does_not_overwrite_the_newer_one()
+    {
+        var account = new FakeSyncAccount { Status = SignedInSince(TimeSpan.FromDays(4)) };
+        var page = NewPageWithAccount(account);
+        await page.LoadCommand.ExecuteAsync(null);
+        page.HasSyncWarning.Should().BeTrue();
+
+        var older = new TaskCompletionSource<AccountStatus>();
+        var newer = new TaskCompletionSource<AccountStatus>();
+        account.StatusGates.Enqueue(older);
+        account.StatusGates.Enqueue(newer);
+        account.RaiseStatusChanged();
+        account.RaiseStatusChanged();
+
+        newer.SetResult(SignedInSince(TimeSpan.FromMinutes(1)));
+        await WaitUntilAsync(() => !page.HasSyncWarning);
+        older.SetResult(SignedInSince(TimeSpan.FromDays(5)));
+        await Task.Delay(100);
+
+        page.HasSyncWarning.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(typeof(InvalidOperationException))]
+    [InlineData(typeof(OperationCanceledException))]
+    public async Task A_failing_status_read_leaves_no_warning_and_does_not_fault_the_load(Type failure)
+    {
+        var account = new FakeSyncAccount { Status = SignedInSince(TimeSpan.FromDays(4)) };
+        var page = NewPageWithAccount(account);
+        await page.LoadCommand.ExecuteAsync(null);
+        page.HasSyncWarning.Should().BeTrue();
+
+        account.StatusFailure = (Exception)Activator.CreateInstance(failure)!;
+        var load = page.LoadCommand.ExecuteAsync(null);
+        await load.Awaiting(t => t).Should().NotThrowAsync();
+
+        (page.HasSyncWarning, page.ErrorMessage).Should().Be((false, null));
+    }
+
+    [Fact]
+    public async Task The_goal_cards_do_not_wait_for_the_sync_status()
+    {
+        await Create("Água");
+        var account = new FakeSyncAccount { Status = SignedInSince(TimeSpan.FromDays(4)) };
+        account.StatusGates.Enqueue(new TaskCompletionSource<AccountStatus>());
+        var page = NewPageWithAccount(account);
+
+        var load = page.LoadCommand.ExecuteAsync(null);
+        await WaitUntilAsync(() => page.Goals.Count == 1);
+
+        load.IsCompleted.Should().BeFalse("o aviso é só um complemento e é lido depois dos cartões");
+    }
+
+    [Fact]
     public async Task Today_has_no_sync_warning_without_an_account()
     {
         var page = NewPage();

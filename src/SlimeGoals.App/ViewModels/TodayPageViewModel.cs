@@ -33,6 +33,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
 
     private bool _subscribed;
     private int _loadVersion;
+    private int _syncWarningVersion;
     private ITimer? _ticker;
     private SynchronizationContext? _ui;
     private ActiveTimer? _offscreenTimer;
@@ -131,16 +132,22 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     {
         if (account is null)
             return;
+        // Uma leitura mais antiga que termina depois de uma mais nova (sem token, ela nem pode ser cancelada) não vale.
+        var version = ++_syncWarningVersion;
+        string? warning;
         try
         {
             var status = await account.GetStatusAsync();
-            SyncWarning = SyncStaleWarning.IsStale(status, time.GetUtcNow()) ? SyncStaleWarning.Text : null;
+            warning = SyncStaleWarning.IsStale(status, time.GetUtcNow()) ? SyncStaleWarning.Text : null;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception)
         {
-            // O aviso é só um complemento: se a conta não responde, a tela Hoje segue sem ele.
-            SyncWarning = null;
+            // O aviso é só um complemento: se a conta não responde, a tela Hoje segue sem ele. Nada escapa daqui, para
+            // a carga da tela e o disparo sem espera (StatusChanged) não falharem por causa dele.
+            warning = null;
         }
+        if (version == _syncWarningVersion)
+            SyncWarning = warning;
     }
 
     [RelayCommand]
@@ -174,7 +181,6 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         var version = ++_loadVersion;
         ErrorMessage = null;
         RefreshPermissions();
-        await RefreshSyncWarningAsync();
         try
         {
             await goals.ArchiveExpiredAsync();
@@ -252,6 +258,8 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         {
             OnPropertyChanged(nameof(IsEmpty));
         }
+        // Por último: o aviso é só um complemento e não atrasa os cartões das metas.
+        await RefreshSyncWarningAsync();
     }
 
     /// <summary>Sem sugestões se a leitura falhar: o campo continua aceitando texto livre.</summary>
