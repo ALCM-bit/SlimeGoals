@@ -61,7 +61,7 @@ public sealed class Sample : IDisposable
     /// <summary>Apaga a sessão de Pomodoro e os trechos guardados, para a próxima largura começar do preparo.</summary>
     public void ClearFocus() => _services.GetRequiredService<IFocusSessionRepository>().ClearAsync().GetAwaiter().GetResult();
 
-    public ShellViewModel CreateShell(bool phone, AccountViewModel? account = null)
+    public ShellViewModel CreateShell(bool phone, AccountViewModel? account = null, ISyncAccount? syncAccount = null)
     {
         var capabilities = phone ? PlatformCapabilities.Android : PlatformCapabilities.Desktop;
         if (account is not null)
@@ -78,14 +78,14 @@ public sealed class Sample : IDisposable
                 s.GetRequiredService<TimerService>(), s.GetRequiredService<GoalService>(), TimeProvider.System,
                 s.GetRequiredService<ReminderService>(), s.GetRequiredService<DataChangeNotifier>(),
                 s.GetRequiredService<ReminderPause>(), s.GetRequiredService<ReportService>(), capabilities, permissions,
-                focus, navigator),
+                focus, navigator, syncAccount),
             new GoalsPageViewModel(s.GetRequiredService<GoalService>(), TimeProvider.System),
             new TimePageViewModel(new PomodoroViewModel(focus, s.GetRequiredService<GoalService>(), Clock,
                 s.GetRequiredService<DataChangeNotifier>(), navigator)),
             new ReportsPageViewModel(s.GetRequiredService<ReportService>(), TimeProvider.System,
                 s.GetRequiredService<DataChangeNotifier>()),
             new SettingsPageViewModel(s.GetRequiredService<AppSettings>(), capabilities: capabilities, permissions: permissions,
-                changes: s.GetRequiredService<DataChangeNotifier>(), account: account),
+                changes: s.GetRequiredService<DataChangeNotifier>(), account: account, navigator: navigator),
         ];
         return new ShellViewModel(pages, capabilities: capabilities, navigator: navigator);
     }

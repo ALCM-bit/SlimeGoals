@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SlimeGoals.App.Account;
 using SlimeGoals.App.Goals;
 using SlimeGoals.App.Hosting;
 using SlimeGoals.Core.Diagnostics;
@@ -10,6 +11,7 @@ using SlimeGoals.Core;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Core.Validation;
+using SlimeGoals.Sync;
 
 namespace SlimeGoals.App.ViewModels;
 
@@ -24,12 +26,14 @@ public sealed record UpcomingReminderViewModel(string Time, string Title);
 public sealed partial class TodayPageViewModel(ProgressService progress, CheckinService checkins, TimerService timers,
     GoalService goals, TimeProvider time, ReminderService reminders, DataChangeNotifier changes,
     ReminderPause? pause = null, ReportService? reports = null, PlatformCapabilities? capabilities = null,
-    IReminderPermissions? permissions = null, FocusService? focus = null, PageNavigator? navigator = null) : PageViewModel
+    IReminderPermissions? permissions = null, FocusService? focus = null, PageNavigator? navigator = null,
+    ISyncAccount? account = null) : PageViewModel
 {
     private readonly bool _reminders = (capabilities ?? PlatformCapabilities.Desktop).Reminders;
 
     private bool _subscribed;
     private int _loadVersion;
+    private int _syncWarningVersion;
     private ITimer? _ticker;
     private SynchronizationContext? _ui;
     private ActiveTimer? _offscreenTimer;
@@ -113,6 +117,39 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
 
     public bool HasFocusBand => FocusBandText is not null;
 
+    /// <summary>Aviso de sincronização parada (<see cref="SyncStaleWarning"/>); nulo se tudo certo ou sem conta.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSyncWarning))]
+    public partial string? SyncWarning { get; set; }
+
+    public bool HasSyncWarning => SyncWarning is not null;
+
+    /// <summary>Botão "Abrir" do aviso: vai para as configurações, no grupo de sincronização.</summary>
+    [RelayCommand]
+    private void OpenSync() => navigator?.ShowSettings(SettingsSection.Sync);
+
+    private async Task RefreshSyncWarningAsync()
+    {
+        if (account is null)
+            return;
+        // Uma leitura mais antiga que termina depois de uma mais nova (sem token, ela nem pode ser cancelada) não vale.
+        var version = ++_syncWarningVersion;
+        string? warning;
+        try
+        {
+            var status = await account.GetStatusAsync();
+            warning = SyncStaleWarning.IsStale(status, time.GetUtcNow()) ? SyncStaleWarning.Text : null;
+        }
+        catch (Exception)
+        {
+            // O aviso é só um complemento: se a conta não responde, a tela Hoje segue sem ele. Nada escapa daqui, para
+            // a carga da tela e o disparo sem espera (StatusChanged) não falharem por causa dele.
+            warning = null;
+        }
+        if (version == _syncWarningVersion)
+            SyncWarning = warning;
+    }
+
     [RelayCommand]
     private void OpenTimePage() => navigator?.Show<TimePageViewModel>();
 
@@ -138,6 +175,8 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             // Assina uma vez (a página vive com o app); pode chegar de qualquer thread, recarrega na da interface.
             _subscribed = true;
             changes.Changed += (_, _) => OnUi(() => LoadCommand.Execute(null));
+            if (account is not null)
+                account.StatusChanged += (_, _) => OnUi(() => _ = RefreshSyncWarningAsync());
         }
         var version = ++_loadVersion;
         ErrorMessage = null;
@@ -219,6 +258,8 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         {
             OnPropertyChanged(nameof(IsEmpty));
         }
+        // Por último: o aviso é só um complemento e não atrasa os cartões das metas.
+        await RefreshSyncWarningAsync();
     }
 
     /// <summary>Sem sugestões se a leitura falhar: o campo continua aceitando texto livre.</summary>

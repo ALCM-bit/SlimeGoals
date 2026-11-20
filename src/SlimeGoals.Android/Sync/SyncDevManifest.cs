@@ -1,7 +1,6 @@
-// Só o APK de desenvolvimento fala com a rede (decisão da 9.5a, mantida na 9.5b): o de distribuição não declara INTERNET.
-#if SYNC_DEV
+// A sincronização vale em todos os builds, então o APK declara INTERNET sempre. O que fica só no desenvolvimento é o
+// tráfego em texto puro (network_security_config_dev).
 using Android;
 using Android.App;
 
 [assembly: UsesPermission(Manifest.Permission.Internet)]
-#endif

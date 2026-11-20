@@ -25,9 +25,9 @@ dotnet build src/SlimeGoals.Android -t:Install -f net10.0-android -p:AndroidSdkD
 ~/Android/Sdk/platform-tools/adb shell monkey -p dev.alcm.slimegoals 1
 ```
 
-O APK Debug é assinado com a chave de debug, por isso é só para o emulador: no celular, ele não instala por cima do app assinado com a sua chave. Ele já traz a sincronização de desenvolvimento (veja [Sincronização](sincronizacao.md#no-android)).
+O APK Debug é assinado com a chave de debug, por isso é só para o emulador: no celular, ele não instala por cima do app assinado com a sua chave. Ele também aceita o servidor de desenvolvimento em texto puro no loopback (veja [Sincronização](sincronizacao.md#no-android)).
 
-Os dados ficam no armazenamento privado do app (`<FilesDir>/slimegoals.db`), e desinstalar o app apaga tudo. O app não entra no backup do Android nem na transferência entre aparelhos: as metas ficam só neste celular.
+Os dados ficam no armazenamento privado do app (`<FilesDir>/slimegoals.db`), e desinstalar o app apaga tudo. O app não entra no backup do Android nem na transferência entre aparelhos: sem conta, as metas ficam só neste celular. Com conta, elas vão cifradas para o servidor (veja [Sincronização](sincronizacao.md)).
 
 Para conferir os layouts sem emulador, use a ferramenta de telas em PNG (veja [Desenvolvimento](desenvolvimento.md#conferir-as-telas-sem-abrir-o-app)).
 
@@ -53,7 +53,7 @@ adb shell am kill dev.alcm.slimegoals
 
 ## Instalar no celular
 
-O APK de distribuição é assinado com uma chave sua, que fica fora do repositório. Ele traz as arquiteturas arm64 (celulares) e x64 (emulador) e não tem acesso à rede.
+O APK de distribuição é assinado com uma chave sua, que fica fora do repositório. Ele traz as arquiteturas arm64 (celulares) e x64 (emulador) e tem a conta de sincronização, com a permissão `INTERNET` e sem tráfego em texto puro: só fala `https://`.
 
 1. **Crie a chave uma vez** e guarde uma cópia dela num lugar seguro:
 
@@ -71,9 +71,9 @@ O APK de distribuição é assinado com uma chave sua, que fica fora do reposit�
 
    O script pede a senha da chave, que não fica no histórico do shell. Para uma chave em outro lugar, aponte `SLIMEGOALS_KEYSTORE`; sem terminal (no CI, por exemplo), defina `SLIMEGOALS_KEYSTORE_PASS`. O SDK do Android e o JDK vêm de `ANDROID_HOME` e `JAVA_HOME`, com padrão `~/Android/Sdk` e `/usr/lib/jvm/java-21-openjdk`.
 
-   O resultado é `artifacts/slimegoals-0.11.0-android.apk`. Com `--dev`, o script gera `artifacts/slimegoals-0.11.0-android-dev.apk`, com a sincronização de desenvolvimento (veja [Sincronização](sincronizacao.md#no-android)).
+   O resultado é `artifacts/slimegoals-0.12.0-android.apk`. Com `--dev`, o script gera `artifacts/slimegoals-0.12.0-android-dev.apk`, com o servidor de desenvolvimento em texto puro no loopback e o receiver de vetores (veja [Sincronização](sincronizacao.md#no-android)).
 
-3. **Instale no celular:** com a depuração USB ligada, rode `adb install artifacts/slimegoals-0.11.0-android.apk`. Outra opção é copiar o APK para o aparelho e abri-lo, permitindo "instalar apps desconhecidos" para o app que o abriu.
+3. **Instale no celular:** com a depuração USB ligada, rode `adb install artifacts/slimegoals-0.12.0-android.apk`. Outra opção é copiar o APK para o aparelho e abri-lo, permitindo "instalar apps desconhecidos" para o app que o abriu.
 
 4. **Primeira abertura:** no aviso do Hoje, toque em "Permitir" (notificações e alarmes exatos). Depois, em Configurações → Bateria, toque em "Liberar" e aceite. Sem isso, o sistema pode adiar ou suspender os lembretes com o celular parado. Liberar a bateria faz "Alarmes exatos" aparecer como permitido, porque o Android trata assim os apps sem restrição de bateria. Se você tirar o app dessa isenção, o bloqueio volta.
 

@@ -1,0 +1,12 @@
+[Unit]
+Description=Regra DOCKER-USER: a porta 443 do SlimeGoals só pela tailnet
+After=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=@ROOT@/packaging/server/tailnet-firewall.sh
+
+[Install]
+WantedBy=docker.service

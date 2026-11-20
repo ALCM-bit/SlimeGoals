@@ -38,9 +38,9 @@ get() { cat "$secrets/$1"; }
 put postgres_password "$(hex 32)"
 put owner_password "$(hex 32)"
 put app_password "$(hex 32)"
-connection="Host=db;Port=5432;Database=slimegoals;Username=%s;Password=%s;GSS Encryption Mode=Disable"
-put ConnectionStrings__PostgresMigrations "$(printf "$connection" slimegoals_owner "$(get owner_password)")"
-put ConnectionStrings__Postgres "$(printf "$connection" slimegoals_app "$(get app_password)")"
+connection() { printf 'Host=db;Port=5432;Database=slimegoals;Username=%s;Password=%s;GSS Encryption Mode=Disable' "$1" "$2"; }
+put ConnectionStrings__PostgresMigrations "$(connection slimegoals_owner "$(get owner_password)")"
+put ConnectionStrings__Postgres "$(connection slimegoals_app "$(get app_password)")"
 put Server__PreloginSecret "$(hex 32)"
 put Server__InviteCode "$(hex 16)"
 put Email__Smtp__Password ""
@@ -59,9 +59,16 @@ SMTP_HOST=
 SMTP_PORT=
 SMTP_USERNAME=
 SMTP_FROM=
+# Na tailnet (compose.tailnet.yaml): o IP 100.x da VM e a pasta de tailnet.crt e tailnet.key.
+# TAILNET_IP=
+# TAILNET_CERT_DIR=/etc/slimegoals/tls
+# Na VM, descomente: todo `docker compose ...` solto passa a incluir o overlay da tailnet. Sem isto, um `docker compose up`
+# sem -f publica o Caddy em 0.0.0.0:80 e 0.0.0.0:443.
+# COMPOSE_FILE=compose.yaml:compose.tailnet.yaml
 ENV
   echo "Criado $env_file."
 fi
 
 echo "Segredos em $secrets. O convite do cadastro está em secrets/Server__InviteCode."
-echo "Preencha o SMTP no .env (a senha vai em secrets/Email__Smtp__Password) e suba com: docker compose up -d --build --wait"
+echo "Preencha o SMTP no .env (a senha vai em secrets/Email__Smtp__Password) e suba como manda docs/servidor.md:"
+echo "desenvolvimento (compose.dev.yaml) ou VM na tailnet (seção \"Na tailnet\"). Não suba o compose.yaml sozinho na VM."

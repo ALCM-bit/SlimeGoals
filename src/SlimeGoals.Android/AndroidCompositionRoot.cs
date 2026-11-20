@@ -6,10 +6,8 @@ using SlimeGoals.App.Hosting;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Infrastructure;
-#if SYNC_DEV
 using SlimeGoals.Android.Sync;
 using SlimeGoals.App.Account;
-#endif
 
 namespace SlimeGoals.Android;
 
@@ -20,11 +18,7 @@ internal static class AndroidCompositionRoot
     {
         var services = new ServiceCollection();
 
-#if SYNC_DEV
         services.AddSingleton(PlatformCapabilities.Android with { Sync = true });
-#else
-        services.AddSingleton(PlatformCapabilities.Android);
-#endif
         // Core, formatador dos lembretes e páginas: os mesmos do desktop
         services.AddSlimeGoalsApp();
 
@@ -56,22 +50,24 @@ internal static class AndroidCompositionRoot
             sp.GetRequiredService<IWindowActivator>(), sp.GetRequiredService<PageNavigator>(),
             action => Dispatcher.UIThread.Post(action)));
 
-#if SYNC_DEV
         AddSync(services, context);
-#endif
 
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true });
     }
 
-#if SYNC_DEV
     /// <summary>
-    /// Conta e sincronização, só no APK de desenvolvimento (9.5b): cofre sobre o Keystore, nome do aparelho do sistema e a
-    /// área de transferência que marca o código de recuperação como sensível. O resto é o mesmo do head Linux.
+    /// Conta e sincronização em todos os builds (9.5b): cofre sobre o Keystore, nome do aparelho do sistema e a área de
+    /// transferência que marca o código de recuperação como sensível. O resto é o mesmo do head Linux. Só o APK de
+    /// desenvolvimento sugere um servidor (o de teste local); no Release o campo começa vazio, com a dica.
     /// </summary>
     private static void AddSync(IServiceCollection services, Context context)
     {
         services.AddSingleton<ITextClipboard>(_ => new AndroidSensitiveClipboard(context));
-        services.AddSlimeGoalsSync(_ => new AndroidKeystoreVault(context), AndroidDeviceName.Get(context));
-    }
+#if SYNC_DEV
+        var defaultServer = new Uri("http://127.0.0.1:8080");
+#else
+        Uri? defaultServer = null;
 #endif
+        services.AddSlimeGoalsSync(_ => new AndroidKeystoreVault(context), AndroidDeviceName.Get(context), defaultServer);
+    }
 }

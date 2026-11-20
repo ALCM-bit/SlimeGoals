@@ -25,6 +25,22 @@ public class AppServiceCollectionExtensionsTests
     }
 
     [Fact]
+    public async Task Sync_passes_the_head_default_server_to_the_account_screen()
+    {
+        await using var provider = SyncServices(new Uri("http://127.0.0.1:8080")).BuildServiceProvider(Validate);
+
+        provider.GetRequiredService<AccountDefaults>().DefaultServer.Should().Be(new Uri("http://127.0.0.1:8080"));
+    }
+
+    [Fact]
+    public async Task Sync_without_a_default_server_leaves_the_field_empty()
+    {
+        await using var provider = SyncServices(null).BuildServiceProvider(Validate);
+
+        provider.GetRequiredService<AccountDefaults>().DefaultServer.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Sync_puts_one_coordinator_behind_the_account_screen_and_the_host()
     {
         await using var provider = SyncServices().BuildServiceProvider(Validate);
@@ -65,11 +81,11 @@ public class AppServiceCollectionExtensionsTests
             .AddSingleton<IFocusAlert, UnusedFocusAlert>();
     }
 
-    private static IServiceCollection SyncServices() => Ports()
+    private static IServiceCollection SyncServices(Uri? defaultServer = null) => Ports()
         .AddSingleton<ISyncStateStore, UnusedSyncStore>()
         .AddSingleton<ISyncLocalStore, UnusedSyncStore>()
         .AddSlimeGoalsApp()
-        .AddSlimeGoalsSync(_ => new InMemorySecretVault(), "pc da Ana");
+        .AddSlimeGoalsSync(_ => new InMemorySecretVault(), "pc da Ana", defaultServer);
 
     private sealed class UnusedFocusAlarm : IFocusAlarm
     {

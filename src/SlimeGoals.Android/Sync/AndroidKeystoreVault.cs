@@ -1,4 +1,3 @@
-#if SYNC_DEV
 using Android.Content;
 using Android.Security.Keystore;
 using Java.Security;
@@ -148,4 +147,3 @@ internal sealed class AndroidKeystoreVault(Context context) : ISecretVault
         }
     }
 }
-#endif

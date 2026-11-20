@@ -8,8 +8,8 @@ Ainda não há pacote pronto para baixar. Gere-o com o `build.sh`, que precisa d
 
 ```bash
 bash packaging/linux/build.sh
-tar -xzf artifacts/slimegoals-0.11.0-linux-x64.tar.gz
-cd slimegoals-0.11.0
+tar -xzf artifacts/slimegoals-0.12.0-linux-x64.tar.gz
+cd slimegoals-0.12.0
 ./install.sh
 ```
 
@@ -24,7 +24,7 @@ A instalação grava:
 | O atalho do menu | `~/.local/share/applications/slimegoals.desktop` |
 | Os ícones | `~/.local/share/icons/hicolor/` |
 
-Os seus dados ficam em `~/.local/share/SlimeGoals/slimegoals.db`. O pacote do Linux não tem rede: a sincronização ainda é só de desenvolvimento.
+Os seus dados ficam em `~/.local/share/SlimeGoals/slimegoals.db`. Sem conta, nada sai do computador. Com conta, os dados vão cifrados para o seu servidor (veja [Sincronização](sincronizacao.md)).
 
 ## Atualizar
 

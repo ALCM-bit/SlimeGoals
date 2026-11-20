@@ -48,3 +48,18 @@ jobs:
       # configuração esquecido ou um bump de imagem incompatível só aparece aqui.
       - name: Monta a imagem do servidor
         run: docker build -f src/SlimeGoals.Server/Dockerfile .
+
+      # O overlay da tailnet precisa trocar, e não somar, as portas do Caddy: senão a 80 e a 443 sairiam em 0.0.0.0.
+      - name: Confere o Compose da tailnet
+        run: bash packaging/server/check-tailnet-compose.sh
+
+      # Certificado da tailnet na VM: o teste usa tailscale e docker falsos; o shellcheck cobre os scripts da pasta.
+      - name: Testa o script do certificado da tailnet
+        run: |
+          bash packaging/server/tests/tailnet-cert.test.sh
+          bash packaging/server/tests/tailnet-firewall.test.sh
+          bash packaging/server/tests/backup.test.sh
+          bash packaging/server/tests/lib.test.sh
+          bash packaging/server/tests/install-systemd.test.sh
+          bash packaging/server/tests/check-tailnet-compose.test.sh
+          shellcheck packaging/server/*.sh packaging/server/lib/*.sh packaging/server/tests/*.sh

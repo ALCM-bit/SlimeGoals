@@ -52,7 +52,8 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     /// <param name="account">Seção "Conta e sincronização"; só aparece com <see cref="PlatformCapabilities.Sync"/>.</param>
     public SettingsPageViewModel(AppSettings settings, IAutostart? autostart = null,
         PlatformCapabilities? capabilities = null, IReminderPermissions? permissions = null,
-        DataChangeNotifier? changes = null, string? appVersion = null, AccountViewModel? account = null)
+        DataChangeNotifier? changes = null, string? appVersion = null, AccountViewModel? account = null,
+        PageNavigator? navigator = null)
     {
         _settings = settings;
         _autostart = autostart;
@@ -61,6 +62,8 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         _changes = changes;
         VersionText = "SlimeGoals " + (appVersion ?? DefaultVersion());
         Account = account;
+        if (navigator is not null)
+            navigator.SettingsRequested += OpenSection;
         if (account is not null)
             account.PropertyChanged += (_, e) =>
             {
@@ -78,7 +81,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     /// <summary>A conta, quando o head a registra; a tela só a mostra com <see cref="ShowAccount"/>.</summary>
     public AccountViewModel? Account { get; }
 
-    /// <summary>Seção "Conta e sincronização" (fase 9.5a): só no build de desenvolvimento do desktop.</summary>
+    /// <summary>Seção "Conta e sincronização" (fase 9.5a): nos dois heads.</summary>
     public bool ShowAccount => Account is not null && _capabilities.Sync;
 
     public string LicenseText => "Licença: PolyForm Noncommercial 1.0.0";

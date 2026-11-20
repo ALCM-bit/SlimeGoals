@@ -49,7 +49,18 @@ public sealed class FakeSyncAccount : ISyncAccount
             throw failure;
     }
 
-    public Task<AccountStatus> GetStatusAsync(CancellationToken ct = default) => Task.FromResult(Status);
+    /// <summary>Segura as próximas leituras do estado, uma por fila, até o teste completar cada uma (fora de ordem, se quiser).</summary>
+    public Queue<TaskCompletionSource<AccountStatus>> StatusGates { get; } = new();
+
+    /// <summary>Lançada por <see cref="GetStatusAsync"/> (só por ela), até o teste limpar.</summary>
+    public Exception? StatusFailure { get; set; }
+
+    public Task<AccountStatus> GetStatusAsync(CancellationToken ct = default)
+    {
+        if (StatusFailure is { } failure)
+            return Task.FromException<AccountStatus>(failure);
+        return StatusGates.TryDequeue(out var gate) ? gate.Task : Task.FromResult(Status);
+    }
 
     public Task StartAsync(CancellationToken ct = default) => OpAsync("start");
 

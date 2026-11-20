@@ -17,7 +17,7 @@
         <StackPanel Spacing="18" IsEnabled="{Binding IsIdle}">
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Servidor" />
-            <TextBox Text="{Binding ServerText}" MaxLength="{x:Static acc:AccountViewModel.MaxServerLength}" IsEnabled="{Binding IsServerEditable}" AutomationProperties.Name="Servidor" />
+            <TextBox Text="{Binding ServerText}" PlaceholderText="{x:Static acc:AccountViewModel.ServerHint}" MaxLength="{x:Static acc:AccountViewModel.MaxServerLength}" IsEnabled="{Binding IsServerEditable}" AutomationProperties.Name="Servidor" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="E-mail" />
@@ -81,7 +81,7 @@
         <StackPanel Spacing="18" IsEnabled="{Binding IsIdle}">
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Servidor" />
-            <TextBox Text="{Binding ServerText}" MaxLength="{x:Static acc:AccountViewModel.MaxServerLength}" IsEnabled="{Binding IsServerEditable}" AutomationProperties.Name="Servidor" />
+            <TextBox Text="{Binding ServerText}" PlaceholderText="{x:Static acc:AccountViewModel.ServerHint}" MaxLength="{x:Static acc:AccountViewModel.MaxServerLength}" IsEnabled="{Binding IsServerEditable}" AutomationProperties.Name="Servidor" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="E-mail" />
@@ -104,7 +104,7 @@
         <StackPanel Spacing="18" IsEnabled="{Binding IsIdle}">
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Servidor" />
-            <TextBox Text="{Binding ServerText}" MaxLength="{x:Static acc:AccountViewModel.MaxServerLength}" IsEnabled="{Binding IsServerEditable}" AutomationProperties.Name="Servidor" />
+            <TextBox Text="{Binding ServerText}" PlaceholderText="{x:Static acc:AccountViewModel.ServerHint}" MaxLength="{x:Static acc:AccountViewModel.MaxServerLength}" IsEnabled="{Binding IsServerEditable}" AutomationProperties.Name="Servidor" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="E-mail" />

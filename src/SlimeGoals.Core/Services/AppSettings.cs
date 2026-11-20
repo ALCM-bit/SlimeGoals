@@ -29,9 +29,6 @@ public sealed class AppSettings(ISettingsRepository settings, DataChangeNotifier
     /// <summary>Chave: sequência da última sessão de Pomodoro começada, em JSON (sem a meta).</summary>
     public const string FocusPlanKey = "focus.plan";
 
-    /// <summary>Servidor padrão: o do <c>compose.yaml</c> de desenvolvimento.</summary>
-    public static Uri DefaultSyncServer { get; } = new("http://127.0.0.1:8080");
-
     /// <summary>Adiar padrão, em minutos.</summary>
     public const int DefaultSnoozeMinutes = 10;
 
@@ -70,16 +67,16 @@ public sealed class AppSettings(ISettingsRepository settings, DataChangeNotifier
         changes?.NotifyChanged();
     }
 
-    /// <summary>Servidor de sincronização; ausente, ou sem endereço absoluto http/https, vale <see cref="DefaultSyncServer"/>.</summary>
-    public async Task<Uri> GetSyncServerAsync(CancellationToken ct = default)
+    /// <summary>Servidor de sincronização; ausente, ou sem endereço absoluto http/https, vale <c>null</c>.</summary>
+    public async Task<Uri?> GetSyncServerAsync(CancellationToken ct = default)
     {
         if (await settings.GetAsync(SyncServerKey, ct) is not { } raw)
-            return DefaultSyncServer;
+            return null;
         if (Uri.TryCreate(raw, UriKind.Absolute, out var server)
             && (server.Scheme == Uri.UriSchemeHttp || server.Scheme == Uri.UriSchemeHttps))
             return server;
         Trace.TraceWarning($"Valor inválido em {SyncServerKey}.");
-        return DefaultSyncServer;
+        return null;
     }
 
     /// <summary>Grava o servidor de sincronização; endereço relativo lança <see cref="ArgumentException"/>.</summary>

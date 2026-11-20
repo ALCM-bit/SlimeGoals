@@ -10,10 +10,8 @@ using SlimeGoals.Platform.Linux.Autostart;
 using SlimeGoals.Platform.Linux.Notifications;
 using SlimeGoals.Platform.Linux.Power;
 using SlimeGoals.Platform.Linux.Scheduling;
-#if SYNC_DEV
 using SlimeGoals.Platform.Linux.Secrets;
 using SlimeGoals.Platform.Linux.SingleInstance;
-#endif
 
 namespace SlimeGoals.Desktop;
 
@@ -24,11 +22,7 @@ internal static class CompositionRoot
     {
         var services = new ServiceCollection();
 
-#if SYNC_DEV
         services.AddSingleton(PlatformCapabilities.Desktop with { Sync = true });
-#else
-        services.AddSingleton(PlatformCapabilities.Desktop);
-#endif
         // Core, formatador dos lembretes e páginas: os mesmos do Android
         services.AddSlimeGoalsApp();
 
@@ -84,24 +78,26 @@ internal static class CompositionRoot
             sp.GetRequiredService<AppSettings>(),
             sp.GetRequiredService<DataChangeNotifier>(),
             action => Dispatcher.UIThread.Post(action)));
-#if SYNC_DEV
         AddSync(services, databasePath);
-#endif
 
         services.AddSingleton<TrayMenuViewModel>();
 
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true });
     }
 
-#if SYNC_DEV
     /// <summary>
-    /// Conta e sincronização, só no build de desenvolvimento (decisões 2 e 14 da 9.5a). O cofre usa como perfil o mesmo
-    /// hash do caminho do banco da instância única; o caminho em claro não vai ao chaveiro.
+    /// Conta e sincronização em todos os builds. O cofre usa como perfil o mesmo hash do caminho do banco da instância
+    /// única; o caminho em claro não vai ao chaveiro. Só o build de desenvolvimento sugere um servidor (o de teste local);
+    /// no Release o campo começa vazio, com a dica.
     /// </summary>
     private static void AddSync(IServiceCollection services, string databasePath)
     {
         var profile = SingleInstanceGuard.KeyHash(Path.GetFullPath(databasePath));
-        services.AddSlimeGoalsSync(_ => SecretServiceVault.ForSessionBus(profile), Environment.MachineName);
-    }
+#if SYNC_DEV
+        var defaultServer = new Uri("http://127.0.0.1:8080");
+#else
+        Uri? defaultServer = null;
 #endif
+        services.AddSlimeGoalsSync(_ => SecretServiceVault.ForSessionBus(profile), Environment.MachineName, defaultServer);
+    }
 }

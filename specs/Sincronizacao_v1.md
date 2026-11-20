@@ -331,7 +331,7 @@ Falha de rede ou da API no passo 1 não impede os outros dois. Cofre indisponív
 
 Acordos feitos ao ligar a conta e a sincronização no Linux (`SyncCoordinator`, `AccountViewModel`, `AccountView` e a composição do head). Onde diferem do texto acima, valem estes.
 
-**Build de desenvolvimento.** A seção "Conta e sincronização" e tudo o que ela usa só entram no head Linux com a constante `SYNC_DEV`, definida em Debug ou com `-p:SyncDev=true`. O Release (`packaging/linux/build.sh`) não registra cofre, coordenador nem tela, e continua sem rede. O Android compila o `SlimeGoals.Sync`, mas não registra nada dele até a 9.5b.
+**Build de desenvolvimento.** A seção "Conta e sincronização" e tudo o que ela usa só entram no head Linux com a constante `SYNC_DEV`, definida em Debug ou com `-p:SyncDev=true`. O Release (`packaging/linux/build.sh`) não registra cofre, coordenador nem tela, e continua sem rede *(superado na 9.6: o Release passou a ter a conta e a rede, e só os extras de desenvolvimento ficam sob `SYNC_DEV`; veja `specs/Publicacao_na_tailnet_v1.md`, T10)*. O Android compila o `SlimeGoals.Sync`, mas não registra nada dele até a 9.5b.
 
 **Endereço do servidor.** Fica em `settings` (`sync_server`), com padrão `http://127.0.0.1:8080`, e só pode ser editado com a conta desligada; com a conta ligada, vale o servidor gravado na sessão do cofre. Aceita só URL absoluta `http` ou `https`, sem credenciais embutidas (`usuario:senha@`), consulta nem fragmento. Desde o endurecimento do servidor, o `https` é exigido em qualquer endereço; o `http` só vale para `127.0.0.1`, `::1` e `localhost`.
 
@@ -391,7 +391,7 @@ O custo é investigar sem a mensagem: o tipo e a pilha dizem onde falhou, mas à
 
 Conta e sincronização no Android, só no APK de desenvolvimento. Onde diferem do texto acima, valem estes.
 
-**Build de desenvolvimento.** Como no Linux, tudo entra com `SYNC_DEV`: Debug, ou Release com `-p:SyncDev=true` (`packaging/android/build.sh --dev`, que gera `slimegoals-<versão>-android-dev.apk` com a mesma chave de assinatura). Só esse APK declara `INTERNET`, registra cofre, coordenador e tela, e tem o receptor de conferência. O APK de distribuição continua sem `INTERNET` e sem o receptor, conferido no manifesto com `aapt2`.
+**Build de desenvolvimento.** Como no Linux, tudo entra com `SYNC_DEV`: Debug, ou Release com `-p:SyncDev=true` (`packaging/android/build.sh --dev`, que gera `slimegoals-<versão>-android-dev.apk` com a mesma chave de assinatura). Só esse APK declara `INTERNET`, registra cofre, coordenador e tela, e tem o receptor de conferência. O APK de distribuição continua sem `INTERNET` e sem o receptor, conferido no manifesto com `aapt2` *(superado na 9.6: o APK de distribuição declara `INTERNET` e tem a conta, sem texto puro; só o receptor continua exclusivo do APK de desenvolvimento)*.
 
 **Rede.** O APK de desenvolvimento usa `network_security_config_dev.xml`: texto puro só para `127.0.0.1` e `localhost`, sem subdomínios. O de distribuição usa `network_security_config.xml`, sem texto puro. O servidor continua preso ao `127.0.0.1` do computador, e o aparelho chega a ele por `adb reverse tcp:8080 tcp:8080`. O cliente HTTP é o do Linux: 30 s de prazo e sem seguir redirecionamento.
 
@@ -473,15 +473,15 @@ O código do spike é descartável, como em `specs/spikes/`.
 | 9.3 | Servidor e Docker Compose |
 | 9.4 | Criptografia e conta |
 | 9.5 | Interface, permissão de internet, Linux e Android sincronizando |
-| 9.6 | Publicação, depois de decidir grátis ou pago: domínio, TLS, backup, e-mail, política de privacidade, nova auditoria |
+| 9.6 | Publicação na tailnet, no formato decidido em `specs/Publicacao_na_tailnet_v1.md` (servidor numa VM própria, só pela tailnet, para os aparelhos do autor): certificado do Tailscale, backup, SMTP, conta no Release e nova auditoria |
 
-Antes de publicar, a 9.6 também precisa cumprir as obrigações da seção 8 de `specs/Endurecimento_do_servidor_v1.md`: IPv6 na rede do Caddy, com o limite por IP agrupando IPv6 por `/64` (até lá, o servidor atende só IPv4, sem registro `AAAA`); e o motor de sincronização recusando partir com uma sessão gravada em `http://` fora do loopback, mostrando "sessão encerrada".
+A 9.6 cumpriu a obrigação 2 da seção 8 de `specs/Endurecimento_do_servidor_v1.md` (o motor recusa partir com uma sessão gravada em `http://` fora do loopback). A obrigação 1 (IPv6 com limite por `/64`) vale só para quem expuser o servidor na internet; na tailnet, o servidor atende só IPv4 (`specs/Publicacao_na_tailnet_v1.md`, seção 6).
 
 Em desenvolvimento, a confirmação de e-mail é simulada: o código sai no log do servidor local, e a pessoa o cola no app. Em produção, sai por SMTP (`specs/Endurecimento_do_servidor_v1.md`).
 
 ## 11. Decisões em aberto
 
-1. Grátis com limites ou pago (fase 9.6).
-2. Onde hospedar e qual serviço de e-mail (fase 9.6).
+1. Grátis com limites ou pago: resolvida na 9.6, que ficou sem oferta pública (uso só do autor; `specs/Publicacao_na_tailnet_v1.md`).
+2. Onde hospedar e qual serviço de e-mail: resolvida na 9.6, com o servidor numa VM do autor na tailnet e SMTP à escolha de quem opera (`specs/Publicacao_na_tailnet_v1.md`).
 3. Sincronização em segundo plano no Android (depois da primeira versão).
 4. Fila no servidor (broker e consumidor) para muitos usuários: fica para depois da funcionalidade combinada.

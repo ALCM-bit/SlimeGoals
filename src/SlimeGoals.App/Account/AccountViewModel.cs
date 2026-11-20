@@ -80,6 +80,8 @@ public sealed partial class AccountViewModel : ObservableObject
     public const string VaultLockedText = "O chaveiro do sistema está travado ou indisponível. Destrave-o para continuar " +
         "sincronizando.";
     public const string RetryVaultLabel = "Tentar de novo";
+    /// <summary>Dica do campo do servidor, quando vazio.</summary>
+    public const string ServerHint = "https://servidor.exemplo.ts.net";
     public const string SessionUnreadableText = "Os dados da sessão neste aparelho estão ilegíveis. Saia da conta e entre de novo.";
 
     private readonly ISyncAccount _account;
@@ -87,7 +89,8 @@ public sealed partial class AccountViewModel : ObservableObject
     private readonly Action<Action> _dispatch;
     private readonly TimeProvider _time;
     private PendingRegistration? _pending;
-    private string _savedServer = ServerAddress.Display(AppSettings.DefaultSyncServer);
+    private readonly Uri? _defaultServer;
+    private string _savedServer;
     private int _refreshVersion;
 
     /// <summary>
@@ -106,6 +109,8 @@ public sealed partial class AccountViewModel : ObservableObject
         _dispatch = dispatch ?? (a => Dispatcher.UIThread.Post(a));
         _time = time ?? TimeProvider.System;
         DeviceName = defaults.DeviceName;
+        _defaultServer = defaults.DefaultServer;
+        _savedServer = DisplayOrEmpty(_defaultServer);
         ServerText = _savedServer;
         // O aviso chega de qualquer thread; o recarregar roda na da interface e nunca lança.
         _account.StatusChanged += (_, _) => _dispatch(() => _ = RefreshAsync());
@@ -133,7 +138,7 @@ public sealed partial class AccountViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSignedOut), nameof(IsSignedIn), nameof(IsSessionExpired), nameof(IsVaultLocked),
-        nameof(IsSessionUnreadable), nameof(IsServerEditable), nameof(ConnectedText), nameof(ServerLineText),
+        nameof(IsSessionUnreadable), nameof(IsInsecureSession), nameof(IsServerEditable), nameof(ConnectedText), nameof(ServerLineText),
         nameof(LastSyncText), nameof(PendingText), nameof(LastError), nameof(SummaryText))]
     public partial AccountStatus Status { get; private set; } = new(AccountState.SignedOut, null, null, null, 0, null);
 
@@ -205,6 +210,7 @@ public sealed partial class AccountViewModel : ObservableObject
     public bool IsSessionExpired => Status.State == AccountState.SessionExpired;
     public bool IsVaultLocked => Status.State == AccountState.VaultLocked;
     public bool IsSessionUnreadable => Status.State == AccountState.SessionUnreadable;
+    public bool IsInsecureSession => Status.State == AccountState.InsecureSession;
 
     /// <summary>Com a conta ligada vale o servidor da sessão: o campo não muda (decisão 5).</summary>
     public bool IsServerEditable => IsSignedOut;
@@ -221,8 +227,10 @@ public sealed partial class AccountViewModel : ObservableObject
     public bool IsSignOutOpen => Page == AccountPage.SignOut;
     public bool IsDeleteAccountOpen => Page == AccountPage.DeleteAccount;
 
-    public string ConfirmText => $"Enviamos um código para {_pending?.Email}. Neste servidor de desenvolvimento, o código " +
-        "aparece no log do servidor (docker compose logs server).";
+    public string ConfirmText => $"Enviamos um código para {_pending?.Email}. Se não chegar em alguns minutos, confira o spam.";
+
+    public string InsecureSessionText => "Esta sessão usa um endereço http://, que não é mais aceito. Saia da conta e " +
+        "entre de novo com https://. O que está na fila deste aparelho não será enviado.";
 
     public string SignOutWarningText => PendingToLose == 1
         ? "Há 1 alteração que ainda não foi enviada. Se sair agora, ela não chega aos outros aparelhos, e metas excluídas " +
@@ -239,6 +247,7 @@ public sealed partial class AccountViewModel : ObservableObject
         AccountState.SessionExpired => "Entre de novo para continuar",
         AccountState.VaultLocked => "Chaveiro travado",
         AccountState.SessionUnreadable => "Sessão ilegível",
+        AccountState.InsecureSession => "Sessão sem https",
         _ => "Sem conta",
     };
 
@@ -256,7 +265,7 @@ public sealed partial class AccountViewModel : ObservableObject
     {
         try
         {
-            _savedServer = ServerAddress.Display(await _settings.GetSyncServerAsync());
+            _savedServer = DisplayOrEmpty(await _settings.GetSyncServerAsync() ?? _defaultServer);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -265,6 +274,8 @@ public sealed partial class AccountViewModel : ObservableObject
 
         await RefreshAsync(reloadServer: true);
     }
+
+    private static string DisplayOrEmpty(Uri? server) => server is null ? "" : ServerAddress.Display(server);
 
     private async Task RefreshAsync(bool reloadServer = false)
     {

@@ -64,9 +64,9 @@ public class AppSettingsTests
     }
 
     [Fact]
-    public async Task AppSettings_sync_server_defaults_to_local_compose()
+    public async Task AppSettings_sync_server_is_null_until_saved()
     {
-        (await Sut.GetSyncServerAsync()).Should().Be(new Uri("http://127.0.0.1:8080"));
+        (await Sut.GetSyncServerAsync()).Should().BeNull();
 
         await Sut.SetSyncServerAsync(new Uri("https://sync.exemplo.com"));
 
@@ -80,11 +80,11 @@ public class AppSettingsTests
     [InlineData("lixo")]
     [InlineData("ftp://x")]
     [InlineData("/home/ana")]
-    public async Task Sync_server_invalid_stored_value_falls_back_to_local_compose(string stored)
+    public async Task Sync_server_invalid_stored_value_is_null(string stored)
     {
         await _settings.SetAsync(AppSettings.SyncServerKey, stored);
 
-        (await Sut.GetSyncServerAsync()).Should().Be(AppSettings.DefaultSyncServer);
+        (await Sut.GetSyncServerAsync()).Should().BeNull();
     }
 
     [Fact]

@@ -1,4 +1,3 @@
-#if SYNC_DEV
 using Android.Content;
 using Android.OS;
 using SlimeGoals.App.Account;
@@ -45,4 +44,3 @@ internal sealed class AndroidSensitiveClipboard(Context context) : ITextClipboar
         return Task.CompletedTask;
     }
 }
-#endif

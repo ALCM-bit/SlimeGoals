@@ -63,6 +63,7 @@ A ferramenta grava um PNG por página, no tamanho do celular (412×915) e no do 
 | `narrow` | as páginas a 320 e 360 px e os estados mais apertados do Hoje e da aba Tempo |
 | `time` | só a aba Tempo (Pomodoro), em quatro tamanhos |
 | `account` | a seção de conta, sobre uma conta falsa e sem rede |
+| `sync-warning` | a tela Hoje com o aviso de sincronização parada (320, 360, 412 e 1100 de largura) |
 | `mini` | a janelinha do cronômetro |
 | `mascot` | as quatro poses do slime |
 
@@ -76,10 +77,10 @@ O Dependabot (`.github/dependabot.yml`) propõe toda semana as atualizações do
 
 ## Subir a versão
 
-A versão fica em `<Version>`, no `Directory.Build.props`. Dela saem o nome do pacote do Linux, o APK (o `versionCode` é calculado dela: 0.11.0 vira 1100) e a versão na tela Sobre. Ao subir, troque também a versão escrita nos comandos dos guias:
+A versão fica em `<Version>`, no `Directory.Build.props`. Dela saem o nome do pacote do Linux, o APK (o `versionCode` é calculado dela: 0.12.0 vira 1200) e a versão na tela Sobre. Ao subir, troque também a versão escrita nos comandos dos guias:
 
 ```bash
-grep -rn '0\.11\.0' README.md docs/
+grep -rn '0\.12\.0' README.md docs/
 ```
 
 ## Como contribuir

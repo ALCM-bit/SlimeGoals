@@ -52,12 +52,12 @@ public static class AppServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Conta e sincronização, que só os builds de desenvolvimento chamam (decisões 2 e 14 da 9.5a). Um coordenador só
-    /// atende a tela de conta e o <see cref="SyncHost"/>. Um <see cref="ITextClipboard"/> registrado pelo head chega à
-    /// tela de conta.
+    /// Conta e sincronização, que os dois heads chamam em todos os builds. Um coordenador só atende a tela de conta e o
+    /// <see cref="SyncHost"/>. Um <see cref="ITextClipboard"/> registrado pelo head chega à tela de conta.
+    /// <paramref name="defaultServer"/> é o servidor que o campo da tela de conta sugere (nulo deixa o campo vazio).
     /// </summary>
     public static IServiceCollection AddSlimeGoalsSync(this IServiceCollection services,
-        Func<IServiceProvider, ISecretVault> vault, string deviceName)
+        Func<IServiceProvider, ISecretVault> vault, string deviceName, Uri? defaultServer)
     {
         services.AddSingleton<ISecretVault>(vault);
         services.AddSingleton(sp => new SyncCoordinator(
@@ -69,7 +69,7 @@ public static class AppServiceCollectionExtensions
             sp.GetRequiredService<TimeProvider>(),
             SyncHttp.Create));
         services.AddSingleton<ISyncAccount>(sp => sp.GetRequiredService<SyncCoordinator>());
-        services.AddSingleton(new AccountDefaults(deviceName));
+        services.AddSingleton(new AccountDefaults(deviceName, defaultServer));
         services.AddSingleton<AccountViewModel>();
         services.AddSingleton<IAppHostedService, SyncHost>();
         return services;

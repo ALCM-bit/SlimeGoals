@@ -1,0 +1,13 @@
+# Proxy HTTPS do servidor de sincronização na tailnet. O certificado vem de arquivos (tailscale cert), sem ACME e sem
+# a porta 80: só a 443, no IP da tailnet. SLIMEGOALS_DOMAIN é o nome .ts.net completo.
+{
+	auto_https disable_redirects
+	skip_install_trust
+}
+
+{$SLIMEGOALS_DOMAIN} {
+	tls /etc/slimegoals/tls/tailnet.crt /etc/slimegoals/tls/tailnet.key
+	header Strict-Transport-Security "max-age=31536000"
+	header -Server
+	reverse_proxy server:8080
+}

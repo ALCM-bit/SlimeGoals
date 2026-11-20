@@ -271,6 +271,60 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
     }
 
     [Fact]
+    public async Task Start_with_an_http_session_outside_loopback_is_InsecureSession_and_does_not_sync()
+    {
+        var a = NewDevice();
+        await SignUpAsync(a);
+        await a.ReplaceAccountAsync();
+        await RewriteSessionServerAsync(a, new Uri("http://192.0.2.10:8080/"));
+        var clientsBefore = a.Net.ClientsCreated;
+
+        await a.Account.StartAsync();
+        a.Account.SyncNow();
+
+        var status = await a.Account.GetStatusAsync();
+        status.State.Should().Be(AccountState.InsecureSession);
+        status.Server.Should().Be(new Uri("http://192.0.2.10:8080/"));
+        status.Email.Should().Be(_email);
+        a.Net.ClientsCreated.Should().Be(clientsBefore);
+    }
+
+    [Fact]
+    public async Task Sign_out_from_an_insecure_session_makes_no_request()
+    {
+        var a = NewDevice();
+        await SignUpAsync(a);
+        await a.Goals.CreateAsync(Draft("Ler"));
+        await a.ReplaceAccountAsync();
+        await RewriteSessionServerAsync(a, new Uri("http://192.0.2.10:8080/"));
+        var clientsBefore = a.Net.ClientsCreated;
+        await a.Account.StartAsync();
+        (await a.Account.GetStatusAsync()).State.Should().Be(AccountState.InsecureSession);
+
+        await a.Account.SignOutAsync();
+
+        (await a.Account.GetStatusAsync()).State.Should().Be(AccountState.SignedOut);
+        a.Vault.Names.Should().BeEmpty();
+        (await a.State.GetAsync()).Enabled.Should().BeFalse();
+        a.Net.ClientsCreated.Should().Be(clientsBefore, "o token iria em texto puro");
+    }
+
+    [Fact]
+    public async Task Start_with_an_http_loopback_session_still_syncs()
+    {
+        var a = NewDevice();
+        await SignUpAsync(a);
+        await a.ReplaceAccountAsync();
+        await RewriteSessionServerAsync(a, new Uri("http://127.0.0.1:8080/"));
+
+        await a.Account.StartAsync();
+        a.Account.SyncNow();
+
+        await WaitUntilAsync(a.Account, s => s.LastSyncAt is not null);
+        (await a.Account.GetStatusAsync()).State.Should().Be(AccountState.SignedIn);
+    }
+
+    [Fact]
     public async Task Reauth_refuses_a_stored_plain_http_server()
     {
         var a = NewDevice();
@@ -468,6 +522,14 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
         var device = new Device(_factory);
         _devices.Add(device);
         return device;
+    }
+
+    /// <summary>Troca o servidor gravado na sessão do cofre, como uma versão antiga teria gravado.</summary>
+    private static async Task RewriteSessionServerAsync(Device device, Uri server)
+    {
+        var secret = JsonNode.Parse((await device.Vault.GetAsync("sync-session"))!)!.AsObject();
+        secret["server"] = server.AbsoluteUri;
+        await device.Vault.SetAsync("sync-session", JsonSerializer.SerializeToUtf8Bytes(secret));
     }
 
     /// <summary>Cadastra e confirma pelo coordenador do aparelho, que fica com a conta ligada.</summary>
