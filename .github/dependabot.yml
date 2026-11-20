@@ -16,6 +16,11 @@ updates:
     directory: /src/SlimeGoals.Server
     schedule:
       interval: weekly
+    # Só os patches da versão do projeto. Mudar de versão maior (10 para 11) é uma migração:
+    # TargetFramework, global.json e as duas imagens juntos, e não um bump isolado.
+    ignore:
+      - dependency-name: "dotnet/*"
+        update-types: ["version-update:semver-major"]
 
   # As imagens do compose.yaml (PostgreSQL e Caddy).
   - package-ecosystem: docker-compose
