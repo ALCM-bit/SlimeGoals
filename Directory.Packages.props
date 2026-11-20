@@ -17,7 +17,7 @@
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="11.0.0" />
     <PackageVersion Include="Dapper" Version="2.1.100" />
     <!-- Servidor -->
-    <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <PackageVersion Include="Npgsql" Version="11.0.0" />
     <PackageVersion Include="MailKit" Version="5.0.0" />
     <!-- Plataforma Linux -->
     <PackageVersion Include="Tmds.DBus.Protocol" Version="0.95.2" />
