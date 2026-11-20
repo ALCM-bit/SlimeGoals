@@ -21,10 +21,16 @@ setup() {
   cp -r "$src/systemd" "$root/packaging/server/systemd"
   printf 'TAILNET_IP=100.64.0.10\nSLIMEGOALS_DOMAIN=servidor.exemplo.ts.net\nTAILNET_CERT_DIR=%s/certs\n' "$work" > "$root/.env"
   for bin in systemctl sysctl; do
-    printf '#!/usr/bin/env bash\necho "%s $*" >> "$FAKE_LOG"\n' "$bin" > "$work/bin/$bin"
+    cat > "$work/bin/$bin" <<FAKE
+#!/usr/bin/env bash
+echo "$bin \$*" >> "\$FAKE_LOG"
+FAKE
   done
   # FAKE_UID: o id falso devolve este número (0 = root).
-  printf '#!/usr/bin/env bash\necho "${FAKE_UID:-0}"\n' > "$work/bin/id"
+  cat > "$work/bin/id" <<'FAKE'
+#!/usr/bin/env bash
+echo "${FAKE_UID:-0}"
+FAKE
   chmod +x "$work/bin/"*
   : > "$work/log"
   out="$work/out"
