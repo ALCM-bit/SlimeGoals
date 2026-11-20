@@ -3,8 +3,9 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:bef136a371963aaa46ec97882845ef6f54dec15728bb4b128b1c2a400ffbc9b4 AS build
 WORKDIR /src
 
-# Primeiro só o que a restauração precisa, para a camada de pacotes ficar em cache.
-COPY global.json Directory.Build.props Directory.Packages.props ./
+# Primeiro só o que a restauração precisa, para a camada de pacotes ficar em cache. O .editorconfig tem as exceções
+# dos analisadores: sem ele, o build em Release reprova (avisos são erros).
+COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
 COPY src/SlimeGoals.Server/SlimeGoals.Server.csproj src/SlimeGoals.Server/
 COPY src/SlimeGoals.Sync.Contracts/SlimeGoals.Sync.Contracts.csproj src/SlimeGoals.Sync.Contracts/
 RUN dotnet restore src/SlimeGoals.Server/SlimeGoals.Server.csproj
