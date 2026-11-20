@@ -58,4 +58,5 @@ jobs:
         run: |
           bash packaging/server/tests/tailnet-cert.test.sh
           bash packaging/server/tests/tailnet-firewall.test.sh
+          bash packaging/server/tests/backup.test.sh
           shellcheck packaging/server/*.sh packaging/server/lib/*.sh packaging/server/tests/*.sh

@@ -1,0 +1,10 @@
+[Unit]
+Description=Backup do banco do servidor SlimeGoals
+# O pg_dump roda pelo Docker: depois dele, e nunca antes.
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+TimeoutStartSec=30min
+ExecStart=@ROOT@/packaging/server/backup.sh

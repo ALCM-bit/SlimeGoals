@@ -23,7 +23,8 @@ for name in TAILNET_IP SLIMEGOALS_DOMAIN; do
   [ -n "$(env_value "$name" "$env_file")" ] || { echo "$name falta (ou está vazio) no .env. Preencha antes de instalar." >&2; exit 1; }
 done
 
-for unit in slimegoals-tls.service slimegoals-tls.timer slimegoals-firewall.service; do
+for unit in slimegoals-tls.service slimegoals-tls.timer slimegoals-firewall.service \
+  slimegoals-backup.service slimegoals-backup.timer; do
   sed "s|@ROOT@|$root|g" "$src/$unit" > "/etc/systemd/system/$unit"
   chmod 644 "/etc/systemd/system/$unit"
 done
@@ -31,8 +32,8 @@ install -m 644 "$src/60-slimegoals.conf" /etc/sysctl.d/60-slimegoals.conf
 sysctl --system > /dev/null
 
 systemctl daemon-reload
-systemctl enable --now slimegoals-tls.timer slimegoals-firewall.service
+systemctl enable --now slimegoals-tls.timer slimegoals-firewall.service slimegoals-backup.timer
 # O serviço do certificado também sobe com o docker.service, na partida da VM.
 systemctl enable slimegoals-tls.service
 systemctl start slimegoals-tls.service
-echo "Instalado: certificado por timer, sysctl e regra de firewall."
+echo "Instalado: certificado por timer, sysctl, regra de firewall e backup diário (/var/backups/slimegoals)."
