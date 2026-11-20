@@ -65,7 +65,7 @@ if run; then :; else fail "first_run: o script devia sair 0"; fi
 [ "$(reloads)" = 1 ] || fail "first_run: esperava 1 reload, houve $(reloads)"
 grep -q 'caddy reload' "$work/log" || fail "first_run: faltou o caddy reload"
 [ ! -e "$work/injetado" ] || fail "first_run: o .env foi executado (source)"
-[ -z "$(ls -A "$work/certs" | grep -v '^tailnet\.')" ] || fail "first_run: sobrou temporário na pasta"
+[ -z "$(find "$work/certs" -mindepth 1 -not -name 'tailnet.*')" ] || fail "first_run: sobrou temporário na pasta"
 
 # 1b: a pasta não existe
 setup creates_missing_dir
@@ -80,7 +80,7 @@ run || fail "same_cert: 1ª execução"
 run || fail "same_cert: 2ª execução devia sair 0"
 [ "$(reloads)" = 0 ] || fail "same_cert: não devia recarregar"
 ! grep -q '^docker' "$work/log" || fail "same_cert: não devia chamar o docker"
-[ -z "$(ls -A "$work/certs" | grep -v '^tailnet\.')" ] || fail "same_cert: sobrou temporário"
+[ -z "$(find "$work/certs" -mindepth 1 -not -name 'tailnet.*')" ] || fail "same_cert: sobrou temporário"
 
 # 3
 setup new_cert_replaces_and_reloads
@@ -101,7 +101,7 @@ if FAKE_FAIL=1 run; then fail "cert_failure: devia sair diferente de zero"; fi
 cmp -s "$work/crt.antes" "$work/certs/tailnet.crt" || fail "cert_failure: crt mudou"
 cmp -s "$work/key.antes" "$work/certs/tailnet.key" || fail "cert_failure: key mudou"
 [ "$(reloads)" = 0 ] || fail "cert_failure: não devia recarregar"
-[ -z "$(ls -A "$work/certs" | grep -v '^tailnet\.')" ] || fail "cert_failure: sobrou temporário"
+[ -z "$(find "$work/certs" -mindepth 1 -not -name 'tailnet.*')" ] || fail "cert_failure: sobrou temporário"
 
 # 5
 setup key_is_never_printed
