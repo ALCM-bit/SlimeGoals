@@ -20,7 +20,7 @@ public class AccountViewModelTests
     private readonly List<Action> _posted = [];
 
     private AccountViewModel Create(bool inlineDispatch = true) =>
-        new(_account, new AppSettings(_repo), new AccountDefaults("notebook-da-ana"),
+        new(_account, new AppSettings(_repo), new AccountDefaults("notebook-da-ana", Local),
             inlineDispatch ? a => a() : _posted.Add, _time);
 
     [Fact]
@@ -90,8 +90,8 @@ public class AccountViewModelTests
 
         vm.Page.Should().Be(AccountPage.Confirm);
         vm.ShownRecoveryCode.Should().BeNull();
-        vm.ConfirmText.Should().Be("Enviamos um código para ana@exemplo.com. Neste servidor de desenvolvimento, o código " +
-            "aparece no log do servidor (docker compose logs server).");
+        vm.ConfirmText.Should().Be(
+            "Enviamos um código para ana@exemplo.com. Se não chegar em alguns minutos, confira o spam.");
         vm.ConfirmationCode = "123456";
 
         await vm.SubmitConfirmCommand.ExecuteAsync(null);
@@ -219,7 +219,7 @@ public class AccountViewModelTests
         _account.Calls.Should().BeEmpty();
         vm.Error.Should().Be("Informe um endereço http:// ou https:// completo.");
         vm.Page.Should().Be(page);
-        (await new AppSettings(_repo).GetSyncServerAsync()).Should().Be(Local);
+        (await new AppSettings(_repo).GetSyncServerAsync()).Should().BeNull();
     }
 
     [Theory]
@@ -641,6 +641,54 @@ public class AccountViewModelTests
         vm.Page.Should().Be(AccountPage.SignOut);
         await vm.SubmitSignOutCommand.ExecuteAsync(null);
         _account.Calls.Should().Equal("reauthenticate", "flush", "sign-out");
+    }
+
+    [Fact]
+    public async Task Server_field_starts_empty_without_a_default_and_without_a_saved_server()
+    {
+        var vm = new AccountViewModel(_account, new AppSettings(_repo), new AccountDefaults("pc"), a => a(), _time);
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        vm.ServerText.Should().BeEmpty();
+        AccountViewModel.ServerHint.Should().Be("https://servidor.exemplo.ts.net");
+    }
+
+    [Fact]
+    public async Task Server_field_starts_with_the_head_default()
+    {
+        var vm = new AccountViewModel(_account, new AppSettings(_repo),
+            new AccountDefaults("pc", new Uri("http://127.0.0.1:8080")), a => a(), _time);
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        vm.ServerText.Should().Be("http://127.0.0.1:8080");
+    }
+
+    [Fact]
+    public async Task Saved_server_wins_over_the_default()
+    {
+        await new AppSettings(_repo).SetSyncServerAsync(new Uri("https://sync.exemplo.com"));
+        var vm = new AccountViewModel(_account, new AppSettings(_repo),
+            new AccountDefaults("pc", new Uri("http://127.0.0.1:8080")), a => a(), _time);
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        vm.ServerText.Should().Be("https://sync.exemplo.com");
+    }
+
+    [Fact]
+    public async Task Insecure_session_offers_only_sign_out()
+    {
+        _account.Status = WithState(AccountState.InsecureSession);
+
+        var vm = await LoadedAsync();
+
+        vm.IsInsecureSession.Should().BeTrue();
+        vm.IsSessionExpired.Should().BeFalse();
+        vm.SummaryText.Should().Be("Sessão sem https");
+        vm.InsecureSessionText.Should().Be("Esta sessão usa um endereço http://, que não é mais aceito. Saia da conta e " +
+            "entre de novo com https://. O que está na fila deste aparelho não será enviado.");
     }
 
     [Fact]

@@ -78,6 +78,14 @@
         <Button Classes="ghost" HorizontalAlignment="Left" Content="Sair" Command="{Binding OpenSignOutCommand}" />
       </StackPanel>
 
+      <!-- Sessão http fora do loopback: só sair -->
+      <StackPanel Spacing="12" IsVisible="{Binding IsInsecureSession}">
+        <Border Classes="warning-band">
+          <TextBlock Text="{Binding InsecureSessionText}" TextWrapping="Wrap" />
+        </Border>
+        <Button Classes="ghost" HorizontalAlignment="Left" Content="Sair" Command="{Binding OpenSignOutCommand}" />
+      </StackPanel>
+
       <!-- Sair (envia a fila) e "Tentar de novo" rodam daqui: ocupado e erro também na seção -->
       <ProgressBar Classes="busy" IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
       <TextBlock Classes="form-error" Text="{Binding Error}"

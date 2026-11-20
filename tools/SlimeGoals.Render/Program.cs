@@ -90,6 +90,8 @@ void RenderAccount(int width, int height)
         "A sessão deste aparelho foi encerrada. Entre de novo."), _ => { });
     Shot("vault-locked", new AccountStatus(AccountState.VaultLocked, null, null, null, 0, null), _ => { });
     Shot("session-unreadable", new AccountStatus(AccountState.SessionUnreadable, null, null, null, 0, null), _ => { });
+    Shot("insecure-session", new AccountStatus(AccountState.InsecureSession, "ana@exemplo.com", new Uri("http://sync.exemplo.com/"), null, 2,
+        null), _ => { });
 
     var signedOut = new AccountStatus(AccountState.SignedOut, null, null, null, 0, null);
     Shot("register", signedOut, vm => vm.OpenRegisterCommand.Execute(null));
