@@ -1,8 +1,8 @@
 # Servidor de sincronização em produção: Caddy (HTTPS) -> servidor -> PostgreSQL.
-# Uso: packaging/server/init-env.sh (cria secrets/ e o .env), preencha o .env e rode
-#   docker compose up -d --build --wait
-# Desenvolvimento (e-mail simulado, porta 127.0.0.1:8080, sem o Caddy):
-#   docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait
+# Uso: packaging/server/init-env.sh (cria secrets/ e o .env) e siga docs/servidor.md.
+# Este arquivo sozinho publica o Caddy em 0.0.0.0:80 e 0.0.0.0:443: não o suba assim na VM da tailnet.
+# Desenvolvimento: com o compose.dev.yaml por cima (e-mail simulado, porta 127.0.0.1:8080, sem o Caddy).
+# VM na tailnet: com o compose.tailnet.yaml por cima (seção "Na tailnet" do guia).
 name: slimegoals
 
 # Endurecimento comum aos três serviços: raiz só de leitura, sem capacidades, sem ganhar privilégio.

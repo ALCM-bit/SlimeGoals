@@ -40,7 +40,7 @@ O volume antigo tem tabelas de um superusuário. Faça nesta ordem, sem apagar d
 
 O servidor roda numa VM Ubuntu que só a sua [tailnet](https://tailscale.com) alcança. Nada é aberto na internet nem no roteador: o Caddy publica só a porta 443, só no IP `100.x` da VM, com o certificado que o próprio Tailscale emite para o nome `.ts.net`. Um script com timer, fora do Docker, pede e renova o certificado, e o Caddy só o lê. Os exemplos abaixo usam `servidor.exemplo.ts.net` e `100.64.0.10`: troque pelos seus, e nunca ponha o nome nem o IP reais no repositório, que é público.
 
-A VM precisa de Tailscale (já entrou na tailnet), Docker com o plugin Compose e `git`. Rode os comandos a partir da pasta do repositório.
+A VM precisa de Tailscale (já entrou na tailnet), Docker com o plugin Compose e `git`. Rode os comandos a partir da pasta do repositório. Essa pasta deve ser gravável só pelo usuário da VM: os scripts de `packaging/server/` rodam como root a partir dela, então quem escreve ali escreve em código de root.
 
 ### 1. Painel do Tailscale
 
@@ -60,7 +60,10 @@ Edite o `.env` (fora do repositório) e preencha:
 SLIMEGOALS_DOMAIN=servidor.exemplo.ts.net   # o nome .ts.net completo da VM; também vira o AllowedHosts
 TAILNET_IP=100.64.0.10                      # o IPv4 100.x da VM (tailscale ip -4)
 # TAILNET_CERT_DIR=/etc/slimegoals/tls      # opcional; é o padrão
+COMPOSE_FILE=compose.yaml:compose.tailnet.yaml
 ```
+
+`TAILNET_IP` precisa ser um IPv4 da faixa da tailnet (100.64.0.0 a 100.127.255.255); os scripts recusam qualquer outro. Descomente a linha `COMPOSE_FILE` (`init-env.sh` e `.env.example` a trazem comentada): com ela, todo `docker compose ...` solto nesta pasta, inclusive um `up` esquecido, já inclui o `compose.tailnet.yaml`. Sem ela, o `compose.yaml` sozinho publica o Caddy em `0.0.0.0:80` e `0.0.0.0:443`, ou seja, para toda a rede de casa. Os scripts do `packaging/server/` passam os arquivos com `-f`, que vale mais que essa variável.
 
 Com o `compose.tailnet.yaml`, as variáveis `HTTP_PORT` e `HTTPS_PORT` são ignoradas: o Caddy publica só `${TAILNET_IP}:443`.
 
@@ -73,8 +76,16 @@ O SMTP é obrigatório, porque o código de confirmação do cadastro vai por e-
 
 ```bash
 sudo packaging/server/install-systemd.sh
-docker compose -f compose.yaml -f compose.tailnet.yaml up -d --build --wait
+docker compose up -d --build --wait
 curl -fsS https://servidor.exemplo.ts.net/health
+```
+
+Confira que só o Caddy publica porta, só no IP da tailnet e só a 443:
+
+```bash
+docker compose config --format json | jq '.services.caddy.ports'                 # só TAILNET_IP, published "443", target 443
+docker compose config --format json | jq '[.services[] | select(.ports) ] | length'   # 1
+docker ps --format '{{.Names}} {{.Ports}}'                                          # só 100.64.0.10:443->443/tcp
 ```
 
 O `install-systemd.sh` recusa se `TAILNET_IP`, `SLIMEGOALS_DOMAIN` ou a pasta do certificado estiverem inválidos, e instala, como root:
@@ -102,16 +113,49 @@ No app (Release), em Configurações, **Conta e sincronização**: preencha o se
 
 ```bash
 git pull
-docker compose -f compose.yaml -f compose.tailnet.yaml up -d --build --wait
+docker compose up -d --build --wait
 ```
 
 Nunca use `docker compose down -v` ao atualizar: ele apaga o banco. `down` sem `-v` mantém o volume.
 
 Se a atualização mexeu nas unidades do systemd, rode o `sudo packaging/server/install-systemd.sh` de novo; ele pode repetir sem problema. Depois de atualizar o Docker em si, confira a regra do firewall (passo 3).
 
+### Conferências na VM
+
+Faça uma vez depois de instalar e de novo depois de mudar o Docker, o firewall ou os scripts. Elas valem para o que o autor só consegue provar na VM de verdade.
+
+**A regra do firewall vale logo depois de reiniciar.** Na partida, a regra do `DOCKER-USER` nasce junto do Docker, e há uma janela curta antes disso. Logo depois de `sudo reboot`, entre de novo e rode `sudo iptables -S DOCKER-USER`: a regra do passo 3 tem de estar lá. Depois, `curl -fsS https://servidor.exemplo.ts.net/health` precisa responder sem `-k`.
+
+**Da rede de casa, nada chega ao Caddy.** Use outra máquina da rede de casa (fora da tailnet), com `<IP da VM na rede de casa>` o endereço da VM nessa rede e `100.64.0.10` o `TAILNET_IP`:
+
+```bash
+sudo ip route add 100.64.0.10/32 via <IP da VM na rede de casa>
+curl -k --max-time 5 https://100.64.0.10/health   # deve esgotar o tempo (curl sai com 28), sem resposta
+sudo ip route del 100.64.0.10/32 via <IP da VM na rede de casa>
+```
+
+Repita contra o contêiner do Caddy pela rede interna do Docker (a rota tem de ser apagada do mesmo jeito):
+
+```bash
+sudo ip route add 10.89.0.2/32 via <IP da VM na rede de casa>
+curl -k --max-time 5 https://10.89.0.2/health      # também deve esgotar o tempo
+sudo ip route del 10.89.0.2/32 via <IP da VM na rede de casa>
+```
+
+Se qualquer um dos dois responder, **pare**, derrube a pilha (`docker compose down`, sem `-v`) e relate: a rede de casa chega ao servidor. Pelo IP da VM em casa, as portas 80 e 443 também não podem responder.
+
+**O certificado servido é o que está no disco (renovação).** O `/health` não diz qual certificado o Caddy apresenta, então compare o número de série do arquivo com o do que o Caddy serve; os dois têm de ser iguais:
+
+```bash
+sudo openssl x509 -noout -serial -in /etc/slimegoals/tls/tailnet.crt
+openssl s_client -connect servidor.exemplo.ts.net:443 -servername servidor.exemplo.ts.net </dev/null 2>/dev/null | openssl x509 -noout -serial
+```
+
+Não há um jeito seguro de forçar o Tailscale a emitir um certificado novo: o `tailscale cert` renova perto do vencimento. Para provar que o Caddy lê o que o script grava, apague (com `sudo`) os dois arquivos da pasta do certificado, rode `sudo systemctl start slimegoals-tls.service` e compare os seriais de novo (o script grava o par, recarrega o Caddy e o `/health` continua respondendo). Para provar a renovação de verdade, anote o serial agora e confira de novo depois da renovação, algumas semanas depois: o serial do arquivo e o do servidor mudam juntos.
+
 ### Backup e restauração
 
-O timer `slimegoals-backup.timer` roda o `packaging/server/backup.sh` todo dia. Ele faz um `pg_dump` em formato custom pelo contêiner `db`, grava `slimegoals-AAAAMMDD-HHMMSS.dump` em `/var/backups/slimegoals` (pasta 700, arquivos 600), confere o arquivo com `pg_restore -l` e guarda os 14 mais recentes. Para rodar à mão, ou para outra pasta: `sudo packaging/server/backup.sh [pasta]`. Os logs vão para o journal (`journalctl -u slimegoals-backup`).
+O timer `slimegoals-backup.timer` roda o `packaging/server/backup.sh` todo dia. Ele faz um `pg_dump` em formato custom pelo contêiner `db`, grava `slimegoals-AAAAMMDD-HHMMSS.dump` em `/var/backups/slimegoals` (pasta 700, arquivos 600), confere o arquivo inteiro com `pg_restore -f /dev/null` (lê índice e dados, então um dump cortado reprova) e guarda os 14 mais recentes. Para rodar à mão, ou para outra pasta: `sudo packaging/server/backup.sh [pasta]`. Os logs vão para o journal (`journalctl -u slimegoals-backup`).
 
 O backup fica só na VM. Os aparelhos guardam os próprios dados, e o servidor guarda só blobs cifrados; copiar os arquivos para fora da VM fica por sua conta.
 
@@ -133,13 +177,12 @@ docker rm -f restore
 **Restaurar depois de um desastre** (ensaiado numa pilha descartável: backup, `down -v`, restauração, `/health` 200, mesma contagem e tabelas do dono `slimegoals_owner`). Antes, tenha um backup conferido pelo passo acima. Este é o **único** caso em que se usa `docker compose down -v`, que apaga o volume do banco: ele só serve para recomeçar com um volume novo, e só depois de conferir o backup. A ordem importa: o banco sobe sozinho, para o servidor não criar as tabelas antes, e a restauração não usa `--no-owner`, para as tabelas continuarem do `slimegoals_owner` (os papéis são criados pela primeira partida do `db`).
 
 ```bash
-F="-f compose.yaml -f compose.tailnet.yaml"
-docker compose $F down -v                    # só aqui; apaga o banco atual
-docker compose $F up -d --wait db            # volume novo: só o banco, com os papéis
-sudo cat /var/backups/slimegoals/slimegoals-AAAAMMDD-HHMMSS.dump | docker compose $F exec -T db pg_restore -U postgres -d slimegoals --clean --if-exists
-docker compose $F up -d --build --wait       # agora o servidor e o Caddy
+docker compose down -v                    # só aqui; apaga o banco atual
+docker compose up -d --wait db            # volume novo: só o banco, com os papéis
+sudo cat /var/backups/slimegoals/slimegoals-AAAAMMDD-HHMMSS.dump | docker compose exec -T db pg_restore -U postgres -d slimegoals --clean --if-exists
+docker compose up -d --build --wait       # agora o servidor e o Caddy
 curl -fsS https://servidor.exemplo.ts.net/health
-docker compose $F exec -T db psql -U postgres -d slimegoals -Atc "select count(*) from accounts" -c "select tablename||' '||tableowner from pg_tables where schemaname='public'"
+docker compose exec -T db psql -U postgres -d slimegoals -Atc "select count(*) from accounts" -c "select tablename||' '||tableowner from pg_tables where schemaname='public'"
 ```
 
 As contas devem aparecer, e todas as tabelas devem ser de `slimegoals_owner`.

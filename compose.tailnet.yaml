@@ -1,7 +1,8 @@
 # Servidor na tailnet, por cima do compose.yaml: o Caddy publica só ${TAILNET_IP}:443, com o certificado lido de arquivos
 # (gerado no host por `tailscale cert`). Troca as portas e os volumes do Caddy, não soma. Nada de porta 80, nada de ACME,
 # e o socket do tailscaled nunca entra no contêiner.
-#   docker compose -f compose.yaml -f compose.tailnet.yaml up -d --build --wait
+# Na VM, ponha COMPOSE_FILE=compose.yaml:compose.tailnet.yaml no .env (docs/servidor.md, "Na tailnet"): sem isso, um
+# `docker compose` sem -f ignora este arquivo e publica o Caddy em 0.0.0.0.
 services:
   caddy:
     ports: !override
