@@ -101,7 +101,7 @@ Os detalhes estão em [Desenvolvimento](docs/desenvolvimento.md#como-contribuir)
 | 6 | Acabamento e empacotamento Linux | ✅ |
 | 7 | Android (7a interface ✅ · 7b lembretes ✅ · 7c distribuição ✅ · ⏳ teste longo com a tela bloqueada) | ⏳ |
 | 8 | Mascote slime | ✅ |
-| 9 | Sincronização cifrada (9.1 modelo local ✅ · 9.2 motor ✅ · 9.3 servidor ✅ · 9.4 criptografia e conta ✅ · 9.5a conta no Linux ✅ · 9.5b conta no Android ✅ · endurecimento do servidor ✅ · 9.6 publicação na tailnet ⏳ aguardando conferência na VM) | ⏳ |
+| 9 | Sincronização cifrada (9.1 modelo local ✅ · 9.2 motor ✅ · 9.3 servidor ✅ · 9.4 criptografia e conta ✅ · 9.5a conta no Linux ✅ · 9.5b conta no Android ✅ · endurecimento do servidor ✅ · 9.6 publicação na tailnet ✅) | ✅ |
 
 Fora das fases, já entregues: cronômetro fora do app, tarefas no cronômetro, Pomodoro e aba Tempo (0.9.0) e segundos nas metas de tempo (0.10.0).
 

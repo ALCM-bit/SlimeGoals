@@ -40,7 +40,7 @@ O volume antigo tem tabelas de um superusuário. Faça nesta ordem, sem apagar d
 
 O servidor roda numa VM Ubuntu que só a sua [tailnet](https://tailscale.com) alcança. Nada é aberto na internet nem no roteador: o Caddy publica só a porta 443, só no IP `100.x` da VM, com o certificado que o próprio Tailscale emite para o nome `.ts.net`. Um script com timer, fora do Docker, pede e renova o certificado, e o Caddy só o lê. Os exemplos abaixo usam `servidor.exemplo.ts.net` e `100.64.0.10`: troque pelos seus, e nunca ponha o nome nem o IP reais no repositório, que é público.
 
-A VM precisa de Tailscale (já entrou na tailnet), Docker com o plugin Compose e `git`. Rode os comandos a partir da pasta do repositório. Essa pasta deve ser gravável só pelo usuário da VM: os scripts de `packaging/server/` rodam como root a partir dela, então quem escreve ali escreve em código de root.
+A VM precisa de Tailscale (já entrou na tailnet), Docker com o plugin Compose, `git` e `jq` (este só para as conferências). Rode os comandos a partir da pasta do repositório. Os comandos `docker` deste guia pedem `sudo` se o seu usuário não estiver no grupo `docker`; entrar nesse grupo equivale a ter root na VM, então `sudo docker ...` é a escolha mais segura. Essa pasta deve ser gravável só pelo usuário da VM: os scripts de `packaging/server/` rodam como root a partir dela, então quem escreve ali escreve em código de root.
 
 ### 1. Painel do Tailscale
 
@@ -63,7 +63,7 @@ TAILNET_IP=100.64.0.10                      # o IPv4 100.x da VM (tailscale ip -
 COMPOSE_FILE=compose.yaml:compose.tailnet.yaml
 ```
 
-`TAILNET_IP` precisa ser um IPv4 da faixa da tailnet (100.64.0.0 a 100.127.255.255); os scripts recusam qualquer outro. Descomente a linha `COMPOSE_FILE` (`init-env.sh` e `.env.example` a trazem comentada): com ela, todo `docker compose ...` solto nesta pasta, inclusive um `up` esquecido, já inclui o `compose.tailnet.yaml`. Sem ela, o `compose.yaml` sozinho publica o Caddy em `0.0.0.0:80` e `0.0.0.0:443`, ou seja, para toda a rede de casa. Os scripts do `packaging/server/` passam os arquivos com `-f`, que vale mais que essa variável.
+`TAILNET_IP` precisa ser um IPv4 da faixa da tailnet (100.64.0.0 a 100.127.255.255); os scripts recusam qualquer outro. Descomente a linha `COMPOSE_FILE` (`init-env.sh` e `.env.example` a trazem comentada): com ela, todo `docker compose ...` solto nesta pasta, inclusive um `up` esquecido, já inclui o `compose.tailnet.yaml`. Sem ela, o `compose.yaml` sozinho publica o Caddy em `0.0.0.0:80` e `0.0.0.0:443`, ou seja, para toda a rede de casa. O `tailnet-cert.sh` e o `backup.sh` passam os arquivos com `-f`, que vale mais que essa variável; o `upgrade-roles.sh` usa o `docker compose` solto e segue o `COMPOSE_FILE`.
 
 Com o `compose.tailnet.yaml`, as variáveis `HTTP_PORT` e `HTTPS_PORT` são ignoradas: o Caddy publica só `${TAILNET_IP}:443`.
 
@@ -126,7 +126,7 @@ Faça uma vez depois de instalar e de novo depois de mudar o Docker, o firewall 
 
 **A regra do firewall vale logo depois de reiniciar.** Na partida, a regra do `DOCKER-USER` nasce junto do Docker, e há uma janela curta antes disso. Logo depois de `sudo reboot`, entre de novo e rode `sudo iptables -S DOCKER-USER`: a regra do passo 3 tem de estar lá. Depois, `curl -fsS https://servidor.exemplo.ts.net/health` precisa responder sem `-k`.
 
-**Da rede de casa, nada chega ao Caddy.** Use outra máquina da rede de casa (fora da tailnet), com `<IP da VM na rede de casa>` o endereço da VM nessa rede e `100.64.0.10` o `TAILNET_IP`:
+**Da rede de casa, nada chega ao Caddy.** Use outra máquina da rede de casa, com `<IP da VM na rede de casa>` o endereço da VM nessa rede e `100.64.0.10` o `TAILNET_IP`. Se a VM roda dentro de outro host (o Umbrel, por exemplo) numa rede privada só dela, faça o teste nesse host, com o IP da VM nessa rede privada, e de novo de uma máquina da rede de casa, com o IP do host. Se a máquina do teste também está na tailnet, desligue o Tailscale nela durante o teste (`sudo tailscale down`, depois `sudo tailscale up`) ou, se não puder, faça a rota manual valer mais que a do Tailscale com `sudo ip rule add to 100.64.0.10/32 lookup main priority 100` e apague a regra no fim (`sudo ip rule del to 100.64.0.10/32 lookup main priority 100`); sem isso, o pedido vai pela tailnet e o teste não prova nada.
 
 ```bash
 sudo ip route add 100.64.0.10/32 via <IP da VM na rede de casa>
@@ -151,7 +151,7 @@ sudo openssl x509 -noout -serial -in /etc/slimegoals/tls/tailnet.crt
 openssl s_client -connect servidor.exemplo.ts.net:443 -servername servidor.exemplo.ts.net </dev/null 2>/dev/null | openssl x509 -noout -serial
 ```
 
-Não há um jeito seguro de forçar o Tailscale a emitir um certificado novo: o `tailscale cert` renova perto do vencimento. Para provar que o Caddy lê o que o script grava, apague (com `sudo`) os dois arquivos da pasta do certificado, rode `sudo systemctl start slimegoals-tls.service` e compare os seriais de novo (o script grava o par, recarrega o Caddy e o `/health` continua respondendo). Para provar a renovação de verdade, anote o serial agora e confira de novo depois da renovação, algumas semanas depois: o serial do arquivo e o do servidor mudam juntos.
+Não há um jeito seguro de forçar o Tailscale a emitir um certificado novo: o `tailscale cert` renova perto do vencimento. Para provar que o Caddy lê o que o script grava, tire os dois arquivos da pasta do certificado sem apagá-los (`sudo mkdir -m 700 /root/tls-antigo && sudo mv /etc/slimegoals/tls/tailnet.crt /etc/slimegoals/tls/tailnet.key /root/tls-antigo/`; fora da pasta, porque o script recusa uma pasta com outros arquivos), rode `sudo systemctl start slimegoals-tls.service` e compare os seriais de novo (o script grava o par, recarrega o Caddy e o `/health` continua respondendo). Depois, apague a cópia: `sudo rm -r /root/tls-antigo`. Para provar a renovação de verdade, anote o serial agora e confira de novo depois da renovação, algumas semanas depois: o serial do arquivo e o do servidor mudam juntos.
 
 ### Backup e restauração
 
