@@ -59,6 +59,9 @@ SMTP_HOST=
 SMTP_PORT=
 SMTP_USERNAME=
 SMTP_FROM=
+# Na tailnet (compose.tailnet.yaml): o IP 100.x da VM e a pasta de tailnet.crt e tailnet.key.
+# TAILNET_IP=
+# TAILNET_CERT_DIR=/etc/slimegoals/tls
 ENV
   echo "Criado $env_file."
 fi

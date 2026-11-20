@@ -48,3 +48,7 @@ jobs:
       # configuração esquecido ou um bump de imagem incompatível só aparece aqui.
       - name: Monta a imagem do servidor
         run: docker build -f src/SlimeGoals.Server/Dockerfile .
+
+      # O overlay da tailnet precisa trocar, e não somar, as portas do Caddy: senão a 80 e a 443 sairiam em 0.0.0.0.
+      - name: Confere o Compose da tailnet
+        run: bash packaging/server/check-tailnet-compose.sh
