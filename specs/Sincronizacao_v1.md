@@ -473,15 +473,15 @@ O código do spike é descartável, como em `specs/spikes/`.
 | 9.3 | Servidor e Docker Compose |
 | 9.4 | Criptografia e conta |
 | 9.5 | Interface, permissão de internet, Linux e Android sincronizando |
-| 9.6 | Publicação, depois de decidir grátis ou pago: domínio, TLS, backup, e-mail, política de privacidade, nova auditoria |
+| 9.6 | Publicação na tailnet, no formato decidido em `specs/Publicacao_na_tailnet_v1.md` (servidor numa VM própria, só pela tailnet, para os aparelhos do autor): certificado do Tailscale, backup, SMTP, conta no Release e nova auditoria |
 
-Antes de publicar, a 9.6 também precisa cumprir as obrigações da seção 8 de `specs/Endurecimento_do_servidor_v1.md`: IPv6 na rede do Caddy, com o limite por IP agrupando IPv6 por `/64` (até lá, o servidor atende só IPv4, sem registro `AAAA`); e o motor de sincronização recusando partir com uma sessão gravada em `http://` fora do loopback, mostrando "sessão encerrada".
+A 9.6 cumpriu a obrigação 2 da seção 8 de `specs/Endurecimento_do_servidor_v1.md` (o motor recusa partir com uma sessão gravada em `http://` fora do loopback). A obrigação 1 (IPv6 com limite por `/64`) vale só para quem expuser o servidor na internet; na tailnet, o servidor atende só IPv4 (`specs/Publicacao_na_tailnet_v1.md`, seção 6).
 
 Em desenvolvimento, a confirmação de e-mail é simulada: o código sai no log do servidor local, e a pessoa o cola no app. Em produção, sai por SMTP (`specs/Endurecimento_do_servidor_v1.md`).
 
 ## 11. Decisões em aberto
 
-1. Grátis com limites ou pago (fase 9.6).
-2. Onde hospedar e qual serviço de e-mail (fase 9.6).
+1. Grátis com limites ou pago: resolvida na 9.6, que ficou sem oferta pública (uso só do autor; `specs/Publicacao_na_tailnet_v1.md`).
+2. Onde hospedar e qual serviço de e-mail: resolvida na 9.6, com o servidor numa VM do autor na tailnet e SMTP à escolha de quem opera (`specs/Publicacao_na_tailnet_v1.md`).
 3. Sincronização em segundo plano no Android (depois da primeira versão).
 4. Fila no servidor (broker e consumidor) para muitos usuários: fica para depois da funcionalidade combinada.

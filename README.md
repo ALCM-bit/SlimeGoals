@@ -3,11 +3,11 @@
 Gestor de metas pessoais com lembretes, para **Linux (GNOME)** e **Android**.
 Você cadastra hábitos diários ou metas semanais, recebe lembretes até cumpri-las,
 registra o progresso com um check-in e acompanha relatórios semanais e mensais. Funciona offline,
-com os dados guardados localmente em SQLite.
+com os dados guardados localmente em SQLite. A conta de sincronização é opcional: sem ela, os dados não saem do aparelho; com ela, saem cifrados.
 
 ![Tela Hoje no desktop, com o slime e as metas do dia](docs/images/hoje-desktop.png)
 
-> **Status:** em desenvolvimento, na versão 0.11.0. O app funciona no Linux, com pacote de instalação, e no Android, com APK assinado. O autor já testou num celular de verdade a instalação, as notificações e os lembretes, inclusive depois de religar o aparelho. A sincronização entre aparelhos existe só no build de desenvolvimento até a fase 9.6. Veja o [roteiro](#roteiro).
+> **Status:** em desenvolvimento, na versão 0.12.0. O app funciona no Linux, com pacote de instalação, e no Android, com APK assinado. O autor já testou num celular de verdade a instalação, as notificações e os lembretes, inclusive depois de religar o aparelho. A sincronização entre aparelhos, cifrada de ponta a ponta, já vem nos dois apps: o servidor fica numa VM sua, alcançável só pela sua tailnet. Veja o [roteiro](#roteiro).
 
 ## Funcionalidades
 
@@ -21,7 +21,7 @@ com os dados guardados localmente em SQLite.
 - **Slime** no Hoje, que muda de pose e de frase conforme o andamento do dia
 - **Relatórios** semanais e mensais, com sequências em dias ou semanas
 - **Arquivamento** sem perda de histórico; tema escuro roxo
-- **Sincronização entre aparelhos**, cifrada de ponta a ponta: por enquanto só no build de desenvolvimento ([como usar](docs/sincronizacao.md))
+- **Sincronização entre aparelhos**, cifrada de ponta a ponta: opcional, com servidor próprio ([como usar](docs/sincronizacao.md))
 
 ## Instalar
 
@@ -56,13 +56,13 @@ O app instalado guarda os dados em `~/.local/share/SlimeGoals/slimegoals.db`. Em
 | [Arquitetura](docs/arquitetura.md) | Projetos e dependências, pastas, regras que os testes garantem, sincronização e servidor |
 | [Linux](docs/linux.md) | Gerar o pacote, instalar, atualizar e desinstalar |
 | [Android](docs/android.md) | Emulador, permissões e comandos `adb`, gerar o APK assinado, instalar e atualizar no celular |
-| [Servidor de sincronização](docs/servidor.md) | Segredos, desenvolvimento, atualização de um banco antigo, produção com HTTPS e SMTP |
+| [Servidor de sincronização](docs/servidor.md) | Segredos, desenvolvimento, publicação na tailnet (certificado, backup, firewall), atualização de um banco antigo, produção com HTTPS e SMTP |
 | [Sincronização](docs/sincronizacao.md) | O que a cifra protege e como usar a conta no Linux e no Android |
 
 As especificações ficam em [`specs/`](specs/):
 
 - [Especificação geral (v1.4)](specs/Planejamento_v3.md): requisitos, modelo de dados, regras de lembrete e design system
-- [Sincronização](specs/Sincronizacao_v1.md) e [Endurecimento do servidor](specs/Endurecimento_do_servidor_v1.md)
+- [Sincronização](specs/Sincronizacao_v1.md), [Endurecimento do servidor](specs/Endurecimento_do_servidor_v1.md) e [Publicação na tailnet](specs/Publicacao_na_tailnet_v1.md)
 - [Cronômetro fora do app](specs/Cronometro_fora_do_app_v1.md), [Tarefas no cronômetro](specs/Tarefas_no_cronometro_v1.md), [Pomodoro](specs/Pomodoro_v1.md) e [Segundos nas metas de tempo](specs/Segundos_nas_metas_de_tempo_v1.md)
 - [Protótipos visuais](specs/design/) (desktop em `v4-bento-desktop.html`, celular em `v3-*-mobile.html`), [planos de implementação](specs/plans/) e [conclusões dos spikes](specs/spikes/)
 
@@ -101,7 +101,7 @@ Os detalhes estão em [Desenvolvimento](docs/desenvolvimento.md#como-contribuir)
 | 6 | Acabamento e empacotamento Linux | ✅ |
 | 7 | Android (7a interface ✅ · 7b lembretes ✅ · 7c distribuição ✅ · ⏳ teste longo com a tela bloqueada) | ⏳ |
 | 8 | Mascote slime | ✅ |
-| 9 | Sincronização cifrada (9.1 modelo local ✅ · 9.2 motor ✅ · 9.3 servidor ✅ · 9.4 criptografia e conta ✅ · 9.5a conta no Linux ✅ · 9.5b conta no Android ✅ · endurecimento do servidor ✅ · 9.6 publicação ⏳) | ⏳ |
+| 9 | Sincronização cifrada (9.1 modelo local ✅ · 9.2 motor ✅ · 9.3 servidor ✅ · 9.4 criptografia e conta ✅ · 9.5a conta no Linux ✅ · 9.5b conta no Android ✅ · endurecimento do servidor ✅ · 9.6 publicação na tailnet ✅) | ✅ |
 
 Fora das fases, já entregues: cronômetro fora do app, tarefas no cronômetro, Pomodoro e aba Tempo (0.9.0) e segundos nas metas de tempo (0.10.0).
 

@@ -94,5 +94,5 @@ As tabelas de hoje pertencem a `slimegoals`, o superusuário. `packaging/server/
 
 Antes de expor o servidor na 9.6, além do que a seção 2 deixa de fora:
 
-1. **IPv6.** `enable_ipv6` na rede `edge`, com uma sub-rede ULA fixa; o Caddy com IP fixo nela, que entra em `Server:TrustedProxyNetworks`; e o limite por IP agrupando os endereços IPv6 por `/64`, porque um cliente IPv6 costuma controlar o `/64` inteiro. Só então publicar as portas em `[::]` e o registro `AAAA`.
-2. **Sessão gravada com `http://` fora do loopback.** O motor de sincronização se recusa a partir com uma sessão gravada que aponte para `http://` fora de `127.0.0.1`, `::1` e `localhost`, e o app mostra "sessão encerrada". Sair continua possível. Hoje só a sessão nova e a reautenticação recusam.
+1. **IPv6** (vale só para quem expuser o servidor na internet; na tailnet, a 9.6 não precisa dela: `specs/Publicacao_na_tailnet_v1.md`, seção 6). `enable_ipv6` na rede `edge`, com uma sub-rede ULA fixa; o Caddy com IP fixo nela, que entra em `Server:TrustedProxyNetworks`; e o limite por IP agrupando os endereços IPv6 por `/64`, porque um cliente IPv6 costuma controlar o `/64` inteiro. Só então publicar as portas em `[::]` e o registro `AAAA`.
+2. **Sessão gravada com `http://` fora do loopback.** O motor de sincronização se recusa a partir com uma sessão gravada que aponte para `http://` fora de `127.0.0.1`, `::1` e `localhost`, e o app mostra "sessão encerrada". Sair continua possível. *Resolvida na 9.6 (T12 de `specs/Publicacao_na_tailnet_v1.md`).*

@@ -85,7 +85,7 @@ docs/                       estes guias e as imagens do README
 - **A composição fica nos heads.** `src/SlimeGoals.Desktop/CompositionRoot.cs` e `src/SlimeGoals.Android/AndroidCompositionRoot.cs` registram tudo e montam o contêiner com `ValidateOnBuild`: um serviço sem registro quebra na partida, não no primeiro uso. A Infrastructure oferece `AddSlimeGoalsInfrastructure`, que os dois heads chamam.
 - **Uma View por ViewModel, sem reflexão.** O `App.axaml` liga cada ViewModel à sua View por `DataTemplate`, com bindings compilados. Não há *ViewLocator* por nome.
 - **O Android implementa as próprias portas no head.** Alarmes (`AlarmManager`), notificações, permissões e o cofre no Android Keystore ficam em `src/SlimeGoals.Android`, porque só compilam com o workload `android`.
-- **A sincronização só existe no build de desenvolvimento.** Até a fase 9.6, o Release não tem a seção de conta, nem o cofre, nem acesso à rede. A chave é a propriedade `SyncDev`, ligada no Debug ou com `-p:SyncDev=true` (veja [Sincronização](sincronizacao.md)).
+- **A conta vale em todos os builds.** O Release tem a seção de conta, o cofre e a rede (`https://` só). A propriedade `SyncDev`, ligada no Debug ou com `-p:SyncDev=true`, só liga os extras de desenvolvimento: servidor padrão `http://127.0.0.1:8080`, texto puro para o loopback no Android e o `CryptoSelfCheckReceiver` (veja [Sincronização](sincronizacao.md)).
 - **O servidor só conhece os contratos.** Ele referencia só o `Sync.Contracts`, não o Core nem o Sync. Os registros chegam cifrados, e ele não tem como lê-los.
 
 ## Sincronização
