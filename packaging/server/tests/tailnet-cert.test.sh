@@ -17,7 +17,7 @@ setup() {
   work="$tmp/$name"
   mkdir -p "$work/root/packaging/server/lib" "$work/bin"
   cp "$src/tailnet-cert.sh" "$work/root/packaging/server/tailnet-cert.sh"
-  cp "$src/lib/env.sh" "$work/root/packaging/server/lib/env.sh"
+  cp "$src/lib/env.sh" "$src/lib/cert-dir.sh" "$work/root/packaging/server/lib/"
   # O .env é lido por linha, nunca com source: o '$(touch ...)' abaixo provaria o contrário.
   cat > "$work/root/.env" <<ENV
 OUTRA=valor
@@ -50,13 +50,19 @@ case " $* " in
 esac
 exit 0
 FAKE
-  chmod +x "$work/bin/tailscale" "$work/bin/docker"
+  # FAKE_DOCKER_ACTIVE=0: docker.service inativo.
+  cat > "$work/bin/systemctl" <<'FAKE'
+#!/usr/bin/env bash
+echo "systemctl $*" >> "$FAKE_LOG"
+[ "${FAKE_DOCKER_ACTIVE:-1}" = 1 ]
+FAKE
+  chmod +x "$work/bin/tailscale" "$work/bin/docker" "$work/bin/systemctl"
   : > "$work/log"
   out="$work/out"
 }
 
 run() { # roda o script; saída (stdout e stderr) em $out
-  FAKE_LOG="$work/log" TAILSCALE_BIN="$work/bin/tailscale" DOCKER_BIN="$work/bin/docker" \
+  FAKE_LOG="$work/log" TAILSCALE_BIN="$work/bin/tailscale" DOCKER_BIN="$work/bin/docker" SYSTEMCTL_BIN="$work/bin/systemctl" \
     bash "$work/root/packaging/server/tailnet-cert.sh" > "$out" 2>&1
 }
 reloads() { grep -c ' exec ' "$work/log" || true; }
@@ -141,6 +147,17 @@ run || fail "caddy_down: 2ª execução devia sair 0"
 [ "$(reloads)" = 1 ] || fail "caddy_down: a 2ª execução devia recarregar (sem mudança de certificado)"
 [ ! -e "$work/certs/.recarregar" ] || fail "caddy_down: o marcador devia sumir depois do reload"
 
+# 6b: Docker inativo (partida da VM) -> nenhuma chamada ao docker, marcador fica, saída 0; depois recarrega
+setup docker_inactive_makes_no_docker_call
+FAKE_DOCKER_ACTIVE=0 run || fail "docker_inactive: devia sair 0"
+[ "$(cat "$work/certs/tailnet.crt")" = "$FAKE_CERT" ] || fail "docker_inactive: os arquivos deviam ser trocados"
+! grep -q '^docker' "$work/log" || fail "docker_inactive: não devia chamar o docker de jeito nenhum"
+[ -e "$work/certs/.recarregar" ] || fail "docker_inactive: o marcador devia ficar"
+: > "$work/log"
+run || fail "docker_inactive: 2ª execução devia sair 0"
+[ "$(reloads)" = 1 ] || fail "docker_inactive: a 2ª execução devia recarregar"
+[ ! -e "$work/certs/.recarregar" ] || fail "docker_inactive: o marcador devia sumir"
+
 # 7: reload falha -> saída diferente de zero, marcador fica, a próxima recarrega
 setup exec_failure_keeps_marker
 if FAKE_EXEC_FAIL=1 run; then fail "exec_failure: devia sair diferente de zero"; fi
@@ -171,6 +188,9 @@ refused() { # nome valor
   [ ! -s "$work/log" ] || fail "refused_$1: não devia chamar o tailscale"
 }
 refused relative "certs/relativo"
+refused etc "/etc"
+refused one_component "/slimegoals"
+refused double_slash "/opt//slimegoals"
 refused dotdot "$tmp/a/../b"
 refused unsafe_chars "$tmp/com espaco"
 if [ "$(id -u)" != 0 ]; then
@@ -181,6 +201,13 @@ setup group_writable
 mkdir -m 775 "$work/certs"
 if run; then fail "group_writable: devia recusar pasta com escrita de grupo"; fi
 [ ! -s "$work/log" ] || fail "group_writable: não devia chamar o tailscale"
+
+# 10b: dois componentes fora da lista de pastas do sistema passa
+setup two_components_ok
+mkdir -p "$work/ok"
+printf 'SLIMEGOALS_DOMAIN=servidor.exemplo.ts.net\nTAILNET_CERT_DIR=%s\n' "$work/ok/tls" > "$work/root/.env"
+run || fail "two_components: devia aceitar"
+[ -f "$work/ok/tls/tailnet.crt" ] || fail "two_components: não gravou"
 
 # 11: temporários velhos somem
 setup stale_tmp_removed

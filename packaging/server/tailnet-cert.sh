@@ -12,9 +12,12 @@ root="$(cd "$here/../.." && pwd -P)"
 env_file="$root/.env"
 tailscale_bin="${TAILSCALE_BIN:-tailscale}"
 docker_bin="${DOCKER_BIN:-docker}"
+systemctl_bin="${SYSTEMCTL_BIN:-systemctl}"
 
 # shellcheck source=packaging/server/lib/env.sh
 . "$here/lib/env.sh"
+# shellcheck source=packaging/server/lib/cert-dir.sh
+. "$here/lib/cert-dir.sh"
 
 die() { echo "tailnet-cert: $1" >&2; exit 1; }
 
@@ -24,9 +27,8 @@ cert_dir="$(env_value TAILNET_CERT_DIR "$env_file")"
 cert_dir="${cert_dir:-/etc/slimegoals/tls}"
 [ -n "$domain" ] || die "SLIMEGOALS_DOMAIN falta no .env."
 
-# Roda como root: só aceita caminho absoluto, de caracteres seguros e sem "..", para nunca mexer em /etc e afins.
-[[ "$cert_dir" =~ ^/[A-Za-z0-9/._-]*$ ]] || die "TAILNET_CERT_DIR deve ser um caminho absoluto só com letras, números e /._-."
-case "/$cert_dir/" in */../*) die "TAILNET_CERT_DIR não pode ter componentes '..'." ;; esac
+# Roda como root: a validação (lib/cert-dir.sh) impede mexer em /etc, /usr e afins.
+if ! msg="$(cert_dir_error "$cert_dir")"; then die "$msg"; fi
 
 # Só o dono lê e entra, desde a criação. O contêiner do Caddy roda como uid 0 sem DAC_OVERRIDE: lê pelos bits do
 # dono, e os arquivos são do root (o serviço roda como root), então 600 basta e a chave nunca fica legível a mais ninguém.
@@ -84,6 +86,14 @@ else
 fi
 
 [ -e "$marker" ] || exit 0
+
+# Na partida este serviço roda antes do docker.service (Before=). Se o Docker não está ativo, qualquer chamada ao CLI
+# acordaria o docker.service pelo docker.socket e ficaria esperando este próprio serviço terminar: um impasse até o
+# timeout. Então, sem Docker ativo, o reload fica pendente (marcador) e o Caddy lê o certificado ao subir.
+if ! "$systemctl_bin" is-active --quiet docker.service; then
+  echo "tailnet-cert: o Docker não está ativo; o reload fica pendente e o Caddy lê o certificado ao subir."
+  exit 0
+fi
 
 compose=("$docker_bin" compose -f "$root/compose.yaml" -f "$root/compose.tailnet.yaml" --project-directory "$root")
 if ! running="$("${compose[@]}" ps --status running -q caddy 2>/dev/null)"; then
