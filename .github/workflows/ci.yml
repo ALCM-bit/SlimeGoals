@@ -52,3 +52,9 @@ jobs:
       # O overlay da tailnet precisa trocar, e não somar, as portas do Caddy: senão a 80 e a 443 sairiam em 0.0.0.0.
       - name: Confere o Compose da tailnet
         run: bash packaging/server/check-tailnet-compose.sh
+
+      # Certificado da tailnet na VM: o teste usa tailscale e docker falsos; o shellcheck cobre os scripts da pasta.
+      - name: Testa o script do certificado da tailnet
+        run: |
+          bash packaging/server/tests/tailnet-cert.test.sh
+          shellcheck packaging/server/*.sh packaging/server/tests/*.sh

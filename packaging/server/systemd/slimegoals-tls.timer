@@ -1,0 +1,10 @@
+[Unit]
+Description=Renovação diária do certificado da tailnet
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
