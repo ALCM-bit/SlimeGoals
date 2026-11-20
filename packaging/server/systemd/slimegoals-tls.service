@@ -6,7 +6,8 @@ Before=docker.service
 
 [Service]
 Type=oneshot
-TimeoutStartSec=90s
+# O script espera até 60s pelo mapa da tailnet antes de desistir; sobra tempo para o pedido do certificado.
+TimeoutStartSec=150s
 # Na partida, uma falha não impede o Docker de subir com o certificado que já existe.
 ExecStart=@ROOT@/packaging/server/tailnet-cert.sh
 

@@ -29,6 +29,12 @@ ENV
 #!/usr/bin/env bash
 echo "tailscale $*" >> "$FAKE_LOG"
 [ "${FAKE_FAIL:-0}" = 1 ] && { echo "erro falso do tailscale" >&2; exit 1; }
+# FAKE_FAIL_TIMES=N: as N primeiras chamadas falham como na partida, antes do netmap chegar.
+if [ -n "${FAKE_FAIL_TIMES:-}" ]; then
+  n=$(( $(cat "$FAKE_LOG.tentativas" 2>/dev/null || echo 0) + 1 ))
+  echo "$n" > "$FAKE_LOG.tentativas"
+  [ "$n" -le "$FAKE_FAIL_TIMES" ] && { echo "500 Internal Server Error: no netmap available" >&2; exit 1; }
+fi
 while [ $# -gt 0 ]; do
   case "$1" in
     --cert-file) printf '%s' "$FAKE_CERT" > "$2"; shift ;;
@@ -63,6 +69,7 @@ FAKE
 
 run() { # roda o script; saída (stdout e stderr) em $out
   FAKE_LOG="$work/log" TAILSCALE_BIN="$work/bin/tailscale" DOCKER_BIN="$work/bin/docker" SYSTEMCTL_BIN="$work/bin/systemctl" \
+    CERT_WAIT_SECONDS="${CERT_WAIT_SECONDS:-0}" CERT_POLL_SECONDS="${CERT_POLL_SECONDS:-1}" \
     bash "$work/root/packaging/server/tailnet-cert.sh" > "$out" 2>&1
 }
 reloads() { grep -c ' exec ' "$work/log" || true; }
@@ -236,6 +243,24 @@ if run; then fail "lock: devia recusar com outra execução rodando"; fi
 [ -d "$work/certs/.novo.velho" ] || fail "lock: não devia limpar nada"
 [ ! -e "$work/certs/tailnet.crt" ] || fail "lock: não devia gravar"
 wait
+
+# 14: na partida o tailscale ainda não tem o netmap -> tenta de novo até dar certo, dentro do prazo
+setup boot_without_netmap_retries
+FAKE_FAIL_TIMES=2 CERT_WAIT_SECONDS=5 run || fail "netmap: devia tentar de novo e sair 0 ($(cat "$out"))"
+[ "$(grep -c '^tailscale cert' "$work/log")" = 3 ] || fail "netmap: esperava 3 tentativas, houve $(grep -c '^tailscale cert' "$work/log")"
+[ "$(cat "$work/certs/tailnet.crt" 2>/dev/null)" = "$FAKE_CERT" ] || fail "netmap: tailnet.crt ausente ou errado"
+[ -z "$(sobras)" ] || fail "netmap: sobrou temporário"
+
+# 14b: falha que não passa -> desiste no prazo, sai diferente de zero e mantém o certificado
+setup persistent_failure_gives_up
+run || fail "gives_up: preparo"
+cp "$work/certs/tailnet.crt" "$work/crt.antes"
+: > "$work/log"
+if FAKE_FAIL=1 CERT_WAIT_SECONDS=2 run; then fail "gives_up: devia sair diferente de zero"; fi
+[ "$(grep -c '^tailscale cert' "$work/log")" = 3 ] || fail "gives_up: esperava 3 tentativas em 2s, houve $(grep -c '^tailscale cert' "$work/log")"
+cmp -s "$work/crt.antes" "$work/certs/tailnet.crt" || fail "gives_up: crt mudou"
+[ "$(reloads)" = 0 ] || fail "gives_up: não devia recarregar"
+[ -z "$(sobras)" ] || fail "gives_up: sobrou temporário"
 
 if [ "$failures" -gt 0 ]; then echo "$failures falha(s)." >&2; exit 1; fi
 echo "OK: tailnet-cert.sh confere."

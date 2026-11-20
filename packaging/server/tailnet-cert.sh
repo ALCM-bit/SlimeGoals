@@ -4,7 +4,9 @@
 # timer do systemd (packaging/server/systemd/). Saída 0 sem mudança ou com renovação; diferente de zero se o
 # `tailscale cert` falha (os arquivos atuais ficam intactos e o Caddy não recarrega).
 # SLIMEGOALS_DOMAIN e TAILNET_CERT_DIR vêm do .env da raiz do repositório, lido linha a linha (nunca com source).
-# TAILSCALE_BIN e DOCKER_BIN existem para o teste trocar por falsos.
+# Na partida da VM o tailscaled pode estar de pé sem o mapa da tailnet ("no netmap available"): o `tailscale cert` é
+# tentado de novo por até CERT_WAIT_SECONDS (padrão 60), de CERT_POLL_SECONDS em CERT_POLL_SECONDS (padrão 5).
+# TAILSCALE_BIN, DOCKER_BIN e os dois tempos existem para o teste.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -13,6 +15,8 @@ env_file="$root/.env"
 tailscale_bin="${TAILSCALE_BIN:-tailscale}"
 docker_bin="${DOCKER_BIN:-docker}"
 systemctl_bin="${SYSTEMCTL_BIN:-systemctl}"
+cert_wait="${CERT_WAIT_SECONDS:-60}"
+cert_poll="${CERT_POLL_SECONDS:-5}"
 
 # shellcheck source=packaging/server/lib/env.sh
 . "$here/lib/env.sh"
@@ -58,9 +62,12 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 # A saída do tailscale vai para o journal; o conteúdo da chave não passa pelo script.
-if ! "$tailscale_bin" cert --cert-file "$tmp/tailnet.crt" --key-file "$tmp/tailnet.key" "$domain"; then
-  die "o tailscale cert falhou; o certificado atual foi mantido."
-fi
+waited=0
+until "$tailscale_bin" cert --cert-file "$tmp/tailnet.crt" --key-file "$tmp/tailnet.key" "$domain"; do
+  [ "$waited" -lt "$cert_wait" ] || die "o tailscale cert falhou; o certificado atual foi mantido."
+  sleep "$cert_poll"
+  waited=$((waited + cert_poll))
+done
 if [ ! -s "$tmp/tailnet.crt" ] || [ ! -s "$tmp/tailnet.key" ]; then
   die "o tailscale cert não gerou os arquivos; o certificado atual foi mantido."
 fi
