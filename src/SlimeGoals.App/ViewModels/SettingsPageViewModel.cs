@@ -81,7 +81,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     /// <summary>A conta, quando o head a registra; a tela só a mostra com <see cref="ShowAccount"/>.</summary>
     public AccountViewModel? Account { get; }
 
-    /// <summary>Seção "Conta e sincronização" (fase 9.5a): só no build de desenvolvimento do desktop.</summary>
+    /// <summary>Seção "Conta e sincronização" (fase 9.5a): nos dois heads.</summary>
     public bool ShowAccount => Account is not null && _capabilities.Sync;
 
     public string LicenseText => "Licença: PolyForm Noncommercial 1.0.0";

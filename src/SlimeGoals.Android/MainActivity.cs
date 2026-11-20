@@ -134,10 +134,8 @@ public class MainActivity : AvaloniaMainActivity
         // A notificação do cronômetro pode ter sido dispensada (Android 14+): ao voltar ao app, ela volta.
         if (AndroidApplication.Services?.GetService<TimerNotificationSync>() is { } timerNotification)
             _ = Task.Run(() => timerNotification.SyncAsync());
-#if SYNC_DEV
         // §4: sincronizar ao voltar ao primeiro plano. Sem conta ligada, não faz nada.
         AndroidApplication.Services?.GetService<SlimeGoals.Sync.ISyncAccount>()?.SyncNow();
-#endif
         if (_resumedBefore)
             AndroidApplication.NotifyDataChanged();
         _resumedBefore = true;

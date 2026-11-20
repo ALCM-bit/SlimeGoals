@@ -1,4 +1,3 @@
-#if SYNC_DEV
 using Android.Content;
 using Android.OS;
 using Android.Provider;
@@ -18,4 +17,3 @@ internal static class AndroidDeviceName
         return name.Length > AccountRules.MaxDeviceNameLength ? name[..AccountRules.MaxDeviceNameLength] : name;
     }
 }
-#endif

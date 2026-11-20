@@ -14,8 +14,9 @@
     <AndroidPackageFormat>apk</AndroidPackageFormat>
   </PropertyGroup>
 
-  <!-- Conta e sincronização só no build de desenvolvimento (9.5b), como no Linux: Debug, ou Release com
-       a propriedade SyncDev=true (packaging/android/build.sh com a opção dev). O APK de distribuição fica sem rede, cofre e seção. -->
+  <!-- A conta e a sincronização valem em todos os builds. SYNC_DEV (Debug, ou Release com SyncDev=true pelo
+       packaging/android/build.sh com a opção dev) só liga o que é de desenvolvimento: o tráfego em texto puro para o
+       servidor local (network_security_config_dev), o CryptoSelfCheckReceiver e o servidor sugerido na tela de conta. -->
   <PropertyGroup Condition="'$(Configuration)' == 'Debug' Or '$(SyncDev)' == 'true'">
     <DefineConstants>$(DefineConstants);SYNC_DEV</DefineConstants>
   </PropertyGroup>

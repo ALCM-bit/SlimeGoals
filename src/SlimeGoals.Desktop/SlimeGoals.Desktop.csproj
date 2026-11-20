@@ -6,8 +6,8 @@
     <RootNamespace>SlimeGoals.Desktop</RootNamespace>
   </PropertyGroup>
 
-  <!-- Build de desenvolvimento (decisão 2 da 9.5a): a conta e a sincronização só entram em Debug ou com
-       -p:SyncDev=true. O Release (packaging/linux/build.sh) fica sem rede, sem cofre e sem a seção. -->
+  <!-- A conta e a sincronização valem em todos os builds. SYNC_DEV (Debug ou -p:SyncDev=true) só decide o servidor
+       sugerido na tela de conta: o de teste local no desenvolvimento, nenhum no Release. -->
   <PropertyGroup Condition="'$(Configuration)' == 'Debug' Or '$(SyncDev)' == 'true'">
     <DefineConstants>$(DefineConstants);SYNC_DEV</DefineConstants>
   </PropertyGroup>
