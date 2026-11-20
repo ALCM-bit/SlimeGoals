@@ -31,7 +31,7 @@ public class GoalDeletionSqliteTests : IDisposable
         Id = Guid.CreateVersion7(), GoalId = goal.Id, DoneAt = T0, Amount = 1, Note = note, UpdatedAt = T0,
     };
 
-    private async Task<Goal> AddWithEverythingLinked(GoalRepository goals, CheckinRepository checkins, ReminderLogRepository log,
+    private static async Task<Goal> AddWithEverythingLinked(GoalRepository goals, CheckinRepository checkins, ReminderLogRepository log,
         string title = "Meta", string? note = null)
     {
         var goal = NewGoal(title);

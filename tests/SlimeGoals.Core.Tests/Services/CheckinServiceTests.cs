@@ -25,7 +25,10 @@ public class CheckinServiceTests
         WeekDays days = WeekDays.All, int target = 8) =>
         Goals.CreateAsync(GoalValidatorTests.Valid() with
         {
-            Measure = measure, Recurrence = recurrence, ActiveDays = days, Target = target,
+            Measure = measure,
+            Recurrence = recurrence,
+            ActiveDays = days,
+            Target = target,
             Unit = measure == Measure.Quantity ? "copos" : null,
         });
 

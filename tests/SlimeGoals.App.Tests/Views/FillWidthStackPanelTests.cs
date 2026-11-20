@@ -49,6 +49,6 @@ public class FillWidthStackPanelTests
     public void Is_styled_as_a_StackPanel()
     {
         new FillWidthStackPanel().Should().BeAssignableTo<StackPanel>();
-        new FillWidthStackPanel().StyleKey.Should().Be(typeof(StackPanel));
+        new FillWidthStackPanel().StyleKey.Should().Be<StackPanel>();
     }
 }

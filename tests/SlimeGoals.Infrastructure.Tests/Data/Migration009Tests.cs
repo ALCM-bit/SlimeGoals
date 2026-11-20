@@ -1,3 +1,4 @@
+using System.Globalization;
 using Dapper;
 using SlimeGoals.Infrastructure.Data;
 
@@ -106,7 +107,7 @@ public class Migration009Tests
         session.Plan.Repeat.Should().Be(1);
         session.Step.Should().Be(0);
         session.Revision.Should().Be(5);
-        session.StartedAt.Should().Be(DateTimeOffset.Parse(Now));
+        session.StartedAt.Should().Be(DateTimeOffset.Parse(Now, CultureInfo.InvariantCulture));
         (await repo.ChunksAsync()).Should().ContainSingle().Which.Seconds.Should().Be(1500);
     }
 

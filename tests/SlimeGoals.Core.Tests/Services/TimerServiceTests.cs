@@ -28,7 +28,14 @@ public class TimerServiceTests
     private TimerService Service => new(_goals, _timers, Checkins, _time, focus: _focus);
 
     private Task<Goal> Study(string title = "Estudar") => Goals.CreateAsync(GoalValidatorTests.Valid() with
-        { Title = title, Measure = Measure.Duration, Unit = null, Recurrence = Recurrence.Daily, Target = 60, ActiveDays = WeekDays.All });
+    {
+        Title = title,
+        Measure = Measure.Duration,
+        Unit = null,
+        Recurrence = Recurrence.Daily,
+        Target = 60,
+        ActiveDays = WeekDays.All,
+    });
 
     [Theory]
     [InlineData(false, false)] // rodando

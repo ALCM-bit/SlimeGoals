@@ -1,3 +1,4 @@
+using System.Globalization;
 using SlimeGoals.Core.Domain;
 using static SlimeGoals.Core.Tests.Support.Goals;
 
@@ -13,9 +14,9 @@ public class GoalHistoryTests
     {
         Id = Guid.NewGuid(),
         GoalId = goal.Id,
-        DoneAt = DateTimeOffset.Parse(day + "T12:00:00Z"),
+        DoneAt = DateTimeOffset.Parse(day + "T12:00:00Z", CultureInfo.InvariantCulture),
         Amount = amount,
-        UpdatedAt = DateTimeOffset.Parse(day + "T12:00:00Z"),
+        UpdatedAt = DateTimeOffset.Parse(day + "T12:00:00Z", CultureInfo.InvariantCulture),
     };
 
     private static DailySums Sums(params Checkin[] checkins) => new(checkins, Zone);

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Domain;
 
@@ -7,6 +8,8 @@ namespace SlimeGoals.Core.Services;
 /// Trata o que o usuário escolheu numa notificação de lembrete (spec §9.11): executa a ação principal,
 /// adia, ignora ou pede para abrir o app, e grava a resposta no log.
 /// </summary>
+[SuppressMessage("Reliability", "CA1001", Justification =
+    "O SemaphoreSlim só aloca recurso do sistema quando alguém lê AvailableWaitHandle; o WaitAsync não lê.")]
 public sealed class ReminderResponseHandler(
     IReminderLogRepository log,
     IGoalRepository goals,

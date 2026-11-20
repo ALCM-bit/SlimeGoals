@@ -29,8 +29,15 @@ public sealed class TimerNotificationSyncTests : IDisposable
     public void Dispose() => _watcher.Dispose();
 
     private Task<Goal> Study() => new GoalService(_goals, _checkins, _timers, _time).CreateAsync(GoalValidatorTests.Valid() with
-        { Measure = Measure.Duration, Unit = null, Recurrence = Recurrence.Daily, Target = 60, ActiveDays = WeekDays.All,
-          ActiveFrom = new TimeOnly(0, 0), ActiveUntil = new TimeOnly(23, 59) });
+    {
+        Measure = Measure.Duration,
+        Unit = null,
+        Recurrence = Recurrence.Daily,
+        Target = 60,
+        ActiveDays = WeekDays.All,
+        ActiveFrom = new TimeOnly(0, 0),
+        ActiveUntil = new TimeOnly(23, 59),
+    });
 
     [Fact]
     public async Task Sync_shows_when_running_and_cancels_when_not()
@@ -58,7 +65,7 @@ public sealed class TimerNotificationSyncTests : IDisposable
         await sync.StartAsync();
 
         await _timerService.StartAsync(goal.Id);
-        await WaitUntil(() => _notification.Calls.Last().StartsWith("show"));
+        await WaitUntil(() => _notification.Calls.Last().StartsWith("show", StringComparison.Ordinal));
 
         await _timerService.DiscardAsync();
         await WaitUntil(() => _notification.Calls.Last() == "cancel");

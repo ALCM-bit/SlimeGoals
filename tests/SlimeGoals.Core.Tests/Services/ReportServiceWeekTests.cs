@@ -30,8 +30,12 @@ public class ReportServiceWeekTests
     {
         var goal = await Goals.CreateAsync(GoalValidatorTests.Valid() with
         {
-            Title = title, Recurrence = recurrence, Target = target, ActiveDays = days,
-            Measure = measure, Unit = measure == Measure.Quantity ? "vezes" : null,
+            Title = title,
+            Recurrence = recurrence,
+            Target = target,
+            ActiveDays = days,
+            Measure = measure,
+            Unit = measure == Measure.Quantity ? "vezes" : null,
         });
         var day = createdOn ?? new DateOnly(2026, 10, 1);
         goal = goal with { CreatedAt = new DateTimeOffset(day.ToDateTime(new TimeOnly(13, 0)), TimeSpan.Zero) + (goal.CreatedAt - Now) };

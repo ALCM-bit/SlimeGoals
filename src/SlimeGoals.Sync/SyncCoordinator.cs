@@ -472,16 +472,8 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
     /// Só endereço absoluto https, ou http em loopback, sem credenciais, consulta nem fragmento. Vale também para o
     /// servidor gravado numa sessão antiga: nenhuma chave derivada da senha vai por http a outro endereço.
     /// </summary>
-    private static Uri RequireServer(Uri server)
-    {
-        if (server is not { IsAbsoluteUri: true }
-            || (server.Scheme != Uri.UriSchemeHttp && server.Scheme != Uri.UriSchemeHttps)
-            || server.UserInfo.Length > 0 || server.Query.Length > 0 || server.Fragment.Length > 0)
-            throw new ArgumentException("Informe um endereço http:// ou https:// completo.", nameof(server));
-        if (server.Scheme == Uri.UriSchemeHttp && !server.IsLoopback)
-            throw new ArgumentException("Use https://. O http:// só vale para 127.0.0.1.", nameof(server));
-        return server;
-    }
+    private static Uri RequireServer(Uri server) =>
+        ServerUrlRules.Check(server) is { } error ? throw new ArgumentException(error, nameof(server)) : server;
 
     private void SetState(AccountState accountState, string? email = null, Uri? server = null) =>
         _snapshot = new Snapshot(accountState, email, server);

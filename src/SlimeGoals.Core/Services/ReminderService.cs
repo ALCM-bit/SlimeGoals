@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Domain;
@@ -13,6 +14,8 @@ public sealed record UpcomingReminder(Goal Goal, DateTimeOffset At);
 /// Orquestra os lembretes (spec §9): levanta o estado de cada meta, decide com o <see cref="ReminderPlanner"/>,
 /// grava os disparos no log e os mostra pelo <see cref="INotificationService"/>.
 /// </summary>
+[SuppressMessage("Reliability", "CA1001", Justification =
+    "O SemaphoreSlim só aloca recurso do sistema quando alguém lê AvailableWaitHandle; o WaitAsync não lê.")]
 public sealed class ReminderService(IGoalRepository goals, ICheckinRepository checkins, ITimerRepository timers,
     IReminderLogRepository log, INotificationService notifications, IReminderFormatter formatter, TimeProvider time,
     ReminderPause? pause = null, AppSettings? settings = null, IFocusSessionRepository? focus = null) : IRemoteDeletionGate
@@ -179,7 +182,7 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
         }
     }
 
-    private DateTimeOffset? NextFor(Goal goal, Snapshot s, DateTimeOffset now) =>
+    private static DateTimeOffset? NextFor(Goal goal, Snapshot s, DateTimeOffset now) =>
         ReminderPlanner.Next(goal, s.StateOf(goal), s.SnoozeMinutes, now, s.Zone);
 
     private async Task<Snapshot> LoadAsync(DateTimeOffset now, CancellationToken ct)

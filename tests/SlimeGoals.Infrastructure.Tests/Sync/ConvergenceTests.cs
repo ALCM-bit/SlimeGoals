@@ -1,3 +1,4 @@
+using System.Globalization;
 using SlimeGoals.Core;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Sync;
@@ -770,7 +771,7 @@ public sealed class ConvergenceTests : IDisposable
                 var device = new SimulatedDevice($"aparelho {i}", DeviceId(i), server, T0 + skew);
                 devices.Add(device);
                 device.PageSize = random.Next(3) == 0 ? random.Next(1, 4) : null;
-                run.Log.Add($"{device.Name}: relógio {skew}, página {device.PageSize?.ToString() ?? "padrão"}");
+                run.Log.Add($"{device.Name}: relógio {skew}, página {device.PageSize?.ToString(CultureInfo.InvariantCulture) ?? "padrão"}");
                 // O primeiro entra de saída; os outros às vezes só no meio, com o que já tinham.
                 if (i == 1 || random.Next(3) != 0)
                     await device.EnableAsync();

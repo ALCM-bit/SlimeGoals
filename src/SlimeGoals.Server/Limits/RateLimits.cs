@@ -9,7 +9,7 @@ namespace SlimeGoals.Server.Limits;
 /// Os contadores usam o <see cref="TimeProvider"/> do servidor (o <c>AddRateLimiter</c> do ASP.NET não aceita um relógio próprio), o que
 /// deixa o teste de reinício da janela determinístico. Os contadores ficam na memória do processo, como as janelas do ASP.NET.
 /// </summary>
-public sealed class RateLimits(TimeProvider time, IOptions<ServerOptions> options, ILogger<RateLimits> logger)
+public sealed partial class RateLimits(TimeProvider time, IOptions<ServerOptions> options, ILogger<RateLimits> logger)
 {
     private static readonly TimeSpan Minute = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan Hour = TimeSpan.FromHours(1);
@@ -37,7 +37,7 @@ public sealed class RateLimits(TimeProvider time, IOptions<ServerOptions> option
         var retry = _emailIps.Hit(HashOf(email + "\n" + ip), options.Value.Limits.AuthPerEmailPerIpPerMinute);
         if (retry is not null)
         {
-            logger.LogWarning("Limite de pedidos por e-mail e IP atingido para {Email}.", MaskEmail(email));
+            LogEmailIpLimit(MaskEmail(email));
         }
 
         return retry;
@@ -52,7 +52,7 @@ public sealed class RateLimits(TimeProvider time, IOptions<ServerOptions> option
         var retry = _loginFailures.Hit(HashOf(email), options.Value.Limits.LoginFailuresPerEmailPerHour);
         if (retry is not null)
         {
-            logger.LogWarning("Limite de falhas de login atingido para {Email}.", MaskEmail(email));
+            LogLoginLimit(MaskEmail(email));
         }
 
         return retry;
@@ -66,7 +66,7 @@ public sealed class RateLimits(TimeProvider time, IOptions<ServerOptions> option
         var retry = _confirmationEmails.Hit(HashOf(email), options.Value.Limits.ConfirmationEmailsPerAddressPerHour);
         if (retry is not null)
         {
-            logger.LogWarning("Limite de e-mails de confirmação atingido para {Email}.", MaskEmail(email));
+            LogConfirmationEmailLimit(MaskEmail(email));
         }
 
         return retry;
@@ -84,7 +84,7 @@ public sealed class RateLimits(TimeProvider time, IOptions<ServerOptions> option
         var retry = _accountFailures.Hit(account.ToString("N"), options.Value.Limits.AuthKeyFailuresPerAccountPerMinute);
         if (retry is not null)
         {
-            logger.LogWarning("Limite de falhas de chave atingido para a conta {Account}.", account);
+            LogKeyLimit(account);
         }
 
         return retry;
@@ -98,6 +98,18 @@ public sealed class RateLimits(TimeProvider time, IOptions<ServerOptions> option
         var at = email.LastIndexOf('@');
         return at <= 0 ? "***" : $"{email[0]}***{email[at..]}";
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Limite de pedidos por e-mail e IP atingido para {MaskedEmail}.")]
+    private partial void LogEmailIpLimit(string maskedEmail);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Limite de falhas de login atingido para {MaskedEmail}.")]
+    private partial void LogLoginLimit(string maskedEmail);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Limite de e-mails de confirmação atingido para {MaskedEmail}.")]
+    private partial void LogConfirmationEmailLimit(string maskedEmail);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Limite de falhas de chave atingido para a conta {Account}.")]
+    private partial void LogKeyLimit(Guid account);
 
     private sealed class Counter(TimeProvider time, TimeSpan window)
     {

@@ -82,17 +82,18 @@ public sealed class TimerRepository(SqliteConnectionFactory db) : ITimerReposito
         await using var tx = await c.BeginTransactionAsync(ct);
         try
         {
+            var parameters = new
+            {
+                NewStart = SqlText.Instant(next.StartedAt),
+                next.Task,
+                GoalId = SqlText.Id(next.GoalId),
+                Expected = SqlText.Instant(expectedStartedAt),
+            };
             // Só passa adiante o mesmo cronômetro que quem troca leu: parado, descartado ou trocado por outro processo, nada muda.
             var moved = await c.ExecuteAsync(new CommandDefinition("""
                 UPDATE active_timer SET started_at = @NewStart, task = @Task
                 WHERE id = 1 AND goal_id = @GoalId AND started_at = @Expected AND stopped_at IS NULL
-                """, new
-                {
-                    NewStart = SqlText.Instant(next.StartedAt),
-                    next.Task,
-                    GoalId = SqlText.Id(next.GoalId),
-                    Expected = SqlText.Instant(expectedStartedAt),
-                }, tx, cancellationToken: ct));
+                """, parameters, tx, cancellationToken: ct));
             if (moved != 1)
             {
                 await tx.RollbackAsync(ct);

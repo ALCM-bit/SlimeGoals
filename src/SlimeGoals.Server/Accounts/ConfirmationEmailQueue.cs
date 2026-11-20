@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 
 namespace SlimeGoals.Server.Accounts;
@@ -9,6 +10,7 @@ public sealed record ConfirmationEmail(string Email, string Token, byte[] TokenH
 /// Fila em memória dos e-mails de confirmação, lida por <see cref="EmailDispatchService"/>. A capacidade conta os
 /// e-mails à espera e o que está sendo enviado: cheia, <see cref="TryEnqueue"/> recusa na hora, sem esperar.
 /// </summary>
+[SuppressMessage("Naming", "CA1711", Justification = "É uma fila de verdade: entra por TryEnqueue e sai em ordem.")]
 public sealed class ConfirmationEmailQueue
 {
     public const int DefaultCapacity = 100;

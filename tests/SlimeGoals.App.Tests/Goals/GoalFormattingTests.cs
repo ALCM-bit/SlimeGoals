@@ -1,3 +1,4 @@
+using System.Globalization;
 using SlimeGoals.App.Goals;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
@@ -89,7 +90,7 @@ public class GoalFormattingTests
     [InlineData(null, "2026-11-15", "Até 15/11")]
     [InlineData("2026-11-05", "2026-11-15", "05/11 a 15/11")]
     public void Period(string? start, string? end, string expected) =>
-        GoalFormatting.Period(start is null ? null : DateOnly.Parse(start), end is null ? null : DateOnly.Parse(end))
+        GoalFormatting.Period(start is null ? null : DateOnly.Parse(start, CultureInfo.InvariantCulture), end is null ? null : DateOnly.Parse(end, CultureInfo.InvariantCulture))
             .Should().Be(expected);
 
     private static Goal Sample(DateOnly? start = null, DateOnly? end = null) => new()

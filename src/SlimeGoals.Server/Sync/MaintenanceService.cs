@@ -23,7 +23,8 @@ public sealed partial class MaintenanceService(
             {
                 var result = await purger.RunAsync(stoppingToken);
                 LogPurged(result.Marks, result.Accounts);
-                LogIdleRevoked(await accounts.RevokeIdleDevicesAsync(time.GetUtcNow(), stoppingToken));
+                var revoked = await accounts.RevokeIdleDevicesAsync(time.GetUtcNow(), stoppingToken);
+                LogIdleRevoked(revoked);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
