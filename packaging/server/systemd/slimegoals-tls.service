@@ -1,10 +1,14 @@
 [Unit]
 Description=Certificado da tailnet para o servidor SlimeGoals
 After=tailscaled.service network-online.target
-Wants=tailscaled.service
+Wants=tailscaled.service network-online.target
 Before=docker.service
 
 [Service]
 Type=oneshot
+TimeoutStartSec=90s
 # Na partida, uma falha não impede o Docker de subir com o certificado que já existe.
 ExecStart=@ROOT@/packaging/server/tailnet-cert.sh
+
+[Install]
+WantedBy=docker.service

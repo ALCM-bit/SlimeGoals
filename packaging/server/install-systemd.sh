@@ -8,10 +8,15 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 src="$root/packaging/server/systemd"
 env_file="$root/.env"
 
+# shellcheck source=packaging/server/lib/env.sh
+. "$root/packaging/server/lib/env.sh"
+
 [ "$(id -u)" -eq 0 ] || { echo "Rode como root (sudo)." >&2; exit 1; }
 [ -f "$env_file" ] || { echo "Não achei o .env em $root. Rode packaging/server/init-env.sh e preencha a seção da tailnet." >&2; exit 1; }
+# O caminho entra no ExecStart e no sed: espaço, |, & ou \ quebrariam as unidades.
+[[ "$root" =~ ^/[A-Za-z0-9/._-]*$ ]] || { echo "O caminho do repositório ($root) tem caracteres fora de A-Z a-z 0-9 / . _ -; mova o repositório." >&2; exit 1; }
 for name in TAILNET_IP SLIMEGOALS_DOMAIN; do
-  grep -Eq "^$name=.+" "$env_file" || { echo "$name falta no .env. Preencha antes de instalar." >&2; exit 1; }
+  [ -n "$(env_value "$name" "$env_file")" ] || { echo "$name falta (ou está vazio) no .env. Preencha antes de instalar." >&2; exit 1; }
 done
 
 for unit in slimegoals-tls.service slimegoals-tls.timer slimegoals-firewall.service; do
@@ -23,5 +28,7 @@ sysctl --system > /dev/null
 
 systemctl daemon-reload
 systemctl enable --now slimegoals-tls.timer slimegoals-firewall.service
+# O serviço do certificado também sobe com o docker.service, na partida da VM.
+systemctl enable slimegoals-tls.service
 systemctl start slimegoals-tls.service
 echo "Instalado: certificado por timer, sysctl e regra de firewall."
