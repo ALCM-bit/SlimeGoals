@@ -67,7 +67,7 @@ run() { # roda o script; saída (stdout e stderr) em $out
 }
 reloads() { grep -c ' exec ' "$work/log" || true; }
 mode() { stat -c %a "$1"; }
-sobras() { find "$work/certs" -mindepth 1 -not -name 'tailnet.*' -not -name '.recarregar'; }
+sobras() { find "$work/certs" -mindepth 1 -not -name 'tailnet.*' -not -name '.recarregar' -not -name .lock; }
 
 export FAKE_CERT="CERT-FALSO-1" FAKE_KEY="CHAVE-SECRETA-FALSA-1"
 
@@ -214,6 +214,28 @@ setup stale_tmp_removed
 mkdir -m 700 "$work/certs"; mkdir "$work/certs/.novo.velho"
 run || fail "stale: devia sair 0"
 [ ! -e "$work/certs/.novo.velho" ] || fail "stale: o temporário velho devia ser apagado"
+
+# 12: pasta existente com outra coisa dentro é recusada (provavelmente a pasta errada), sem tocar em nada
+setup foreign_content_refused
+mkdir -m 700 "$work/certs"; printf 'x' > "$work/certs/id_rsa"
+if run; then fail "foreign: devia recusar pasta com outro arquivo"; fi
+[ ! -s "$work/log" ] || fail "foreign: não devia chamar o tailscale"
+[ "$(cat "$work/certs/id_rsa")" = x ] || fail "foreign: mexeu no arquivo alheio"
+
+# 12b: caminho com tailscale é recusado
+refused tailscale_path "$tmp/var-lib-tailscale/certs"
+refused etc_ssl "/etc/ssl/slimegoals"
+
+# 13: outra execução segura o lock -> recusa e não escreve nada (nem apaga as sobras)
+setup concurrent_run_refused
+mkdir -m 700 "$work/certs"; mkdir "$work/certs/.novo.velho"
+( exec 9> "$work/certs/.lock"; flock -n 9 && sleep 3 ) &
+sleep 0.5
+if run; then fail "lock: devia recusar com outra execução rodando"; fi
+[ ! -s "$work/log" ] || fail "lock: não devia chamar o tailscale"
+[ -d "$work/certs/.novo.velho" ] || fail "lock: não devia limpar nada"
+[ ! -e "$work/certs/tailnet.crt" ] || fail "lock: não devia gravar"
+wait
 
 if [ "$failures" -gt 0 ]; then echo "$failures falha(s)." >&2; exit 1; fi
 echo "OK: tailnet-cert.sh confere."

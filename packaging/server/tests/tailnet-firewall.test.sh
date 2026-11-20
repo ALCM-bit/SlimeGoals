@@ -12,7 +12,7 @@ fail() { echo "FALHOU: $1" >&2; failures=$((failures + 1)); }
 
 mkdir -p "$tmp/root/packaging/server/lib" "$tmp/bin"
 cp "$src/tailnet-firewall.sh" "$tmp/root/packaging/server/"
-cp "$src/lib/env.sh" "$tmp/root/packaging/server/lib/"
+cp "$src/lib/env.sh" "$src/lib/tailnet-ip.sh" "$tmp/root/packaging/server/lib/"
 printf 'TAILNET_IP="100.64.0.10"\r\n' > "$tmp/root/.env"
 cat > "$tmp/bin/iptables" <<'FAKE'
 #!/usr/bin/env bash
@@ -35,6 +35,13 @@ FAKE_EXISTS=1 run || fail "regra presente: devia sair 0"
 
 printf 'TAILNET_IP=\n' > "$tmp/root/.env"
 if run; then fail "IP vazio: devia recusar"; fi
+
+for bad in 100.128.0.1 192.168.1.10 fd7a:115c:a1e0::1 100.64.0.256; do
+  printf 'TAILNET_IP=%s\n' "$bad" > "$tmp/root/.env"
+  : > "$tmp/log"
+  if run; then fail "IP $bad: devia recusar"; fi
+  [ ! -s "$tmp/log" ] || fail "IP $bad: não devia chamar o iptables"
+done
 
 if [ "$failures" -gt 0 ]; then echo "$failures falha(s)." >&2; exit 1; fi
 echo "OK: tailnet-firewall.sh confere."

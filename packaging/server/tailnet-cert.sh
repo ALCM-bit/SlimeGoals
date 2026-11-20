@@ -38,10 +38,15 @@ if [ -e "$cert_dir" ]; then
   if [ ! -d "$cert_dir" ] || [ -L "$cert_dir" ]; then die "TAILNET_CERT_DIR não é uma pasta."; fi
   [ "$(stat -c %u "$cert_dir")" = "$(id -u)" ] || die "a pasta de TAILNET_CERT_DIR não é do usuário que roda o script; recusado."
   (( (8#$(stat -c %a "$cert_dir")) & 8#022 )) && die "a pasta de TAILNET_CERT_DIR aceita escrita de grupo ou outros; recusado."
+  if ! msg="$(cert_dir_contents_error "$cert_dir")"; then die "$msg"; fi
 else
   mkdir -p "$cert_dir"
   chmod 700 "$cert_dir"
 fi
+
+# Uma execução por vez (timer e partida podem coincidir): o lock fica aberto (fd 9) até o script terminar.
+exec 9> "$cert_dir/.lock"
+flock -n 9 || die "outra execução está rodando; nada foi feito."
 
 # Sobras de uma execução morta no meio.
 find "$cert_dir" -mindepth 1 -maxdepth 1 -name '.novo.*' -exec rm -rf {} +

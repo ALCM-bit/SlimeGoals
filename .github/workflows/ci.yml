@@ -59,4 +59,7 @@ jobs:
           bash packaging/server/tests/tailnet-cert.test.sh
           bash packaging/server/tests/tailnet-firewall.test.sh
           bash packaging/server/tests/backup.test.sh
+          bash packaging/server/tests/lib.test.sh
+          bash packaging/server/tests/install-systemd.test.sh
+          bash packaging/server/tests/check-tailnet-compose.test.sh
           shellcheck packaging/server/*.sh packaging/server/lib/*.sh packaging/server/tests/*.sh
