@@ -84,3 +84,9 @@ O APK de distribuição é assinado com uma chave sua, que fica fora do reposit�
 ## Atualizar
 
 Gere o APK de novo com o mesmo comando e instale com `adb install -r artifacts/slimegoals-<versão>-android.apk`. Os dados ficam. **Com outra chave, só desinstalando o app, o que apaga os dados.**
+
+## Notificações na tela de bloqueio
+
+Os lembretes e o cronômetro têm uma versão para a tela de bloqueio que não mostra a meta nem a tarefa: o lembrete aparece como "Lembrete: Desbloqueie para ver a meta.", com os mesmos botões, e o cronômetro aparece só com "Cronômetro" (ou a fase do Pomodoro) e o tempo. O aviso de fim de bloco do Pomodoro já só mostra a fase e aparece sempre inteiro.
+
+Quem escolhe entre a versão escondida e a inteira é o Android, não o app. Para esconder a meta, ligue em Configurações → Notificações a opção de ocultar o conteúdo sensível na tela de bloqueio (na Samsung, "Notificações na tela de bloqueio" → "Ocultar conteúdo"). Ela vale para todos os apps. Com o sistema mostrando todo o conteúdo, a tela de bloqueio mostra a notificação inteira, com o título da meta.

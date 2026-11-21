@@ -20,6 +20,12 @@ public sealed record RunningTimer(Guid GoalId, string Title, string Icon, GoalCo
     public string Label => Focus is null
         ? Task is null ? Title : $"{Title} · {Task}"
         : string.Join(" · ", new[] { Focus.Phase, GoalId == Guid.Empty ? null : Title, Task }.OfType<string>());
+
+    /// <summary>
+    /// O que a notificação mostra na tela de bloqueio que esconde o conteúdo: <see cref="LockScreenText.Timer"/>, ou só a
+    /// fase na sessão de Pomodoro. Nem meta nem tarefa.
+    /// </summary>
+    public string PublicLabel => Focus?.Phase ?? LockScreenText.Timer;
 }
 
 /// <summary>

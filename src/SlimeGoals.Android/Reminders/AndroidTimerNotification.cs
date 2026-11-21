@@ -38,37 +38,51 @@ internal sealed class AndroidTimerNotification(Context context, StopTimerSecretS
     {
         // Criar um canal que já existe não faz nada (nem desfaz o que a pessoa mudou nele).
         Manager.CreateNotificationChannel(new NotificationChannel(ChannelId, "Cronômetro", NotificationImportance.Low));
+        // Sem o código (preferências com falha), o botão não funcionaria: a notificação fica só com o toque. A sessão de
+        // Pomodoro termina só pela aba Tempo.
+        var stop = timer.Focus is null && secrets.Get() is { } secret
+            ? new Notification.Action.Builder((global::Android.Graphics.Drawables.Icon?)null, "Parar",
+                ActivityIntent(StopRequestCode, secret)).Build()
+            : null;
+        // Privada: na tela de bloqueio que esconde o conteúdo sensível (configuração do sistema), o Android mostra a
+        // versão pública, igual mas sem meta nem tarefa (RunningTimer.PublicLabel).
+        var notification = Builder(timer, timer.Label, stop)
+            .SetVisibility(NotificationVisibility.Private)
+            .SetPublicVersion(Builder(timer, timer.PublicLabel, stop).Build())
+            .Build();
+        Manager.Notify(NotificationId, notification);
+    }
+
+    public void Cancel() => Manager.Cancel(NotificationId);
+
+    private Notification.Builder Builder(RunningTimer timer, string label, Notification.Action? stop)
+    {
         var builder = new Notification.Builder(context, ChannelId)
             .SetSmallIcon(Resource.Drawable.ic_notification)
             .SetColor(AndroidNotificationService.Accent)
-            .SetContentTitle(timer.Label) // leitor de tela e lugares que não mostram o layout próprio
+            .SetContentTitle(label) // leitor de tela e lugares que não mostram o layout próprio
             .SetCategory(OperatingSystem.IsAndroidVersionAtLeast(31) ? Notification.CategoryStopwatch : Notification.CategoryProgress)
             .SetOngoing(true)
             .SetOnlyAlertOnce(true)
             // O tempo vai grande no corpo; o do cabeçalho (pequeno, ao lado do nome do app) sai para não repetir.
             .SetShowWhen(false)
             .SetStyle(new Notification.DecoratedCustomViewStyle())
-            .SetCustomContentView(Body(Resource.Layout.notification_timer, timer))
-            .SetCustomBigContentView(Body(Resource.Layout.notification_timer_big, timer))
+            .SetCustomContentView(Body(Resource.Layout.notification_timer, timer, label))
+            .SetCustomBigContentView(Body(Resource.Layout.notification_timer_big, timer, label))
             // A sessão de Pomodoro abre na aba Tempo.
             .SetContentIntent(timer.Focus is null
                 ? ActivityIntent(OpenRequestCode, secret: null)
                 : AndroidFocusAlert.OpenTempo(context, OpenTempoRequestCode));
-        // Sem o código (preferências com falha), o botão não funcionaria: a notificação fica só com o toque. A sessão de
-        // Pomodoro termina só pela aba Tempo.
-        if (timer.Focus is null && secrets.Get() is { } secret)
-            builder.AddAction(new Notification.Action.Builder((global::Android.Graphics.Drawables.Icon?)null, "Parar",
-                ActivityIntent(StopRequestCode, secret)).Build());
-        Manager.Notify(NotificationId, builder.Build());
+        if (stop is not null)
+            builder.AddAction(stop);
+        return builder;
     }
 
-    public void Cancel() => Manager.Cancel(NotificationId);
-
     // O Chronometer conta no relógio desde o boot; ao mudar a hora do aparelho, o SystemEventReceiver repõe a notificação.
-    private RemoteViews Body(int layout, RunningTimer timer)
+    private RemoteViews Body(int layout, RunningTimer timer, string label)
     {
         var views = new RemoteViews(context.PackageName, layout);
-        views.SetTextViewText(Resource.Id.timer_title, timer.Label);
+        views.SetTextViewText(Resource.Id.timer_title, label);
         var now = DateTimeOffset.UtcNow;
         if (timer.Focus is not { } focus)
             views.SetChronometer(Resource.Id.timer_elapsed,
