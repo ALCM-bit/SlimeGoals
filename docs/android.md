@@ -71,9 +71,9 @@ O APK de distribuição é assinado com uma chave sua, que fica fora do reposit�
 
    O script pede a senha da chave, que não fica no histórico do shell. Para uma chave em outro lugar, aponte `SLIMEGOALS_KEYSTORE`; sem terminal (no CI, por exemplo), defina `SLIMEGOALS_KEYSTORE_PASS`. O SDK do Android e o JDK vêm de `ANDROID_HOME` e `JAVA_HOME`, com padrão `~/Android/Sdk` e `/usr/lib/jvm/java-21-openjdk`.
 
-   O resultado é `artifacts/slimegoals-0.12.0-android.apk`. Com `--dev`, o script gera `artifacts/slimegoals-0.12.0-android-dev.apk`, com o servidor de desenvolvimento em texto puro no loopback e o receiver de vetores (veja [Sincronização](sincronizacao.md#no-android)).
+   O resultado é `artifacts/slimegoals-0.12.1-android.apk`. Com `--dev`, o script gera `artifacts/slimegoals-0.12.1-android-dev.apk`, com o servidor de desenvolvimento em texto puro no loopback e o receiver de vetores (veja [Sincronização](sincronizacao.md#no-android)).
 
-3. **Instale no celular:** com a depuração USB ligada, rode `adb install artifacts/slimegoals-0.12.0-android.apk`. Outra opção é copiar o APK para o aparelho e abri-lo, permitindo "instalar apps desconhecidos" para o app que o abriu.
+3. **Instale no celular:** com a depuração USB ligada, rode `adb install artifacts/slimegoals-0.12.1-android.apk`. Outra opção é copiar o APK para o aparelho e abri-lo, permitindo "instalar apps desconhecidos" para o app que o abriu.
 
 4. **Primeira abertura:** no aviso do Hoje, toque em "Permitir" (notificações e alarmes exatos). Depois, em Configurações → Bateria, toque em "Liberar" e aceite. Sem isso, o sistema pode adiar ou suspender os lembretes com o celular parado. Liberar a bateria faz "Alarmes exatos" aparecer como permitido, porque o Android trata assim os apps sem restrição de bateria. Se você tirar o app dessa isenção, o bloqueio volta.
 
