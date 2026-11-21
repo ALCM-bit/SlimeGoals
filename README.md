@@ -99,7 +99,7 @@ Os detalhes estão em [Desenvolvimento](docs/desenvolvimento.md#como-contribuir)
 | 4 | Lembretes (planejador, agendador, notificação nativa, segundo plano) | ✅ |
 | 5 | Relatórios | ✅ |
 | 6 | Acabamento e empacotamento Linux | ✅ |
-| 7 | Android (7a interface ✅ · 7b lembretes ✅ · 7c distribuição ✅ · ⏳ teste longo com a tela bloqueada) | ⏳ |
+| 7 | Android (7a interface ✅ · 7b lembretes ✅ · 7c distribuição ✅ · teste longo com a tela bloqueada ✅) | ✅ |
 | 8 | Mascote slime | ✅ |
 | 9 | Sincronização cifrada (9.1 modelo local ✅ · 9.2 motor ✅ · 9.3 servidor ✅ · 9.4 criptografia e conta ✅ · 9.5a conta no Linux ✅ · 9.5b conta no Android ✅ · endurecimento do servidor ✅ · 9.6 publicação na tailnet ✅) | ✅ |
 
