@@ -7,7 +7,7 @@ com os dados guardados localmente em SQLite. A conta de sincronização é opcio
 
 ![Tela Hoje no desktop, com o slime e as metas do dia](docs/images/hoje-desktop.png)
 
-> **Status:** em desenvolvimento, na versão 0.12.0. O app funciona no Linux, com pacote de instalação, e no Android, com APK assinado. O autor já testou num celular de verdade a instalação, as notificações e os lembretes, inclusive depois de religar o aparelho. A sincronização entre aparelhos, cifrada de ponta a ponta, já vem nos dois apps: o servidor fica numa VM sua, alcançável só pela sua tailnet. Veja o [roteiro](#roteiro).
+> **Status:** em desenvolvimento, na versão 0.12.1. O app funciona no Linux, com pacote de instalação, e no Android, com APK assinado. O autor já testou num celular de verdade a instalação, as notificações e os lembretes, inclusive depois de religar o aparelho. A sincronização entre aparelhos, cifrada de ponta a ponta, já vem nos dois apps: o servidor fica numa VM sua, alcançável só pela sua tailnet. Veja o [roteiro](#roteiro).
 
 ## Funcionalidades
 
