@@ -15,9 +15,9 @@ using SlimeGoals.Sync;
 using ScrollViewer = Avalonia.Controls.ScrollViewer;
 using Window = Avalonia.Controls.Window;
 
-if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini" or "sync-warning")))
+if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini" or "sync-warning" or "today-filter")))
 {
-    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning]");
+    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning|today-filter]");
     return 1;
 }
 
@@ -67,6 +67,14 @@ if (which == "mini")
     RenderMini("mini-focus-goal-task", () => sample.CreateMiniFocus("Leitura", "Revisar capítulo 3"));
     RenderMini("mini-focus-paused-hover", () => sample.CreateMiniFocus("Leitura", null, paused: true), hover: true);
     sample.ClearFocus();
+}
+// O filtro de tags do Hoje vem no all e, sozinho, no today-filter
+if (which is "all" or "today-filter")
+{
+    RenderTodayTags(320, 900);
+    RenderTodayTags(360, 900);
+    RenderTodayTags(412, 915);
+    RenderTodayTags(1100, 720);
 }
 if (which == "sync-warning")
 {
@@ -423,6 +431,58 @@ void RenderNarrow(int width)
     window.Close();
 }
 
+// Hoje com tags: a linha de filtros sem seleção (idle), com duas tags marcadas (today-filter: Limpar e "x de y metas"),
+// com uma tag que esconde cartões (single) e sem nenhuma meta com tag (today-filter-empty: a linha some).
+void RenderTodayTags(int width, int height)
+{
+    var shell = sample.CreateShell(width < 720);
+    var window = new Window { Width = width, Height = height, Content = new ShellView { DataContext = shell } };
+    window.Show();
+    var today = shell.Pages.OfType<TodayPageViewModel>().Single();
+    shell.CurrentPage = today;
+    Pump();
+    Capture($"today-filter-idle-{width}.png");
+    foreach (var name in new[] { "saúde", "estudos" })
+        today.Filter.ToggleCommand.Execute(today.Filter.Chips.Single(c => c.Name == name));
+    Pump();
+    Capture($"today-filter-{width}.png");
+    // Uma tag que esconde cartões: só "treino" (a meta Treino) fica na lista.
+    today.Filter.ClearCommand.Execute(null);
+    today.Filter.ToggleCommand.Execute(today.Filter.Chips.Single(c => c.Name == "treino"));
+    Pump();
+    Capture($"today-filter-single-{width}.png");
+    today.Filter.ClearCommand.Execute(null);
+    // O estado vazio que se alcança: nenhuma meta de hoje tem tag, então não há linha de filtros.
+    // "Nenhuma meta de hoje com essas tags." não tem captura: hoje nenhuma combinação de chips esvazia a lista.
+    var goalService = sample.Goals;
+    var tagged = goalService.ListAsync().GetAwaiter().GetResult().Where(g => g.Tags.Count > 0).ToList();
+    SetTags(g => []);
+    today.LoadCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+    Pump();
+    Capture($"today-filter-empty-{width}.png");
+    SetTags(g => g.Tags); // devolve as tags: a mesma amostra serve às outras larguras e telas
+    window.Close();
+
+    void SetTags(Func<Goal, IReadOnlyList<string>> tagsOf)
+    {
+        foreach (var g in tagged)
+            goalService.UpdateAsync(g.Id, new GoalDraft(g.Title, g.Recurrence, g.Target, g.Icon, g.Color, g.ReminderEveryMinutes,
+                g.ActiveFrom, g.ActiveUntil, g.ActiveDays, g.StartDate, g.EndDate, g.Measure, g.Unit) with
+            { Tags = tagsOf(g) })
+                .GetAwaiter().GetResult();
+    }
+
+    void Capture(string name)
+    {
+        var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para capturar.");
+        using var stream = File.Create(Path.Combine(outDir, name));
+#pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
+        frame.Save(stream);
+#pragma warning restore CS0618
+        Console.WriteLine(Path.Combine(outDir, name));
+    }
+}
+
 // Hoje com um cronômetro rodando: o cartão mais apertado (tempo + parar + mais opções).
 void RenderTodayWithTimer(int width)
 {
@@ -552,8 +612,17 @@ void Render(bool phone, string suffix, int width, int height)
     Show("goals", goals);
 
     goals.NewCommand.Execute(null);
+    // O quadro de tags: um chip marcado e outro digitado, para ver os dois estados e a quebra de linha.
+    goals.Editor!.Tags.ReloadCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+    goals.Editor.Tags.ToggleCommand.Execute(goals.Editor.Tags.Chips[0]);
+    goals.Editor.Tags.NewName = "organização da casa";
+    goals.Editor.Tags.CreateCommand.Execute(null);
     Pump();
     Capture("goal-edit");
+    // O quadro de tags inteiro, rolado até ele
+    window.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("tag-box")).BringIntoView();
+    Pump();
+    Capture("goal-edit-tags");
     // O fim do formulário (horários, período e, no layout estreito, as ações) fica abaixo da dobra
     window.GetVisualDescendants().OfType<GoalEditView>().Single()
         .GetVisualDescendants().OfType<ScrollViewer>().First().ScrollToEnd();
@@ -570,17 +639,38 @@ void Render(bool phone, string suffix, int width, int height)
 
     Show("settings", settings);
     // Cada grupo de Configurações na página dele (os que a plataforma tem).
-    foreach (var section in new[] { SettingsSection.Reminders, SettingsSection.Window, SettingsSection.General, SettingsSection.About })
+    foreach (var section in new[] { SettingsSection.Reminders, SettingsSection.Tags, SettingsSection.Window, SettingsSection.General, SettingsSection.About })
     {
         settings.OpenSectionCommand.Execute(section);
         if (settings.Section != section)
             continue;
         Pump();
         Capture($"settings-{section.ToString().ToLowerInvariant()}");
+        if (section == SettingsSection.Tags)
+            CaptureTagStates();
         settings.CloseSectionCommand.Execute(null);
     }
 
     window.Close();
+
+    // Uma linha em cada estado (cores, edição com erro, junção, exclusão) e o campo de nova tag.
+    void CaptureTagStates()
+    {
+        var tags = settings.Tags!;
+        tags.LoadCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+        tags.Rows[0].TogglePickerCommand.Execute(null);
+        tags.Rows[1].BeginEditCommand.Execute(null);
+        tags.Rows[1].EditText = "a".PadRight(25, 'a');
+        tags.Rows[1].ConfirmEditCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+        tags.Rows[2].BeginEditCommand.Execute(null);
+        tags.Rows[2].EditText = "estudos";
+        tags.Rows[2].ConfirmEditCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+        tags.Rows[3].BeginDeleteCommand.Execute(null);
+        tags.BeginCreateCommand.Execute(null);
+        tags.NewName = "organização da casa";
+        Pump();
+        Capture("settings-tags-edit");
+    }
 
     void Show(string name, PageViewModel page)
     {

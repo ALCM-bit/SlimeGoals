@@ -220,8 +220,8 @@ public class ReportsPageViewModelTests
 
     private sealed class ThrowingGoalRepository : IGoalRepository
     {
-        public Task AddAsync(Goal goal, CancellationToken ct = default) => throw new InvalidOperationException();
-        public Task UpdateAsync(Goal goal, CancellationToken ct = default) => throw new InvalidOperationException();
+        public Task AddAsync(Goal goal, TagChanges tagChanges, CancellationToken ct = default) => throw new InvalidOperationException();
+        public Task UpdateAsync(Goal goal, TagChanges tagChanges, CancellationToken ct = default) => throw new InvalidOperationException();
         public Task DeleteAsync(Guid id, CancellationToken ct = default) => throw new InvalidOperationException();
         public Task<Goal?> GetAsync(Guid id, CancellationToken ct = default) => throw new InvalidOperationException();
         public Task<IReadOnlyList<Goal>> ListAsync(bool includeArchived, CancellationToken ct = default) =>

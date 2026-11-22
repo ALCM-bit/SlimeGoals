@@ -1,5 +1,6 @@
 using Dapper;
 using SlimeGoals.Core.Abstractions;
+using SlimeGoals.Core.Domain;
 
 namespace SlimeGoals.Infrastructure.Data;
 
@@ -28,13 +29,18 @@ public sealed class SyncStateRepository(SqliteConnectionFactory db) : ISyncState
         await c.ExecuteAsync(new CommandDefinition(
             "UPDATE sync_state SET enabled = 1, device_id = COALESCE(device_id, @New)",
             new { New = SqlText.Id(Guid.NewGuid()) }, tx, cancellationToken: ct));
-        // SQL direto, sem passar pelo modelo: uma linha inválida não pode impedir de ligar.
+        // SQL direto, sem passar pelo modelo: uma linha inválida não pode impedir de ligar. As tags padrão intocadas
+        // (data de 1970) ficam de fora: qualquer mudança feita em outro aparelho vence (Tags_v1 §4.4.7).
         await c.ExecuteAsync(new CommandDefinition($"""
             INSERT INTO sync_outbox (record_id, kind, op, base_seq)
             SELECT id, '{SyncOutbox.Goal}', 'upsert', 0 FROM goals ORDER BY created_at;
             INSERT INTO sync_outbox (record_id, kind, op, base_seq)
             SELECT id, '{SyncOutbox.Checkin}', 'upsert', 0 FROM checkins ORDER BY done_at;
-            """, transaction: tx, cancellationToken: ct));
+            INSERT INTO sync_outbox (record_id, kind, op, base_seq)
+            SELECT id, '{SyncOutbox.Tag}', 'upsert', 0 FROM tags WHERE updated_at <> @Seed ORDER BY name;
+            INSERT INTO sync_outbox (record_id, kind, op, base_seq)
+            SELECT id, '{SyncOutbox.GoalTag}', 'upsert', 0 FROM goal_tags ORDER BY goal_id, tag_name;
+            """, new { Seed = SqlText.Instant(DefaultTags.Seed) }, tx, cancellationToken: ct));
         await tx.CommitAsync(ct);
     }
 

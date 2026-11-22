@@ -28,4 +28,7 @@ public sealed record Goal
     public required DateTimeOffset UpdatedAt { get; init; }
     public DateTimeOffset? ArchivedAt { get; init; }
     public DateTimeOffset? DeletedAt { get; init; }
+
+    /// <summary>Nomes visíveis das tags, em ordem ordinal. Só leitura: a gravação passa por <see cref="TagChanges"/>.</summary>
+    public IReadOnlyList<string> Tags { get; init; } = [];
 }

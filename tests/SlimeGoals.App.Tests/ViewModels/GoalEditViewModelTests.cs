@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Time.Testing;
+using SlimeGoals.App.Hosting;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
@@ -10,14 +11,20 @@ public class GoalEditViewModelTests
 {
     // 02/11/2026, fuso UTC (padrão do FakeTimeProvider).
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 11, 2, 12, 0, 0, TimeSpan.Zero));
-    private readonly InMemoryGoalRepository _repo = new();
+    private readonly InMemoryTagRepository _tagRepo = new();
+    private readonly InMemoryGoalRepository _repo;
     private readonly InMemoryCheckinRepository _checkins = new();
     private readonly InMemoryTimerRepository _timers = new();
     private readonly List<bool> _closed = [];
-    private GoalService Service => new(_repo, _checkins, _timers, _time);
 
-    private GoalEditViewModel New() => new(Service, null, false, _closed.Add);
-    private GoalEditViewModel Edit(Goal goal, bool locked = false) => new(Service, goal, locked, _closed.Add);
+    public GoalEditViewModelTests() => _repo = new InMemoryGoalRepository(tags: _tagRepo);
+
+    private readonly PageNavigator _navigator = new();
+    private GoalService Service => new(_repo, _checkins, _timers, _time, tags: _tagRepo);
+    private TagService Tags => new(_tagRepo, _repo, _time);
+
+    private GoalEditViewModel New() => new(Service, Tags, null, false, _closed.Add, navigator: _navigator);
+    private GoalEditViewModel Edit(Goal goal, bool locked = false) => new(Service, Tags, goal, locked, _closed.Add, navigator: _navigator);
 
     private Task<Goal> Existing(Func<GoalDraft, GoalDraft>? change = null) => Service.CreateAsync((change ?? (d => d))(
         new GoalDraft("Estudar inglês", Recurrence.Weekly, 5, "book", GoalColor.Pink, 45,
@@ -383,7 +390,7 @@ public class GoalEditViewModelTests
     [Fact]
     public async Task New_goal_can_start_as_locked_time_goal_and_tells_the_saved_id()
     {
-        var vm = new GoalEditViewModel(Service, null, measureLocked: true, _closed.Add, initialMeasure: Measure.Duration);
+        var vm = new GoalEditViewModel(Service, Tags, null, measureLocked: true, _closed.Add, initialMeasure: Measure.Duration);
         (vm.IsDuration, vm.IsMeasureLocked, vm.SavedGoalId).Should().Be((true, true, (Guid?)null));
         vm.IsQuantity = true; // travada: não muda
         vm.Title = "Estudar";
@@ -486,5 +493,44 @@ public class GoalEditViewModelTests
         stale.IsCompletion = true;
         await stale.SaveCommand.ExecuteAsync(null);
         stale.MeasureError.Should().Be("A medida não muda depois do primeiro registro.");
+    }
+
+    [Fact]
+    public async Task Save_sends_selected_names_in_draft()
+    {
+        await Tags.CreateAsync("casa");
+        var vm = New();
+        await vm.Tags.ReloadCommand.ExecuteAsync(null);
+        vm.Title = "Arrumar";
+        vm.Tags.ToggleCommand.Execute(vm.Tags.Chips.Single());
+        vm.Tags.NewName = "Saúde";
+        await vm.Tags.CreateCommand.ExecuteAsync(null);
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        var saved = (await _repo.ListAsync(includeArchived: false)).Single();
+        saved.Tags.Should().Equal("casa", "saúde");
+        _tagRepo.Tags.Select(t => t.Name).Should().BeEquivalentTo("casa", "saúde");
+    }
+
+    [Fact]
+    public async Task Editing_starts_with_the_goal_tags_selected()
+    {
+        var goal = await Existing(d => d with { Tags = ["casa"] });
+        var vm = Edit(goal);
+
+        vm.Tags.SelectedNames.Should().Equal("casa");
+    }
+
+    [Fact]
+    public void Manage_tags_requests_settings_tags_with_return_to_goals()
+    {
+        var requests = new List<(SettingsSection, Type?)>();
+        _navigator.SettingsRequested += (section, returnTo) => requests.Add((section, returnTo));
+        var vm = New();
+
+        vm.ManageTagsCommand.Execute(null);
+
+        requests.Should().Equal((SettingsSection.Tags, typeof(GoalsPageViewModel)));
     }
 }

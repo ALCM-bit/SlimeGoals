@@ -215,6 +215,28 @@ public class SyncOutboxTests : IDisposable
     }
 
     [Fact]
+    public async Task Deleting_goal_handles_each_link()
+    {
+        EnableSync();
+        var goal = NewGoal();
+        GoalTag Link(string name) => new() { Id = TagIds.ForLink(goal.Id, name), GoalId = goal.Id, TagName = name, UpdatedAt = T0 };
+        var known = Link("leitura");
+        var unsent = Link("corrida");
+        await Goals.AddAsync(goal, new TagChanges([], [known, unsent]));
+        MarkKnown(known.Id, "goal_tag", 4);
+
+        await Goals.DeleteAsync(goal.Id);
+
+        var rows = (await _db.Anchor.QueryAsync("SELECT record_id, kind, op, base_seq FROM sync_outbox")).ToList();
+        rows.Should().ContainSingle();
+        ((string)rows[0].record_id).Should().Be(Text(known.Id));
+        ((string)rows[0].kind).Should().Be("goal_tag");
+        ((string)rows[0].op).Should().Be("delete");
+        ((long)rows[0].base_seq).Should().Be(4);
+        Count("goal_tags").Should().Be(0);
+    }
+
+    [Fact]
     public async Task Deleting_goal_purges_pending_checkins()
     {
         EnableSync();

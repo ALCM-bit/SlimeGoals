@@ -59,6 +59,16 @@
               <TextBlock Grid.Column="1" Classes="nav-row-chevron" Text="›" />
             </Grid>
           </Button>
+          <Button Classes="nav-row" Command="{Binding OpenSectionCommand}"
+                  CommandParameter="{x:Static vm:SettingsSection.Tags}" AutomationProperties.Name="Tags">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+              <StackPanel Spacing="2" VerticalAlignment="Center">
+                <TextBlock Classes="nav-row-title" Text="Tags" />
+                <TextBlock Classes="nav-row-summary" Text="{Binding TagsSummary}" />
+              </StackPanel>
+              <TextBlock Grid.Column="1" Classes="nav-row-chevron" Text="›" />
+            </Grid>
+          </Button>
           <Button Classes="nav-row" IsVisible="{Binding ShowWindow}" Command="{Binding OpenSectionCommand}"
                   CommandParameter="{x:Static vm:SettingsSection.Window}" AutomationProperties.Name="Janela">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
@@ -138,6 +148,12 @@
               </Grid>
             </StackPanel>
           </Border>
+        </views:FillWidthStackPanel>
+      </ScrollViewer>
+
+      <ScrollViewer Classes="page" IsVisible="{Binding IsTagsOpen}">
+        <views:FillWidthStackPanel Classes="settings-list" Margin="0,0,0,14">
+          <views:TagsSettingsView DataContext="{Binding Tags}" />
         </views:FillWidthStackPanel>
       </ScrollViewer>
 

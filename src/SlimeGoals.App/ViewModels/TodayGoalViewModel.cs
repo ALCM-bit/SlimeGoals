@@ -16,9 +16,12 @@ public sealed partial class TodayGoalViewModel : ObservableObject
     private readonly TimeProvider _time;
 
     public TodayGoalViewModel(GoalProgress progress, ActiveTimer? timer, TimeProvider time,
-        IReadOnlyList<Checkin>? todayCheckins = null)
+        IReadOnlyList<Checkin>? todayCheckins = null, IReadOnlyDictionary<string, GoalColor>? tagColors = null)
     {
         Goal = progress.Goal;
+        // Tag que só existe como ligação (ainda não chegou) fica em Purple.
+        Tags = [.. Goal.Tags.Select(n => new TagChipViewModel(n,
+            tagColors is not null && tagColors.TryGetValue(n, out var c) ? c : GoalColor.Purple))];
         ProgressText = GoalFormatting.Progress(progress);
         Fraction = Math.Clamp((double)progress.Done / Goal.Target, 0, 1);
         IsMet = progress.IsMet;
@@ -54,6 +57,13 @@ public sealed partial class TodayGoalViewModel : ObservableObject
     [ObservableProperty] public partial bool IsChunksOpen { get; set; }
 
     public Goal Goal { get; }
+
+    /// <summary>Chips pequenos abaixo da barra de progresso.</summary>
+    public IReadOnlyList<TagChipViewModel> Tags { get; }
+    public bool HasTags => Tags.Count > 0;
+
+    /// <summary>false quando o filtro de tags do Hoje esconde o cartão.</summary>
+    [ObservableProperty] public partial bool IsShown { get; set; } = true;
     public string Title => Goal.Title;
     public string IconKey => Goal.Icon;
     public GoalColor Color => Goal.Color;

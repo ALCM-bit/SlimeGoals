@@ -108,6 +108,88 @@ public class GoalRepositoryTests : IDisposable
         await act.Should().ThrowAsync<FormatException>();
     }
 
+    private static readonly DateTimeOffset TagT0 = new(2026, 11, 21, 12, 0, 0, TimeSpan.Zero);
+
+    private static Tag NewTag(string name) =>
+        new() { Id = TagIds.ForTag(name), Name = name, Color = GoalColor.Pink, UpdatedAt = TagT0 };
+
+    private static GoalTag NewLink(Guid goalId, string name) =>
+        new() { Id = TagIds.ForLink(goalId, name), GoalId = goalId, TagName = name, UpdatedAt = TagT0 };
+
+    [Fact]
+    public async Task Add_with_links_reads_back_visible_tags_sorted()
+    {
+        var goal = NewGoal();
+        await Repo.AddAsync(goal, new TagChanges([NewTag("saúde"), NewTag("casa")],
+            [NewLink(goal.Id, "saúde"), NewLink(goal.Id, "casa")]));
+
+        (await Repo.GetAsync(goal.Id))!.Tags.Should().Equal("casa", "saúde");
+        (await Repo.ListAsync(includeArchived: false)).Single().Tags.Should().Equal("casa", "saúde");
+    }
+
+    [Fact]
+    public async Task Update_with_removed_link_hides_tag()
+    {
+        var goal = NewGoal();
+        var link = NewLink(goal.Id, "casa");
+        await Repo.AddAsync(goal, new TagChanges([NewTag("casa")], [link]));
+
+        await Repo.UpdateAsync(goal, new TagChanges([], [link with { UpdatedAt = TagT0.AddMinutes(1), RemovedAt = TagT0.AddMinutes(1) }]));
+
+        (await Repo.GetAsync(goal.Id))!.Tags.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task List_ignores_links_of_other_goals()
+    {
+        var a = NewGoal("A", TagT0);
+        var b = NewGoal("B", TagT0.AddMinutes(1));
+        await Repo.AddAsync(a, new TagChanges([NewTag("casa"), NewTag("saúde")], [NewLink(a.Id, "casa")]));
+        await Repo.AddAsync(b, new TagChanges([], [NewLink(b.Id, "saúde")]));
+
+        var listed = await Repo.ListAsync(includeArchived: false);
+
+        listed.Single(g => g.Id == a.Id).Tags.Should().Equal("casa");
+        listed.Single(g => g.Id == b.Id).Tags.Should().Equal("saúde");
+    }
+
+    [Fact]
+    public async Task Link_to_missing_tag_row_still_listed()
+    {
+        var goal = NewGoal();
+        await Repo.AddAsync(goal, new TagChanges([], [NewLink(goal.Id, "nova")]));
+
+        (await Repo.ListAsync(includeArchived: false)).Single().Tags.Should().Equal("nova");
+    }
+
+    [Fact]
+    public async Task Goal_update_without_changes_keeps_links()
+    {
+        var goal = NewGoal();
+        await Repo.AddAsync(goal, new TagChanges([NewTag("casa")], [NewLink(goal.Id, "casa")]));
+
+        await Repo.UpdateAsync(goal with { Title = "Outro título" });
+
+        var read = (await Repo.GetAsync(goal.Id))!;
+        read.Title.Should().Be("Outro título");
+        read.Tags.Should().Equal("casa");
+    }
+
+    [Theory]
+    [InlineData("UPDATE tags SET color = 'azul' WHERE name = 'ruim'")]
+    [InlineData("UPDATE goal_tags SET updated_at = 'agora' WHERE tag_name = 'ruim'")]
+    public async Task Invalid_tag_or_link_row_is_ignored_by_goal_reads(string corruption)
+    {
+        var goal = NewGoal();
+        await Repo.AddAsync(goal, new TagChanges([NewTag("casa"), NewTag("ruim")],
+            [NewLink(goal.Id, "casa"), NewLink(goal.Id, "ruim")]));
+        _db.Anchor.Execute(corruption);
+
+        (await Repo.GetAsync(goal.Id))!.Title.Should().Be(goal.Title);
+        var listed = await Repo.ListAsync(includeArchived: false);
+        listed.Should().ContainSingle().Which.Tags.Should().Contain("casa");
+    }
+
     private static Goal NewGoal(string title = "Ler 📚 ação", DateTimeOffset? createdAt = null) => new()
     {
         Id = Guid.CreateVersion7(),
@@ -229,8 +311,8 @@ public class GoalRepositoryTests : IDisposable
             var reopened = new SqliteConnectionFactory($"Data Source={path}");
             using (var c = reopened.Open())
             {
-                MigrationRunner.Migrate(c).Should().Be(9);
-                c.ExecuteScalar<long>("PRAGMA user_version").Should().Be(9);
+                MigrationRunner.Migrate(c).Should().Be(10);
+                c.ExecuteScalar<long>("PRAGMA user_version").Should().Be(10);
             }
             (await new GoalRepository(reopened).GetAsync(goal.Id)).Should().Be(goal);
         }

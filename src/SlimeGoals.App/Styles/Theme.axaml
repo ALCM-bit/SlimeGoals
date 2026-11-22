@@ -93,6 +93,7 @@
   <StreamGeometry x:Key="IconPlus">M 5 12 L 19 12 M 12 5 L 12 19</StreamGeometry>
   <!-- Lucide arrow-left-right: trocar a tarefa do cronômetro -->
   <StreamGeometry x:Key="IconPencil">M 16 3 L 21 8 L 8 21 L 3 21 L 3 16 Z M 13 6 L 18 11</StreamGeometry>
+  <StreamGeometry x:Key="IconTrash">M 3 6 H 21 M 19 6 V 20 A 2 2 0 0 1 17 22 H 7 A 2 2 0 0 1 5 20 V 6 M 8 6 V 4 A 2 2 0 0 1 10 4 H 14 A 2 2 0 0 1 16 4 V 6 M 10 11 V 17 M 14 11 V 17</StreamGeometry>
   <StreamGeometry x:Key="IconChevronDown">M 6 9 L 12 15 L 18 9</StreamGeometry>
   <StreamGeometry x:Key="IconSwap">M 8 3 L 4 7 L 8 11 M 4 7 L 20 7 M 16 21 L 20 17 L 16 13 M 20 17 L 4 17</StreamGeometry>
   <StreamGeometry x:Key="IconPlay">M 6 3 L 20 12 L 6 21 Z</StreamGeometry>

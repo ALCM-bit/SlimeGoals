@@ -44,14 +44,14 @@ Os dois *heads* também referenciam o Core direto; as setas foram omitidas para 
 ```
 src/
   SlimeGoals.Core/
-    Domain/                 metas, medidas, períodos, registros, cronômetro e sessão de foco
-    Services/               casos de uso: GoalService, CheckinService, TimerService, FocusService, ReminderService…
+    Domain/                 metas, medidas, períodos, registros, cronômetro e sessão de foco; tags (TagName, TagIds, Tag, GoalTag, DefaultTags, TagVisibility, TagChanges, TagSummary)
+    Services/               casos de uso: GoalService, CheckinService, TimerService, FocusService, ReminderService, TagService…
     Validation/             validação do rascunho de meta
-    Abstractions/           portas: repositórios, notificações, agendador, relógio, cofre…
+    Abstractions/           portas: repositórios (inclusive ITagRepository), notificações, agendador, relógio, cofre…
     Sync/                   motor de sincronização, merge, agendamento e as portas dele
     Diagnostics/            texto de rastreio sem dado pessoal
   SlimeGoals.Infrastructure/
-    Data/                   conexão, migrações SQL e repositórios
+    Data/                   conexão, migrações SQL (010_tags.sql) e repositórios (TagRepository, com TagRows)
   SlimeGoals.Platform.Linux/
     Notifications/  Scheduling/  Autostart/  Power/  SingleInstance/  Secrets/
   SlimeGoals.Sync/
@@ -62,6 +62,8 @@ src/
   SlimeGoals.Sync.Contracts/
   SlimeGoals.App/
     Views/  ViewModels/  Styles/ (tokens do tema)  Assets/  Converters/
+                            tags: TagPickerViewModel e TagChipViewModel (quadro da meta), TagsSettingsViewModel/TagRowViewModel e
+                            TagsSettingsView (Configurações › Tags), TodayTagFilterViewModel (filtro do Hoje), TagChip e TagStripScroll
     Account/                a seção de conta: ViewModel, textos e endereço do servidor
     Goals/                  formatação de metas, relatórios e lembretes
     Hosting/                ciclo de vida, navegação, lembretes e janelinha do cronômetro

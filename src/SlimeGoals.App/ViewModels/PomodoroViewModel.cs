@@ -37,6 +37,7 @@ public sealed partial class PomodoroViewModel : ObservableObject
     private readonly DataChangeNotifier _changes;
     private readonly PageNavigator? _navigator;
 
+    private readonly TagService _tags;
     private bool _subscribed;
     private bool _seeded;
     private int _loadVersion;
@@ -44,11 +45,12 @@ public sealed partial class PomodoroViewModel : ObservableObject
     private FocusSession? _session;
     private string? _sessionGoalTitle;
 
-    public PomodoroViewModel(FocusService focus, GoalService goals, TimeProvider time, DataChangeNotifier changes,
+    public PomodoroViewModel(FocusService focus, GoalService goals, TagService tags, TimeProvider time, DataChangeNotifier changes,
         PageNavigator? navigator = null)
     {
         _focus = focus;
         _goals = goals;
+        _tags = tags;
         _time = time;
         _changes = changes;
         _navigator = navigator;
@@ -119,8 +121,13 @@ public sealed partial class PomodoroViewModel : ObservableObject
         if (!_subscribed)
         {
             // Assina uma vez (a página vive com o app); pode chegar de qualquer thread, recarrega na da interface.
+            // Com o editor de meta aberto, os chips dele também são relidos: uma tag excluída sai da seleção antes de salvar.
             _subscribed = true;
-            _changes.Changed += (_, _) => OnUi(() => LoadCommand.Execute(null));
+            _changes.Changed += (_, _) => OnUi(() =>
+            {
+                LoadCommand.Execute(null);
+                Editor?.Tags.ReloadCommand.Execute(null);
+            });
         }
         var version = ++_loadVersion;
         try

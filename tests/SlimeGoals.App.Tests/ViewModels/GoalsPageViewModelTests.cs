@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Time.Testing;
+using SlimeGoals.App.Hosting;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
@@ -11,20 +12,49 @@ public class GoalsPageViewModelTests
     private static readonly DateTimeOffset T0 = new(2026, 11, 2, 12, 0, 0, TimeSpan.Zero);
     private static readonly DateOnly Today = new(2026, 11, 2);
     private readonly FakeTimeProvider _time = new(T0);
-    private readonly InMemoryGoalRepository _repo = new();
+    private readonly InMemoryTagRepository _tagRepo = new();
+    private readonly InMemoryGoalRepository _repo;
     private readonly InMemoryCheckinRepository _checkins = new();
+    private readonly DataChangeNotifier _changes = new();
     private readonly GoalService _service;
+    private readonly TagService _tags;
     private readonly GoalsPageViewModel _vm;
 
     public GoalsPageViewModelTests()
     {
-        _service = new GoalService(_repo, _checkins, new InMemoryTimerRepository(), _time);
-        _vm = new GoalsPageViewModel(_service, _time);
+        _repo = new InMemoryGoalRepository(tags: _tagRepo);
+        _service = new GoalService(_repo, _checkins, new InMemoryTimerRepository(), _time, tags: _tagRepo);
+        _tags = new TagService(_tagRepo, _repo, _time);
+        _vm = new GoalsPageViewModel(_service, _time, _tags, new PageNavigator(), _changes);
     }
 
-    private Task<Goal> Create(string title, Recurrence r = Recurrence.Daily, DateOnly? end = null) =>
+    private Task<Goal> Create(string title, Recurrence r = Recurrence.Daily, DateOnly? end = null, params string[] tags) =>
         _service.CreateAsync(new GoalDraft(title, r, 3, "book", GoalColor.Purple, 120,
-            new TimeOnly(9, 0), new TimeOnly(18, 0), WeekDays.Weekdays, null, end));
+            new TimeOnly(9, 0), new TimeOnly(18, 0), WeekDays.Weekdays, null, end)
+        { Tags = tags });
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        for (var i = 0; i < 200 && !condition(); i++)
+            await Task.Delay(10);
+        condition().Should().BeTrue();
+    }
+
+    /// <summary>Abre o editor da única meta da lista, com os chips já lidos.</summary>
+    private async Task<GoalEditViewModel> EditOnlyGoal()
+    {
+        await Load();
+        await _vm.EditCommand.ExecuteAsync(_vm.Goals.Single());
+        var editor = _vm.Editor!;
+        await editor.Tags.ReloadCommand.ExecuteAsync(null);
+        return editor;
+    }
+
+    private async Task ReturnToPage(GoalEditViewModel editor)
+    {
+        _vm.Activate();
+        await WaitUntilAsync(() => editor.Tags.ReloadCommand.ExecutionTask is not { IsCompleted: false });
+    }
 
     private async Task Load() => await _vm.LoadCommand.ExecuteAsync(null);
     private IEnumerable<string> Titles => _vm.Goals.Select(g => g.Title);
@@ -273,5 +303,124 @@ public class GoalsPageViewModelTests
         await _vm.ArchiveCommand.ExecuteAsync(_vm.Goals.Single());
 
         _vm.ErrorMessage.Should().Be("Não foi possível concluir a ação.");
+    }
+
+    [Fact]
+    public async Task Activate_reloads_tags_of_the_open_editor()
+    {
+        await _tags.CreateAsync("casa");
+        _vm.NewCommand.Execute(null);
+        await _vm.Editor!.Tags.ReloadCommand.ExecuteAsync(null);
+        _vm.Editor.Tags.Chips.Select(c => c.Name).Should().Equal("casa");
+
+        await _tags.CreateAsync("estudos");
+        _vm.Activate();
+
+        await WaitUntilAsync(() => _vm.Editor.Tags.Chips.Select(c => c.Name).SequenceEqual(["casa", "estudos"]));
+    }
+
+    [Fact]
+    public async Task Tag_created_in_a_new_goal_is_already_in_settings_and_stays_after_cancel()
+    {
+        _vm.NewCommand.Execute(null);
+        var editor = _vm.Editor!;
+        await editor.Tags.ReloadCommand.ExecuteAsync(null);
+
+        editor.Tags.NewName = "Saúde";
+        await editor.Tags.CreateCommand.ExecuteAsync(null);
+
+        // "Gerenciar tags ›" lista o catálogo: a tag já está lá, antes de salvar a meta.
+        (await _tags.ListAsync()).Select(t => (t.Name, t.ActiveGoals)).Should().Equal(("saúde", 0));
+
+        await ReturnToPage(editor);
+        editor.Tags.SelectedNames.Should().Equal("saúde");
+
+        editor.CancelCommand.Execute(null);
+        (await _tags.ListAsync()).Select(t => t.Name).Should().Equal("saúde");
+    }
+
+    [Fact]
+    public async Task Renaming_the_selected_tag_in_settings_keeps_it_on_the_goal_after_save()
+    {
+        var goal = await Create("Ler", tags: "saúde");
+        var editor = await EditOnlyGoal();
+
+        await _tags.RenameAsync("saúde", "bem-estar");
+        await ReturnToPage(editor);
+
+        editor.Tags.SelectedNames.Should().Equal("bem-estar");
+        await editor.SaveCommand.ExecuteAsync(null);
+        (await _service.GetAsync(goal.Id))!.Tags.Should().Equal("bem-estar");
+    }
+
+    [Fact]
+    public async Task Merging_the_selected_tag_in_settings_keeps_the_merged_tag_on_the_goal_after_save()
+    {
+        var goal = await Create("Ler", tags: "saúde");
+        await _tags.CreateAsync("estudos");
+        var editor = await EditOnlyGoal();
+
+        await _tags.RenameAsync("saúde", "estudos");
+        await ReturnToPage(editor);
+
+        editor.Tags.SelectedNames.Should().Equal("estudos");
+        await editor.SaveCommand.ExecuteAsync(null);
+        (await _service.GetAsync(goal.Id))!.Tags.Should().Equal("estudos");
+    }
+
+    [Fact]
+    public async Task Rename_keeps_what_the_person_changed_in_the_editor()
+    {
+        var goal = await Create("Ler", tags: ["saúde", "casa"]);
+        await _tags.CreateAsync("estudos");
+        var editor = await EditOnlyGoal();
+        editor.Tags.ToggleCommand.Execute(editor.Tags.Chips.Single(c => c.Name == "casa"));
+        editor.Tags.ToggleCommand.Execute(editor.Tags.Chips.Single(c => c.Name == "estudos"));
+        editor.Tags.NewName = "nova";
+        await editor.Tags.CreateCommand.ExecuteAsync(null);
+
+        await _tags.RenameAsync("saúde", "bem-estar");
+        await ReturnToPage(editor);
+
+        editor.Tags.SelectedNames.Should().Equal("bem-estar", "estudos", "nova");
+        await editor.SaveCommand.ExecuteAsync(null);
+        (await _service.GetAsync(goal.Id))!.Tags.Should().Equal("bem-estar", "estudos", "nova");
+    }
+
+    [Fact]
+    public async Task Tag_deleted_by_a_sync_while_the_editor_is_open_stays_deleted_after_save()
+    {
+        var goal = await Create("Ler", tags: ["tarefas", "casa"]);
+        var editor = await EditOnlyGoal();
+
+        // A exclusão chega de outro aparelho: escrita direta no banco e o aviso do notificador.
+        await _tags.DeleteAsync("tarefas");
+        _changes.NotifyChanged();
+        await WaitUntilAsync(() => !editor.Tags.SelectedNames.Contains("tarefas"));
+
+        editor.Title = "Ler mais";
+        await editor.SaveCommand.ExecuteAsync(null);
+        (await _service.GetAsync(goal.Id))!.Tags.Should().Equal("casa");
+        (await _tags.ListAsync()).Select(t => t.Name).Should().Equal("casa");
+    }
+
+    [Fact]
+    public async Task Closed_editor_and_hidden_page_stop_listening_to_changes()
+    {
+        await Create("Ler", tags: "casa");
+        var editor = await EditOnlyGoal();
+
+        _vm.Deactivate();
+        await _tags.CreateAsync("longe");
+        _changes.NotifyChanged();
+        editor.Tags.Chips.Select(c => c.Name).Should().Equal("casa");
+
+        await ReturnToPage(editor);
+        editor.Tags.Chips.Select(c => c.Name).Should().Equal("casa", "longe");
+
+        editor.CancelCommand.Execute(null);
+        await _tags.CreateAsync("depois");
+        _changes.NotifyChanged();
+        editor.Tags.Chips.Select(c => c.Name).Should().Equal("casa", "longe");
     }
 }

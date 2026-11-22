@@ -16,10 +16,65 @@ public partial class TodayView : UserControl
         InitializeComponent();
         // Depois do AutoCompleteBox: o Enter que escolhe uma sugestão já pôs o texto no campo quando chega aqui.
         AddHandler(KeyDownEvent, OnTaskKeyDown, RoutingStrategies.Bubble, handledEventsToo: true);
+        // A roda do mouse rola a linha de filtros de lado (o desktop não tem como arrastar com o dedo).
+        TagStrip.PointerWheelChanged += OnTagStripWheel;
+        TagStrip.ScrollChanged += (_, _) => UpdateTagStripHint();
         AddHandler(PointerPressedEvent, (_, _) => _pointerDown = true, RoutingStrategies.Tunnel, handledEventsToo: true);
         // Depois do Click do botão solto (que roda na bolha, antes de chegar aqui).
         AddHandler(PointerReleasedEvent, OnPointerReleasedAfterClick, RoutingStrategies.Bubble, handledEventsToo: true);
     }
+
+    private void OnTagStripWheel(object? sender, PointerWheelEventArgs e)
+    {
+        if (e.Delta.Y == 0 || sender is not ScrollViewer strip)
+            return;
+        var max = Math.Max(0, strip.Extent.Width - strip.Viewport.Width);
+        if (max == 0)
+            return; // nada rola: a roda segue para a página
+        strip.Offset = strip.Offset.WithX(Math.Clamp(strip.Offset.X - e.Delta.Y * 48, 0, max));
+        e.Handled = true;
+    }
+
+    private TodayTagFilterViewModel? _filter;
+
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        base.OnDataContextChanged(e);
+        if (_filter is not null)
+            _filter.RevealRequested -= OnRevealRequested;
+        _filter = (DataContext as TodayPageViewModel)?.Filter;
+        if (_filter is not null)
+            _filter.RevealRequested += OnRevealRequested;
+    }
+
+    /// <summary>
+    /// Deixa um dos chips pedidos à vista; se algum já está, a linha não se mexe. Espera o layout: os chips novos de uma
+    /// recarga, ou o "Limpar" que acabou de aparecer, ainda não têm lugar quando o pedido chega.
+    /// </summary>
+    private void OnRevealRequested(object? sender, IReadOnlyList<TagChipViewModel> targets) => Dispatcher.UIThread.Post(() =>
+    {
+        var offset = TagStrip.Offset.X;
+        var shown = TagChips.GetVisualDescendants().OfType<TagChip>().ToList();
+        var bounds = new List<(double Left, double Right)>();
+        foreach (var target in targets)
+        {
+            var chip = shown.FirstOrDefault(c => c.DataContext == target);
+            if (chip?.TranslatePoint(default, TagStrip) is { } at)
+                bounds.Add((at.X + offset, at.X + offset + chip.Bounds.Width));
+        }
+        var revealed = TagStripScroll.RevealAnyOffset(offset, TagStrip.Viewport.Width, bounds);
+        if (revealed != offset)
+            TagStrip.Offset = TagStrip.Offset.WithX(revealed);
+    }, DispatcherPriority.Loaded);
+
+    private void UpdateTagStripHint()
+    {
+        var more = TagStripScroll.CanScrollRight(TagStrip.Offset.X, TagStrip.Extent.Width, TagStrip.Viewport.Width);
+        TagStripFade.IsVisible = TagStripMore.IsVisible = more;
+    }
+
+    private void OnTagStripMore(object? sender, RoutedEventArgs e) =>
+        TagStrip.Offset = TagStrip.Offset.WithX(TagStripScroll.NextOffset(TagStrip.Offset.X, TagStrip.Extent.Width, TagStrip.Viewport.Width));
 
     private bool _pointerDown;
     private readonly List<Action> _afterRelease = [];

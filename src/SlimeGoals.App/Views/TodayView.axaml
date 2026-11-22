@@ -141,6 +141,50 @@
               IsVisible="{Binding CanPause}" Command="{Binding TogglePauseCommand}" />
     </Grid>
 
+    <!-- Filtro por tags: "Limpar" fixo à esquerda, só com seleção; os chips rolam de lado (nunca quebram) -->
+    <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12" DataContext="{Binding Filter}"
+                x:DataType="vm:TodayTagFilterViewModel" IsVisible="{Binding IsVisible}">
+      <Grid ColumnDefinitions="Auto,*">
+        <Button Classes="ghost" Content="✕ Limpar" MinHeight="36" Padding="12,0" Margin="0,0,8,0" VerticalAlignment="Center"
+                IsVisible="{Binding HasSelection}" Command="{Binding ClearCommand}" />
+        <Panel Grid.Column="1">
+          <ScrollViewer x:Name="TagStrip" HorizontalScrollBarVisibility="Hidden"
+                        VerticalScrollBarVisibility="Disabled">
+            <ItemsControl x:Name="TagChips" ItemsSource="{Binding Chips}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" Spacing="8" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:TagChipViewModel">
+                  <views:TagChip Command="{Binding $parent[ItemsControl].((vm:TodayTagFilterViewModel)DataContext).ToggleCommand}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+          <!-- Há mais chips à direita: esmaecido até o fundo da página e a seta "›" que rola um passo (spec §4.8) -->
+          <Border x:Name="TagStripFade" Width="60" HorizontalAlignment="Right" IsHitTestVisible="False" IsVisible="False"
+                  Background="{DynamicResource Bg}">
+            <Border.OpacityMask>
+              <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                <GradientStop Offset="0" Color="#00000000" />
+                <GradientStop Offset="1" Color="#FF000000" />
+              </LinearGradientBrush>
+            </Border.OpacityMask>
+          </Border>
+          <Button x:Name="TagStripMore" Width="28" Height="28" MinHeight="28" Padding="0" CornerRadius="14"
+                  HorizontalAlignment="Right" VerticalAlignment="Center" IsVisible="False"
+                  Background="{DynamicResource Surface2}" AutomationProperties.Name="Mais tags" ToolTip.Tip="Mais tags"
+                  Click="OnTagStripMore">
+            <TextBlock Text="›" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Button>
+        </Panel>
+      </Grid>
+      <TextBlock Text="{Binding SummaryText}" Foreground="{DynamicResource Muted}" FontSize="13"
+                 IsVisible="{Binding HasSelection}" />
+    </StackPanel>
+
     <Panel>
       <TextBlock Text="{Binding EmptyMessage}" IsVisible="{Binding IsEmpty}" Foreground="{DynamicResource Muted}"
                  HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="15" />
@@ -149,7 +193,7 @@
         <ItemsControl ItemsSource="{Binding Goals}" Margin="0,0,0,14">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:TodayGoalViewModel">
-              <Border Classes="card today" Classes.met="{Binding IsMet}" Margin="0,0,0,10">
+              <Border Classes="card today" Classes.met="{Binding IsMet}" Margin="0,0,0,10" IsVisible="{Binding IsShown}">
                 <StackPanel Spacing="12">
                   <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
                     <Border Classes="icon-tile"
@@ -288,6 +332,20 @@
 
                   <!-- Barra na largura do cartão: igual em todos, sem depender dos botões ao lado do texto -->
                   <ProgressBar Classes="goal" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
+
+                  <!-- Tags da meta: chips pequenos, só se ela tem tags -->
+                  <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel ItemSpacing="6" LineSpacing="6" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:TagChipViewModel">
+                        <views:TagChip Classes="small" IsHitTestVisible="False" Focusable="False" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
 
                   <!-- Trechos de hoje (spec §7.2): recolhível, fechado por padrão; o editor abre no lugar da linha -->
                   <StackPanel Spacing="6" IsVisible="{Binding HasChunks}">
@@ -448,6 +506,8 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+        <TextBlock Text="Nenhuma meta de hoje com essas tags." IsVisible="{Binding Filter.IsFilteredEmpty}"
+                   Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" FontSize="15" Margin="0,24,0,24" />
     <!-- Próximos lembretes do dia, depois das metas e dentro da rolagem (só com itens):
          fora dela, cada meta com lembrete tirava uma linha da lista no celular -->
     <StackPanel Margin="0,4,0,14" IsVisible="{Binding HasUpcoming}">

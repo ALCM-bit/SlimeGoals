@@ -17,6 +17,7 @@ public enum SettingsSection
     None,
     Sync,
     Reminders,
+    Tags,
     Window,
     General,
     About,
@@ -36,6 +37,8 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     private readonly PlatformCapabilities _capabilities;
     private readonly IReminderPermissions? _permissions;
     private readonly DataChangeNotifier? _changes;
+    private readonly PageNavigator? _navigator;
+    private Type? _returnTo;
 
     private const string SaveError = "Não foi possível salvar a configuração.";
     private const string AutostartError = "Não foi possível alterar o início com o sistema.";
@@ -53,7 +56,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     public SettingsPageViewModel(AppSettings settings, IAutostart? autostart = null,
         PlatformCapabilities? capabilities = null, IReminderPermissions? permissions = null,
         DataChangeNotifier? changes = null, string? appVersion = null, AccountViewModel? account = null,
-        PageNavigator? navigator = null)
+        PageNavigator? navigator = null, TagsSettingsViewModel? tags = null)
     {
         _settings = settings;
         _autostart = autostart;
@@ -62,8 +65,21 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         _changes = changes;
         VersionText = "SlimeGoals " + (appVersion ?? DefaultVersion());
         Account = account;
+        Tags = tags;
+        if (tags is not null)
+            tags.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(TagsSettingsViewModel.Summary))
+                    OnPropertyChanged(nameof(TagsSummary));
+            };
+        _navigator = navigator;
         if (navigator is not null)
-            navigator.SettingsRequested += OpenSection;
+            navigator.SettingsRequested += (section, returnTo) =>
+            {
+                OpenSection(section);
+                // Só vale se o grupo abriu; vem depois de OpenSection, que limpa o destino de um pedido anterior.
+                _returnTo = Section == section ? returnTo : null;
+            };
         if (account is not null)
             account.PropertyChanged += (_, e) =>
             {
@@ -75,6 +91,9 @@ public sealed partial class SettingsPageViewModel : PageViewModel
                 }
             };
     }
+
+    /// <summary>A seção "Tags"; sem ela (testes, heads sem DI) a página abre vazia.</summary>
+    public TagsSettingsViewModel? Tags { get; }
 
     public string VersionText { get; }
 
@@ -100,6 +119,8 @@ public sealed partial class SettingsPageViewModel : PageViewModel
 
     public bool IsRemindersOpen => IsSectionOpen && Section == SettingsSection.Reminders;
 
+    public bool IsTagsOpen => IsSectionOpen && Section == SettingsSection.Tags;
+
     public bool IsWindowOpen => IsSectionOpen && Section == SettingsSection.Window;
 
     public bool IsGeneralOpen => IsSectionOpen && Section == SettingsSection.General;
@@ -111,6 +132,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     {
         SettingsSection.Sync => "Sincronização",
         SettingsSection.Reminders => "Lembretes",
+        SettingsSection.Tags => "Tags",
         SettingsSection.Window => "Janela",
         SettingsSection.General => "Geral",
         SettingsSection.About => "Sobre",
@@ -125,25 +147,41 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         {
             SettingsSection.Sync => ShowAccount,
             SettingsSection.Reminders => ShowReminders,
+            SettingsSection.Tags => true,
             SettingsSection.Window => ShowWindow,
             SettingsSection.General => ShowGeneral,
             SettingsSection.About => true,
             _ => false,
         };
+        _returnTo = null; // quem abre pela lista não volta para outra página
         if (available)
             Section = section;
     }
 
+    /// <summary>Fecha o grupo: volta à página de onde ele foi pedido (se houve), senão à lista de grupos.</summary>
     [RelayCommand]
-    private void CloseSection() => Section = SettingsSection.None;
+    private void CloseSection()
+    {
+        var returnTo = _returnTo;
+        _returnTo = null;
+        Section = SettingsSection.None;
+        if (returnTo is not null)
+            _navigator?.Show(returnTo);
+    }
 
-    partial void OnSectionChanged(SettingsSection value) => NotifySectionChanged();
+    partial void OnSectionChanged(SettingsSection value)
+    {
+        NotifySectionChanged();
+        if (value == SettingsSection.Tags)
+            Tags?.LoadCommand.Execute(null);
+    }
 
     private void NotifySectionChanged()
     {
         OnPropertyChanged(nameof(IsSectionOpen));
         OnPropertyChanged(nameof(IsSyncOpen));
         OnPropertyChanged(nameof(IsRemindersOpen));
+        OnPropertyChanged(nameof(IsTagsOpen));
         OnPropertyChanged(nameof(IsWindowOpen));
         OnPropertyChanged(nameof(IsGeneralOpen));
         OnPropertyChanged(nameof(IsAboutOpen));
@@ -151,6 +189,8 @@ public sealed partial class SettingsPageViewModel : PageViewModel
 
     // Resumos mostrados na lista de grupos, ao lado do nome de cada um.
     public string RemindersSummary => SelectedSnooze is { } snooze ? $"Adiar por {snooze.Label}" : "";
+
+    public string TagsSummary => Tags?.Summary ?? "";
 
     public string WindowSummary => CloseHides ? "Ao fechar: manter em segundo plano" : "Ao fechar: encerrar o app";
 
@@ -350,12 +390,19 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     public override void Activate()
     {
         LoadCommand.Execute(null);
+        Tags?.LoadCommand.Execute(null);
+        Tags?.StartWatching();
         if (ShowAccount)
             Account!.LoadCommand.Execute(null);
     }
 
     /// <summary>Ao sair de Configurações, senhas e o código de recuperação digitados saem da memória da tela.</summary>
-    public override void Deactivate() => Account?.ClearSecretInputs();
+    public override void Deactivate()
+    {
+        _returnTo = null; // quem sai de Configurações por outro caminho não volta à página que pediu o grupo
+        Tags?.StopWatching();
+        Account?.ClearSecretInputs();
+    }
 
     [RelayCommand]
     private async Task LoadAsync()

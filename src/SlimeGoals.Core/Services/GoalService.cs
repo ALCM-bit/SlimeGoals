@@ -12,7 +12,7 @@ namespace SlimeGoals.Core.Services;
 /// Os lembretes entram na exclusão, para as notificações pendentes saírem junto; sem eles, só o banco é limpo.
 /// </summary>
 public sealed class GoalService(IGoalRepository goals, ICheckinRepository checkins, ITimerRepository timers, TimeProvider time,
-    DataChangeNotifier? changes = null, ReminderService? reminders = null)
+    DataChangeNotifier? changes = null, ReminderService? reminders = null, ITagRepository? tags = null)
 {
     public async Task<Goal> CreateAsync(GoalDraft draft, CancellationToken ct = default)
     {
@@ -36,7 +36,9 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
             UpdatedAt = now,
         }, draft);
 
-        await goals.AddAsync(goal, ct);
+        var plan = await PlanTagsAsync(goal.Id, draft.Tags, now, ct);
+        goal = goal with { Tags = plan.Names ?? goal.Tags };
+        await goals.AddAsync(goal, plan.Changes, ct);
         changes?.NotifyChanged();
         return goal;
     }
@@ -55,7 +57,9 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
             throw new GoalValidationException(
                 [new ValidationError(nameof(GoalDraft.Measure), "A medida não muda depois do primeiro registro.")]);
         var updated = Apply(current, draft) with { UpdatedAt = NextUpdatedAt(current) };
-        await goals.UpdateAsync(updated, ct);
+        var plan = await PlanTagsAsync(id, draft.Tags, time.GetUtcNow(), ct);
+        updated = updated with { Tags = plan.Names ?? updated.Tags };
+        await goals.UpdateAsync(updated, plan.Changes, ct);
         changes?.NotifyChanged();
         return updated;
     }
@@ -151,6 +155,66 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
         var now = time.GetUtcNow();
         var after = current.UpdatedAt.AddMilliseconds(1);
         return now > after ? now : after;
+    }
+
+    /// <summary>
+    /// Calcula as linhas de tag e de ligação do salvamento. Só as tags que entram na meta agora e não estão
+    /// visíveis são criadas ou reativadas: uma tag que a meta já tinha e que ainda não chegou fica só como ligação.
+    /// Com <paramref name="requested"/> nulo, as tags ficam como estão.
+    /// </summary>
+    private async Task<(TagChanges Changes, IReadOnlyList<string>? Names)> PlanTagsAsync(
+        Guid goalId, IReadOnlyList<string>? requested, DateTimeOffset now, CancellationToken ct)
+    {
+        if (requested is null || tags is null)
+            return (TagChanges.Empty, null);
+
+        var wanted = requested.Select(TagName.Normalize).Distinct(StringComparer.Ordinal).ToList();
+        var state = new TagService.TagState(await tags.ListTagsAsync(ct), await tags.ListLinksAsync(ct));
+        var own = state.Links.Where(l => l.GoalId == goalId).ToDictionary(l => l.TagName, StringComparer.Ordinal);
+        var newTags = new List<Tag>();
+        var newLinks = new List<GoalTag>();
+        var colors = state.Visible.Values.Select(t => t.Color).ToList();
+
+        foreach (var name in wanted)
+        {
+            own.TryGetValue(name, out var link);
+            state.Tags.TryGetValue(name, out var tag);
+            if (link is not null && TagVisibility.IsLinkVisible(link, tag))
+                continue;
+
+            // Tag excluída que segue à vista (outra meta a marcou depois): a ligação precisa ser mais nova que a exclusão,
+            // senão um relógio atrasado a deixaria escondida.
+            var at = link is null ? now : TagService.Next(now, link.UpdatedAt);
+            if (tag?.DeletedAt is { } deletedAt && at <= deletedAt)
+                at = TagService.Next(now, deletedAt);
+            newLinks.Add(link is null
+                ? TagService.NewLink(goalId, name, at)
+                : link with { RemovedAt = null, UpdatedAt = at });
+            if (state.Visible.ContainsKey(name))
+                continue;
+            if (tag is not null)
+                newLinks.AddRange(state.HiddenLinksOf(tag).Where(l => l.GoalId != goalId)
+                    .Select(l => TagService.RemoveAt(l, TagService.Next(now, l.UpdatedAt))));
+            var written = tag is null
+                ? TagService.NewTag(name, TagService.PickColor(colors, colors.Count), now)
+                : tag with { DeletedAt = null, UpdatedAt = TagService.Next(now, tag.UpdatedAt) };
+            colors.Add(written.Color);
+            newTags.Add(written);
+        }
+
+        foreach (var (name, link) in own)
+        {
+            if (!wanted.Contains(name) && TagVisibility.IsLinkVisible(link, state.Tags.GetValueOrDefault(name)))
+            {
+                var at = TagService.Next(now, link.UpdatedAt);
+                newLinks.Add(link with { RemovedAt = at, UpdatedAt = at });
+            }
+        }
+
+        var allTags = state.Tags.Values.Where(t => newTags.All(n => n.Id != t.Id)).Concat(newTags);
+        var allLinks = state.Links.Where(l => newLinks.All(n => n.Id != l.Id)).Concat(newLinks);
+        var names = TagVisibility.NamesFor(goalId, allLinks, allTags.ToDictionary(t => t.Name, StringComparer.Ordinal));
+        return (new TagChanges(newTags, newLinks), names);
     }
 
     /// <summary>Data de hoje no fuso local do relógio injetado.</summary>

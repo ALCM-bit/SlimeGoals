@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SlimeGoals.App.Hosting;
 using SlimeGoals.Core;
 using SlimeGoals.Core.Services;
 
@@ -10,9 +11,14 @@ namespace SlimeGoals.App.ViewModels;
 /// Tela Metas: lista (ativas ou arquivadas) e, quando <see cref="Editor"/> não é nulo,
 /// a página de edição no lugar da lista (spec §7).
 /// </summary>
-public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider time) : PageViewModel
+public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider time, TagService tags, PageNavigator navigator,
+    DataChangeNotifier? changes = null)
+    : PageViewModel
 {
     private int _loadVersion;
+    private bool _active = true;
+    private bool _listening;
+    private SynchronizationContext? _ui;
 
     public override string Title => "Metas";
 
@@ -27,7 +33,55 @@ public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider
     public bool IsEmpty => Goals.Count == 0;
     public string EmptyMessage => ShowArchived ? "Nenhuma meta arquivada." : "Nenhuma meta ativa. Crie a primeira!";
 
-    public override void Activate() => LoadCommand.Execute(null);
+    public override void Activate()
+    {
+        _active = true;
+        LoadCommand.Execute(null);
+        // O editor sobrevive à ida a Configurações › Tags: na volta, cores, nomes e exclusões de lá já aparecem nos chips.
+        Editor?.Tags.ReloadCommand.Execute(null);
+        UpdateListening();
+    }
+
+    public override void Deactivate()
+    {
+        _active = false;
+        UpdateListening();
+    }
+
+    partial void OnEditorChanged(GoalEditViewModel? value) => UpdateListening();
+
+    /// <summary>
+    /// Com o editor aberto e a página à vista, uma mudança de fora (sincronização, outro processo) relê os chips: uma tag
+    /// excluída sai da seleção antes de salvar, em vez de voltar com a meta (spec Tags §4.4.3). Fechado o editor ou
+    /// escondida a página, deixa de ouvir; a volta à página relê de qualquer jeito.
+    /// </summary>
+    private void UpdateListening()
+    {
+        var listen = changes is not null && _active && Editor is not null;
+        if (listen == _listening)
+            return;
+        _listening = listen;
+        _ui ??= SynchronizationContext.Current;
+        if (listen)
+            changes!.Changed += OnDataChanged;
+        else
+            changes!.Changed -= OnDataChanged;
+    }
+
+    /// <summary>Pode chegar de qualquer thread; relê os chips na da interface.</summary>
+    private void OnDataChanged(object? sender, EventArgs e)
+    {
+        if (_ui is null)
+            ReloadEditorTags();
+        else
+            _ui.Post(_ => ReloadEditorTags(), null);
+    }
+
+    private void ReloadEditorTags()
+    {
+        if (_listening)
+            Editor?.Tags.ReloadCommand.Execute(null);
+    }
 
     partial void OnShowArchivedChanged(bool value)
     {
@@ -68,7 +122,7 @@ public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider
     }
 
     [RelayCommand]
-    private void New() => Editor = new GoalEditViewModel(service, null, measureLocked: false, CloseEditor);
+    private void New() => Editor = new GoalEditViewModel(service, tags, null, measureLocked: false, CloseEditor, navigator: navigator);
 
     /// <summary>Abre o editor; meta com registros abre com a medida travada (spec §5.2).</summary>
     [RelayCommand(CanExecute = nameof(CanEdit))]
@@ -80,7 +134,7 @@ public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider
         try
         {
             var locked = await service.HasRecordsAsync(item.Goal.Id);
-            Editor = new GoalEditViewModel(service, item.Goal, locked, CloseEditor);
+            Editor = new GoalEditViewModel(service, tags, item.Goal, locked, CloseEditor, navigator: navigator);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

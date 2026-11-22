@@ -2,6 +2,7 @@ using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SlimeGoals.App.Goals;
+using SlimeGoals.App.Hosting;
 using SlimeGoals.Core;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
@@ -22,6 +23,7 @@ public sealed partial class GoalEditViewModel : ObservableObject
 
     private readonly GoalService _service;
     private readonly Goal? _existing;
+    private readonly PageNavigator? _navigator;
     private readonly Action<bool> _close;
     private readonly Dictionary<string, string> _errors = [];
 
@@ -35,10 +37,17 @@ public sealed partial class GoalEditViewModel : ObservableObject
 
     /// <param name="measureLocked">A meta já tem registros: a medida não pode mudar (spec §5.2).</param>
     /// <param name="initialMeasure">Medida de uma meta nova (ex.: tempo, para receber o foco de um Pomodoro).</param>
-    public GoalEditViewModel(GoalService service, Goal? existing, bool measureLocked, Action<bool> close,
-        Measure? initialMeasure = null)
+    /// <param name="navigator">Para "Gerenciar tags"; sem ele o link não aparece.</param>
+    public GoalEditViewModel(GoalService service, TagService tags, Goal? existing, bool measureLocked, Action<bool> close,
+        Measure? initialMeasure = null, PageNavigator? navigator = null)
     {
         _service = service;
+        _navigator = navigator;
+        // A meta existente relê as próprias tags a cada recarga do quadro (renomeação, junção, exclusão por sincronização).
+        Tags = existing is null
+            ? new TagPickerViewModel(tags, [])
+            : new TagPickerViewModel(tags, existing.Tags, async ct => (await service.GetAsync(existing.Id, ct))?.Tags);
+        Tags.ReloadCommand.Execute(null);
         _existing = existing;
         _close = close;
         IsMeasureLocked = measureLocked;
@@ -98,6 +107,15 @@ public sealed partial class GoalEditViewModel : ObservableObject
     public IReadOnlyList<IconOption> Icons { get; }
     public IReadOnlyList<ColorOption> Colors { get; }
     public IReadOnlyList<DayOption> Days { get; }
+
+    /// <summary>O quadro de tags; os nomes marcados vão no rascunho ao salvar.</summary>
+    public TagPickerViewModel Tags { get; }
+
+    public bool CanManageTags => _navigator is not null;
+
+    /// <summary>Abre Configurações › Tags; voltar de lá devolve a página da meta, com o formulário como estava.</summary>
+    [RelayCommand(CanExecute = nameof(CanManageTags))]
+    private void ManageTags() => _navigator?.ShowSettings(SettingsSection.Tags, typeof(GoalsPageViewModel));
 
     [ObservableProperty] public partial string Title { get; set; }
 
@@ -323,7 +341,8 @@ public sealed partial class GoalEditViewModel : ObservableObject
             StartDate is { } s ? DateOnly.FromDateTime(s) : null,
             EndDate is { } e ? DateOnly.FromDateTime(e) : null,
             Measure,
-            Measure == Measure.Quantity ? Unit : null);
+            Measure == Measure.Quantity ? Unit : null,
+            Tags.SelectedNames);
 
         var errors = GoalValidator.Validate(draft).Select(x => (x.Field, x.Message)).ToList();
         if (ActiveFrom is null || ActiveUntil is null)

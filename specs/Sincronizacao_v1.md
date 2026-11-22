@@ -34,6 +34,8 @@ As mesmas metas e registros aparecem em todos os aparelhos de uma pessoa, sem qu
 | `goals` | Sim | Vence o `updated_at` mais novo; empate, o maior id de aparelho. A meta inteira, não campo a campo |
 | `checkins` | Sim | Só são acrescentados, e ajuste é valor negativo. A exceção são as compensações concorrentes: vale a mais recente |
 | Exclusão de meta | Sim | Vence qualquer edição e apaga os registros da meta |
+| `tags` | Sim | Vence o `updated_at` mais novo; exclusão é campo do conteúdo (`Tags_v1.md` §4.4). Formato 3 |
+| `goal_tags` | Sim | Vence o `updated_at` mais novo; exclusão é campo do conteúdo (`RemovedAt`). Formato 3 |
 | `reminder_log`, `settings`, `active_timer` | Não | Pertencem ao aparelho |
 
 **Consequências aceitas:**
@@ -90,7 +92,7 @@ Migração `006_sync_engine.sql`:
 - Linha que não converte vai para o Trace e não trava a sincronização, como no `RowReader`.
 - Registro que não pode ser lido mantém a cópia local: o `seq` dele e o `base_seq` da fila avançam, e ele continua confirmado.
 - Versão de formato desconhecida pausa a sincronização, com o aviso "atualize o app". `last_seq` não avança e nada se perde.
-- Desde os segundos nas metas de tempo (`Segundos_nas_metas_de_tempo_v1.md`), o app grava o formato 2 e lê os formatos 1 e 2. O formato 1 guarda minutos: o leitor multiplica por 60 nas metas de duração e nos registros delas, inclusive os que esperam a meta em `sync_pending`. Versão fora de 1–2 continua pausando com "atualize o app".
+- Desde os segundos nas metas de tempo (`Segundos_nas_metas_de_tempo_v1.md`), o app grava o formato 2 e lê os formatos 1 e 2. O formato 1 guarda minutos: o leitor multiplica por 60 nas metas de duração e nos registros delas, inclusive os que esperam a meta em `sync_pending`. Versão fora de 1–2 continua pausando com "atualize o app". Desde as tags (`Tags_v1.md`), o app grava o formato 3 e lê os formatos 1 a 3: a meta e o registro têm o mesmo conteúdo do formato 2, e o formato 3 só acrescenta os tipos `tag` e `goal_tag`. Versão fora de 1–3 pausa com o mesmo aviso.
 - Um `DataChangeNotifier.Defer` agrupa a página num único aviso.
 - Dados aplicados não voltam para a fila (inclusive a exclusão recebida, que usa o caminho sem fila).
 

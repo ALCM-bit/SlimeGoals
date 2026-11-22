@@ -31,13 +31,15 @@ public class PomodoroViewModelTests
     }
 
     private GoalService GoalService => new(_goals, _checkins, _timers, _time);
+    private readonly InMemoryTagRepository _tagRepo = new();
+    private TagService Tags => new(_tagRepo, _goals, _time);
     private CheckinService Checkins => new(_goals, _checkins, _time);
     private TimerService Timers => new(_goals, _timers, Checkins, _time, _changes, _sessions);
     private FocusService Focus => new(_goals, _sessions, _timers, Checkins, new AppSettings(_settings), _time, _changes);
 
     private async Task<PomodoroViewModel> Loaded()
     {
-        var vm = new PomodoroViewModel(Focus, GoalService, _time, _changes, _navigator);
+        var vm = new PomodoroViewModel(Focus, GoalService, Tags, _time, _changes, _navigator);
         await vm.LoadAsync();
         return vm;
     }
@@ -260,7 +262,7 @@ public class PomodoroViewModelTests
     [Fact]
     public async Task Time_page_has_the_pomodoro_tab_and_loads_on_activate()
     {
-        var pomodoro = new PomodoroViewModel(Focus, GoalService, _time, _changes, _navigator);
+        var pomodoro = new PomodoroViewModel(Focus, GoalService, Tags, _time, _changes, _navigator);
         var page = new TimePageViewModel(pomodoro);
 
         (page.Title, page.IconKey, page.ShortTitle).Should().Be(("Tempo", "NavTime", "Tempo"));
@@ -278,7 +280,7 @@ public class PomodoroViewModelTests
     {
         var alert = new FakeAlert();
         var alerts = new FocusAlerts(Focus, _sessions, new NoAlarm(), alert, _time, _changes);
-        var page = new TimePageViewModel(new PomodoroViewModel(Focus, GoalService, _time, _changes), alerts);
+        var page = new TimePageViewModel(new PomodoroViewModel(Focus, GoalService, Tags, _time, _changes), alerts);
 
         page.Activate();
 
@@ -290,7 +292,7 @@ public class PomodoroViewModelTests
     {
         var alert = new FakeAlert();
         var alerts = new FocusAlerts(Focus, _sessions, new NoAlarm(), alert, _time, _changes);
-        var page = new TimePageViewModel(new PomodoroViewModel(Focus, GoalService, _time, _changes), alerts);
+        var page = new TimePageViewModel(new PomodoroViewModel(Focus, GoalService, Tags, _time, _changes), alerts);
 
         page.Resume();
 
@@ -749,6 +751,26 @@ public class PomodoroViewModelTests
     }
 
     [Fact]
+    public async Task Goal_editor_drops_a_selected_tag_deleted_by_a_sync()
+    {
+        await Tags.CreateAsync("tarefas");
+        await Focus.StartAsync(new FocusPlan([F(25)], 1), null);
+        _time.Advance(TimeSpan.FromMinutes(25));
+        await Focus.AdvanceAsync();
+        var vm = await Loaded();
+        vm.CreateGoalCommand.Execute(null);
+        var editor = vm.Editor!;
+        await editor.Tags.ReloadCommand.ExecuteAsync(null);
+        editor.Tags.ToggleCommand.Execute(editor.Tags.Chips.Single());
+
+        await Tags.DeleteAsync("tarefas"); // a exclusão chega de outro aparelho
+        _changes.NotifyChanged();
+
+        editor.Tags.SelectedNames.Should().BeEmpty();
+        editor.Tags.Chips.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Back_closes_what_is_open_over_the_session()
     {
         var vm = await Running(new FocusPlan([F(25), B(5)], 1));
@@ -774,7 +796,7 @@ public class PomodoroViewModelTests
         var held = new HeldSessions(_sessions);
         var focus = new FocusService(_goals, held, _timers, Checkins, new AppSettings(_settings), _time, _changes);
         await focus.StartAsync(new FocusPlan([F(25), B(5), F(25)], 1), null);
-        var vm = new PomodoroViewModel(focus, GoalService, _time, _changes, _navigator);
+        var vm = new PomodoroViewModel(focus, GoalService, Tags, _time, _changes, _navigator);
         await vm.LoadAsync();
         _time.Advance(TimeSpan.FromMinutes(25));
 

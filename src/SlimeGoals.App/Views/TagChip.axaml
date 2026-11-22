@@ -1,0 +1,70 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SlimeGoals.App.ViewModels"
+             xmlns:conv="using:SlimeGoals.App.Converters"
+             x:Class="SlimeGoals.App.Views.TagChip"
+             x:DataType="vm:TagChipViewModel">
+  <UserControl.Styles>
+    <!-- Tamanho normal e o pequeno (classe "small", nos cartões do Hoje). Valores em estilo, e não locais, para o small valer -->
+    <Style Selector="Border.tag-chip">
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Padding" Value="12,0" />
+    </Style>
+    <Style Selector="StackPanel.tag-chip-content">
+      <Setter Property="Spacing" Value="8" />
+    </Style>
+    <Style Selector="TextBlock.tag-chip-name">
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style Selector="TextBlock.tag-chip-count">
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector=":is(UserControl).small Border.tag-chip">
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="Padding" Value="9,0" />
+    </Style>
+    <Style Selector=":is(UserControl).small StackPanel.tag-chip-content">
+      <Setter Property="Spacing" Value="6" />
+    </Style>
+    <Style Selector=":is(UserControl).small TextBlock.tag-chip-name">
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector=":is(UserControl).small TextBlock.tag-chip-count">
+      <Setter Property="FontSize" Value="11" />
+    </Style>
+  </UserControl.Styles>
+  <UserControl.Resources>
+    <conv:TagChipBrushConverter x:Key="ChipBrush" />
+  </UserControl.Resources>
+  <!-- Chip de tag: ponto + nome (+ contagem). Marcado, ganha o fundo e a borda da cor da tag. -->
+  <Button Classes="tag-chip" Click="OnClick" AutomationProperties.Name="{Binding Name}">
+    <Border Classes="tag-chip" BorderThickness="1" CornerRadius="999">
+      <Border.Background>
+        <MultiBinding Converter="{StaticResource ChipBrush}" ConverterParameter="Back">
+          <Binding Path="IsSelected" />
+          <Binding Path="Color" />
+        </MultiBinding>
+      </Border.Background>
+      <Border.BorderBrush>
+        <MultiBinding Converter="{StaticResource ChipBrush}" ConverterParameter="Line">
+          <Binding Path="IsSelected" />
+          <Binding Path="Color" />
+        </MultiBinding>
+      </Border.BorderBrush>
+      <StackPanel Classes="tag-chip-content" Orientation="Horizontal" VerticalAlignment="Center">
+        <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                 Fill="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
+        <TextBlock Classes="tag-chip-name" Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center">
+          <TextBlock.Foreground>
+            <MultiBinding Converter="{StaticResource ChipBrush}" ConverterParameter="Text">
+              <Binding Path="IsSelected" />
+              <Binding Path="Color" />
+            </MultiBinding>
+          </TextBlock.Foreground>
+        </TextBlock>
+        <TextBlock Classes="tag-chip-count" Text="{Binding Count}" Foreground="{DynamicResource Muted}" VerticalAlignment="Center"
+                   IsVisible="{Binding Count, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
+    </Border>
+  </Button>
+</UserControl>

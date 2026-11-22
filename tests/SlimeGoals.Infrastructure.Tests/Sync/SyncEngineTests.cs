@@ -380,7 +380,7 @@ public class SyncEngineTests : IDisposable
 
         var record = _server.Records.Should().ContainSingle().Subject;
         var envelope = _crypto.Open(record.RecordKey, record.Blob!);
-        envelope.Should().Be(new SyncEnvelope(2, SyncRecordKind.Goal, goal.Id, Me, envelope.Payload));
+        envelope.Should().Be(new SyncEnvelope(3, SyncRecordKind.Goal, goal.Id, Me, envelope.Payload));
         SyncCodec.DecodeGoal(envelope.Payload, envelope.Version).Id.Should().Be(goal.Id);
     }
 

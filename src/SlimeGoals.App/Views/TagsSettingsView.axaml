@@ -1,0 +1,135 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SlimeGoals.App.ViewModels"
+             xmlns:domain="using:SlimeGoals.Core.Domain"
+             xmlns:views="using:SlimeGoals.App.Views"
+             x:Class="SlimeGoals.App.Views.TagsSettingsView"
+             x:DataType="vm:TagsSettingsViewModel">
+  <!-- Configurações › Tags (spec Tags §4.7). O título "Tags" vem da página; aqui, o botão, o campo de nova tag e as linhas. -->
+  <views:FillWidthStackPanel Spacing="10">
+    <Button Classes="ghost" Content="+ Nova tag" HorizontalAlignment="Right" MinHeight="44"
+            Command="{Binding BeginCreateCommand}" IsVisible="{Binding !IsCreating}" />
+
+    <!-- Nova tag: o campo com ✓ e ✕, no topo da lista -->
+    <Border Classes="card" IsVisible="{Binding IsCreating}">
+      <StackPanel Spacing="8">
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+          <TextBox Text="{Binding NewName}" MaxLength="{x:Static domain:TagName.MaxLength}" PlaceholderText="Nova tag…"
+                   MinHeight="44" VerticalContentAlignment="Center" AutomationProperties.Name="Nova tag">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter" Command="{Binding ConfirmCreateCommand}" />
+              <KeyBinding Gesture="Escape" Command="{Binding CancelCreateCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
+          <Button Grid.Column="1" Classes="primary icon" AutomationProperties.Name="Criar tag" ToolTip.Tip="Criar tag"
+                  Command="{Binding ConfirmCreateCommand}">
+            <Path Classes="btn-icon" Data="{StaticResource IconCheck}" />
+          </Button>
+          <Button Grid.Column="2" Classes="ghost icon" AutomationProperties.Name="Cancelar" ToolTip.Tip="Cancelar"
+                  Command="{Binding CancelCreateCommand}">
+            <Path Classes="btn-icon" Data="{StaticResource IconX}" />
+          </Button>
+        </Grid>
+        <TextBlock Classes="field-error" Text="{Binding NewNameError}" IsVisible="{Binding HasNewNameError}" />
+      </StackPanel>
+    </Border>
+
+    <Border Classes="card" IsVisible="{Binding IsEmpty}">
+      <TextBlock Text="{Binding EmptyMessage}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+    </Border>
+
+    <ItemsControl ItemsSource="{Binding Rows}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <StackPanel Spacing="10" />
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:TagRowViewModel">
+          <Border x:Name="RowRoot" Classes="card" Padding="12,8">
+            <StackPanel Spacing="8">
+
+              <!-- Em repouso: ponto de cor (abre as cores), nome e uso, ✎ e 🗑 -->
+              <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="4" IsVisible="{Binding IsIdle}">
+                <Button Classes="ghost icon" AutomationProperties.Name="Cor da tag" ToolTip.Tip="Cor da tag"
+                        Command="{Binding TogglePickerCommand}">
+                  <Ellipse Width="16" Height="16" Fill="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
+                </Button>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="4,0">
+                  <TextBlock Classes="nav-row-title" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Classes="nav-row-summary" Text="{Binding UsageText}" />
+                </StackPanel>
+                <Button Grid.Column="2" Classes="ghost icon" AutomationProperties.Name="Renomear" ToolTip.Tip="Renomear"
+                        Command="{Binding BeginEditCommand}">
+                  <Path Classes="btn-icon" Data="{StaticResource IconPencil}" />
+                </Button>
+                <Button Grid.Column="3" Classes="ghost icon danger" AutomationProperties.Name="Excluir" ToolTip.Tip="Excluir"
+                        Command="{Binding BeginDeleteCommand}">
+                  <Path Classes="btn-icon" Data="{StaticResource IconTrash}" />
+                </Button>
+              </Grid>
+
+              <!-- As quatro cores: gravam ao escolher -->
+              <ItemsControl ItemsSource="{Binding Colors}" IsVisible="{Binding IsPickingColor}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="8" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ColorOption">
+                    <Button Classes="ghost icon" AutomationProperties.Name="{Binding Name}" ToolTip.Tip="{Binding Name}"
+                            Command="{Binding #RowRoot.((vm:TagRowViewModel)DataContext).PickColorCommand}"
+                            CommandParameter="{Binding Color}">
+                      <Ellipse Width="28" Height="28" Fill="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <!-- Renomear: o campo com ✓ e ✕ (padrão do campo da tarefa no Hoje) -->
+              <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsEditing}">
+                <Ellipse Width="16" Height="16" Margin="14,0,6,0"
+                         Fill="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
+                <TextBox Grid.Column="1" Text="{Binding EditText}" MaxLength="{x:Static domain:TagName.MaxLength}"
+                         MinHeight="44" VerticalContentAlignment="Center" AutomationProperties.Name="Nome da tag">
+                  <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding ConfirmEditCommand}" />
+                    <KeyBinding Gesture="Escape" Command="{Binding CancelEditCommand}" />
+                  </TextBox.KeyBindings>
+                </TextBox>
+                <Button Grid.Column="2" Classes="primary icon" AutomationProperties.Name="Confirmar nome" ToolTip.Tip="Confirmar nome"
+                        Command="{Binding ConfirmEditCommand}">
+                  <Path Classes="btn-icon" Data="{StaticResource IconCheck}" />
+                </Button>
+                <Button Grid.Column="3" Classes="ghost icon" AutomationProperties.Name="Cancelar edição" ToolTip.Tip="Cancelar edição"
+                        Command="{Binding CancelEditCommand}">
+                  <Path Classes="btn-icon" Data="{StaticResource IconX}" />
+                </Button>
+              </Grid>
+              <TextBlock Classes="field-error" Text="{Binding EditError}" IsVisible="{Binding HasEditError}" Margin="4,0" />
+
+              <!-- Juntar com uma tag que já existe -->
+              <StackPanel Spacing="8" IsVisible="{Binding IsConfirmingMerge}" Margin="4,0">
+                <TextBlock Text="{Binding MergeQuestion}" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                  <Button Classes="ghost" Content="Cancelar" Command="{Binding CancelMergeCommand}" />
+                  <Button Classes="primary" Content="Juntar" Command="{Binding ConfirmMergeCommand}" />
+                </StackPanel>
+              </StackPanel>
+
+              <!-- Excluir -->
+              <StackPanel Spacing="8" IsVisible="{Binding IsConfirmingDelete}" Margin="4,0">
+                <TextBlock Text="{Binding DeleteQuestion}" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                  <Button Classes="ghost" Content="Cancelar" Command="{Binding CancelDeleteCommand}" />
+                  <Button Classes="danger-solid" Content="Excluir" Command="{Binding ConfirmDeleteCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </views:FillWidthStackPanel>
+</UserControl>

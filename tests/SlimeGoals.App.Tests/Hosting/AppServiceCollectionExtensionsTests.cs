@@ -69,11 +69,13 @@ public class AppServiceCollectionExtensionsTests
         var checkins = new InMemoryCheckinRepository();
         var timers = new InMemoryTimerRepository(checkins);
         var log = new InMemoryReminderLogRepository();
+        var tags = new InMemoryTagRepository();
         return new ServiceCollection()
             .AddSingleton<ICheckinRepository>(checkins)
             .AddSingleton<ITimerRepository>(timers)
             .AddSingleton<IReminderLogRepository>(log)
-            .AddSingleton<IGoalRepository>(new InMemoryGoalRepository(checkins, log, timers))
+            .AddSingleton<ITagRepository>(tags)
+            .AddSingleton<IGoalRepository>(new InMemoryGoalRepository(checkins, log, timers, tags))
             .AddSingleton<IFocusSessionRepository>(new InMemoryFocusSessionRepository(checkins, timers))
             .AddSingleton<ISettingsRepository>(new InMemorySettingsRepository())
             .AddSingleton<INotificationService>(new FakeNotificationService())

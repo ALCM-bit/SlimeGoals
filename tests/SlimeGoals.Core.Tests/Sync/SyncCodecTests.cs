@@ -103,7 +103,7 @@ public class SyncCodecTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(3)]
+    [InlineData(4)]
     public void Goal_of_unreadable_version_throws_FormatException(int version)
     {
         var act = () => SyncCodec.DecodeGoal(SyncCodec.Encode(FullGoal()), version);
@@ -143,5 +143,53 @@ public class SyncCodecTests
         root.GetProperty("activeFrom").GetString().Should().Be("08:05");
         root.GetProperty("activeUntil").GetString().Should().Be("21:45");
         root.GetProperty("createdAt").GetString().Should().Be(T0.ToString("O"));
+    }
+
+    [Fact]
+    public void Tag_roundtrips()
+    {
+        var tag = new Tag { Id = TagIds.ForTag("saúde"), Name = "saúde", Color = GoalColor.Pink, UpdatedAt = T0, DeletedAt = T0.AddDays(1) };
+        SyncCodec.DecodeTag(SyncCodec.Encode(tag)).Should().BeEquivalentTo(tag);
+        var live = tag with { DeletedAt = null };
+        SyncCodec.DecodeTag(SyncCodec.Encode(live)).Should().BeEquivalentTo(live);
+    }
+
+    [Fact]
+    public void GoalTag_roundtrips()
+    {
+        var goalId = Guid.NewGuid();
+        var link = new GoalTag { Id = TagIds.ForLink(goalId, "estudos"), GoalId = goalId, TagName = "estudos", UpdatedAt = T0, RemovedAt = T0.AddHours(2) };
+        SyncCodec.DecodeGoalTag(SyncCodec.Encode(link)).Should().BeEquivalentTo(link);
+        var live = link with { RemovedAt = null };
+        SyncCodec.DecodeGoalTag(SyncCodec.Encode(live)).Should().BeEquivalentTo(live);
+    }
+
+    [Fact]
+    public void Tag_with_unnormalized_name_is_FormatException()
+    {
+        var json = SyncCodec.Encode(new Tag { Id = Guid.NewGuid(), Name = "Estudos", Color = GoalColor.Purple, UpdatedAt = T0 });
+        var link = SyncCodec.Encode(new GoalTag { Id = Guid.NewGuid(), GoalId = Guid.NewGuid(), TagName = "Estudos", UpdatedAt = T0 });
+        var empty = SyncCodec.Encode(new Tag { Id = Guid.NewGuid(), Name = "", Color = GoalColor.Purple, UpdatedAt = T0 });
+        var act1 = () => SyncCodec.DecodeTag(json);
+        var act2 = () => SyncCodec.DecodeGoalTag(link);
+        var act3 = () => SyncCodec.DecodeTag(empty);
+        act1.Should().Throw<FormatException>();
+        act2.Should().Throw<FormatException>();
+        act3.Should().Throw<FormatException>();
+    }
+
+    [Fact]
+    public void Goal_format_3_reads_like_format_2()
+    {
+        SyncCodec.FormatVersion.Should().Be(3);
+        var json = SyncCodec.Encode(FullGoal());
+        SyncCodec.DecodeGoal(json, 3).Should().BeEquivalentTo(SyncCodec.DecodeGoal(json, 2));
+    }
+
+    [Fact]
+    public void Format_4_is_unreadable()
+    {
+        var act = () => SyncCodec.DecodeGoal(SyncCodec.Encode(FullGoal()), 4);
+        act.Should().Throw<FormatException>();
     }
 }

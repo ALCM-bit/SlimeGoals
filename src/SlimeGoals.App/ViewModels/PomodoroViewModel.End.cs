@@ -75,7 +75,7 @@ public sealed partial class PomodoroViewModel
         if (!IsAwaitingDestination)
             return;
         GoalEditViewModel? editor = null;
-        editor = new GoalEditViewModel(_goals, null, measureLocked: true, saved => OnEditorClosed(editor!, saved),
+        editor = new GoalEditViewModel(_goals, _tags, null, measureLocked: true, saved => OnEditorClosed(editor!, saved),
             initialMeasure: Measure.Duration)
         {
             BackText = "← Tempo",
