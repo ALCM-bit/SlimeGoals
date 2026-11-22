@@ -9,7 +9,7 @@ namespace SlimeGoals.Testing;
 /// são os que <see cref="DeleteAsync"/> limpa junto, como a transação do banco.
 /// </summary>
 public sealed class InMemoryGoalRepository(InMemoryCheckinRepository? checkins = null, InMemoryReminderLogRepository? log = null,
-    InMemoryTimerRepository? timers = null) : IGoalRepository
+    InMemoryTimerRepository? timers = null, InMemoryTagRepository? tags = null) : IGoalRepository
 {
     private readonly Dictionary<Guid, Goal> _goals = new();
     private readonly HashSet<Guid> _unreadable = [];
@@ -31,6 +31,7 @@ public sealed class InMemoryGoalRepository(InMemoryCheckinRepository? checkins =
     {
         if (FailWritesWith is not null) throw FailWritesWith;
         _goals.Add(goal.Id, goal);
+        tags?.Apply(tagChanges);
         return Task.CompletedTask;
     }
 
@@ -41,6 +42,7 @@ public sealed class InMemoryGoalRepository(InMemoryCheckinRepository? checkins =
         if (FailWritesWith is not null) throw FailWritesWith;
         if (!_goals.ContainsKey(goal.Id)) throw new GoalNotFoundException(goal.Id);
         _goals[goal.Id] = goal;
+        tags?.Apply(tagChanges);
         return Task.CompletedTask;
     }
 
@@ -58,11 +60,13 @@ public sealed class InMemoryGoalRepository(InMemoryCheckinRepository? checkins =
     {
         if (_unreadable.Contains(id))
             throw new FormatException($"Linha inválida: {id}.");
-        return FailReadsWith is not null ? throw FailReadsWith : Task.FromResult(_goals.TryGetValue(id, out var g) && g.DeletedAt is null ? g : null);
+        return FailReadsWith is not null ? throw FailReadsWith : Task.FromResult(_goals.TryGetValue(id, out var g) && g.DeletedAt is null ? WithTags(g) : null);
     }
 
     public Task<IReadOnlyList<Goal>> ListAsync(bool includeArchived, CancellationToken ct = default) =>
         FailReadsWith is not null ? throw FailReadsWith : Task.FromResult<IReadOnlyList<Goal>>(_goals.Values
             .Where(g => g.DeletedAt is null && !_unreadable.Contains(g.Id) && (includeArchived || g.ArchivedAt is null))
-            .OrderBy(g => g.CreatedAt).ToList());
+            .OrderBy(g => g.CreatedAt).Select(WithTags).ToList());
+
+    private Goal WithTags(Goal goal) => tags is null ? goal : goal with { Tags = tags.NamesFor(goal.Id) };
 }

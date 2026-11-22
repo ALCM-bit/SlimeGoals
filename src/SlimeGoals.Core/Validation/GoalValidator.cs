@@ -45,6 +45,10 @@ public static class GoalValidator
         if (string.IsNullOrWhiteSpace(draft.Icon))
             Add(nameof(GoalDraft.Icon), "Escolha um ícone.");
 
+        foreach (var tag in draft.Tags ?? [])
+            if (TagName.Validate(TagName.Normalize(tag)) is { } tagError)
+                Add(nameof(GoalDraft.Tags), tagError);
+
         return errors;
     }
 
