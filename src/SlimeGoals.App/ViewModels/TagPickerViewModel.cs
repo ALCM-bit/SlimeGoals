@@ -30,7 +30,8 @@ public sealed partial class TagChipViewModel(string name, GoalColor color, bool 
 /// <remarks>
 /// A seleção é a base (as tags da meta no banco) mais o que a pessoa marcou e menos o que desmarcou nesta edição. A cada
 /// recarga a base é relida: uma tag renomeada ou juntada em Configurações, ou excluída por uma sincronização, chega com o
-/// nome de agora, e o que a pessoa mexeu continua valendo.
+/// nome de agora. O que a pessoa marcou ou desmarcou vai junto para o nome novo (pelo registro de renomeações do
+/// <see cref="TagService"/>).
 /// </remarks>
 public sealed partial class TagPickerViewModel : ObservableObject
 {
@@ -50,6 +51,9 @@ public sealed partial class TagPickerViewModel : ObservableObject
     private HashSet<string> _known = new(StringComparer.Ordinal);
     private int _version;
 
+    /// <summary>Até onde o registro de renomeações do <see cref="TagService"/> já foi aplicado.</summary>
+    private int _renameMark;
+
     /// <param name="initial">As tags da meta ao abrir o editor.</param>
     /// <param name="readBase">Relê as tags da meta no banco (nulo: a meta sumiu, fica a base de antes). Sem ele (meta
     /// nova), a base é <paramref name="initial"/>, e só perde as tags excluídas.</param>
@@ -58,6 +62,7 @@ public sealed partial class TagPickerViewModel : ObservableObject
     {
         _service = service;
         _readBase = readBase;
+        _renameMark = service.RenameMark;
         _base = initial.ToHashSet(StringComparer.Ordinal);
         // Antes da primeira leitura, os nomes da meta já aparecem marcados (em Purple): salvar cedo não os perde.
         foreach (var name in initial.Distinct(StringComparer.Ordinal))
@@ -100,6 +105,10 @@ public sealed partial class TagPickerViewModel : ObservableObject
             return;
 
         var visible = list.Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
+        var (renames, mark) = _service.RenamesSince(_renameMark);
+        _renameMark = mark;
+        foreach (var rename in renames)
+            Carry(rename);
         bool Deleted(string name) => _known.Contains(name) && !visible.Contains(name);
         if (fresh is not null)
             _base = fresh.ToHashSet(StringComparer.Ordinal);
@@ -167,6 +176,25 @@ public sealed partial class TagPickerViewModel : ObservableObject
         Remember(name, selected: true);
         NewName = "";
         await ReloadAsync(ct); // a tag nova chega com a cor dela
+    }
+
+    /// <summary>
+    /// Leva ao nome novo o que a pessoa fez com o antigo nesta edição. Marcada continua marcada (numa junção, a tag de
+    /// destino fica marcada). Desmarcada continua desmarcada só numa renomeação simples: numa junção, desmarcar a antiga
+    /// não tira uma tag que a meta já tinha.
+    /// </summary>
+    private void Carry(TagRename rename)
+    {
+        var (from, to) = (rename.OldName, rename.NewName);
+        var wasAdded = _added.Remove(from);
+        var wasRemoved = _removed.Remove(from);
+        if (wasAdded)
+        {
+            _removed.Remove(to);
+            _added.Add(to);
+        }
+        else if (wasRemoved && !_known.Contains(to) && !_added.Contains(to))
+            _removed.Add(to);
     }
 
     private void Remember(string name, bool selected)

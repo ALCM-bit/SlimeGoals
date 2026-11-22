@@ -13,6 +13,29 @@ public sealed class TagService(ITagRepository tags, IGoalRepository goals, TimeP
 {
     private static readonly GoalColor[] Palette = [GoalColor.Purple, GoalColor.Pink, GoalColor.Amber, GoalColor.Green];
 
+    private readonly Lock _renamesLock = new();
+    private readonly List<TagRename> _renames = [];
+
+    /// <summary>A posição atual do registro de renomeações: quem guarda a marca lê depois só as que vieram em seguida.</summary>
+    public int RenameMark
+    {
+        get
+        {
+            lock (_renamesLock)
+                return _renames.Count;
+        }
+    }
+
+    /// <summary>
+    /// As renomeações feitas neste aparelho desde <paramref name="mark"/>, na ordem, e a marca nova. O quadro de tags da
+    /// meta usa para levar o que a pessoa marcou ou desmarcou ao nome novo.
+    /// </summary>
+    public (IReadOnlyList<TagRename> Renames, int Mark) RenamesSince(int mark)
+    {
+        lock (_renamesLock)
+            return ([.. _renames.Skip(mark)], _renames.Count);
+    }
+
     /// <summary>As tags visíveis em ordem ordinal, com as contagens de metas ativas e arquivadas.</summary>
     public async Task<IReadOnlyList<TagSummary>> ListAsync(CancellationToken ct = default)
     {
@@ -114,6 +137,8 @@ public sealed class TagService(ITagRepository tags, IGoalRepository goals, TimeP
         }
 
         await SaveAsync(new TagChanges(changedTags, changedLinks), ct);
+        lock (_renamesLock)
+            _renames.Add(new TagRename(oldNormalized, newName));
     }
 
     /// <summary>Exclui a tag e tira as ligações dela, de metas ativas e arquivadas, no mesmo instante.</summary>

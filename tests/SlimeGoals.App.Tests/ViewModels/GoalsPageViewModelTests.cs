@@ -405,6 +405,22 @@ public class GoalsPageViewModelTests
     }
 
     [Fact]
+    public async Task Save_rereads_the_tags_so_a_deletion_just_applied_by_a_sync_does_not_come_back()
+    {
+        var goal = await Create("Ler", tags: ["tarefas", "casa"]);
+        var editor = await EditOnlyGoal();
+
+        // A sincronização acabou de gravar a exclusão, e o aviso ainda não chegou ao editor.
+        await _tags.DeleteAsync("tarefas");
+        editor.Tags.SelectedNames.Should().Contain("tarefas");
+
+        editor.Title = "Ler mais";
+        await editor.SaveCommand.ExecuteAsync(null);
+        (await _service.GetAsync(goal.Id))!.Tags.Should().Equal("casa");
+        (await _tags.ListAsync()).Select(t => t.Name).Should().Equal("casa");
+    }
+
+    [Fact]
     public async Task Closed_editor_and_hidden_page_stop_listening_to_changes()
     {
         await Create("Ler", tags: "casa");

@@ -44,7 +44,7 @@ Os dois *heads* também referenciam o Core direto; as setas foram omitidas para 
 ```
 src/
   SlimeGoals.Core/
-    Domain/                 metas, medidas, períodos, registros, cronômetro e sessão de foco; tags (TagName, TagIds, Tag, GoalTag, DefaultTags, TagVisibility, TagChanges, TagSummary)
+    Domain/                 metas, medidas, períodos, registros, cronômetro e sessão de foco; tags (TagName, TagIds, Tag, GoalTag, DefaultTags, TagVisibility, TagChanges, TagSummary, TagRename)
     Services/               casos de uso: GoalService, CheckinService, TimerService, FocusService, ReminderService, TagService…
     Validation/             validação do rascunho de meta
     Abstractions/           portas: repositórios (inclusive ITagRepository), notificações, agendador, relógio, cofre…

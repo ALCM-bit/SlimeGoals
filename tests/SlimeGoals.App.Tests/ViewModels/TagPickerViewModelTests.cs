@@ -193,4 +193,65 @@ public class TagPickerViewModelTests
 
         vm.SelectedNames.Should().Equal("casa");
     }
+
+    [Fact]
+    public async Task Tag_ticked_in_this_edit_and_renamed_in_settings_stays_ticked_with_the_new_name()
+    {
+        var vm = await Loaded();
+        vm.NewName = "saúde";
+        await vm.CreateCommand.ExecuteAsync(null);
+
+        await _service.RenameAsync("saúde", "bem-estar");
+        await vm.ReloadCommand.ExecuteAsync(null);
+
+        vm.SelectedNames.Should().Equal("bem-estar");
+    }
+
+    [Fact]
+    public async Task Tag_ticked_in_this_edit_and_merged_in_settings_ticks_the_target()
+    {
+        await _service.CreateAsync("estudos");
+        var vm = await Loaded();
+        vm.NewName = "leitura";
+        await vm.CreateCommand.ExecuteAsync(null);
+
+        await _service.RenameAsync("leitura", "estudos");
+        await vm.ReloadCommand.ExecuteAsync(null);
+
+        vm.SelectedNames.Should().Equal("estudos");
+    }
+
+    [Fact]
+    public async Task Tag_unticked_and_renamed_in_settings_stays_unticked()
+    {
+        await _service.CreateAsync("saúde");
+        IReadOnlyList<string> stored = ["saúde"];
+        var vm = new TagPickerViewModel(_service, stored, _ => Task.FromResult<IReadOnlyList<string>?>(stored));
+        await vm.ReloadCommand.ExecuteAsync(null);
+        vm.ToggleCommand.Execute(vm.Chips.Single());
+
+        await _service.RenameAsync("saúde", "bem-estar");
+        stored = ["bem-estar"]; // a meta acompanha a renomeação no banco
+        await vm.ReloadCommand.ExecuteAsync(null);
+
+        vm.SelectedNames.Should().BeEmpty();
+        vm.Chips.Select(c => c.Name).Should().Equal("bem-estar");
+    }
+
+    [Fact]
+    public async Task Tag_unticked_and_merged_into_a_tag_the_goal_has_keeps_the_target()
+    {
+        await _service.CreateAsync("saúde");
+        await _service.CreateAsync("estudos");
+        IReadOnlyList<string> stored = ["estudos", "saúde"];
+        var vm = new TagPickerViewModel(_service, stored, _ => Task.FromResult<IReadOnlyList<string>?>(stored));
+        await vm.ReloadCommand.ExecuteAsync(null);
+        vm.ToggleCommand.Execute(vm.Chips.Single(c => c.Name == "saúde"));
+
+        await _service.RenameAsync("saúde", "estudos");
+        stored = ["estudos"];
+        await vm.ReloadCommand.ExecuteAsync(null);
+
+        vm.SelectedNames.Should().Equal(["estudos"], "a meta já tinha estudos, e desmarcar saúde não tira estudos");
+    }
 }
