@@ -123,7 +123,7 @@ Fora da meta, a pessoa pode **trocar a cor**, **renomear** e **excluir** uma tag
   - A cor de uma tag nova é a primeira da paleta (Purple → Pink → Amber → Green) que ainda não está em uso. Se todas estão em uso, usa a da posição `quantidade de tags ativas mod 4`.
 - **TrocarCor(nome, cor).**
 - **Renomear(antigo, novo):** numa transação só:
-  1. cria ou reativa a tag nova, com a cor da antiga se for nova;
+  1. cria ou reativa a tag nova, com a cor da antiga se for nova ou estava excluída;
   2. para cada ligação ativa da antiga, grava `RemovedAt` nela e cria ou reativa a ligação da mesma meta com o nome novo;
   3. exclui a antiga.
 
@@ -159,8 +159,9 @@ Fica logo depois de "Cor" (escolha do autor: o modelo C, um quadro próprio).
   - O erro aparece abaixo do campo, como nos outros campos da página.
 - **"Gerenciar tags ›"** abre Configurações › Tags. *Decisão minha:* o formulário da meta não é perdido.
   - Voltar dessa tela retorna à página da meta com o que já estava preenchido.
-  - As mudanças de cor e de nome feitas lá já aparecem nos chips.
+  - As mudanças de cor e de nome feitas lá já aparecem nos chips. Uma tag marcada que foi renomeada ou juntada lá continua marcada, com o nome novo.
   - Se uma tag marcada no formulário for excluída lá, ela sai da seleção.
+  - *Decisão da revisão final:* com o formulário aberto, uma exclusão que chega pela sincronização também tira a tag da seleção, e salvar não a traz de volta (§4.4.3).
 
 ### 4.7 Configurações › Tags
 
@@ -248,6 +249,7 @@ Roteiro no desktop, sempre com `XDG_DATA_HOME=/tmp/slimegoals-dev/data XDG_CONFI
 - [ ] Em Configurações › Tags, renomear "saúde" para "estudos": o app pergunta se junta, e as metas das duas ficam com "estudos".
 - [ ] Excluir "tarefas": a confirmação diz em quantas metas ela está, e a tag some das metas e do Hoje.
 - [ ] Voltar da tela de tags para a página de uma meta aberta: o que estava digitado continua lá.
+- [ ] Gerenciar tags › renomear a tag marcada › voltar › Salvar: a meta mantém a tag com o nome novo.
 
 Conferência no emulador (`slimegoals-api36`, sempre com `-s emulator-5554`), com a conta de teste no servidor de desenvolvimento:
 
