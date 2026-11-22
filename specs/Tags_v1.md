@@ -134,7 +134,7 @@ Fora da meta, a pessoa pode **trocar a cor**, **renomear** e **excluir** uma tag
 - **Listar:** as tags visíveis (§4.4.5), em ordem alfabética, com a contagem de metas não excluídas que as usam. Arquivadas contam (*Decisão minha*). O texto mostra as arquivadas à parte: "usada em 3 metas (1 arquivada)".
 - **Salvar uma meta** (`GoalService`, na mesma transação da meta):
   - cria as ligações novas e grava `RemovedAt` nas que saíram;
-  - cria pela regra de "Criar" só as tags **digitadas em "Nova tag"** que ainda não existem.
+  - cria pela regra de "Criar" as tags que entram na meta agora e não estão visíveis (por exemplo, uma excluída por outro aparelho depois de marcada). O quadro da meta já grava as tags digitadas em "Nova tag" (§4.6).
 
   Uma tag que a meta já tinha e que ainda não chegou ao aparelho fica só como ligação, sem linha em `tags`. Gravar uma linha nova com a data de agora venceria a tag verdadeira que ainda está a caminho. *Decisão minha.*
 
@@ -153,9 +153,10 @@ Fica logo depois de "Cor" (escolha do autor: o modelo C, um quadro próprio).
   - Tocar marca ou desmarca.
   - A tag marcada fica com o fundo e a borda da cor dela. A desmarcada fica neutra, com um ponto da cor dela.
   - Os chips quebram linha.
-- **"Nova tag…" + Criar (ou Enter):** valida o nome (§4.1) e põe a tag na lista **já marcada**.
-  - *Decisão minha:* a tag só é gravada ao **salvar a meta**. Cancelar a meta não deixa tag sobrando.
-  - Se o nome já existe, a tag existente é marcada.
+- **"Nova tag…" + Criar (ou Enter):** valida o nome (§4.1), **grava a tag no catálogo na hora** (a regra de "Criar" do §4.5) e a põe na lista **já marcada**, com a cor dela.
+  - *Decisão do autor (22/11):* a tag já aparece em "Gerenciar tags ›" e nos outros aparelhos antes de salvar a meta. Cancelar a meta deixa a tag no catálogo, sem meta, e ela pode ser excluída em Configurações › Tags. A ligação com a meta só é gravada ao salvar.
+  - Se o nome já está nos chips, a tag é só marcada, sem gravar: uma tag que ainda está a caminho não ganha linha nova.
+  - Se a gravação falha, aparece "Não foi possível salvar a tag." abaixo do campo, e o nome digitado fica.
   - O erro aparece abaixo do campo, como nos outros campos da página.
 - **"Gerenciar tags ›"** abre Configurações › Tags. *Decisão minha:* o formulário da meta não é perdido.
   - Voltar dessa tela retorna à página da meta com o que já estava preenchido.
@@ -244,7 +245,7 @@ Metas de hoje                                 [Pausar lembretes]
 
 Roteiro no desktop, sempre com `XDG_DATA_HOME=/tmp/slimegoals-dev/data XDG_CONFIG_HOME=/tmp/slimegoals-dev/config dotnet run --project src/SlimeGoals.Desktop`:
 
-- [ ] Criar uma meta com a tag "saúde" (digitada no quadro da meta).
+- [ ] Criar uma meta com a tag "saúde" (digitada no quadro da meta). Antes de salvar, "Gerenciar tags ›" já mostra "saúde"; voltar mantém a tag marcada.
 - [ ] No Hoje, filtrar por "saúde": a lista mostra só as metas com ela, "x de y metas" e "✕ Limpar" aparecem; limpar volta tudo.
 - [ ] Em Configurações › Tags, renomear "saúde" para "estudos": o app pergunta se junta, e as metas das duas ficam com "estudos".
 - [ ] Excluir "tarefas": a confirmação diz em quantas metas ela está, e a tag some das metas e do Hoje.
