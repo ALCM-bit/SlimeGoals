@@ -1233,7 +1233,7 @@ public class SyncApplyTests : IDisposable
     }
 
     [Fact]
-    public async Task Remote_tag_deletion_only_forgets_the_mapping()
+    public async Task Remote_tag_deletion_keeps_the_local_copy_mapped_at_the_deletion_seq()
     {
         var tag = NewTag("leitura");
         await ApplyAsync(1, In(tag, 1));
@@ -1242,8 +1242,25 @@ public class SyncApplyTests : IDisposable
 
         deleted.Should().BeEmpty();
         (await TagAsync("leitura")).Should().Be(tag);
-        Record(tag.Id).Should().BeNull();
+        Record(tag.Id).Should().Be(new RecordLine(2, Key(tag.Id), "tag", 1));
         Count("sync_outbox").Should().Be(0);
+
+        // A próxima edição local vai para o servidor com a base da marca, e não como registro novo.
+        await Tags.SaveAsync(new TagChanges([tag with { Color = GoalColor.Pink, UpdatedAt = T0.AddMinutes(5) }], []));
+        QueueRow(tag.Id).Should().Be(new QueueLine("upsert", 2, "tag"));
+    }
+
+    [Fact]
+    public async Task Remote_tag_deletion_gives_a_queued_edit_the_deletion_seq()
+    {
+        var tag = NewTag("leitura");
+        await ApplyAsync(1, In(tag, 1));
+        await Tags.SaveAsync(new TagChanges([tag with { Color = GoalColor.Pink, UpdatedAt = T0.AddMinutes(5) }], []));
+
+        await ApplyAsync(4, Deleted(tag.Id, 4));
+
+        QueueRow(tag.Id).Should().Be(new QueueLine("upsert", 4, "tag"));
+        Record(tag.Id).Should().Be(new RecordLine(4, Key(tag.Id), "tag", 1));
     }
 
     [Fact]

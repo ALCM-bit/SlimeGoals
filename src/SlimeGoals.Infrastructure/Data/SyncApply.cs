@@ -55,7 +55,9 @@ internal sealed class SyncApply
         var deleted = await apply.ApplyGoalsAsync(records, deviceId);
         await apply.ApplyRecordsAsync(records, SyncOutbox.Checkin, (_, known) => apply.RemoveCheckinAsync(known.RecordId),
             apply.ApplyCheckinAsync);
-        await apply.ApplyRecordsAsync(records, SyncOutbox.Tag, apply.ForgetTagAsync, (r, e) => apply.ApplyTagAsync(r, e, deviceId));
+        // Tag não vira exclusão no servidor (Tags_v1 §4.4.4): se uma marca chegar, a linha local fica, mapeada no seq da
+        // marca, e a próxima edição (ou a que está na fila) vai com essa base.
+        await apply.ApplyRecordsAsync(records, SyncOutbox.Tag, apply.KeepLocalCopyAsync, (r, e) => apply.ApplyTagAsync(r, e, deviceId));
         await apply.ApplyRecordsAsync(records, SyncOutbox.GoalTag, (_, known) => apply.RemoveLinkAsync(known.RecordId),
             (r, e) => apply.ApplyLinkAsync(r, e, deviceId));
         await apply.RecalculateCompensationsAsync();
@@ -407,15 +409,6 @@ internal sealed class SyncApply
         DELETE FROM sync_outbox WHERE record_id = @Id;
         DELETE FROM sync_records WHERE record_id = @Id;
         """, new { Id = recordId });
-
-    /// <summary>
-    /// Tag não vira exclusão no servidor (Tags_v1 §4.4.4): se uma chegar, a linha local fica e só sai do mapa. A edição na
-    /// fila ganha a base da marca, senão daria conflito em todo ciclo.
-    /// </summary>
-    private Task<int> ForgetTagAsync(IncomingRecord record, KnownRecord known) => RunAsync("""
-        DELETE FROM sync_records WHERE record_id = @Id;
-        UPDATE sync_outbox SET base_seq = @Seq WHERE record_id = @Id;
-        """, new { Id = known.RecordId, record.Seq });
 
     /// <summary>A meta foi excluída aqui: o conteúdo não entra, e o servidor recebe a exclusão com a base que acabou de mostrar.</summary>
     private async Task DiscardAsync(IncomingRecord record, SyncEnvelope envelope, string kind)
