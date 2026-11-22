@@ -163,6 +163,7 @@
                 <Grid ColumnDefinitions="*,Auto">
                   <TextBlock Classes="field-label" Text="Tags" VerticalAlignment="Center" />
                   <Button Grid.Column="1" Classes="back" Content="Gerenciar tags ›" MinHeight="32" Padding="8,0"
+                          VerticalAlignment="Center" VerticalContentAlignment="Center"
                           Command="{Binding $parent[UserControl].((vm:GoalEditViewModel)DataContext).ManageTagsCommand}"
                           IsVisible="{Binding $parent[UserControl].((vm:GoalEditViewModel)DataContext).CanManageTags}" />
                 </Grid>
