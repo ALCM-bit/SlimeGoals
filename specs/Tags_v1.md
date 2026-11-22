@@ -70,7 +70,7 @@ Fora da meta, a pessoa pode **trocar a cor**, **renomear** e **excluir** uma tag
 
 **SQLite (migração `010_tags.sql`):**
 - `tags (id TEXT PK, name TEXT NOT NULL UNIQUE, color TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT)`;
-- `goal_tags (id TEXT PK, goal_id TEXT NOT NULL REFERENCES goals(id), tag_name TEXT NOT NULL, updated_at TEXT NOT NULL, removed_at TEXT, UNIQUE (goal_id, tag_name))`. Não há chave estrangeira para `tags`, porque a ligação pode chegar antes da tag. Não há `ON DELETE CASCADE`: *Decisão minha*, para seguir a convenção de `GoalDeletion`, que apaga as linhas filhas à mão;
+- `goal_tags (id TEXT PK, goal_id TEXT NOT NULL, tag_name TEXT NOT NULL, updated_at TEXT NOT NULL, removed_at TEXT, UNIQUE (goal_id, tag_name))`. Não há chave estrangeira nem para `tags` nem para `goals`, porque a ligação pode chegar antes da tag e antes da meta (§4.4.6). `GoalDeletion` apaga as ligações da meta à mão, como faz com as outras linhas filhas;
 - `sync_outbox.kind` e `sync_records.kind` passam a aceitar `'tag'` e `'goal_tag'`. O SQLite não altera um `CHECK`, então essas duas tabelas são recriadas na migração, copiando os dados;
 - as três tags padrão (§4.3).
 
@@ -98,7 +98,7 @@ Fora da meta, a pessoa pode **trocar a cor**, **renomear** e **excluir** uma tag
 3. **Edições de meta não tocam nas tags.** Como as tags não viajam dentro da meta, nenhuma edição de meta, nem as feitas antes de atualizar ou ainda na fila, apaga ou ressuscita uma tag. Uma mudança de título concorrente com a exclusão de uma tag também não traz a tag de volta. *Decisão minha*, motivada pela revisão.
 4. **Conflito**, para a tag e para a ligação: vence o `updated_at` mais novo; no empate, vence o maior id de aparelho do envelope, como nas metas.
    - A exclusão é só um campo do conteúdo. Por isso, **excluir e recriar com o mesmo nome**, ou tirar e pôr de novo a mesma tag numa meta, seguem a mesma regra: vale o que aconteceu por último.
-   - Tags e ligações não usam `sync_tombstones` nem a exclusão no servidor.
+   - Tags e ligações não usam `sync_tombstones` nem a exclusão no servidor. A exceção é a ligação de uma meta excluída (item 6).
    - **Data de uma edição:** mesma regra das metas. `updated_at` é o maior entre a hora atual e o `updated_at` local + 1 ms.
 5. **O que aparece numa meta** é calculado na leitura por uma função pura do Core. O resultado não depende da ordem em que os registros chegaram nem de como foram divididos em páginas. Uma ligação aparece se:
    - ela não tem `RemovedAt`; **e**
@@ -107,7 +107,9 @@ Fora da meta, a pessoa pode **trocar a cor**, **renomear** e **excluir** uma tag
    O segundo caso é o de alguém marcar a tag numa meta, em outro aparelho, depois que ela foi excluída. Para não perder essa escolha, a tag aparece de novo, como ativa, em todas as telas, com a cor que tinha. *Decisão minha.* Isso não conta como "voltar sozinha": alguém a marcou depois da exclusão. Excluir uma tag também grava `RemovedAt` em todas as ligações dela, com o mesmo instante, então as ligações antigas nunca a trazem de volta.
 
    Uma ligação cuja tag ainda não chegou aparece com a cor Purple até a tag chegar. Nada é gravado em `tags` por causa disso.
-6. **Ligação de meta que não existe:** espera em `sync_pending` até a meta chegar, como os registros. Meta excluída apaga as ligações dela junto com os registros, pelo mesmo caminho de `GoalDeletion` e da marca de exclusão. Ligação que chega para uma meta com marca de exclusão é ignorada.
+6. **Ligação de meta que ainda não existe:** é gravada em `goal_tags` assim mesmo, sem chave estrangeira, e só aparece quando a meta chega. *Decisão do plano:* isso dispensa a `sync_pending`, que guarda registros e os decodifica como registros.
+   - **Meta excluída** apaga as ligações dela junto com os registros, pelo mesmo caminho de `GoalDeletion` e de `EnqueueGoalDeletionAsync`. É o único caso em que uma ligação vira exclusão no servidor, como os registros da meta.
+   - Ligação que chega para uma meta com marca de exclusão é descartada, como os registros.
 7. **Fila:**
    - Toda gravação de tag ou de ligação entra na `sync_outbox` (`kind = 'tag'` ou `'goal_tag'`, `op = 'upsert'`) na mesma transação.
    - `SyncApply` não grava nada na fila por causa das tags. A exceção que já existe, a das metas com marca de exclusão, continua sendo a única.
