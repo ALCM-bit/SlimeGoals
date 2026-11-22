@@ -238,6 +238,9 @@ public sealed partial class GoalEditViewModel : ObservableObject
         _submitted = true;
         GeneralError = null;
         _serviceErrors.Clear();
+        // Relê as tags antes de montar o rascunho: uma exclusão que a sincronização acabou de gravar, e cujo aviso ainda
+        // não chegou, não volta com o salvamento.
+        await Tags.ReloadCommand.ExecuteAsync(null);
         if (!Revalidate(out var draft))
             return;
 
