@@ -18,6 +18,7 @@ public partial class TodayView : UserControl
         AddHandler(KeyDownEvent, OnTaskKeyDown, RoutingStrategies.Bubble, handledEventsToo: true);
         // A roda do mouse rola a linha de filtros de lado (o desktop não tem como arrastar com o dedo).
         TagStrip.PointerWheelChanged += OnTagStripWheel;
+        TagStrip.ScrollChanged += (_, _) => UpdateTagStripHint();
         AddHandler(PointerPressedEvent, (_, _) => _pointerDown = true, RoutingStrategies.Tunnel, handledEventsToo: true);
         // Depois do Click do botão solto (que roda na bolha, antes de chegar aqui).
         AddHandler(PointerReleasedEvent, OnPointerReleasedAfterClick, RoutingStrategies.Bubble, handledEventsToo: true);
@@ -31,6 +32,15 @@ public partial class TodayView : UserControl
         strip.Offset = strip.Offset.WithX(Math.Clamp(strip.Offset.X - e.Delta.Y * 48, 0, max));
         e.Handled = true;
     }
+
+    private void UpdateTagStripHint()
+    {
+        var more = TagStripScroll.CanScrollRight(TagStrip.Offset.X, TagStrip.Extent.Width, TagStrip.Viewport.Width);
+        TagStripFade.IsVisible = TagStripMore.IsVisible = more;
+    }
+
+    private void OnTagStripMore(object? sender, RoutedEventArgs e) =>
+        TagStrip.Offset = TagStrip.Offset.WithX(TagStripScroll.NextOffset(TagStrip.Offset.X, TagStrip.Extent.Width, TagStrip.Viewport.Width));
 
     private bool _pointerDown;
     private readonly List<Action> _afterRelease = [];

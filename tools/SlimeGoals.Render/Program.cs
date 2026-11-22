@@ -444,6 +444,11 @@ void RenderTodayTags(int width, int height)
         today.Filter.ToggleCommand.Execute(today.Filter.Chips.Single(c => c.Name == name));
     Pump();
     Capture($"today-tags-selected-{width}.png");
+    // Uma tag que esconde cartões: só "treino" (a meta Treino) fica na lista.
+    today.Filter.ClearCommand.Execute(null);
+    today.Filter.ToggleCommand.Execute(today.Filter.Chips.Single(c => c.Name == "treino"));
+    Pump();
+    Capture($"today-tags-filtered-{width}.png");
     today.Filter.ClearCommand.Execute(null);
     window.Close();
 

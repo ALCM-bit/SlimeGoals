@@ -147,21 +147,39 @@
       <Grid ColumnDefinitions="Auto,*">
         <Button Classes="ghost" Content="✕ Limpar" MinHeight="36" Padding="12,0" Margin="0,0,8,0" VerticalAlignment="Center"
                 IsVisible="{Binding HasSelection}" Command="{Binding ClearCommand}" />
-        <ScrollViewer x:Name="TagStrip" Grid.Column="1" HorizontalScrollBarVisibility="Hidden"
-                      VerticalScrollBarVisibility="Disabled">
-          <ItemsControl ItemsSource="{Binding Chips}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <StackPanel Orientation="Horizontal" Spacing="8" />
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:TagChipViewModel">
-                <views:TagChip Command="{Binding $parent[ItemsControl].((vm:TodayTagFilterViewModel)DataContext).ToggleCommand}" />
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
+        <Panel Grid.Column="1">
+          <ScrollViewer x:Name="TagStrip" HorizontalScrollBarVisibility="Hidden"
+                        VerticalScrollBarVisibility="Disabled">
+            <ItemsControl ItemsSource="{Binding Chips}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" Spacing="8" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:TagChipViewModel">
+                  <views:TagChip Command="{Binding $parent[ItemsControl].((vm:TodayTagFilterViewModel)DataContext).ToggleCommand}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+          <!-- Há mais chips à direita: esmaecido até o fundo da página e a seta "›" que rola um passo (spec §4.8) -->
+          <Border x:Name="TagStripFade" Width="60" HorizontalAlignment="Right" IsHitTestVisible="False" IsVisible="False"
+                  Background="{DynamicResource Bg}">
+            <Border.OpacityMask>
+              <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                <GradientStop Offset="0" Color="#00000000" />
+                <GradientStop Offset="1" Color="#FF000000" />
+              </LinearGradientBrush>
+            </Border.OpacityMask>
+          </Border>
+          <Button x:Name="TagStripMore" Width="28" Height="28" MinHeight="28" Padding="0" CornerRadius="14"
+                  HorizontalAlignment="Right" VerticalAlignment="Center" IsVisible="False"
+                  Background="{DynamicResource Surface2}" AutomationProperties.Name="Mais tags" ToolTip.Tip="Mais tags"
+                  Click="OnTagStripMore">
+            <TextBlock Text="›" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Button>
+        </Panel>
       </Grid>
       <TextBlock Text="{Binding SummaryText}" Foreground="{DynamicResource Muted}" FontSize="13"
                  IsVisible="{Binding HasSelection}" />

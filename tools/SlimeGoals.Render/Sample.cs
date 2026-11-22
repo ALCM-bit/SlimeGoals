@@ -100,9 +100,9 @@ public sealed class Sample : IDisposable
         var until = new TimeOnly(22, 0);
 
         var water = await goals.CreateAsync(new GoalDraft("Beber água", Recurrence.Daily, 8, "water", GoalColor.Pink,
-            120, from, until, WeekDays.All, null, null, Measure.Quantity, "copos") with { Tags = ["saúde"] });
+            120, from, until, WeekDays.All, null, null, Measure.Quantity, "copos") with { Tags = ["saúde", "hidratação", "rotina", "casa", "manhã", "hábitos"] });
         var reading = await goals.CreateAsync(new GoalDraft("Leitura", Recurrence.Daily, 9000, "book", GoalColor.Purple,
-            180, from, until, WeekDays.All, null, null, Measure.Duration) with { Tags = ["estudos"] });
+            180, from, until, WeekDays.All, null, null, Measure.Duration) with { Tags = ["estudos", "livros", "foco"] });
         var workout = await goals.CreateAsync(new GoalDraft("Treino", Recurrence.Weekly, 18000, "workout", GoalColor.Green,
             180, from, until, WeekDays.All, null, null, Measure.Duration) with { Tags = ["saúde", "treino"] });
         var english = await goals.CreateAsync(new GoalDraft("Aula de inglês com a professora particular às terças", Recurrence.Weekly, 1, "language", GoalColor.Amber,
