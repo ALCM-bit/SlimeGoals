@@ -30,6 +30,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\SlimeGoals.App\SlimeGoals.App.csproj" />
+    <!-- Só para montar o contêiner dos heads com o SQLite de verdade (AppContainerSqliteTests) -->
+    <ProjectReference Include="..\..\src\SlimeGoals.Infrastructure\SlimeGoals.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
