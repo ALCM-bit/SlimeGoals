@@ -219,4 +219,38 @@ Metas de hoje                                 [Pausar lembretes]
   - `EnableAsync` que enfileira tags e ligações, menos as cópias de 1970;
   - migração 010 sobre um banco com fila e registros;
   - ViewModels do quadro (inclusive a tag que ainda não chegou), da seção de Configurações e do filtro do Hoje (OU entre tags, "Limpar", seleção que some).
-- **Documentos:** atualizar `specs/Sincronizacao_v1.md` §3 com as linhas das tags e das ligações, e `docs/arquitetura.md` se surgirem arquivos novos.
+- **Documentos:** atualizar `specs/Sincronizacao_v1.md` §3 com as linhas das tags e das ligações, e `docs/arquitetura.md` se surgirem arquivos novos. Feito na verificação (§6).
+
+## 6. Verificação
+
+### Feito automaticamente (21/11/2026)
+
+- **Build e testes:** `dotnet build SlimeGoals.slnx -c Release` sem avisos nem erros; `dotnet test --solution SlimeGoals.slnx`: 2117 testes, 0 falhas, 0 ignorados (com o Docker ligado para os testes do servidor).
+- **Android:** `dotnet build SlimeGoals.Android.slnx` (comando de `docs/android.md`) sem avisos nem erros. Só compilado: o APK não foi instalado nem empacotado.
+- **Telas:** `tools/SlimeGoals.Render` (README da ferramenta) a 320, 360, 412 e 1100 px:
+  - `goal-edit-tags-<w>`: o quadro de tags na página da meta;
+  - `settings-tags-<w>` e `settings-tags-edit-<w>`: Configurações › Tags e uma linha em cada estado;
+  - `today-filter-idle-<w>`, `today-filter-<w>` (duas tags marcadas), `today-filter-single-<w>` e `today-filter-empty-<w>` (nenhuma meta de hoje com tag, sem linha de filtros).
+- **Partida do desktop em pasta temporária** (`XDG_DATA_HOME` e `XDG_CONFIG_HOME` em `/tmp`): o app abriu e ficou de pé por 25 s, sem nada na saída de erro. O banco ficou na versão 10, com as tabelas `tags` e `goal_tags` e as três tags padrão (`medicamentos`, `estudos` e `tarefas`, com `updated_at` de 1970).
+
+### Decisões de implementação
+
+- **A seta "›" do filtro do Hoje também aparece no celular.** As views não têm um sinal confiável de celular ou desktop, e a seta não atrapalha o toque. Fica como está, não só no desktop como dizia a §4.8.
+- **"Nenhuma meta de hoje com essas tags." é defensiva e hoje inalcançável.** Uma tag marcada sempre tem meta na lista: quando a última meta dela sai, a tag deixa a seleção (§4.8). Por isso a ferramenta de telas não a captura; o estado vazio que existe é o de nenhuma meta com tag.
+- **O app só tem o tema escuro** (`RequestedThemeVariant="Dark"`), então a conferência de "dois temas" valeu para um só.
+
+### Falta conferir à mão (pendente)
+
+Roteiro no desktop, sempre com `XDG_DATA_HOME=/tmp/slimegoals-dev/data XDG_CONFIG_HOME=/tmp/slimegoals-dev/config dotnet run --project src/SlimeGoals.Desktop`:
+
+- [ ] Criar uma meta com a tag "saúde" (digitada no quadro da meta).
+- [ ] No Hoje, filtrar por "saúde": a lista mostra só as metas com ela, "x de y metas" e "✕ Limpar" aparecem; limpar volta tudo.
+- [ ] Em Configurações › Tags, renomear "saúde" para "estudos": o app pergunta se junta, e as metas das duas ficam com "estudos".
+- [ ] Excluir "tarefas": a confirmação diz em quantas metas ela está, e a tag some das metas e do Hoje.
+- [ ] Voltar da tela de tags para a página de uma meta aberta: o que estava digitado continua lá.
+
+Conferência no emulador (`slimegoals-api36`, sempre com `-s emulator-5554`), com a conta de teste no servidor de desenvolvimento:
+
+- [ ] Instalar, entrar na conta e ver que as tags criadas no desktop chegam com a cor certa.
+- [ ] Ver que a exclusão de "tarefas" chega.
+- [ ] Marcar uma tag numa meta no emulador e ver que ela chega ao desktop.

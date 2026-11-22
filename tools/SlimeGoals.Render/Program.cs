@@ -15,9 +15,9 @@ using SlimeGoals.Sync;
 using ScrollViewer = Avalonia.Controls.ScrollViewer;
 using Window = Avalonia.Controls.Window;
 
-if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini" or "sync-warning" or "today-tags")))
+if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini" or "sync-warning" or "today-filter")))
 {
-    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning|today-tags]");
+    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning|today-filter]");
     return 1;
 }
 
@@ -68,7 +68,8 @@ if (which == "mini")
     RenderMini("mini-focus-paused-hover", () => sample.CreateMiniFocus("Leitura", null, paused: true), hover: true);
     sample.ClearFocus();
 }
-if (which == "today-tags")
+// O filtro de tags do Hoje vem no all e, sozinho, no today-filter
+if (which is "all" or "today-filter")
 {
     RenderTodayTags(320, 900);
     RenderTodayTags(360, 900);
@@ -430,7 +431,8 @@ void RenderNarrow(int width)
     window.Close();
 }
 
-// Hoje com tags: a linha de filtros sem seleção, com duas tags marcadas (Limpar e "x de y metas") e uma sem meta.
+// Hoje com tags: a linha de filtros sem seleção (idle), com duas tags marcadas (today-filter: Limpar e "x de y metas"),
+// com uma tag que esconde cartões (single) e sem nenhuma meta com tag (today-filter-empty: a linha some).
 void RenderTodayTags(int width, int height)
 {
     var shell = sample.CreateShell(width < 720);
@@ -439,18 +441,35 @@ void RenderTodayTags(int width, int height)
     var today = shell.Pages.OfType<TodayPageViewModel>().Single();
     shell.CurrentPage = today;
     Pump();
-    Capture($"today-tags-{width}.png");
+    Capture($"today-filter-idle-{width}.png");
     foreach (var name in new[] { "saúde", "estudos" })
         today.Filter.ToggleCommand.Execute(today.Filter.Chips.Single(c => c.Name == name));
     Pump();
-    Capture($"today-tags-selected-{width}.png");
+    Capture($"today-filter-{width}.png");
     // Uma tag que esconde cartões: só "treino" (a meta Treino) fica na lista.
     today.Filter.ClearCommand.Execute(null);
     today.Filter.ToggleCommand.Execute(today.Filter.Chips.Single(c => c.Name == "treino"));
     Pump();
-    Capture($"today-tags-filtered-{width}.png");
+    Capture($"today-filter-single-{width}.png");
     today.Filter.ClearCommand.Execute(null);
+    // O estado vazio que se alcança: nenhuma meta de hoje tem tag, então não há linha de filtros.
+    // "Nenhuma meta de hoje com essas tags." não tem captura: hoje nenhuma combinação de chips esvazia a lista.
+    var goalService = sample.Goals;
+    var tagged = goalService.ListAsync().GetAwaiter().GetResult().Where(g => g.Tags.Count > 0).ToList();
+    SetTags(g => []);
+    today.LoadCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+    Pump();
+    Capture($"today-filter-empty-{width}.png");
+    SetTags(g => g.Tags); // devolve as tags: a mesma amostra serve às outras larguras e telas
     window.Close();
+
+    void SetTags(Func<Goal, IReadOnlyList<string>> tagsOf)
+    {
+        foreach (var g in tagged)
+            goalService.UpdateAsync(g.Id, new GoalDraft(g.Title, g.Recurrence, g.Target, g.Icon, g.Color, g.ReminderEveryMinutes,
+                g.ActiveFrom, g.ActiveUntil, g.ActiveDays, g.StartDate, g.EndDate, g.Measure, g.Unit) with { Tags = tagsOf(g) })
+                .GetAwaiter().GetResult();
+    }
 
     void Capture(string name)
     {
@@ -599,6 +618,10 @@ void Render(bool phone, string suffix, int width, int height)
     goals.Editor.Tags.CreateCommand.Execute(null);
     Pump();
     Capture("goal-edit");
+    // O quadro de tags inteiro, rolado até ele
+    window.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("tag-box")).BringIntoView();
+    Pump();
+    Capture("goal-edit-tags");
     // O fim do formulário (horários, período e, no layout estreito, as ações) fica abaixo da dobra
     window.GetVisualDescendants().OfType<GoalEditView>().Single()
         .GetVisualDescendants().OfType<ScrollViewer>().First().ScrollToEnd();
@@ -645,7 +668,7 @@ void Render(bool phone, string suffix, int width, int height)
         tags.BeginCreateCommand.Execute(null);
         tags.NewName = "organização da casa";
         Pump();
-        Capture("settings-tags-states");
+        Capture("settings-tags-edit");
     }
 
     void Show(string name, PageViewModel page)

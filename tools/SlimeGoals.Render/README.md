@@ -5,15 +5,17 @@ Ferramenta de desenvolvimento que renderiza as telas do app sem janela (Avalonia
 ## Uso
 
 ```
-dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning]
+dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning|today-filter]
 ```
 
 Sem o segundo argumento, vale `all`. Grava um PNG por tela e tamanho, sempre o `ShellView` inteiro:
 
-- `today-<tamanho>.png`, `goals-<tamanho>.png`, `goal-edit-<tamanho>.png`, `goal-edit-end-<tamanho>.png` (o formulário rolado até o fim),
+- `today-<tamanho>.png`, `goals-<tamanho>.png`, `goal-edit-<tamanho>.png`, `goal-edit-tags-<tamanho>.png` (o quadro de tags, rolado até ele, com um chip marcado e outro recém-criado), `goal-edit-end-<tamanho>.png` (o formulário rolado até o fim),
   `reports-week-<tamanho>.png`, `reports-month-<tamanho>.png`, `settings-<tamanho>.png` (a lista de grupos) e
-  `settings-<grupo>-<tamanho>.png` para cada grupo que a plataforma tem (`reminders`, `window`, `general`, `about`);
+  `settings-<grupo>-<tamanho>.png` para cada grupo que a plataforma tem (`reminders`, `tags`, `window`, `general`, `about`) e `settings-tags-edit-<tamanho>.png` (Configurações › Tags com uma linha em cada estado: cores, edição com erro, junção, exclusão e o campo de nova tag);
 - `<tamanho>` é `phone` (412×915) ou `desktop` (1100×720).
+
+O modo `today-filter` (também incluído no `all`) grava o Hoje com o filtro de tags a 320, 360, 412 e 1100 px, como `<cena>-<largura>.png`: `today-filter-idle` (a linha de chips sem seleção), `today-filter` (duas tags marcadas: "✕ Limpar" fixo e "x de y metas"), `today-filter-single` (uma tag que esconde cartões) e `today-filter-empty` (nenhuma meta de hoje com tag: a linha de filtros some). A mensagem "Nenhuma meta de hoje com essas tags." não tem captura: é uma defesa que hoje não se alcança, porque uma tag marcada sempre tem meta na lista (ao sair a última, ela deixa a seleção). O `all` grava só 412 e 1100 px nas demais telas; `narrow` acrescenta 320 e 360.
 
 O modo `account` grava a seção "Conta e sincronização" de Configurações sobre uma conta falsa (`SampleAccount`, em `Sample.cs`: nenhuma rede, códigos de mentira), a 320×1400, 360×1400 e 1100×800, como `account-<tela>-<largura>.png`:
 
@@ -35,10 +37,14 @@ O modo `mini` grava a janelinha do cronômetro (a `MiniTimerWindow` de verdade, 
 
 O modo `mascot` grava só `mascot.png`: as quatro poses do slime (dormindo, parado, feliz, comemorando), lado a lado em 160×160 sobre o `HeroBrush`, com o nome acessível embaixo. O quadro é capturado cerca de 0,8 s depois de montar a tela, com as animações já em andamento.
 
+## Tema
+
+O app só tem o tema escuro (`RequestedThemeVariant="Dark"` em `App.axaml`, sem paleta clara), então as telas saem só nele.
+
 ## Dados
 
 Um banco SQLite temporário (`slimegoals-render-<guid>.db` em `Path.GetTempPath()`), apagado ao final; nunca toca o banco do app.
-Quatro metas de exemplo (Beber água, Leitura, Treino, Aula de inglês) e registros dos últimos 10 dias. O relógio é o do sistema, menos no Pomodoro (`FocusService` e a aba Tempo), que usa um relógio de cena parado (`SceneClock`) que só anda quando a cena manda.
+Quatro metas de exemplo (Beber água, Leitura, Treino, Aula de inglês), com tags (as três padrão e mais algumas, uma delas, "trabalho", sem meta) e registros dos últimos 10 dias. O relógio é o do sistema, menos no Pomodoro (`FocusService` e a aba Tempo), que usa um relógio de cena parado (`SceneClock`) que só anda quando a cena manda.
 
 ## Observações
 

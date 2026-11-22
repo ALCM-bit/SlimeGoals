@@ -51,6 +51,7 @@ public sealed class Sample : IDisposable
     /// </summary>
     /// <param name="account">Com ela, a seção "Conta e sincronização" aparece (capacidades do desktop com <c>Sync</c>).</param>
     /// <summary>Para as cenas que precisam de registros além dos da amostra (trechos de hoje).</summary>
+    public GoalService Goals => _services.GetRequiredService<GoalService>();
     public CheckinService Checkins => _services.GetRequiredService<CheckinService>();
 
     /// <summary>
