@@ -43,7 +43,10 @@ public sealed partial class GoalEditViewModel : ObservableObject
     {
         _service = service;
         _navigator = navigator;
-        Tags = new TagPickerViewModel(tags, existing?.Tags ?? []);
+        // A meta existente relê as próprias tags a cada recarga do quadro (renomeação, junção, exclusão por sincronização).
+        Tags = existing is null
+            ? new TagPickerViewModel(tags, [])
+            : new TagPickerViewModel(tags, existing.Tags, async ct => (await service.GetAsync(existing.Id, ct))?.Tags);
         Tags.ReloadCommand.Execute(null);
         _existing = existing;
         _close = close;

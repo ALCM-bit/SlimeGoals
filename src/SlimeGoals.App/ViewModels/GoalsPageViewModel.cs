@@ -11,10 +11,14 @@ namespace SlimeGoals.App.ViewModels;
 /// Tela Metas: lista (ativas ou arquivadas) e, quando <see cref="Editor"/> não é nulo,
 /// a página de edição no lugar da lista (spec §7).
 /// </summary>
-public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider time, TagService tags, PageNavigator navigator)
+public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider time, TagService tags, PageNavigator navigator,
+    DataChangeNotifier? changes = null)
     : PageViewModel
 {
     private int _loadVersion;
+    private bool _active = true;
+    private bool _listening;
+    private SynchronizationContext? _ui;
 
     public override string Title => "Metas";
 
@@ -31,9 +35,52 @@ public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider
 
     public override void Activate()
     {
+        _active = true;
         LoadCommand.Execute(null);
         // O editor sobrevive à ida a Configurações › Tags: na volta, cores, nomes e exclusões de lá já aparecem nos chips.
         Editor?.Tags.ReloadCommand.Execute(null);
+        UpdateListening();
+    }
+
+    public override void Deactivate()
+    {
+        _active = false;
+        UpdateListening();
+    }
+
+    partial void OnEditorChanged(GoalEditViewModel? value) => UpdateListening();
+
+    /// <summary>
+    /// Com o editor aberto e a página à vista, uma mudança de fora (sincronização, outro processo) relê os chips: uma tag
+    /// excluída sai da seleção antes de salvar, em vez de voltar com a meta (spec Tags §4.4.3). Fechado o editor ou
+    /// escondida a página, deixa de ouvir; a volta à página relê de qualquer jeito.
+    /// </summary>
+    private void UpdateListening()
+    {
+        var listen = changes is not null && _active && Editor is not null;
+        if (listen == _listening)
+            return;
+        _listening = listen;
+        _ui ??= SynchronizationContext.Current;
+        if (listen)
+            changes!.Changed += OnDataChanged;
+        else
+            changes!.Changed -= OnDataChanged;
+    }
+
+    /// <summary>Pode chegar de qualquer thread; relê os chips na da interface.</summary>
+    private void OnDataChanged(object? sender, EventArgs e)
+    {
+        if (_ui is null)
+            ReloadEditorTags();
+        else
+            _ui.Post(_ => ReloadEditorTags(), null);
+    }
+
+    private void ReloadEditorTags()
+    {
+        if (_listening)
+            Editor?.Tags.ReloadCommand.Execute(null);
     }
 
     partial void OnShowArchivedChanged(bool value)

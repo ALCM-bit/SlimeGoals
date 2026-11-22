@@ -115,4 +115,53 @@ public class TagPickerViewModelTests
         vm.Chips.First(c => c.Name == "casa").Color.Should().Be(GoalColor.Amber);
         vm.Chips.Select(c => c.Name).Should().NotContain("estudos");
     }
+
+    [Fact]
+    public async Task Reload_rereads_the_goal_tags_and_keeps_what_the_person_changed()
+    {
+        foreach (var name in new[] { "casa", "estudos", "saúde", "x" })
+            await _service.CreateAsync(name);
+        IReadOnlyList<string> stored = ["casa", "saúde", "x"];
+        var vm = new TagPickerViewModel(_service, stored, _ => Task.FromResult<IReadOnlyList<string>?>(stored));
+        await vm.ReloadCommand.ExecuteAsync(null);
+        vm.ToggleCommand.Execute(vm.Chips.Single(c => c.Name == "casa"));    // desmarcada
+        vm.ToggleCommand.Execute(vm.Chips.Single(c => c.Name == "estudos")); // marcada
+        vm.NewName = "nova";
+        vm.CreateCommand.Execute(null);                                       // digitada, ainda não é tag
+
+        // Em Configurações: "saúde" vira "bem-estar" (a meta acompanha) e "estudos" é excluída.
+        await _service.RenameAsync("saúde", "bem-estar");
+        await _service.DeleteAsync("estudos");
+        stored = ["bem-estar", "casa", "x"];
+        await vm.ReloadCommand.ExecuteAsync(null);
+
+        vm.SelectedNames.Should().Equal("bem-estar", "x", "nova");
+        vm.Chips.Select(c => c.Name).Should().Equal("bem-estar", "casa", "x", "nova");
+    }
+
+    [Fact]
+    public async Task Goal_gone_from_the_database_keeps_the_previous_base()
+    {
+        await _service.CreateAsync("casa");
+        var vm = new TagPickerViewModel(_service, ["casa"], _ => Task.FromResult<IReadOnlyList<string>?>(null));
+
+        await vm.ReloadCommand.ExecuteAsync(null);
+
+        vm.SelectedNames.Should().Equal("casa");
+    }
+
+    [Fact]
+    public async Task Toggling_a_tag_off_and_on_again_keeps_it_selected_after_reload()
+    {
+        await _service.CreateAsync("casa");
+        var vm = new TagPickerViewModel(_service, [], _ => Task.FromResult<IReadOnlyList<string>?>([]));
+        await vm.ReloadCommand.ExecuteAsync(null);
+
+        vm.ToggleCommand.Execute(vm.Chips.Single());
+        vm.ToggleCommand.Execute(vm.Chips.Single());
+        vm.ToggleCommand.Execute(vm.Chips.Single());
+        await vm.ReloadCommand.ExecuteAsync(null);
+
+        vm.SelectedNames.Should().Equal("casa");
+    }
 }

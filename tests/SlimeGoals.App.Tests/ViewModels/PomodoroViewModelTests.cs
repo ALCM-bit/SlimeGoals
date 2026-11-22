@@ -31,7 +31,8 @@ public class PomodoroViewModelTests
     }
 
     private GoalService GoalService => new(_goals, _checkins, _timers, _time);
-    private TagService Tags => new(new InMemoryTagRepository(), _goals, _time);
+    private readonly InMemoryTagRepository _tagRepo = new();
+    private TagService Tags => new(_tagRepo, _goals, _time);
     private CheckinService Checkins => new(_goals, _checkins, _time);
     private TimerService Timers => new(_goals, _timers, Checkins, _time, _changes, _sessions);
     private FocusService Focus => new(_goals, _sessions, _timers, Checkins, new AppSettings(_settings), _time, _changes);
@@ -747,6 +748,26 @@ public class PomodoroViewModelTests
         _checkins.All.Single().Should().Match<Checkin>(c => c.GoalId == created.Id && c.Amount == 25 * 60);
         vm.Editor.Should().BeNull();
         (vm.IsAwaitingDestination, vm.GoalText, vm.Error).Should().Be((false, "Ler", null));
+    }
+
+    [Fact]
+    public async Task Goal_editor_drops_a_selected_tag_deleted_by_a_sync()
+    {
+        await Tags.CreateAsync("tarefas");
+        await Focus.StartAsync(new FocusPlan([F(25)], 1), null);
+        _time.Advance(TimeSpan.FromMinutes(25));
+        await Focus.AdvanceAsync();
+        var vm = await Loaded();
+        vm.CreateGoalCommand.Execute(null);
+        var editor = vm.Editor!;
+        await editor.Tags.ReloadCommand.ExecuteAsync(null);
+        editor.Tags.ToggleCommand.Execute(editor.Tags.Chips.Single());
+
+        await Tags.DeleteAsync("tarefas"); // a exclusão chega de outro aparelho
+        _changes.NotifyChanged();
+
+        editor.Tags.SelectedNames.Should().BeEmpty();
+        editor.Tags.Chips.Should().BeEmpty();
     }
 
     [Fact]

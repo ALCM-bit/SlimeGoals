@@ -121,8 +121,13 @@ public sealed partial class PomodoroViewModel : ObservableObject
         if (!_subscribed)
         {
             // Assina uma vez (a página vive com o app); pode chegar de qualquer thread, recarrega na da interface.
+            // Com o editor de meta aberto, os chips dele também são relidos: uma tag excluída sai da seleção antes de salvar.
             _subscribed = true;
-            _changes.Changed += (_, _) => OnUi(() => LoadCommand.Execute(null));
+            _changes.Changed += (_, _) => OnUi(() =>
+            {
+                LoadCommand.Execute(null);
+                Editor?.Tags.ReloadCommand.Execute(null);
+            });
         }
         var version = ++_loadVersion;
         try
