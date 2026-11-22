@@ -150,7 +150,7 @@
         <Panel Grid.Column="1">
           <ScrollViewer x:Name="TagStrip" HorizontalScrollBarVisibility="Hidden"
                         VerticalScrollBarVisibility="Disabled">
-            <ItemsControl ItemsSource="{Binding Chips}">
+            <ItemsControl x:Name="TagChips" ItemsSource="{Binding Chips}">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                   <StackPanel Orientation="Horizontal" Spacing="8" />

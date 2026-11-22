@@ -29,9 +29,51 @@ public partial class TodayView : UserControl
         if (e.Delta.Y == 0 || sender is not ScrollViewer strip)
             return;
         var max = Math.Max(0, strip.Extent.Width - strip.Viewport.Width);
+        if (max == 0)
+            return; // nada rola: a roda segue para a página
         strip.Offset = strip.Offset.WithX(Math.Clamp(strip.Offset.X - e.Delta.Y * 48, 0, max));
         e.Handled = true;
     }
+
+    private TodayTagFilterViewModel? _filter;
+
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        base.OnDataContextChanged(e);
+        if (_filter is not null)
+        {
+            _filter.Chips.CollectionChanged -= OnChipsChanged;
+            _filter.PropertyChanged -= OnFilterChanged;
+        }
+        _filter = (DataContext as TodayPageViewModel)?.Filter;
+        if (_filter is not null)
+        {
+            _filter.Chips.CollectionChanged += OnChipsChanged;
+            _filter.PropertyChanged += OnFilterChanged;
+        }
+    }
+
+    private void OnChipsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) => RevealSelectedChip();
+
+    private void OnFilterChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(TodayTagFilterViewModel.SummaryText))
+            RevealSelectedChip();
+    }
+
+    /// <summary>Com seleção, o primeiro chip marcado fica à vista; se já está, a linha não se mexe.</summary>
+    private void RevealSelectedChip() => Dispatcher.UIThread.Post(() =>
+    {
+        if (_filter?.Chips.FirstOrDefault(c => c.IsSelected) is not { } selected)
+            return;
+        var chip = TagChips.GetVisualDescendants().OfType<TagChip>().FirstOrDefault(c => c.DataContext == selected);
+        if (chip?.TranslatePoint(default, TagStrip) is not { } at)
+            return;
+        var offset = TagStrip.Offset.X;
+        var target = TagStripScroll.RevealOffset(offset, TagStrip.Viewport.Width, at.X + offset, at.X + offset + chip.Bounds.Width);
+        if (target != offset)
+            TagStrip.Offset = TagStrip.Offset.WithX(target);
+    }, DispatcherPriority.Loaded);
 
     private void UpdateTagStripHint()
     {

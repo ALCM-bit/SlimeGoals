@@ -125,7 +125,7 @@ public class TodayTagFilterViewModelTests
     }
 
     [Fact]
-    public void Filtered_empty_message()
+    public void Filtered_empty_message_text_and_defensive_flag_stay_off_while_the_selection_matches()
     {
         Refreshed(Card("a", "x"));
         _filter.IsFilteredEmpty.Should().BeFalse();
