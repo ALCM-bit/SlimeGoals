@@ -9,6 +9,8 @@ internal static class SyncOutbox
 {
     public const string Goal = "goal";
     public const string Checkin = "checkin";
+    public const string Tag = "tag";
+    public const string GoalTag = "goal_tag";
 
     private const string ReplaceOnConflict =
         " ON CONFLICT (record_id) DO UPDATE SET op = excluded.op, base_seq = excluded.base_seq, revision = revision + 1;";

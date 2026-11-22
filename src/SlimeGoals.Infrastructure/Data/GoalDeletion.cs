@@ -16,6 +16,7 @@ internal static class GoalDeletion
             DELETE FROM active_timer WHERE goal_id = @Id;
             DELETE FROM checkins WHERE goal_id = @Id;
             DELETE FROM reminder_log WHERE goal_id = @Id;
+            DELETE FROM goal_tags WHERE goal_id = @Id;
             """, parameters, tx, cancellationToken: ct));
         return await c.ExecuteAsync(new CommandDefinition(
             "DELETE FROM goals WHERE id = @Id", parameters, tx, cancellationToken: ct));

@@ -20,6 +20,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton(new SqliteConnectionFactory(connectionString));
         services.AddSingleton<IGoalRepository, GoalRepository>();
         services.AddSingleton<ICheckinRepository, CheckinRepository>();
+        services.AddSingleton<ITagRepository, TagRepository>();
         services.AddSingleton<ITimerRepository, TimerRepository>();
         services.AddSingleton<IFocusSessionRepository, FocusSessionRepository>();
         services.AddSingleton<IReminderLogRepository, ReminderLogRepository>();

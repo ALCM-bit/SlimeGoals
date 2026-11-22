@@ -47,7 +47,7 @@ public class Migration009Tests
             InsertCheckin(c, goal, 10, compensationPeriod: "2026-11-09"),
         };
 
-        MigrationRunner.Migrate(c).Should().Be(9);
+        MigrationRunner.Migrate(c).Should().Be(10);
 
         c.ExecuteScalar<int>("SELECT target FROM goals WHERE id = @Id", new { Id = goal.ToString("D") }).Should().Be(5400);
         ids.Select(i => c.ExecuteScalar<int>("SELECT amount FROM checkins WHERE id = @Id", new { Id = i.ToString("D") }))
