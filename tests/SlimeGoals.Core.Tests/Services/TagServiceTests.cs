@@ -132,6 +132,24 @@ public class TagServiceTests
     }
 
     [Fact]
+    public async Task Renames_are_logged_in_order_for_whoever_reads_from_a_mark()
+    {
+        await _service.CreateAsync("saúde");
+        await _service.CreateAsync("estudos");
+        var mark = _service.RenameMark;
+
+        await _service.RenameAsync("saúde", "Bem-estar");
+        await _service.RenameAsync("bem-estar", "estudos"); // junção
+        await _service.RenameAsync("estudos", " ESTUDOS ");  // mesmo nome: não conta
+        await _service.RenameAsync("sumida", "outra");       // não existe: não conta
+
+        var (renames, next) = _service.RenamesSince(mark);
+        renames.Should().Equal(new TagRename("saúde", "bem-estar"), new TagRename("bem-estar", "estudos"));
+        _service.RenamesSince(next).Renames.Should().BeEmpty();
+        next.Should().Be(_service.RenameMark);
+    }
+
+    [Fact]
     public async Task Rename_to_same_normalized_name_does_nothing()
     {
         await GoalWith("estudos");
