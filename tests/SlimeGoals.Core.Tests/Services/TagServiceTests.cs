@@ -197,4 +197,38 @@ public class TagServiceTests
 
         (await _goals.GetAsync(goal.Id))!.UpdatedAt.Should().Be(goal.UpdatedAt);
     }
+
+    /// <summary>Tag excluída em t1 com uma ligação de t0 &lt; t1 (corrida de sincronização): a meta não a mostra.</summary>
+    private async Task<Goal> SeedDeletedTagWithHiddenLink()
+    {
+        var goal = await GoalWith();
+        await Seed([NewTag("t", GoalColor.Green, T0.AddHours(1), T0.AddHours(1))], [NewLink(goal.Id, "t", T0)]);
+        (await _goals.GetAsync(goal.Id))!.Tags.Should().BeEmpty();
+        _time.Advance(TimeSpan.FromHours(2));
+        return goal;
+    }
+
+    [Fact]
+    public async Task Create_deleted_does_not_bring_back_hidden_links()
+    {
+        var goal = await SeedDeletedTagWithHiddenLink();
+
+        await _service.CreateAsync("t");
+
+        (await _goals.GetAsync(goal.Id))!.Tags.Should().BeEmpty();
+        _tags.Links.Single().RemovedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Rename_into_deleted_target_does_not_bring_back_hidden_links()
+    {
+        var hidden = await SeedDeletedTagWithHiddenLink();
+        var moved = await GoalWith("velho");
+        await Seed([NewTag("velho", GoalColor.Pink, T0)]);
+
+        await _service.RenameAsync("velho", "t");
+
+        (await _goals.GetAsync(hidden.Id))!.Tags.Should().BeEmpty();
+        (await _goals.GetAsync(moved.Id))!.Tags.Should().Equal("t");
+    }
 }

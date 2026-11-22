@@ -89,4 +89,20 @@ public class GoalServiceTagsTests
             .Which.Errors.Should().ContainSingle().Which.Should().Be(new ValidationError(nameof(GoalDraft.Tags), "Dê um nome à tag."));
         _tags.Writes.Should().Be(0);
     }
+
+    [Fact]
+    public async Task Adding_deleted_tag_to_other_goal_does_not_bring_back_hidden_links()
+    {
+        var hidden = await _service.CreateAsync(Draft());
+        var other = await _service.CreateAsync(Draft());
+        await _tags.SaveAsync(new TagChanges(
+            [new Tag { Id = TagIds.ForTag("t"), Name = "t", Color = GoalColor.Green, UpdatedAt = T0.AddHours(1), DeletedAt = T0.AddHours(1) }],
+            [new GoalTag { Id = TagIds.ForLink(hidden.Id, "t"), GoalId = hidden.Id, TagName = "t", UpdatedAt = T0 }]));
+        _time.Advance(TimeSpan.FromHours(2));
+
+        await _service.UpdateAsync(other.Id, Draft("t"));
+
+        (await _goals.GetAsync(other.Id))!.Tags.Should().Equal("t");
+        (await _goals.GetAsync(hidden.Id))!.Tags.Should().BeEmpty();
+    }
 }

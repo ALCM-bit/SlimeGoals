@@ -36,10 +36,16 @@ public sealed class TagService(ITagRepository tags, IGoalRepository goals, TimeP
         if (!state.Visible.ContainsKey(name))
         {
             var now = time.GetUtcNow();
-            var tag = state.Tags.TryGetValue(name, out var old)
-                ? old with { DeletedAt = null, UpdatedAt = Next(now, old.UpdatedAt) }
-                : NewTag(name, PickColor(state.Visible.Values.Select(t => t.Color), state.Visible.Count), now);
-            await SaveAsync(new TagChanges([tag], []), ct);
+            if (state.Tags.TryGetValue(name, out var old))
+            {
+                var hidden = state.HiddenLinksOf(old).Select(l => RemoveAt(l, Next(now, l.UpdatedAt)));
+                await SaveAsync(new TagChanges([old with { DeletedAt = null, UpdatedAt = Next(now, old.UpdatedAt) }], [.. hidden]), ct);
+            }
+            else
+            {
+                var tag = NewTag(name, PickColor(state.Visible.Values.Select(t => t.Color), state.Visible.Count), now);
+                await SaveAsync(new TagChanges([tag], []), ct);
+            }
         }
 
         return (await ListAsync(ct)).Single(s => s.Name == name);
@@ -85,6 +91,12 @@ public sealed class TagService(ITagRepository tags, IGoalRepository goals, TimeP
             changedTags.Add((target ?? NewTag(newName, oldTag.Color, instant)) with { DeletedAt = null, UpdatedAt = instant });
 
         var changedLinks = new List<GoalTag>();
+        if (target is not null && !state.Visible.ContainsKey(newName))
+        {
+            var moving = oldLinks.Select(l => l.GoalId).ToHashSet();
+            changedLinks.AddRange(state.HiddenLinksOf(target).Where(l => !moving.Contains(l.GoalId)).Select(l => RemoveAt(l, instant)));
+        }
+
         foreach (var link in oldLinks)
         {
             changedLinks.Add(link with { RemovedAt = instant, UpdatedAt = instant });
@@ -120,6 +132,9 @@ public sealed class TagService(ITagRepository tags, IGoalRepository goals, TimeP
                 return color;
         return Palette[visibleCount % Palette.Length];
     }
+
+    /// <summary>Marca a ligação como removida no instante dado (a data de edição acompanha).</summary>
+    internal static GoalTag RemoveAt(GoalTag link, DateTimeOffset at) => link with { RemovedAt = at, UpdatedAt = at };
 
     internal static Tag NewTag(string name, GoalColor color, DateTimeOffset at) =>
         new() { Id = TagIds.ForTag(name), Name = name, Color = color, UpdatedAt = at };
@@ -179,6 +194,10 @@ public sealed class TagService(ITagRepository tags, IGoalRepository goals, TimeP
         public IReadOnlyList<GoalTag> Links { get; }
 
         public IEnumerable<GoalTag> LinksOf(string name) => _links[name];
+
+        /// <summary>Ligações não removidas que só a exclusão da tag esconde; reativar a tag as traria de volta.</summary>
+        public List<GoalTag> HiddenLinksOf(Tag tag) =>
+            [.. _links[tag.Name].Where(l => l.RemovedAt is null && !TagVisibility.IsLinkVisible(l, tag))];
 
         public List<GoalTag> VisibleLinksOf(Tag tag) =>
             [.. _links[tag.Name].Where(l => TagVisibility.IsLinkVisible(l, tag))];

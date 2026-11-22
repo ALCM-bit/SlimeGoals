@@ -187,6 +187,9 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
                 : link with { RemovedAt = null, UpdatedAt = TagService.Next(now, link.UpdatedAt) });
             if (state.Visible.ContainsKey(name))
                 continue;
+            if (tag is not null)
+                newLinks.AddRange(state.HiddenLinksOf(tag).Where(l => l.GoalId != goalId)
+                    .Select(l => TagService.RemoveAt(l, TagService.Next(now, l.UpdatedAt))));
             var written = tag is null
                 ? TagService.NewTag(name, TagService.PickColor(colors, colors.Count), now)
                 : tag with { DeletedAt = null, UpdatedAt = TagService.Next(now, tag.UpdatedAt) };
