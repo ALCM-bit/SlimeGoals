@@ -1,8 +1,11 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SlimeGoals.Core.Diagnostics;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
+using SlimeGoals.Core.Validation;
 
 namespace SlimeGoals.App.ViewModels;
 
@@ -21,8 +24,8 @@ public sealed partial class TagChipViewModel(string name, GoalColor color, bool 
 }
 
 /// <summary>
-/// O quadro de tags da página da meta (spec Tags §4.6). Só escolhe nomes: quem grava as tags e as ligações é o
-/// <see cref="GoalService"/>, ao salvar a meta. Por isso "Criar" só põe um chip marcado na lista.
+/// O quadro de tags da página da meta (spec Tags §4.6). "Criar" grava a tag no catálogo na hora, como em Configurações;
+/// as ligações com a meta só são gravadas pelo <see cref="GoalService"/>, ao salvar a meta.
 /// </summary>
 /// <remarks>
 /// A seleção é a base (as tags da meta no banco) mais o que a pessoa marcou e menos o que desmarcou nesta edição. A cada
@@ -102,7 +105,7 @@ public sealed partial class TagPickerViewModel : ObservableObject
             _base = fresh.ToHashSet(StringComparer.Ordinal);
         else
             _base.RemoveWhere(Deleted);
-        // Marcada que era tag e sumiu foi excluída; digitada que nunca foi tag continua (só grava ao salvar).
+        // Marcada que era tag e sumiu foi excluída; marcada que nunca foi tag do aparelho (a caminho) continua.
         _added.RemoveWhere(Deleted);
         _known = visible;
 
@@ -110,7 +113,7 @@ public sealed partial class TagPickerViewModel : ObservableObject
         Chips.Clear();
         foreach (var tag in list)
             Chips.Add(new TagChipViewModel(tag.Name, tag.Color, selected.Contains(tag.Name)));
-        // Marcadas que ainda não são tags do aparelho (a tag está a caminho, ou foi digitada e só grava ao salvar).
+        // Marcadas que ainda não são tags do aparelho: a tag está a caminho.
         foreach (var name in selected.Where(n => !visible.Contains(n)).Order(StringComparer.Ordinal))
             Chips.Add(new TagChipViewModel(name, GoalColor.Purple, isSelected: true));
     }
@@ -124,8 +127,12 @@ public sealed partial class TagPickerViewModel : ObservableObject
         Remember(chip.Name, chip.IsSelected);
     }
 
+    /// <summary>
+    /// Valida o nome e grava a tag (cria ou reativa uma excluída), já marcada. Um nome que já está nos chips só é marcado:
+    /// uma tag a caminho não ganha linha nova, que venceria a verdadeira.
+    /// </summary>
     [RelayCommand]
-    private void Create()
+    private async Task CreateAsync(CancellationToken ct)
     {
         var name = TagName.Normalize(NewName);
         if (TagName.Validate(name) is { } error)
@@ -135,11 +142,31 @@ public sealed partial class TagPickerViewModel : ObservableObject
         }
 
         if (Chips.FirstOrDefault(c => c.Name == name) is { } existing)
+        {
             existing.IsSelected = true;
-        else
-            Chips.Add(new TagChipViewModel(name, GoalColor.Purple, isSelected: true));
+            Remember(name, selected: true);
+            NewName = "";
+            return;
+        }
+
+        try
+        {
+            await _service.CreateAsync(name, ct);
+        }
+        catch (GoalValidationException ex)
+        {
+            NewNameError = ex.Errors[0].Message;
+            return;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Trace.TraceError($"Falha ao criar a tag: {TraceText.Types(ex)}");
+            NewNameError = TagsSettingsViewModel.SaveError;
+            return;
+        }
         Remember(name, selected: true);
         NewName = "";
+        await ReloadAsync(ct); // a tag nova chega com a cor dela
     }
 
     private void Remember(string name, bool selected)

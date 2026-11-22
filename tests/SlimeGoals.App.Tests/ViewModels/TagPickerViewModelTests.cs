@@ -52,19 +52,48 @@ public class TagPickerViewModelTests
     }
 
     [Fact]
-    public async Task Create_adds_selected_chip_without_writing_to_repository()
+    public async Task Create_writes_the_tag_right_away_and_selects_it()
     {
+        await _service.CreateAsync("casa"); // Purple: a nova pega a primeira cor livre
         var vm = await Loaded();
-        var writes = _repo.Writes;
 
         vm.NewName = "  Saúde ";
-        vm.CreateCommand.Execute(null);
+        await vm.CreateCommand.ExecuteAsync(null);
 
-        vm.Chips.Select(c => (c.Name, c.IsSelected, c.Color)).Should().Equal(("saúde", true, GoalColor.Purple));
+        (await _service.ListAsync()).Select(t => (t.Name, t.Color)).Should().Equal(
+            ("casa", GoalColor.Purple), ("saúde", GoalColor.Pink));
+        vm.Chips.Select(c => (c.Name, c.IsSelected, c.Color)).Should().Equal(
+            ("casa", false, GoalColor.Purple), ("saúde", true, GoalColor.Pink));
         vm.SelectedNames.Should().Equal("saúde");
         (vm.NewName, vm.NewNameError).Should().Be(("", (string?)null));
-        _repo.Writes.Should().Be(writes);
-        _repo.Tags.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Create_name_of_a_tag_still_on_its_way_selects_it_without_writing()
+    {
+        var vm = await Loaded("chegando");
+        vm.ToggleCommand.Execute(vm.Chips.Single());
+        var writes = _repo.Writes;
+
+        vm.NewName = "Chegando";
+        await vm.CreateCommand.ExecuteAsync(null);
+
+        vm.SelectedNames.Should().Equal("chegando");
+        _repo.Writes.Should().Be(writes, "uma linha nova venceria a tag verdadeira que está a caminho");
+    }
+
+    [Fact]
+    public async Task Create_that_fails_to_save_shows_error_and_selects_nothing()
+    {
+        var vm = await Loaded();
+        _repo.FailNextSave = true;
+
+        vm.NewName = "saúde";
+        await vm.CreateCommand.ExecuteAsync(null);
+
+        vm.NewNameError.Should().Be("Não foi possível salvar a tag.");
+        vm.NewName.Should().Be("saúde");
+        vm.Chips.Should().BeEmpty();
     }
 
     [Fact]
@@ -74,7 +103,7 @@ public class TagPickerViewModelTests
         var vm = await Loaded();
 
         vm.NewName = " CASA";
-        vm.CreateCommand.Execute(null);
+        await vm.CreateCommand.ExecuteAsync(null);
 
         vm.Chips.Should().ContainSingle().Which.IsSelected.Should().BeTrue();
         vm.NewName.Should().BeEmpty();
@@ -86,11 +115,11 @@ public class TagPickerViewModelTests
         var vm = await Loaded();
 
         vm.NewName = "   ";
-        vm.CreateCommand.Execute(null);
+        await vm.CreateCommand.ExecuteAsync(null);
         vm.NewNameError.Should().Be("Dê um nome à tag.");
 
         vm.NewName = new string('a', 25);
-        vm.CreateCommand.Execute(null);
+        await vm.CreateCommand.ExecuteAsync(null);
         vm.NewNameError.Should().Be("A tag pode ter até 24 caracteres.");
         vm.Chips.Should().BeEmpty();
 
@@ -105,13 +134,13 @@ public class TagPickerViewModelTests
         await _service.CreateAsync("estudos");
         var vm = await Loaded("casa", "estudos", "chegando");
         vm.NewName = "novinha";
-        vm.CreateCommand.Execute(null);
+        await vm.CreateCommand.ExecuteAsync(null);
 
         await _service.DeleteAsync("estudos");
         await _service.ChangeColorAsync("casa", GoalColor.Amber);
         await vm.ReloadCommand.ExecuteAsync(null);
 
-        vm.SelectedNames.Should().Equal("casa", "chegando", "novinha");
+        vm.SelectedNames.Should().Equal("casa", "novinha", "chegando");
         vm.Chips.First(c => c.Name == "casa").Color.Should().Be(GoalColor.Amber);
         vm.Chips.Select(c => c.Name).Should().NotContain("estudos");
     }
@@ -127,7 +156,7 @@ public class TagPickerViewModelTests
         vm.ToggleCommand.Execute(vm.Chips.Single(c => c.Name == "casa"));    // desmarcada
         vm.ToggleCommand.Execute(vm.Chips.Single(c => c.Name == "estudos")); // marcada
         vm.NewName = "nova";
-        vm.CreateCommand.Execute(null);                                       // digitada, ainda não é tag
+        await vm.CreateCommand.ExecuteAsync(null);                            // criada na hora
 
         // Em Configurações: "saúde" vira "bem-estar" (a meta acompanha) e "estudos" é excluída.
         await _service.RenameAsync("saúde", "bem-estar");
@@ -135,8 +164,8 @@ public class TagPickerViewModelTests
         stored = ["bem-estar", "casa", "x"];
         await vm.ReloadCommand.ExecuteAsync(null);
 
-        vm.SelectedNames.Should().Equal("bem-estar", "x", "nova");
-        vm.Chips.Select(c => c.Name).Should().Equal("bem-estar", "casa", "x", "nova");
+        vm.SelectedNames.Should().Equal("bem-estar", "nova", "x");
+        vm.Chips.Select(c => c.Name).Should().Equal("bem-estar", "casa", "nova", "x");
     }
 
     [Fact]

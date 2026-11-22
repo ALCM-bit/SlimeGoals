@@ -20,8 +20,16 @@ public sealed class InMemoryTagRepository : ITagRepository
 
     public Task<IReadOnlyList<GoalTag>> ListLinksAsync(CancellationToken ct = default) => Task.FromResult(Links);
 
+    /// <summary>Faz o próximo <see cref="SaveAsync"/> falhar, como um banco indisponível.</summary>
+    public bool FailNextSave { get; set; }
+
     public Task SaveAsync(TagChanges changes, CancellationToken ct = default)
     {
+        if (FailNextSave)
+        {
+            FailNextSave = false;
+            throw new InvalidOperationException("falha simulada ao gravar a tag");
+        }
         Apply(changes);
         return Task.CompletedTask;
     }

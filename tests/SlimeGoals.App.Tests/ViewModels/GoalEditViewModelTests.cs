@@ -504,7 +504,7 @@ public class GoalEditViewModelTests
         vm.Title = "Arrumar";
         vm.Tags.ToggleCommand.Execute(vm.Tags.Chips.Single());
         vm.Tags.NewName = "Saúde";
-        vm.Tags.CreateCommand.Execute(null);
+        await vm.Tags.CreateCommand.ExecuteAsync(null);
 
         await vm.SaveCommand.ExecuteAsync(null);
 

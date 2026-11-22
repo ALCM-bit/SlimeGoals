@@ -319,6 +319,26 @@ public class GoalsPageViewModelTests
     }
 
     [Fact]
+    public async Task Tag_created_in_a_new_goal_is_already_in_settings_and_stays_after_cancel()
+    {
+        _vm.NewCommand.Execute(null);
+        var editor = _vm.Editor!;
+        await editor.Tags.ReloadCommand.ExecuteAsync(null);
+
+        editor.Tags.NewName = "Saúde";
+        await editor.Tags.CreateCommand.ExecuteAsync(null);
+
+        // "Gerenciar tags ›" lista o catálogo: a tag já está lá, antes de salvar a meta.
+        (await _tags.ListAsync()).Select(t => (t.Name, t.ActiveGoals)).Should().Equal(("saúde", 0));
+
+        await ReturnToPage(editor);
+        editor.Tags.SelectedNames.Should().Equal("saúde");
+
+        editor.CancelCommand.Execute(null);
+        (await _tags.ListAsync()).Select(t => t.Name).Should().Equal("saúde");
+    }
+
+    [Fact]
     public async Task Renaming_the_selected_tag_in_settings_keeps_it_on_the_goal_after_save()
     {
         var goal = await Create("Ler", tags: "saúde");
@@ -356,7 +376,7 @@ public class GoalsPageViewModelTests
         editor.Tags.ToggleCommand.Execute(editor.Tags.Chips.Single(c => c.Name == "casa"));
         editor.Tags.ToggleCommand.Execute(editor.Tags.Chips.Single(c => c.Name == "estudos"));
         editor.Tags.NewName = "nova";
-        editor.Tags.CreateCommand.Execute(null);
+        await editor.Tags.CreateCommand.ExecuteAsync(null);
 
         await _tags.RenameAsync("saúde", "bem-estar");
         await ReturnToPage(editor);
