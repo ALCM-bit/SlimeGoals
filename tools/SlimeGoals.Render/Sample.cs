@@ -79,7 +79,7 @@ public sealed class Sample : IDisposable
                 s.GetRequiredService<TimerService>(), s.GetRequiredService<GoalService>(), TimeProvider.System,
                 s.GetRequiredService<ReminderService>(), s.GetRequiredService<DataChangeNotifier>(),
                 s.GetRequiredService<ReminderPause>(), s.GetRequiredService<ReportService>(), capabilities, permissions,
-                focus, navigator, syncAccount),
+                focus, navigator, syncAccount, s.GetRequiredService<TagService>()),
             new GoalsPageViewModel(s.GetRequiredService<GoalService>(), TimeProvider.System, s.GetRequiredService<TagService>(), navigator),
             new TimePageViewModel(new PomodoroViewModel(focus, s.GetRequiredService<GoalService>(), s.GetRequiredService<TagService>(), Clock,
                 s.GetRequiredService<DataChangeNotifier>(), navigator)),

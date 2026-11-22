@@ -27,7 +27,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     GoalService goals, TimeProvider time, ReminderService reminders, DataChangeNotifier changes,
     ReminderPause? pause = null, ReportService? reports = null, PlatformCapabilities? capabilities = null,
     IReminderPermissions? permissions = null, FocusService? focus = null, PageNavigator? navigator = null,
-    ISyncAccount? account = null) : PageViewModel
+    ISyncAccount? account = null, TagService? tags = null) : PageViewModel
 {
     private readonly bool _reminders = (capabilities ?? PlatformCapabilities.Desktop).Reminders;
 
@@ -44,6 +44,9 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     public override string IconKey => "NavToday";
 
     public ObservableCollection<TodayGoalViewModel> Goals { get; } = [];
+
+    /// <summary>Filtro por tags: muda só quais cartões aparecem; hero, contadores e slime contam <see cref="Goals"/> inteiro.</summary>
+    public TodayTagFilterViewModel Filter { get; } = new();
 
     public ObservableCollection<UpcomingReminderViewModel> Upcoming { get; } = [];
 
@@ -187,6 +190,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             var snapshot = await progress.GetTodayAsync();
             var todayCheckins = await checkins.TodayAsync();
             var session = focus is null ? null : await focus.GetAsync();
+            var tagColors = await LoadTagColorsAsync();
             if (version != _loadVersion)
                 return;
 
@@ -200,7 +204,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             foreach (var item in snapshot.Goals)
             {
                 var card = new TodayGoalViewModel(item, snapshot.Timer, time,
-                    todayCheckins.Where(c => c.GoalId == item.Goal.Id).ToList())
+                    todayCheckins.Where(c => c.GoalId == item.Goal.Id).ToList(), tagColors)
                 {
                     CanStartTimer = snapshot.Timer is null && session is null,
                 };
@@ -214,6 +218,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
                 }
                 Goals.Add(card);
             }
+            Filter.Refresh(Goals);
             var running = Goals.FirstOrDefault(g => g.IsTimerRunning);
             if (draft is not null && running is not null && running.Goal.Id == draft.Goal.Id
                 && (draft.IsSwitchingTask || draft.IsEditingTask
@@ -260,6 +265,22 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         }
         // Por último: o aviso é só um complemento e não atrasa os cartões das metas.
         await RefreshSyncWarningAsync();
+    }
+
+    /// <summary>Sem as cores, as tags dos cartões ficam em Purple: o filtro não derruba a tela.</summary>
+    private async Task<IReadOnlyDictionary<string, GoalColor>?> LoadTagColorsAsync()
+    {
+        if (tags is null)
+            return null;
+        try
+        {
+            return await tags.ColorsAsync();
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            Trace.TraceWarning($"Cores das tags indisponíveis: {TraceText.Types(e)}");
+            return null;
+        }
     }
 
     /// <summary>Sem sugestões se a leitura falhar: o campo continua aceitando texto livre.</summary>

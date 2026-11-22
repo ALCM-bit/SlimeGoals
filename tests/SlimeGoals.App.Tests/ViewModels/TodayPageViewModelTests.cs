@@ -18,7 +18,8 @@ public class TodayPageViewModelTests
     // Quarta, 04/11/2026 12:00 em São Paulo (UTC-3).
     private static readonly DateTimeOffset Now = new(2026, 11, 4, 15, 0, 0, TimeSpan.Zero);
     private readonly FakeTimeProvider _time = new(Now);
-    private readonly InMemoryGoalRepository _goals = new();
+    private readonly InMemoryTagRepository _tagRepo = new();
+    private readonly InMemoryGoalRepository _goals;
     private readonly InMemoryCheckinRepository _checkins = new();
     private readonly InMemoryTimerRepository _timers;
     private readonly InMemoryReminderLogRepository _log = new();
@@ -28,13 +29,14 @@ public class TodayPageViewModelTests
 
     public TodayPageViewModelTests()
     {
+        _goals = new(tags: _tagRepo);
         _timers = new(_checkins);
         _time.SetLocalTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
     }
 
     private TimerService Timers => new(_goals, _timers, CheckinService, _time);
 
-    private GoalService GoalService => new(_goals, _checkins, _timers, _time);
+    private GoalService GoalService => new(_goals, _checkins, _timers, _time, tags: _tagRepo);
     private CheckinService CheckinService => new(_goals, _checkins, _time);
 
     private ReminderPause Pause => new(_settings, _time, _changes);
@@ -43,7 +45,8 @@ public class TodayPageViewModelTests
         new ProgressService(_goals, _checkins, _timers, _time), CheckinService,
         new TimerService(_goals, _timers, CheckinService, _time), GoalService, _time,
         new ReminderService(_goals, _checkins, _timers, _log, _notifications, new ReminderFormatter(), _time, Pause),
-        _changes, Pause, new ReportService(_goals, _checkins, _log, _time), capabilities, permissions);
+        _changes, Pause, new ReportService(_goals, _checkins, _log, _time), capabilities, permissions,
+        tags: new TagService(_tagRepo, _goals, _time));
 
     private TodayPageViewModel NewPageWithAccount(FakeSyncAccount account, PageNavigator? navigator = null) => new(
         new ProgressService(_goals, _checkins, _timers, _time), CheckinService,
@@ -271,6 +274,63 @@ public class TodayPageViewModelTests
         GoalService.CreateAsync(new GoalDraft(title, Recurrence.Daily, target, "water", GoalColor.Green, 60,
             new TimeOnly(8, 0), new TimeOnly(20, 0), WeekDays.All, null, null, measure,
             measure == Measure.Quantity ? unit : null));
+
+    private Task<Goal> CreateTagged(string title, params string[] tags) =>
+        GoalService.CreateAsync(new GoalDraft(title, Recurrence.Daily, 1, "water", GoalColor.Green, 60,
+            new TimeOnly(8, 0), new TimeOnly(20, 0), WeekDays.All, null, null, Measure.Completion, null) with { Tags = tags });
+
+    [Fact]
+    public async Task Cards_carry_tag_chips_with_the_tag_colors()
+    {
+        await CreateTagged("Remédio", "medicamentos", "zeta");
+        await CreateTagged("Sem tag");
+        var page = NewPage();
+        await page.LoadCommand.ExecuteAsync(null);
+
+        var card = Card(page, "Remédio");
+        card.HasTags.Should().BeTrue();
+        card.Tags.Select(t => (t.Name, t.Color)).Should().Equal(("medicamentos", GoalColor.Purple), ("zeta", GoalColor.Pink));
+        Card(page, "Sem tag").HasTags.Should().BeFalse();
+        page.Filter.Chips.Select(c => c.Name).Should().Equal("medicamentos", "zeta");
+    }
+
+    [Fact]
+    public async Task Filter_does_not_change_week_percent_counters_or_mascot()
+    {
+        await CreateTagged("A", "x");
+        await CreateTagged("B", "y");
+        await CreateTagged("C", "y");
+        var page = NewPage();
+        await page.LoadCommand.ExecuteAsync(null);
+        var before = (page.WeekPercent, page.InProgress, page.Completed, page.Mascot, page.IsEmpty, page.StreakValue);
+
+        page.Filter.ToggleCommand.Execute(page.Filter.Chips.Single(c => c.Name == "x"));
+
+        page.Goals.Count(g => g.IsShown).Should().Be(1);
+        (page.WeekPercent, page.InProgress, page.Completed, page.Mascot, page.IsEmpty, page.StreakValue).Should().Be(before);
+        page.Goals.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task Selection_survives_reload_and_drops_when_the_last_goal_of_the_tag_is_completed()
+    {
+        await CreateTagged("A", "x");
+        var b = await CreateTagged("B", "y");
+        var page = NewPage();
+        await page.LoadCommand.ExecuteAsync(null);
+        page.Filter.ToggleCommand.Execute(page.Filter.Chips.Single(c => c.Name == "y"));
+
+        await page.LoadCommand.ExecuteAsync(null);
+        page.Filter.HasSelection.Should().BeTrue();
+        Card(page, "A").IsShown.Should().BeFalse();
+
+        // Meta arquivada sai da lista: a tag "y" some da linha, e o filtro se limpa.
+        await GoalService.ArchiveAsync(b.Id);
+        await page.LoadCommand.ExecuteAsync(null);
+
+        page.Filter.HasSelection.Should().BeFalse();
+        Card(page, "A").IsShown.Should().BeTrue();
+    }
 
     private static TodayGoalViewModel Card(TodayPageViewModel page, string title) => page.Goals.Single(g => g.Title == title);
 

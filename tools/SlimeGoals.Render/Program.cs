@@ -15,9 +15,9 @@ using SlimeGoals.Sync;
 using ScrollViewer = Avalonia.Controls.ScrollViewer;
 using Window = Avalonia.Controls.Window;
 
-if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini" or "sync-warning")))
+if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini" or "sync-warning" or "today-tags")))
 {
-    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning]");
+    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning|today-tags]");
     return 1;
 }
 
@@ -67,6 +67,13 @@ if (which == "mini")
     RenderMini("mini-focus-goal-task", () => sample.CreateMiniFocus("Leitura", "Revisar capítulo 3"));
     RenderMini("mini-focus-paused-hover", () => sample.CreateMiniFocus("Leitura", null, paused: true), hover: true);
     sample.ClearFocus();
+}
+if (which == "today-tags")
+{
+    RenderTodayTags(320, 900);
+    RenderTodayTags(360, 900);
+    RenderTodayTags(412, 915);
+    RenderTodayTags(1100, 720);
 }
 if (which == "sync-warning")
 {
@@ -421,6 +428,34 @@ void RenderNarrow(int width)
 #pragma warning restore CS0618
     Console.WriteLine(path);
     window.Close();
+}
+
+// Hoje com tags: a linha de filtros sem seleção, com duas tags marcadas (Limpar e "x de y metas") e uma sem meta.
+void RenderTodayTags(int width, int height)
+{
+    var shell = sample.CreateShell(width < 720);
+    var window = new Window { Width = width, Height = height, Content = new ShellView { DataContext = shell } };
+    window.Show();
+    var today = shell.Pages.OfType<TodayPageViewModel>().Single();
+    shell.CurrentPage = today;
+    Pump();
+    Capture($"today-tags-{width}.png");
+    foreach (var name in new[] { "saúde", "estudos" })
+        today.Filter.ToggleCommand.Execute(today.Filter.Chips.Single(c => c.Name == name));
+    Pump();
+    Capture($"today-tags-selected-{width}.png");
+    today.Filter.ClearCommand.Execute(null);
+    window.Close();
+
+    void Capture(string name)
+    {
+        var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para capturar.");
+        using var stream = File.Create(Path.Combine(outDir, name));
+#pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
+        frame.Save(stream);
+#pragma warning restore CS0618
+        Console.WriteLine(Path.Combine(outDir, name));
+    }
 }
 
 // Hoje com um cronômetro rodando: o cartão mais apertado (tempo + parar + mais opções).
