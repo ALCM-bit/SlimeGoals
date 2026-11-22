@@ -17,5 +17,5 @@ public class TagIdsTests
 
     [Fact]
     public void Same_name_in_nfd_and_nfc_gives_same_id() =>
-        TagIds.ForTag(TagName.Normalize("Saúde")).Should().Be(TagIds.ForTag(TagName.Normalize("saúde")));
+        TagIds.ForTag(TagName.Normalize("Sau\u0301de")).Should().Be(TagIds.ForTag(TagName.Normalize("sa\u00fade")));
 }

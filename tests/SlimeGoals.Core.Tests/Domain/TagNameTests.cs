@@ -8,7 +8,7 @@ public class TagNameTests
     [Theory]
     [InlineData("  Estudos  ", "estudos")]
     [InlineData("Vida   Saudável", "vida saudável")]
-    [InlineData("Saúde", "saúde")] // NFD vira NFC
+    [InlineData("Sau\u0301de", "sa\u00fade")] // NFD vira NFC
     public void Normalize_is_nfc_trimmed_single_spaced_and_invariant_lower(string raw, string expected) =>
         TagName.Normalize(raw).Should().Be(expected);
 
