@@ -175,6 +175,21 @@ public class GoalRepositoryTests : IDisposable
         read.Tags.Should().Equal("casa");
     }
 
+    [Theory]
+    [InlineData("UPDATE tags SET color = 'azul' WHERE name = 'ruim'")]
+    [InlineData("UPDATE goal_tags SET updated_at = 'agora' WHERE tag_name = 'ruim'")]
+    public async Task Invalid_tag_or_link_row_is_ignored_by_goal_reads(string corruption)
+    {
+        var goal = NewGoal();
+        await Repo.AddAsync(goal, new TagChanges([NewTag("casa"), NewTag("ruim")],
+            [NewLink(goal.Id, "casa"), NewLink(goal.Id, "ruim")]));
+        _db.Anchor.Execute(corruption);
+
+        (await Repo.GetAsync(goal.Id))!.Title.Should().Be(goal.Title);
+        var listed = await Repo.ListAsync(includeArchived: false);
+        listed.Should().ContainSingle().Which.Tags.Should().Contain("casa");
+    }
+
     private static Goal NewGoal(string title = "Ler 📚 ação", DateTimeOffset? createdAt = null) => new()
     {
         Id = Guid.CreateVersion7(),

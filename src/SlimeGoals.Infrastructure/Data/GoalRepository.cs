@@ -117,10 +117,11 @@ public sealed class GoalRepository(SqliteConnectionFactory db) : IGoalRepository
     private static async Task<(IReadOnlyDictionary<string, Tag> Tags, List<GoalTag> Links)> ReadTagsAsync(
         SqliteConnection c, CancellationToken ct)
     {
-        var tags = (await c.QueryAsync<TagRow>(new CommandDefinition(TagRows.SelectTags, cancellationToken: ct)))
-            .Select(r => r.ToDomain()).ToDictionary(t => t.Name);
-        var links = (await c.QueryAsync<GoalTagRow>(new CommandDefinition(TagRows.SelectLinks, cancellationToken: ct)))
-            .Select(r => r.ToDomain()).ToList();
+        var tags = (await RowReader.ReadValidAsync<TagRow, Tag>(c,
+            new CommandDefinition(TagRows.SelectTags, cancellationToken: ct), "tags", r => r.ToDomain()))
+            .ToDictionary(t => t.Name);
+        var links = await RowReader.ReadValidAsync<GoalTagRow, GoalTag>(c,
+            new CommandDefinition(TagRows.SelectLinks, cancellationToken: ct), "goal_tags", r => r.ToDomain());
         return (tags, links);
     }
 }
