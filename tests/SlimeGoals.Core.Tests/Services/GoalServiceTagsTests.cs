@@ -105,4 +105,24 @@ public class GoalServiceTagsTests
         (await _goals.GetAsync(other.Id))!.Tags.Should().Equal("t");
         (await _goals.GetAsync(hidden.Id))!.Tags.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task Link_to_deleted_but_visible_tag_is_newer_than_the_deletion_even_with_a_lagging_clock()
+    {
+        // "t" foi excluída às T0+1h, mas outra meta a marcou depois (T0+2h): ela continua visível. O relógio daqui está em T0.
+        var marker = await _service.CreateAsync(Draft());
+        var goal = await _service.CreateAsync(Draft());
+        var deletedAt = T0.AddHours(1);
+        await _tags.SaveAsync(new TagChanges(
+            [new Tag { Id = TagIds.ForTag("t"), Name = "t", Color = GoalColor.Green, UpdatedAt = deletedAt, DeletedAt = deletedAt }],
+            [new GoalTag { Id = TagIds.ForLink(marker.Id, "t"), GoalId = marker.Id, TagName = "t", UpdatedAt = T0.AddHours(2) }]));
+
+        var updated = await _service.UpdateAsync(goal.Id, Draft("t"));
+
+        updated.Tags.Should().Equal("t");
+        (await _goals.GetAsync(goal.Id))!.Tags.Should().Equal("t");
+        _tags.Links.Single(l => l.GoalId == goal.Id).UpdatedAt.Should().Be(deletedAt.AddMilliseconds(1));
+        _tags.Tags.Single().Should().Match<Tag>(t => t.DeletedAt == deletedAt && t.UpdatedAt == deletedAt, "a tag visível não é regravada");
+    }
 }
+

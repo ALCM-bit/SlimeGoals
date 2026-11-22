@@ -81,14 +81,19 @@ public sealed class TagService(ITagRepository tags, IGoalRepository goals, TimeP
 
         var oldLinks = state.VisibleLinksOf(oldTag);
         state.Tags.TryGetValue(newName, out var target);
-        var known = oldLinks.Select(l => l.UpdatedAt).Append(oldTag.UpdatedAt);
+        // As ligações do nome novo entram mesmo sem a linha da tag: elas podem ter chegado antes dela, com data à frente.
+        var known = oldLinks.Select(l => l.UpdatedAt).Append(oldTag.UpdatedAt).Concat(state.LinksOf(newName).Select(l => l.UpdatedAt));
         if (target is not null)
-            known = known.Append(target.UpdatedAt).Concat(state.LinksOf(newName).Select(l => l.UpdatedAt));
+            known = known.Append(target.UpdatedAt);
         var instant = Next(time.GetUtcNow(), known.Max());
 
         var changedTags = new List<Tag> { oldTag with { DeletedAt = instant, UpdatedAt = instant } };
+        // Nome novo que não está à vista (nunca existiu ou foi excluído): a tag fica com a cor da antiga.
         if (!state.Visible.ContainsKey(newName))
-            changedTags.Add((target ?? NewTag(newName, oldTag.Color, instant)) with { DeletedAt = null, UpdatedAt = instant });
+            changedTags.Add((target ?? NewTag(newName, oldTag.Color, instant)) with
+            {
+                Color = oldTag.Color, DeletedAt = null, UpdatedAt = instant,
+            });
 
         var changedLinks = new List<GoalTag>();
         if (target is not null && !state.Visible.ContainsKey(newName))

@@ -182,9 +182,14 @@ public sealed class GoalService(IGoalRepository goals, ICheckinRepository checki
             if (link is not null && TagVisibility.IsLinkVisible(link, tag))
                 continue;
 
+            // Tag excluída que segue à vista (outra meta a marcou depois): a ligação precisa ser mais nova que a exclusão,
+            // senão um relógio atrasado a deixaria escondida.
+            var at = link is null ? now : TagService.Next(now, link.UpdatedAt);
+            if (tag?.DeletedAt is { } deletedAt && at <= deletedAt)
+                at = TagService.Next(now, deletedAt);
             newLinks.Add(link is null
-                ? TagService.NewLink(goalId, name, now)
-                : link with { RemovedAt = null, UpdatedAt = TagService.Next(now, link.UpdatedAt) });
+                ? TagService.NewLink(goalId, name, at)
+                : link with { RemovedAt = null, UpdatedAt = at });
             if (state.Visible.ContainsKey(name))
                 continue;
             if (tag is not null)

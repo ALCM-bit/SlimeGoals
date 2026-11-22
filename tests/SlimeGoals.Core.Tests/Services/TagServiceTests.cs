@@ -231,4 +231,40 @@ public class TagServiceTests
         (await _goals.GetAsync(hidden.Id))!.Tags.Should().BeEmpty();
         (await _goals.GetAsync(moved.Id))!.Tags.Should().Equal("t");
     }
+
+    [Fact]
+    public async Task Rename_into_deleted_target_takes_the_old_tag_color()
+    {
+        await Seed([NewTag("t", GoalColor.Amber, T0, deletedAt: T0)]);
+        var goal = await GoalWith("velho");
+        await Seed([NewTag("velho", GoalColor.Green, T0)]);
+        _time.Advance(TimeSpan.FromHours(1));
+        var now = _time.GetUtcNow();
+
+        await _service.RenameAsync("velho", "t");
+
+        _tags.Tags.Single(t => t.Name == "t").Should().Be(NewTag("t", GoalColor.Green, now));
+        (await _goals.GetAsync(goal.Id))!.Tags.Should().Equal("t");
+    }
+
+    [Fact]
+    public async Task Rename_to_a_name_with_links_but_no_tag_row_is_newer_than_those_links()
+    {
+        // A ligação "nova" de outra meta chegou antes da tag, com data à frente do relógio daqui.
+        var other = await _goalService.CreateAsync(GoalValidatorTests.Valid());
+        var arrived = T0.AddHours(3);
+        await Seed(links: [NewLink(other.Id, "nova", arrived)]);
+        var goal = await GoalWith("velho");
+        await Seed([NewTag("velho", GoalColor.Green, T0)]);
+        var instant = arrived.AddMilliseconds(1);
+
+        await _service.RenameAsync("velho", "nova");
+
+        _tags.Tags.Single(t => t.Name == "nova").Should().Be(NewTag("nova", GoalColor.Green, instant));
+        _tags.Tags.Single(t => t.Name == "velho").DeletedAt.Should().Be(instant);
+        _tags.Links.Single(l => l.GoalId == goal.Id && l.TagName == "nova").UpdatedAt.Should().Be(instant);
+        (await _goals.GetAsync(goal.Id))!.Tags.Should().Equal("nova");
+        (await _goals.GetAsync(other.Id))!.Tags.Should().Equal("nova");
+    }
 }
+
