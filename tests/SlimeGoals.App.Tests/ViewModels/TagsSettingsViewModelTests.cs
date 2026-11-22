@@ -23,7 +23,8 @@ public class TagsSettingsViewModelTests
 
     private async Task<Goal> GoalWith(params string[] tags) =>
         await _goals.CreateAsync(new GoalDraft("Meta", Recurrence.Daily, 3, "book", GoalColor.Purple, 120,
-            new TimeOnly(9, 0), new TimeOnly(18, 0), WeekDays.Weekdays, null, null) with { Tags = tags });
+            new TimeOnly(9, 0), new TimeOnly(18, 0), WeekDays.Weekdays, null, null) with
+        { Tags = tags });
 
     private async Task<TagsSettingsViewModel> Loaded()
     {

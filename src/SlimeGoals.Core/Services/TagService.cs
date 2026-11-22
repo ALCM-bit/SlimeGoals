@@ -92,7 +92,9 @@ public sealed class TagService(ITagRepository tags, IGoalRepository goals, TimeP
         if (!state.Visible.ContainsKey(newName))
             changedTags.Add((target ?? NewTag(newName, oldTag.Color, instant)) with
             {
-                Color = oldTag.Color, DeletedAt = null, UpdatedAt = instant,
+                Color = oldTag.Color,
+                DeletedAt = null,
+                UpdatedAt = instant,
             });
 
         var changedLinks = new List<GoalTag>();

@@ -467,7 +467,8 @@ void RenderTodayTags(int width, int height)
     {
         foreach (var g in tagged)
             goalService.UpdateAsync(g.Id, new GoalDraft(g.Title, g.Recurrence, g.Target, g.Icon, g.Color, g.ReminderEveryMinutes,
-                g.ActiveFrom, g.ActiveUntil, g.ActiveDays, g.StartDate, g.EndDate, g.Measure, g.Unit) with { Tags = tagsOf(g) })
+                g.ActiveFrom, g.ActiveUntil, g.ActiveDays, g.StartDate, g.EndDate, g.Measure, g.Unit) with
+            { Tags = tagsOf(g) })
                 .GetAwaiter().GetResult();
     }
 

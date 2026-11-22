@@ -42,7 +42,8 @@ public sealed class AppContainerSqliteTests : IDisposable
     {
         var goals = _services.GetRequiredService<GoalService>();
         var draft = new GoalDraft("Ler", Recurrence.Daily, 3, "book", GoalColor.Purple, 120,
-            new TimeOnly(9, 0), new TimeOnly(18, 0), WeekDays.All, null, null) { Tags = ["Saúde", "estudos"] };
+            new TimeOnly(9, 0), new TimeOnly(18, 0), WeekDays.All, null, null)
+        { Tags = ["Saúde", "estudos"] };
 
         var created = await goals.CreateAsync(draft);
 

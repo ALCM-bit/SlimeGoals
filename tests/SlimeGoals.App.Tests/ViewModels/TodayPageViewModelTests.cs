@@ -277,7 +277,8 @@ public class TodayPageViewModelTests
 
     private Task<Goal> CreateTagged(string title, params string[] tags) =>
         GoalService.CreateAsync(new GoalDraft(title, Recurrence.Daily, 1, "water", GoalColor.Green, 60,
-            new TimeOnly(8, 0), new TimeOnly(20, 0), WeekDays.All, null, null, Measure.Completion, null) with { Tags = tags });
+            new TimeOnly(8, 0), new TimeOnly(20, 0), WeekDays.All, null, null, Measure.Completion, null) with
+        { Tags = tags });
 
     [Fact]
     public async Task Cards_carry_tag_chips_with_the_tag_colors()

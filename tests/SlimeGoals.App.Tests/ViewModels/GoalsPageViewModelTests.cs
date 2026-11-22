@@ -30,7 +30,8 @@ public class GoalsPageViewModelTests
 
     private Task<Goal> Create(string title, Recurrence r = Recurrence.Daily, DateOnly? end = null, params string[] tags) =>
         _service.CreateAsync(new GoalDraft(title, r, 3, "book", GoalColor.Purple, 120,
-            new TimeOnly(9, 0), new TimeOnly(18, 0), WeekDays.Weekdays, null, end) { Tags = tags });
+            new TimeOnly(9, 0), new TimeOnly(18, 0), WeekDays.Weekdays, null, end)
+        { Tags = tags });
 
     private static async Task WaitUntilAsync(Func<bool> condition)
     {
