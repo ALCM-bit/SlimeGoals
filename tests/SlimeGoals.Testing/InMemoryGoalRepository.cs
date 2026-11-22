@@ -25,14 +25,18 @@ public sealed class InMemoryGoalRepository(InMemoryCheckinRepository? checkins =
     /// <summary>Simula linha inválida no banco: a meta some das listas, e a leitura por id lança <see cref="FormatException"/>.</summary>
     public void MarkUnreadable(Guid id) => _unreadable.Add(id);
 
-    public Task AddAsync(Goal goal, CancellationToken ct = default)
+    public Task AddAsync(Goal goal, CancellationToken ct = default) => AddAsync(goal, TagChanges.Empty, ct);
+
+    public Task AddAsync(Goal goal, TagChanges tagChanges, CancellationToken ct = default)
     {
         if (FailWritesWith is not null) throw FailWritesWith;
         _goals.Add(goal.Id, goal);
         return Task.CompletedTask;
     }
 
-    public Task UpdateAsync(Goal goal, CancellationToken ct = default)
+    public Task UpdateAsync(Goal goal, CancellationToken ct = default) => UpdateAsync(goal, TagChanges.Empty, ct);
+
+    public Task UpdateAsync(Goal goal, TagChanges tagChanges, CancellationToken ct = default)
     {
         if (FailWritesWith is not null) throw FailWritesWith;
         if (!_goals.ContainsKey(goal.Id)) throw new GoalNotFoundException(goal.Id);

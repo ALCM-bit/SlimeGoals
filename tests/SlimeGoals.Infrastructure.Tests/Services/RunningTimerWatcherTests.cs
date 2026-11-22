@@ -179,7 +179,7 @@ public sealed class RunningTimerWatcherTests : IDisposable
         _watcher.Current.Should().NotBeNull();
         (await ChangesDuring(async () =>
         {
-            await _goals.UpdateAsync(archived with { ArchivedAt = T0, UpdatedAt = T0.AddSeconds(1) });
+            await _goals.UpdateAsync(archived with { ArchivedAt = T0, UpdatedAt = T0.AddSeconds(1) }, TagChanges.Empty);
             _changes.NotifyChanged();
         })).Should().Be(1);
         _watcher.Current.Should().BeNull();
@@ -226,8 +226,8 @@ public sealed class RunningTimerWatcherTests : IDisposable
     {
         public string? FailWith { get; set; }
 
-        public Task AddAsync(Goal goal, CancellationToken ct = default) => inner.AddAsync(goal, ct);
-        public Task UpdateAsync(Goal goal, CancellationToken ct = default) => inner.UpdateAsync(goal, ct);
+        public Task AddAsync(Goal goal, TagChanges tagChanges, CancellationToken ct = default) => inner.AddAsync(goal, tagChanges, ct);
+        public Task UpdateAsync(Goal goal, TagChanges tagChanges, CancellationToken ct = default) => inner.UpdateAsync(goal, tagChanges, ct);
         public Task DeleteAsync(Guid id, CancellationToken ct = default) => inner.DeleteAsync(id, ct);
 
         public Task<Goal?> GetAsync(Guid id, CancellationToken ct = default) =>

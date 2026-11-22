@@ -1,5 +1,6 @@
 using System.Data;
 using Dapper;
+using Microsoft.Data.Sqlite;
 using SlimeGoals.Core;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Domain;
@@ -18,7 +19,9 @@ public sealed class GoalRepository(SqliteConnectionFactory db) : IGoalRepository
         FROM goals
         """;
 
-    public async Task AddAsync(Goal goal, CancellationToken ct = default)
+    public Task AddAsync(Goal goal, CancellationToken ct = default) => AddAsync(goal, TagChanges.Empty, ct);
+
+    public async Task AddAsync(Goal goal, TagChanges tagChanges, CancellationToken ct = default)
     {
         await using var c = db.Open();
         await using var tx = await c.BeginTransactionAsync(ct);
@@ -31,10 +34,13 @@ public sealed class GoalRepository(SqliteConnectionFactory db) : IGoalRepository
                     @ArchivedAt, @DeletedAt)
             """, GoalRow.FromDomain(goal), tx, cancellationToken: ct));
         await SyncOutbox.EnqueueAsync(c, tx, goal.Id, SyncOutbox.Goal, ct);
+        await TagRows.WriteAsync(c, tx, tagChanges, ct);
         await tx.CommitAsync(ct);
     }
 
-    public async Task UpdateAsync(Goal goal, CancellationToken ct = default)
+    public Task UpdateAsync(Goal goal, CancellationToken ct = default) => UpdateAsync(goal, TagChanges.Empty, ct);
+
+    public async Task UpdateAsync(Goal goal, TagChanges tagChanges, CancellationToken ct = default)
     {
         await using var c = db.Open();
         await using var tx = await c.BeginTransactionAsync(ct);
@@ -50,6 +56,7 @@ public sealed class GoalRepository(SqliteConnectionFactory db) : IGoalRepository
         if (affected == 0)
             throw new GoalNotFoundException(goal.Id);
         await SyncOutbox.EnqueueAsync(c, tx, goal.Id, SyncOutbox.Goal, ct);
+        await TagRows.WriteAsync(c, tx, tagChanges, ct);
         await tx.CommitAsync(ct);
     }
 
@@ -73,7 +80,10 @@ public sealed class GoalRepository(SqliteConnectionFactory db) : IGoalRepository
             var row = await c.QuerySingleOrDefaultAsync<GoalRow>(new CommandDefinition(
                 SelectColumns + " WHERE id = @Id AND deleted_at IS NULL",
                 new { Id = id.ToString("D") }, cancellationToken: ct));
-            return row?.ToDomain();
+            if (row is null)
+                return null;
+            var (tags, links) = await ReadTagsAsync(c, ct);
+            return row.ToDomain() with { Tags = VisibleNames(id, links, tags) };
         }
         catch (DataException e)
         {
@@ -85,10 +95,32 @@ public sealed class GoalRepository(SqliteConnectionFactory db) : IGoalRepository
     public async Task<IReadOnlyList<Goal>> ListAsync(bool includeArchived, CancellationToken ct = default)
     {
         await using var c = db.Open();
-        return await RowReader.ReadValidAsync<GoalRow, Goal>(c, new CommandDefinition(
+        var goals = await RowReader.ReadValidAsync<GoalRow, Goal>(c, new CommandDefinition(
             SelectColumns + """
              WHERE deleted_at IS NULL AND (@IncludeArchived OR archived_at IS NULL)
              ORDER BY created_at
             """, new { IncludeArchived = includeArchived }, cancellationToken: ct), "goals", r => r.ToDomain());
+        if (goals.Count == 0)
+            return goals;
+
+        var (tags, links) = await ReadTagsAsync(c, ct);
+        var linksByGoal = links.ToLookup(l => l.GoalId);
+        return [.. goals.Select(g => g with { Tags = VisibleNames(g.Id, linksByGoal[g.Id], tags) })];
+    }
+
+    // Sem tags, a mesma lista vazia compartilhada de Goal.Tags: a igualdade de record compara a lista por referência.
+    private static IReadOnlyList<string> VisibleNames(
+        Guid goalId, IEnumerable<GoalTag> links, IReadOnlyDictionary<string, Tag> tags) =>
+        TagVisibility.NamesFor(goalId, links, tags) is { Count: > 0 } names ? names : [];
+
+    /// <summary>Uma consulta de tags e uma de ligações por chamada, nunca uma por meta.</summary>
+    private static async Task<(IReadOnlyDictionary<string, Tag> Tags, List<GoalTag> Links)> ReadTagsAsync(
+        SqliteConnection c, CancellationToken ct)
+    {
+        var tags = (await c.QueryAsync<TagRow>(new CommandDefinition(TagRows.SelectTags, cancellationToken: ct)))
+            .Select(r => r.ToDomain()).ToDictionary(t => t.Name);
+        var links = (await c.QueryAsync<GoalTagRow>(new CommandDefinition(TagRows.SelectLinks, cancellationToken: ct)))
+            .Select(r => r.ToDomain()).ToList();
+        return (tags, links);
     }
 }
