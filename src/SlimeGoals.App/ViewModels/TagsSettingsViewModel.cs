@@ -18,11 +18,15 @@ public sealed partial class TagsSettingsViewModel : ObservableObject
     internal const string SaveError = "Não foi possível salvar a tag.";
 
     private readonly TagService _service;
+    private readonly DataChangeNotifier? _changes;
+    private SynchronizationContext? _ui;
+    private bool _watching;
     private int _version;
 
-    public TagsSettingsViewModel(TagService service)
+    public TagsSettingsViewModel(TagService service, DataChangeNotifier? changes = null)
     {
         _service = service;
+        _changes = changes;
         Rows.CollectionChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(IsEmpty));
@@ -31,6 +35,36 @@ public sealed partial class TagsSettingsViewModel : ObservableObject
     }
 
     public ObservableCollection<TagRowViewModel> Rows { get; } = [];
+
+    /// <summary>
+    /// Com Configurações à vista, uma mudança de fora (sincronização, outro processo) relê a lista: uma tag renomeada ou
+    /// excluída em outro aparelho não fica na tela para ser editada. Quem mostra a tela liga e desliga.
+    /// </summary>
+    public void StartWatching()
+    {
+        if (_watching || _changes is null)
+            return;
+        _watching = true;
+        _ui ??= SynchronizationContext.Current;
+        _changes.Changed += OnDataChanged;
+    }
+
+    public void StopWatching()
+    {
+        if (!_watching)
+            return;
+        _watching = false;
+        _changes!.Changed -= OnDataChanged;
+    }
+
+    /// <summary>Pode chegar de qualquer thread; relê na da interface.</summary>
+    private void OnDataChanged(object? sender, EventArgs e)
+    {
+        if (_ui is null)
+            LoadCommand.Execute(null);
+        else
+            _ui.Post(_ => LoadCommand.Execute(null), null);
+    }
 
     public bool IsEmpty => Rows.Count == 0;
 
@@ -79,9 +113,16 @@ public sealed partial class TagsSettingsViewModel : ObservableObject
         if (version != _version)
             return;
 
+        // A linha que continua na lista mantém o que estava aberto nela (o campo do nome com o texto digitado, a pergunta).
+        var previous = Rows.ToDictionary(r => r.Name, StringComparer.Ordinal);
         Rows.Clear();
         foreach (var tag in list)
-            Rows.Add(new TagRowViewModel(tag, this, _service));
+        {
+            var row = new TagRowViewModel(tag, this, _service);
+            if (previous.TryGetValue(tag.Name, out var old))
+                row.KeepStateOf(old);
+            Rows.Add(row);
+        }
     }
 
     [RelayCommand]
@@ -189,6 +230,18 @@ public sealed partial class TagRowViewModel : ObservableObject
     public bool IsIdle => !IsEditing && !IsConfirmingDelete && !IsConfirmingMerge;
 
     partial void OnEditTextChanged(string value) => EditError = null;
+
+    /// <summary>Copia os estados abertos da linha de antes da recarga, com a mesma tag.</summary>
+    internal void KeepStateOf(TagRowViewModel old)
+    {
+        EditText = old.EditText;
+        EditError = old.EditError;
+        MergeQuestion = old.MergeQuestion;
+        IsPickingColor = old.IsPickingColor;
+        IsEditing = old.IsEditing;
+        IsConfirmingDelete = old.IsConfirmingDelete;
+        IsConfirmingMerge = old.IsConfirmingMerge;
+    }
 
     [RelayCommand]
     private void TogglePicker() => IsPickingColor = !IsPickingColor;

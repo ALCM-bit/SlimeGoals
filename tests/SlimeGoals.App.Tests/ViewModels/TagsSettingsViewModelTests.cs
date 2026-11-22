@@ -206,4 +206,39 @@ public class TagsSettingsViewModelTests
         vm.NewNameError.Should().BeNull();
         vm.Rows.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task While_watching_a_change_from_outside_reloads_the_list()
+    {
+        var changes = new DataChangeNotifier();
+        var vm = new TagsSettingsViewModel(_tags, changes);
+        await vm.LoadCommand.ExecuteAsync(null);
+        vm.StartWatching();
+
+        await _tags.CreateAsync("chegou"); // a tag chega por uma sincronização
+        changes.NotifyChanged();
+        vm.Rows.Select(r => r.Name).Should().Equal("chegou");
+
+        vm.StopWatching();
+        await _tags.CreateAsync("depois");
+        changes.NotifyChanged();
+        vm.Rows.Select(r => r.Name).Should().Equal("chegou");
+    }
+
+    [Fact]
+    public async Task Reload_keeps_the_open_state_of_a_row_that_is_still_there()
+    {
+        await _tags.CreateAsync("casa");
+        var vm = await Loaded();
+        var row = vm.Rows.Single();
+        row.BeginEditCommand.Execute(null);
+        row.EditText = "cas";
+
+        await _tags.CreateAsync("outra");
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        vm.Rows.Single(r => r.Name == "casa").Should().Match<TagRowViewModel>(r => r.IsEditing && r.EditText == "cas" && !r.IsIdle);
+        vm.Rows.Single(r => r.Name == "outra").IsIdle.Should().BeTrue();
+    }
 }
+

@@ -89,7 +89,7 @@ public sealed class Sample : IDisposable
                 s.GetRequiredService<DataChangeNotifier>()),
             new SettingsPageViewModel(s.GetRequiredService<AppSettings>(), capabilities: capabilities, permissions: permissions,
                 changes: s.GetRequiredService<DataChangeNotifier>(), account: account, navigator: navigator,
-                tags: new TagsSettingsViewModel(s.GetRequiredService<TagService>())),
+                tags: new TagsSettingsViewModel(s.GetRequiredService<TagService>(), s.GetRequiredService<DataChangeNotifier>())),
         ];
         return new ShellViewModel(pages, capabilities: capabilities, navigator: navigator);
     }

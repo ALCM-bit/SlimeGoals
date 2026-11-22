@@ -391,6 +391,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     {
         LoadCommand.Execute(null);
         Tags?.LoadCommand.Execute(null);
+        Tags?.StartWatching();
         if (ShowAccount)
             Account!.LoadCommand.Execute(null);
     }
@@ -399,6 +400,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     public override void Deactivate()
     {
         _returnTo = null; // quem sai de Configurações por outro caminho não volta à página que pediu o grupo
+        Tags?.StopWatching();
         Account?.ClearSecretInputs();
     }
 

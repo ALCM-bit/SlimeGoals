@@ -507,4 +507,26 @@ public class SettingsPageViewModelTests
         shown.Should().BeEmpty();
         vm.IsMainOpen.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task Tags_follow_changes_from_outside_only_while_settings_is_shown()
+    {
+        var changes = new DataChangeNotifier();
+        var tagRepo = new InMemoryTagRepository();
+        var service = new TagService(tagRepo, new InMemoryGoalRepository(tags: tagRepo), TimeProvider.System);
+        var tags = new TagsSettingsViewModel(service, changes);
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()), tags: tags);
+
+        vm.Activate();
+        await service.CreateAsync("chegou");
+        changes.NotifyChanged();
+        await tags.LoadCommand.ExecutionTask!;
+        tags.Rows.Select(r => r.Name).Should().Equal("chegou");
+
+        vm.Deactivate();
+        await service.CreateAsync("depois");
+        changes.NotifyChanged();
+        tags.Rows.Select(r => r.Name).Should().Equal("chegou");
+    }
 }
+
