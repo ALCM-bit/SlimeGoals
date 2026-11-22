@@ -47,30 +47,27 @@ public sealed class SyncLocalStore(SqliteConnectionFactory db) : ISyncLocalStore
     /// <summary>Monta o item com o conteúdo atual da linha. Nulo se não dá para enviar (já registrado no Trace).</summary>
     private static async Task<OutboxItem?> BuildItemAsync(Microsoft.Data.Sqlite.SqliteConnection c, QueueRow row, CancellationToken ct)
     {
-        var kind = row.Kind == SyncOutbox.Goal ? SyncRecordKind.Goal : SyncRecordKind.Checkin;
+        var kind = SyncOutbox.KindOf(row.Kind);
         var id = Guid.ParseExact(row.RecordId, "D");
         if (row.Op == "delete")
             return new OutboxItem(id, kind, true, row.BaseSeq, row.Revision, null);
 
-        var parameters = new { Id = row.RecordId };
-        string? payload;
-        if (kind == SyncRecordKind.Goal)
+        var payload = kind switch
         {
-            var goals = await RowReader.ReadValidAsync<GoalRow, string>(c, new CommandDefinition(
-                GoalRepository.SelectColumns + " WHERE id = @Id", parameters, cancellationToken: ct),
-                "goals", r => SyncCodec.Encode(r.ToDomain()));
-            payload = goals.SingleOrDefault();
-        }
-        else
-        {
-            var checkins = await RowReader.ReadValidAsync<CheckinRepository.Row, string>(c, new CommandDefinition("""
+            SyncRecordKind.Goal => await PayloadAsync<GoalRow>(c, GoalRepository.SelectColumns, "goals",
+                r => SyncCodec.Encode(r.ToDomain()), row.RecordId, ct),
+            SyncRecordKind.Checkin => await PayloadAsync<CheckinRepository.Row>(c, """
                 SELECT id AS Id, goal_id AS GoalId, done_at AS DoneAt, amount AS Amount, note AS Note,
                        updated_at AS UpdatedAt, deleted_at AS DeletedAt,
                        compensation_period AS CompensationPeriod, compensation_seen AS CompensationSeen
-                FROM checkins WHERE id = @Id
-                """, parameters, cancellationToken: ct), "checkins", r => SyncCodec.Encode(r.ToDomain()));
-            payload = checkins.SingleOrDefault();
-        }
+                FROM checkins
+                """, "checkins", r => SyncCodec.Encode(r.ToDomain()), row.RecordId, ct),
+            SyncRecordKind.Tag => await PayloadAsync<TagRow>(c, TagRows.TagColumns, "tags",
+                r => SyncCodec.Encode(r.ToDomain()), row.RecordId, ct),
+            SyncRecordKind.GoalTag => await PayloadAsync<GoalTagRow>(c, TagRows.LinkColumns, "goal_tags",
+                r => SyncCodec.Encode(r.ToDomain()), row.RecordId, ct),
+            _ => throw new UnreachableException($"Tipo de registro sem leitura na fila: {kind}."),
+        };
 
         if (payload is null)
         {
@@ -78,6 +75,15 @@ public sealed class SyncLocalStore(SqliteConnectionFactory db) : ISyncLocalStore
             return null;
         }
         return new OutboxItem(id, kind, false, row.BaseSeq, row.Revision, payload);
+    }
+
+    /// <summary>Conteúdo da linha <paramref name="recordId"/>; nulo se ela não existe ou não converte (já registrado no Trace).</summary>
+    private static async Task<string?> PayloadAsync<TRow>(Microsoft.Data.Sqlite.SqliteConnection c, string select, string table,
+        Func<TRow, string> encode, string recordId, CancellationToken ct)
+    {
+        var payloads = await RowReader.ReadValidAsync(c, new CommandDefinition(
+            select + " WHERE id = @Id", new { Id = recordId }, cancellationToken: ct), table, encode);
+        return payloads.SingleOrDefault();
     }
 
     public async Task<IReadOnlyList<Guid>> ReadUnkeyedAsync(int limit, CancellationToken ct = default)
@@ -109,7 +115,7 @@ public sealed class SyncLocalStore(SqliteConnectionFactory db) : ISyncLocalStore
             var p = new
             {
                 Id = SqlText.Id(confirmation.RecordId),
-                Kind = confirmation.Kind == SyncRecordKind.Goal ? SyncOutbox.Goal : SyncOutbox.Checkin,
+                Kind = SyncOutbox.NameOf(confirmation.Kind),
                 confirmation.RecordKey,
                 confirmation.Seq,
                 confirmation.Revision,

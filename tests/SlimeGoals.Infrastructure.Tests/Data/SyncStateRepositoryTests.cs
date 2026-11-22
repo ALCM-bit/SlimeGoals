@@ -14,6 +14,7 @@ public class SyncStateRepositoryTests : IDisposable
     private SyncStateRepository Sync => new(_db.Factory);
     private GoalRepository Goals => new(_db.Factory);
     private CheckinRepository Checkins => new(_db.Factory);
+    private TagRepository Tags => new(_db.Factory);
 
     public void Dispose() => _db.Dispose();
 
@@ -71,6 +72,33 @@ public class SyncStateRepositoryTests : IDisposable
         var doneAts = _db.Anchor.Query<string>(
             "SELECT c.done_at FROM sync_outbox o JOIN checkins c ON c.id = o.record_id WHERE o.kind = 'checkin' ORDER BY o.position").ToList();
         doneAts.Should().BeInAscendingOrder();
+    }
+
+    [Fact]
+    public async Task Enable_queues_changed_tags_and_all_links_but_not_untouched_defaults()
+    {
+        var goal = NewGoal(T0);
+        await Goals.AddAsync(goal);
+        var created = new Tag { Id = TagIds.ForTag("leitura"), Name = "leitura", Color = GoalColor.Pink, UpdatedAt = T0 };
+        var deletedDefault = DefaultTags.All.Single(t => t.Name == "tarefas") with { UpdatedAt = T0, DeletedAt = T0 };
+        var link = new GoalTag { Id = TagIds.ForLink(goal.Id, "leitura"), GoalId = goal.Id, TagName = "leitura", UpdatedAt = T0 };
+        var removed = new GoalTag
+        {
+            Id = TagIds.ForLink(goal.Id, "estudos"), GoalId = goal.Id, TagName = "estudos", UpdatedAt = T0, RemovedAt = T0,
+        };
+        var missingGoal = Guid.CreateVersion7();
+        var orphan = new GoalTag { Id = TagIds.ForLink(missingGoal, "corrida"), GoalId = missingGoal, TagName = "corrida", UpdatedAt = T0 };
+        await Tags.SaveAsync(new TagChanges([created, deletedDefault], [link, removed, orphan]));
+
+        await Sync.EnableAsync();
+
+        var queue = _db.Anchor.Query<(string Id, string Kind)>("SELECT record_id, kind FROM sync_outbox ORDER BY position").ToList();
+        queue.Where(q => q.Kind == "tag").Select(q => q.Id).Should().BeEquivalentTo(
+            [created.Id.ToString("D"), deletedDefault.Id.ToString("D")]);
+        queue.Where(q => q.Kind == "goal_tag").Select(q => q.Id).Should().BeEquivalentTo(
+            [link.Id.ToString("D"), removed.Id.ToString("D"), orphan.Id.ToString("D")]);
+        queue.Select(q => q.Kind).Should().Equal("goal", "tag", "tag", "goal_tag", "goal_tag", "goal_tag");
+        _db.Anchor.Query<string>("SELECT op FROM sync_outbox").Should().OnlyContain(o => o == "upsert");
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using System.Data;
 using Dapper;
 using Microsoft.Data.Sqlite;
+using SlimeGoals.Core.Sync;
 
 namespace SlimeGoals.Infrastructure.Data;
 
@@ -11,6 +12,26 @@ internal static class SyncOutbox
     public const string Checkin = "checkin";
     public const string Tag = "tag";
     public const string GoalTag = "goal_tag";
+
+    /// <summary>O tipo do registro a partir da coluna <c>kind</c>. O CHECK da tabela só aceita os quatro nomes.</summary>
+    public static SyncRecordKind KindOf(string name) => name switch
+    {
+        Goal => SyncRecordKind.Goal,
+        Checkin => SyncRecordKind.Checkin,
+        Tag => SyncRecordKind.Tag,
+        GoalTag => SyncRecordKind.GoalTag,
+        _ => throw new ArgumentOutOfRangeException(nameof(name), name, "Tipo de registro desconhecido."),
+    };
+
+    /// <summary>O nome da coluna <c>kind</c> para o tipo do registro.</summary>
+    public static string NameOf(SyncRecordKind kind) => kind switch
+    {
+        SyncRecordKind.Goal => Goal,
+        SyncRecordKind.Checkin => Checkin,
+        SyncRecordKind.Tag => Tag,
+        SyncRecordKind.GoalTag => GoalTag,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Tipo de registro desconhecido."),
+    };
 
     private const string ReplaceOnConflict =
         " ON CONFLICT (record_id) DO UPDATE SET op = excluded.op, base_seq = excluded.base_seq, revision = revision + 1;";
@@ -49,7 +70,7 @@ internal static class SyncOutbox
     }
 
     /// <summary>
-    /// Leva a exclusão da meta e de seus registros para a fila. Chamar antes dos DELETE, com os registros
+    /// Leva a exclusão da meta, de seus registros e de suas ligações com tags para a fila. Chamar antes dos DELETE, com os registros
     /// ainda presentes. O que o servidor já conhece vira exclusão; o que nunca foi enviado só sai da fila.
     /// </summary>
     public static async Task EnqueueGoalDeletionAsync(SqliteConnection c, IDbTransaction tx, Guid goalId, CancellationToken ct)
@@ -64,13 +85,16 @@ internal static class SyncOutbox
             SELECT t.id, t.kind, 'delete', r.seq
             FROM (SELECT id, 'checkin' AS kind FROM checkins WHERE goal_id = @Id
                   UNION ALL
+                  SELECT id, 'goal_tag' AS kind FROM goal_tags WHERE goal_id = @Id
+                  UNION ALL
                   SELECT id, 'goal' AS kind FROM goals WHERE id = @Id) t
             JOIN sync_records r ON r.record_id = t.id
             WHERE 1
             """ + ReplaceOnConflict + """
             DELETE FROM sync_outbox
             WHERE record_id NOT IN (SELECT record_id FROM sync_records)
-              AND (record_id = @Id OR record_id IN (SELECT id FROM checkins WHERE goal_id = @Id));
+              AND (record_id = @Id OR record_id IN (SELECT id FROM checkins WHERE goal_id = @Id)
+                   OR record_id IN (SELECT id FROM goal_tags WHERE goal_id = @Id));
             INSERT OR IGNORE INTO sync_tombstones (goal_id) VALUES (@Id);
             DELETE FROM sync_pending WHERE goal_id = @Id;
             """, parameters, tx, cancellationToken: ct));

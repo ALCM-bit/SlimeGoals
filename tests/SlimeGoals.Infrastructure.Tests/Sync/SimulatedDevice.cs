@@ -16,8 +16,11 @@ internal sealed record SnapshotGoal(Guid Id, string Title, string UpdatedAt, str
 /// <summary>Registro como a tabela guarda, com <c>superseded</c>. <see cref="Row"/> traz todas as colunas.</summary>
 internal sealed record SnapshotCheckin(Guid Id, Guid GoalId, int Amount, bool Superseded, string DoneAt, string? Period, string? Seen, string Row);
 
-/// <summary>O que tem de ser igual em todos os aparelhos. O que é só local (lembretes, cronômetro, tabelas da sincronização) fica de fora.</summary>
-internal sealed record DeviceSnapshot(IReadOnlyList<SnapshotGoal> Goals, IReadOnlyList<SnapshotCheckin> Checkins)
+/// <summary>
+/// O que tem de ser igual em todos os aparelhos. O que é só local (lembretes, cronômetro, tabelas da sincronização) fica de fora.
+/// <see cref="TagLines"/> fica à parte de <see cref="Lines"/>: as tags padrão existem em todo aparelho, até no vazio.
+/// </summary>
+internal sealed record DeviceSnapshot(IReadOnlyList<SnapshotGoal> Goals, IReadOnlyList<SnapshotCheckin> Checkins, IReadOnlyList<string> TagLines)
 {
     /// <summary>Uma linha por registro: a diferença entre dois aparelhos aparece legível na falha.</summary>
     public IReadOnlyList<string> Lines => [.. Goals.Select(g => g.Row), .. Checkins.Select(c => c.Row)];
@@ -33,6 +36,7 @@ internal sealed class SimulatedDevice : IDisposable
     private readonly DataChangeNotifier _changes = new();
     private readonly GoalService _goals;
     private readonly CheckinService _checkins;
+    private readonly TagRepository _tags;
 
     /// <param name="crypto">Cripto do motor; sem ela, <see cref="PlainSyncCrypto"/>.</param>
     public SimulatedDevice(string name, Guid id, ISyncTransport server, DateTimeOffset now, ISyncCrypto? crypto = null)
@@ -50,6 +54,7 @@ internal sealed class SimulatedDevice : IDisposable
             new PlainFormatter(), Time);
         _goals = new GoalService(goals, checkins, timers, Time, _changes, reminders);
         _checkins = new CheckinService(goals, checkins, Time, _changes);
+        _tags = new TagRepository(_db.Factory);
         _engine = new SyncEngine(_state, new SyncLocalStore(_db.Factory), _transport, crypto ?? new PlainSyncCrypto(), reminders, _changes, Time);
         // EnableAsync mantém o id que já existe: assim cada aparelho tem o seu, escolhido pelo teste.
         _db.Anchor.Execute("UPDATE sync_state SET device_id = @Id", new { Id = id.ToString("D") });
@@ -129,6 +134,47 @@ internal sealed class SimulatedDevice : IDisposable
 
     public Task DeleteGoal(Guid id) => _goals.DeleteAsync(id);
 
+    /// <summary>Cria ou muda a tag. Sem o TagService (outra tarefa), a data segue a regra dele: max(agora, local + 1 ms).</summary>
+    public async Task SaveTag(string name, GoalColor color)
+    {
+        var current = (await _tags.ListTagsAsync()).SingleOrDefault(t => t.Name == name);
+        var tag = new Tag { Id = TagIds.ForTag(name), Name = name, Color = color, UpdatedAt = Stamp(current?.UpdatedAt) };
+        await _tags.SaveAsync(new TagChanges([tag], []));
+    }
+
+    /// <summary>Exclui a tag e tira, com o mesmo instante, as ligações dela que este aparelho conhece.</summary>
+    public async Task DeleteTag(string name)
+    {
+        var tag = (await _tags.ListTagsAsync()).Single(t => t.Name == name);
+        var links = (await _tags.ListLinksAsync()).Where(l => l.TagName == name && l.RemovedAt is null).ToList();
+        var at = Stamp(links.Select(l => l.UpdatedAt).Append(tag.UpdatedAt).Max());
+        await _tags.SaveAsync(new TagChanges([tag with { UpdatedAt = at, DeletedAt = at }],
+            [.. links.Select(l => l with { UpdatedAt = at, RemovedAt = at })]));
+    }
+
+    /// <summary>Marca a tag na meta, como o quadro da meta fará.</summary>
+    public async Task LinkTag(Guid goalId, string name)
+    {
+        var id = TagIds.ForLink(goalId, name);
+        var current = (await _tags.ListLinksAsync()).SingleOrDefault(l => l.Id == id);
+        await _tags.SaveAsync(new TagChanges([],
+            [new GoalTag { Id = id, GoalId = goalId, TagName = name, UpdatedAt = Stamp(current?.UpdatedAt) }]));
+    }
+
+    /// <summary>As tags que a meta mostra.</summary>
+    public async Task<IReadOnlyList<string>> TagsOf(Guid goalId) =>
+        (await _goals.GetAsync(goalId) ?? throw new GoalNotFoundException(goalId)).Tags;
+
+    public Task<IReadOnlyList<Tag>> ListTags() => _tags.ListTagsAsync();
+
+    public Task<IReadOnlyList<GoalTag>> ListLinks() => _tags.ListLinksAsync();
+
+    private DateTimeOffset Stamp(DateTimeOffset? previous)
+    {
+        var now = Time.GetUtcNow();
+        return previous is { } p && p.AddMilliseconds(1) > now ? p.AddMilliseconds(1) : now;
+    }
+
     /// <summary>O motor trata exceção como falha de rede: a ação do teste que falhou com o envio no ar tem de aparecer aqui.</summary>
     public async Task<SyncCycleResult> SyncAsync()
     {
@@ -167,7 +213,8 @@ internal sealed class SimulatedDevice : IDisposable
             Guid.ParseExact((string)r["id"]!, "D"), Guid.ParseExact((string)r["goal_id"]!, "D"), (int)(long)r["amount"]!,
             (long)r["superseded"]! == 1, (string)r["done_at"]!, (string?)r["compensation_period"], (string?)r["compensation_seen"],
             Describe(r))).ToList();
-        return new DeviceSnapshot(goals, checkins);
+        var tags = Rows("SELECT * FROM tags ORDER BY id").Concat(Rows("SELECT * FROM goal_tags ORDER BY id")).Select(Describe).ToList();
+        return new DeviceSnapshot(goals, checkins, tags);
     }
 
     private IEnumerable<IDictionary<string, object?>> Rows(string sql) =>

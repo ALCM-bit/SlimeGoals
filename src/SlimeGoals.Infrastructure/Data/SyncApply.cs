@@ -10,8 +10,9 @@ using SlimeGoals.Core.Sync;
 namespace SlimeGoals.Infrastructure.Data;
 
 /// <summary>
-/// Aplica o que chega do servidor dentro da transação de quem chama (spec de sincronização §4). Dado aplicado não
-/// volta para a fila; a única exceção é o <c>delete</c> de um upsert que chegou para uma meta com marca de exclusão.
+/// Aplica o que chega do servidor dentro da transação de quem chama (spec de sincronização §4; tags em Tags_v1 §4.4).
+/// Dado aplicado não volta para a fila; a única exceção é o <c>delete</c> de um upsert que chegou para uma meta com marca
+/// de exclusão.
 /// </summary>
 internal sealed class SyncApply
 {
@@ -52,7 +53,11 @@ internal sealed class SyncApply
     {
         var apply = new SyncApply(c, tx, ct);
         var deleted = await apply.ApplyGoalsAsync(records, deviceId);
-        await apply.ApplyCheckinsAsync(records);
+        await apply.ApplyRecordsAsync(records, SyncOutbox.Checkin, (_, known) => apply.RemoveCheckinAsync(known.RecordId),
+            apply.ApplyCheckinAsync);
+        await apply.ApplyRecordsAsync(records, SyncOutbox.Tag, apply.ForgetTagAsync, (r, e) => apply.ApplyTagAsync(r, e, deviceId));
+        await apply.ApplyRecordsAsync(records, SyncOutbox.GoalTag, (_, known) => apply.RemoveLinkAsync(known.RecordId),
+            (r, e) => apply.ApplyLinkAsync(r, e, deviceId));
         await apply.RecalculateCompensationsAsync();
         await apply.RunAsync("UPDATE sync_state SET last_seq = @LastSeq", new { LastSeq = lastSeq });
         return deleted;
@@ -84,6 +89,11 @@ internal sealed class SyncApply
         }
         foreach (var id in await apply.UnconfirmedAsync(SyncOutbox.Checkin))
             await apply.RemoveCheckinAsync(id);
+        // As tags padrão que nunca mudaram não estão no mapa: ficam.
+        foreach (var id in await apply.UnconfirmedAsync(SyncOutbox.Tag))
+            await apply.RemoveTagAsync(id);
+        foreach (var id in await apply.UnconfirmedAsync(SyncOutbox.GoalTag))
+            await apply.RemoveLinkAsync(id);
 
         await apply.RecalculateCompensationsAsync();
         await apply.RunAsync("""
@@ -121,23 +131,28 @@ internal sealed class SyncApply
         return deleted;
     }
 
-    /// <summary>Roda depois das metas: a exclusão de uma meta já tirou do mapa as chaves dos registros dela.</summary>
-    private async Task ApplyCheckinsAsync(IReadOnlyList<IncomingRecord> records)
+    /// <summary>
+    /// Os registros de um tipo que não é meta. Roda depois das metas: a exclusão de uma meta já tirou do mapa as chaves
+    /// dos registros e das ligações dela.
+    /// </summary>
+    private async Task ApplyRecordsAsync(IReadOnlyList<IncomingRecord> records, string kind,
+        Func<IncomingRecord, KnownRecord, Task> removeAsync, Func<IncomingRecord, SyncEnvelope, Task> applyAsync)
     {
+        var recordKind = SyncOutbox.KindOf(kind);
         foreach (var record in records)
         {
             if (record.Unreadable || record.Envelope is null)
             {
-                if (await FindAsync(record.RecordKey) is not { Kind: SyncOutbox.Checkin } known)
+                if (await FindAsync(record.RecordKey) is not { } known || known.Kind != kind)
                     continue;
                 if (record.Unreadable)
                     await KeepLocalCopyAsync(record, known);
                 else
-                    await RemoveCheckinAsync(known.RecordId);
+                    await removeAsync(record, known);
             }
-            else if (record.Envelope.Kind == SyncRecordKind.Checkin)
+            else if (record.Envelope.Kind == recordKind)
             {
-                await ApplyCheckinAsync(record, record.Envelope);
+                await applyAsync(record, record.Envelope);
             }
         }
     }
@@ -157,7 +172,7 @@ internal sealed class SyncApply
         }
 
         var parameters = new { Id = SqlText.Id(goal.Id), record.Seq };
-        if (await QueuedEditAsync(goal.Id) is { } localUpdatedAt
+        if (await QueuedEditAsync("goals", goal.Id) is { } localUpdatedAt
             && SyncMerge.LocalWins(localUpdatedAt, deviceId, goal.UpdatedAt, envelope.DeviceId))
         {
             await RunAsync("UPDATE sync_outbox SET base_seq = @Seq WHERE record_id = @Id", parameters);
@@ -215,6 +230,57 @@ internal sealed class SyncApply
         }
         await MapAsync(record, SqlText.Id(envelope.RecordId), SyncOutbox.Checkin);
         await InsertCheckinAsync(checkin);
+    }
+
+    private async Task ApplyTagAsync(IncomingRecord record, SyncEnvelope envelope, Guid deviceId)
+    {
+        var tag = Decode(envelope, SyncCodec.DecodeTag, t => t.Id);
+        if (tag is null)
+        {
+            await KeepUnreadableAsync(record);
+            return;
+        }
+        await ApplyNewestAsync(record, envelope, deviceId, "tags", tag.UpdatedAt, SyncOutbox.Tag,
+            () => RunAsync(TagRows.UpsertTag, TagRow.FromDomain(tag)));
+    }
+
+    /// <summary>Sem a meta, a ligação entra assim mesmo e só aparece quando ela chegar (Tags_v1 §4.4.6).</summary>
+    private async Task ApplyLinkAsync(IncomingRecord record, SyncEnvelope envelope, Guid deviceId)
+    {
+        var link = Decode(envelope, SyncCodec.DecodeGoalTag, l => l.Id);
+        if (link is null)
+        {
+            await KeepUnreadableAsync(record);
+            return;
+        }
+        if (await IsTombstonedAsync(link.GoalId))
+        {
+            await DiscardAsync(record, envelope, SyncOutbox.GoalTag);
+            return;
+        }
+        await ApplyNewestAsync(record, envelope, deviceId, "goal_tags", link.UpdatedAt, SyncOutbox.GoalTag,
+            () => RunAsync(TagRows.UpsertLink, GoalTagRow.FromDomain(link)));
+    }
+
+    /// <summary>
+    /// Regra de conflito das tags e das ligações, a mesma das metas: a edição local na fila que vence só ganha a base nova;
+    /// senão a linha remota entra e o upsert sai da fila. A visibilidade é calculada na leitura, aqui só se grava a linha.
+    /// </summary>
+    private async Task ApplyNewestAsync(IncomingRecord record, SyncEnvelope envelope, Guid deviceId, string table,
+        DateTimeOffset remoteUpdatedAt, string kind, Func<Task<int>> writeAsync)
+    {
+        var parameters = new { Id = SqlText.Id(envelope.RecordId), record.Seq };
+        if (await QueuedEditAsync(table, envelope.RecordId) is { } localUpdatedAt
+            && SyncMerge.LocalWins(localUpdatedAt, deviceId, remoteUpdatedAt, envelope.DeviceId))
+        {
+            await RunAsync("UPDATE sync_outbox SET base_seq = @Seq WHERE record_id = @Id", parameters);
+        }
+        else
+        {
+            await writeAsync();
+            await RunAsync("DELETE FROM sync_outbox WHERE record_id = @Id AND op = 'upsert'", parameters);
+        }
+        await MapAsync(record, parameters.Id, kind);
     }
 
     /// <summary>Registro do formato 1 de meta de tempo vem em minutos e fica em segundos; o resto já está no formato atual.</summary>
@@ -292,15 +358,20 @@ internal sealed class SyncApply
         }
     }
 
-    /// <summary>Tira a meta, os registros dela e tudo o que a sincronização guarda sobre eles. Devolve quantas linhas de meta saíram.</summary>
+    /// <summary>
+    /// Tira a meta, os registros e as ligações dela e tudo o que a sincronização guarda sobre eles. Devolve quantas linhas
+    /// de meta saíram.
+    /// </summary>
     private async Task<int> RemoveGoalAsync(Guid goalId)
     {
         await RunAsync("""
             DELETE FROM sync_outbox WHERE record_id = @Id
                 OR record_id IN (SELECT id FROM checkins WHERE goal_id = @Id)
+                OR record_id IN (SELECT id FROM goal_tags WHERE goal_id = @Id)
                 OR record_id IN (SELECT record_id FROM sync_pending WHERE goal_id = @Id);
             DELETE FROM sync_records WHERE record_id = @Id
                 OR record_id IN (SELECT id FROM checkins WHERE goal_id = @Id)
+                OR record_id IN (SELECT id FROM goal_tags WHERE goal_id = @Id)
                 OR record_id IN (SELECT record_id FROM sync_pending WHERE goal_id = @Id);
             DELETE FROM sync_pending WHERE goal_id = @Id;
             """, new { Id = SqlText.Id(goalId) });
@@ -324,6 +395,27 @@ internal sealed class SyncApply
             DELETE FROM sync_records WHERE record_id = @Id;
             """, parameters);
     }
+
+    /// <summary>Só no fim de uma sincronização completa: o servidor não tem mais a tag e a fila não a guarda.</summary>
+    private Task<int> RemoveTagAsync(string recordId) => RunAsync("""
+        DELETE FROM tags WHERE id = @Id;
+        DELETE FROM sync_records WHERE record_id = @Id;
+        """, new { Id = recordId });
+
+    private Task<int> RemoveLinkAsync(string recordId) => RunAsync("""
+        DELETE FROM goal_tags WHERE id = @Id;
+        DELETE FROM sync_outbox WHERE record_id = @Id;
+        DELETE FROM sync_records WHERE record_id = @Id;
+        """, new { Id = recordId });
+
+    /// <summary>
+    /// Tag não vira exclusão no servidor (Tags_v1 §4.4.4): se uma chegar, a linha local fica e só sai do mapa. A edição na
+    /// fila ganha a base da marca, senão daria conflito em todo ciclo.
+    /// </summary>
+    private Task<int> ForgetTagAsync(IncomingRecord record, KnownRecord known) => RunAsync("""
+        DELETE FROM sync_records WHERE record_id = @Id;
+        UPDATE sync_outbox SET base_seq = @Seq WHERE record_id = @Id;
+        """, new { Id = known.RecordId, record.Seq });
 
     /// <summary>A meta foi excluída aqui: o conteúdo não entra, e o servidor recebe a exclusão com a base que acabou de mostrar.</summary>
     private async Task DiscardAsync(IncomingRecord record, SyncEnvelope envelope, string kind)
@@ -392,13 +484,16 @@ internal sealed class SyncApply
             LIMIT 1
             """, new { Key = recordKey }, _tx, cancellationToken: _ct));
 
-    /// <summary>Data da edição local que espera envio. Data que não converte não disputa: a linha já não seria enviada.</summary>
-    private async Task<DateTimeOffset?> QueuedEditAsync(Guid goalId)
+    /// <summary>
+    /// Data da edição local que espera envio, lida de <paramref name="table"/> (<c>goals</c>, <c>tags</c> ou
+    /// <c>goal_tags</c>, nunca texto de fora). Data que não converte não disputa: a linha já não seria enviada.
+    /// </summary>
+    private async Task<DateTimeOffset?> QueuedEditAsync(string table, Guid id)
     {
-        var text = await _c.ExecuteScalarAsync<string?>(new CommandDefinition("""
-            SELECT g.updated_at FROM goals g JOIN sync_outbox o ON o.record_id = g.id
-            WHERE g.id = @Id AND o.op = 'upsert'
-            """, new { Id = SqlText.Id(goalId) }, _tx, cancellationToken: _ct));
+        var text = await _c.ExecuteScalarAsync<string?>(new CommandDefinition($"""
+            SELECT t.updated_at FROM {table} t JOIN sync_outbox o ON o.record_id = t.id
+            WHERE t.id = @Id AND o.op = 'upsert'
+            """, new { Id = SqlText.Id(id) }, _tx, cancellationToken: _ct));
         return DateTimeOffset.TryParseExact(text, "O", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var at) ? at : null;
     }
 

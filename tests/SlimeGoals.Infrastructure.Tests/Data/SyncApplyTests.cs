@@ -19,6 +19,7 @@ public class SyncApplyTests : IDisposable
     private SyncLocalStore Store => new(_db.Factory);
     private GoalRepository Goals => new(_db.Factory);
     private CheckinRepository Checkins => new(_db.Factory);
+    private TagRepository Tags => new(_db.Factory);
 
     public SyncApplyTests() => _db.Anchor.Execute("UPDATE sync_state SET enabled = 1");
 
@@ -54,6 +55,20 @@ public class SyncApplyTests : IDisposable
 
     private static IncomingRecord In(Checkin checkin, long seq, Guid? device = null, int version = SyncCodec.FormatVersion) =>
         new(Key(checkin.Id), seq, new SyncEnvelope(version, SyncRecordKind.Checkin, checkin.Id, device ?? Other, SyncCodec.Encode(checkin)));
+
+    private static Tag NewTag(string name, GoalColor color = GoalColor.Pink, DateTimeOffset? updatedAt = null) =>
+        new() { Id = TagIds.ForTag(name), Name = name, Color = color, UpdatedAt = updatedAt ?? T0 };
+
+    private static GoalTag NewLink(Guid goalId, string name, DateTimeOffset? updatedAt = null) =>
+        new() { Id = TagIds.ForLink(goalId, name), GoalId = goalId, TagName = name, UpdatedAt = updatedAt ?? T0 };
+
+    private static IncomingRecord In(Tag tag, long seq, Guid? device = null) =>
+        new(Key(tag.Id), seq, new SyncEnvelope(SyncCodec.FormatVersion, SyncRecordKind.Tag, tag.Id, device ?? Other, SyncCodec.Encode(tag)));
+
+    private static IncomingRecord In(GoalTag link, long seq, Guid? device = null) =>
+        new(Key(link.Id), seq, new SyncEnvelope(SyncCodec.FormatVersion, SyncRecordKind.GoalTag, link.Id, device ?? Other, SyncCodec.Encode(link)));
+
+    private async Task<Tag?> TagAsync(string name) => (await Tags.ListTagsAsync()).SingleOrDefault(t => t.Name == name);
 
     private static IncomingRecord Unreadable(Guid id, SyncRecordKind kind, long seq) => new(Key(id), seq,
         new SyncEnvelope(SyncCodec.FormatVersion, kind, id, Other, "{quebrado"));
@@ -1071,5 +1086,202 @@ public class SyncApplyTests : IDisposable
 
         RowExists("checkins", checkin.Id).Should().BeFalse();
         QueueRow(checkin.Id).Should().Be(new QueueLine("delete", 9, "checkin"));
+    }
+
+    // Tags e ligações
+
+    [Fact]
+    public async Task Remote_tag_newer_replaces_local()
+    {
+        await Tags.SaveAsync(new TagChanges([NewTag("leitura")], []));
+        var remote = NewTag("leitura", GoalColor.Green, T0.AddMinutes(5));
+
+        await ApplyAsync(1, In(remote, 1));
+
+        (await TagAsync("leitura")).Should().Be(remote);
+        Count("sync_outbox").Should().Be(0);
+        Record(remote.Id).Should().Be(new RecordLine(1, Key(remote.Id), "tag", 1));
+    }
+
+    [Fact]
+    public async Task Queued_local_tag_newer_wins_and_keeps_queue()
+    {
+        var local = NewTag("leitura", GoalColor.Pink, T0.AddMinutes(5));
+        await Tags.SaveAsync(new TagChanges([local], []));
+
+        await ApplyAsync(3, In(NewTag("leitura", GoalColor.Green, T0.AddMinutes(1)), 3));
+
+        (await TagAsync("leitura")).Should().Be(local);
+        QueueRow(local.Id).Should().Be(new QueueLine("upsert", 3, "tag"));
+        Record(local.Id).Should().Be(new RecordLine(3, Key(local.Id), "tag", 1));
+    }
+
+    [Fact]
+    public async Task Default_tag_1970_loses_to_remote_change()
+    {
+        var deleted = DefaultTags.All.Single(t => t.Name == "tarefas") with { UpdatedAt = T0, DeletedAt = T0 };
+        var recolored = DefaultTags.All.Single(t => t.Name == "estudos") with { Color = GoalColor.Pink, UpdatedAt = T0 };
+
+        // Um id de aparelho menor que o local: a data mais nova decide, não o desempate.
+        await ApplyAsync(2, In(deleted, 1, Guid.Empty), In(recolored, 2, Guid.Empty));
+
+        (await TagAsync("tarefas")).Should().Be(deleted);
+        (await TagAsync("estudos")).Should().Be(recolored);
+        (await TagAsync("medicamentos")).Should().Be(DefaultTags.All.Single(t => t.Name == "medicamentos"));
+        Count("sync_outbox").Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Link_follows_the_same_rule_as_the_tag()
+    {
+        var goal = NewGoal();
+        await ApplyAsync(1, In(goal, 1));
+        var local = NewLink(goal.Id, "leitura", T0.AddMinutes(5));
+        await Tags.SaveAsync(new TagChanges([], [local]));
+        var other = NewLink(goal.Id, "corrida");
+        await Tags.SaveAsync(new TagChanges([], [other]));
+        var newer = other with { UpdatedAt = T0.AddMinutes(9), RemovedAt = T0.AddMinutes(9) };
+
+        await ApplyAsync(3, In(local with { UpdatedAt = T0.AddMinutes(1), RemovedAt = T0.AddMinutes(1) }, 2), In(newer, 3));
+
+        (await Tags.ListLinksAsync()).Should().BeEquivalentTo([local, newer]);
+        QueueRow(local.Id).Should().Be(new QueueLine("upsert", 2, "goal_tag"));
+        QueueRow(other.Id).Should().BeNull();
+        Record(newer.Id).Should().Be(new RecordLine(3, Key(newer.Id), "goal_tag", 1));
+    }
+
+    [Fact]
+    public async Task Tag_payload_of_another_record_is_invalid()
+    {
+        var tag = NewTag("leitura");
+        var envelope = new SyncEnvelope(SyncCodec.FormatVersion, SyncRecordKind.Tag, Guid.CreateVersion7(), Other, SyncCodec.Encode(tag));
+        using var trace = new TraceCapture();
+
+        await ApplyAsync(1, new IncomingRecord("k:x", 1, envelope));
+
+        (await TagAsync("leitura")).Should().BeNull();
+        trace.Messages.Should().Contain(m => m.Contains("o conteúdo é de outro registro"));
+        LastSeq.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Link_for_missing_goal_is_stored_and_shows_when_goal_arrives()
+    {
+        var goal = NewGoal();
+        var link = NewLink(goal.Id, "leitura");
+
+        await ApplyAsync(1, In(link, 1));
+
+        (await Tags.ListLinksAsync()).Should().Equal(link);
+        Count("sync_pending").Should().Be(0);
+        Count("sync_outbox").Should().Be(0);
+        Record(link.Id).Should().Be(new RecordLine(1, Key(link.Id), "goal_tag", 1));
+        (await Goals.GetAsync(goal.Id)).Should().BeNull();
+
+        await ApplyAsync(2, In(goal, 2));
+
+        (await Goals.GetAsync(goal.Id))!.Tags.Should().Equal("leitura");
+        Count("tags").Should().Be(DefaultTags.All.Count, "a ligação não cria a linha da tag");
+    }
+
+    [Fact]
+    public async Task Link_for_tombstoned_goal_is_discarded()
+    {
+        var goal = NewGoal();
+        var link = NewLink(goal.Id, "leitura");
+        _db.Anchor.Execute("INSERT INTO sync_tombstones (goal_id) VALUES (@Id)", new { Id = goal.Id.ToString("D") });
+
+        await ApplyAsync(4, In(link, 4));
+
+        Count("goal_tags").Should().Be(0);
+        QueueRow(link.Id).Should().Be(new QueueLine("delete", 4, "goal_tag"));
+        Record(link.Id).Should().Be(new RecordLine(4, Key(link.Id), "goal_tag", 1));
+    }
+
+    [Fact]
+    public async Task Remote_goal_deletion_removes_links()
+    {
+        var goal = NewGoal();
+        var other = NewGoal();
+        var synced = NewLink(goal.Id, "leitura");
+        var kept = NewLink(other.Id, "leitura");
+        await ApplyAsync(4, In(goal, 1), In(synced, 2), In(other, 3), In(kept, 4));
+        var queued = NewLink(goal.Id, "corrida");
+        await Tags.SaveAsync(new TagChanges([], [queued]));
+
+        var deleted = await ApplyAsync(9, Deleted(goal.Id, 9));
+
+        deleted.Should().Equal(goal.Id);
+        (await Tags.ListLinksAsync()).Should().Equal(kept);
+        Count("sync_outbox").Should().Be(0);
+        Record(synced.Id).Should().BeNull();
+        Record(kept.Id).Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Remote_link_deletion_removes_the_row()
+    {
+        var goal = NewGoal();
+        var link = NewLink(goal.Id, "leitura");
+        await ApplyAsync(2, In(goal, 1), In(link, 2));
+
+        await ApplyAsync(3, Deleted(link.Id, 3));
+
+        Count("goal_tags").Should().Be(0);
+        Record(link.Id).Should().BeNull();
+        RowExists("goals", goal.Id).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Remote_tag_deletion_only_forgets_the_mapping()
+    {
+        var tag = NewTag("leitura");
+        await ApplyAsync(1, In(tag, 1));
+
+        var deleted = await ApplyAsync(2, Deleted(tag.Id, 2));
+
+        deleted.Should().BeEmpty();
+        (await TagAsync("leitura")).Should().Be(tag);
+        Record(tag.Id).Should().BeNull();
+        Count("sync_outbox").Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Sealed_tag_and_link_keep_the_local_copy()
+    {
+        var goal = NewGoal();
+        var tag = NewTag("leitura");
+        var link = NewLink(goal.Id, "leitura");
+        await ApplyAsync(3, In(goal, 1), In(tag, 2), In(link, 3));
+        await Store.BeginFullResyncAsync();
+
+        await ApplyAsync(3, In(goal, 1), Sealed(tag.Id, 2), Sealed(link.Id, 3));
+        await Store.FinishFullResyncAsync();
+
+        (await TagAsync("leitura")).Should().Be(tag);
+        (await Tags.ListLinksAsync()).Should().Equal(link);
+    }
+
+    [Fact]
+    public async Task Full_resync_removes_unconfirmed_tags_and_links_but_keeps_untouched_defaults()
+    {
+        var goal = NewGoal();
+        var tag = NewTag("leitura");
+        var link = NewLink(goal.Id, "leitura");
+        var gone = NewLink(goal.Id, "corrida");
+        await ApplyAsync(4, In(goal, 1), In(tag, 2), In(link, 3), In(gone, 4));
+        var queued = NewTag("queued", GoalColor.Amber);
+        await Tags.SaveAsync(new TagChanges([queued], []));
+        await Store.BeginFullResyncAsync();
+        await ApplyAsync(3, In(goal, 1), In(link, 3));
+
+        await Store.FinishFullResyncAsync();
+
+        (await Tags.ListTagsAsync()).Should().BeEquivalentTo([.. DefaultTags.All, queued]);
+        (await Tags.ListLinksAsync()).Should().Equal(link);
+        Record(tag.Id).Should().BeNull();
+        Record(gone.Id).Should().BeNull();
+        QueueRow(queued.Id).Should().Be(new QueueLine("upsert", 0, "tag"));
+        (await Goals.GetAsync(goal.Id))!.Tags.Should().Equal("leitura");
     }
 }

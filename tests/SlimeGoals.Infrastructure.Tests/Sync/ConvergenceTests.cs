@@ -74,9 +74,13 @@ public sealed class ConvergenceTests : IDisposable
 
     private static void ShouldBeEqual(IReadOnlyList<SimulatedDevice> devices)
     {
-        var expected = devices[0].Snapshot().Lines;
+        var expected = devices[0].Snapshot();
         foreach (var device in devices.Skip(1))
-            device.Snapshot().Lines.Should().Equal(expected, $"{device.Name} tem de terminar igual a {devices[0].Name}");
+        {
+            var snapshot = device.Snapshot();
+            snapshot.Lines.Should().Equal(expected.Lines, $"{device.Name} tem de terminar igual a {devices[0].Name}");
+            snapshot.TagLines.Should().Equal(expected.TagLines, $"{device.Name} tem de ter as tags de {devices[0].Name}");
+        }
     }
 
     /// <summary>Envelopes que ainda têm conteúdo no servidor.</summary>
@@ -86,9 +90,14 @@ public sealed class ConvergenceTests : IDisposable
         return server.Records.Where(r => r.Blob is not null).Select(r => crypto.Open(r.RecordKey, r.Blob!)).ToList();
     }
 
-    /// <summary>O id da meta dona do conteúdo, venha ele de uma meta ou de um registro.</summary>
-    private static Guid OwnerGoal(SyncEnvelope envelope) =>
-        envelope.Kind == SyncRecordKind.Goal ? envelope.RecordId : SyncCodec.DecodeCheckin(envelope.Payload).GoalId;
+    /// <summary>O id da meta dona do conteúdo, venha ele de uma meta, de um registro ou de uma ligação. Tag não tem dona.</summary>
+    private static Guid OwnerGoal(SyncEnvelope envelope) => envelope.Kind switch
+    {
+        SyncRecordKind.Goal => envelope.RecordId,
+        SyncRecordKind.Checkin => SyncCodec.DecodeCheckin(envelope.Payload).GoalId,
+        SyncRecordKind.GoalTag => SyncCodec.DecodeGoalTag(envelope.Payload).GoalId,
+        _ => Guid.Empty,
+    };
 
     private void ServerShouldHoldNothingOf(Guid goalId) =>
         LiveBlobs(_server).Where(e => OwnerGoal(e) == goalId).Should().BeEmpty("excluir apaga o conteúdo no servidor (RS05)");
@@ -1192,5 +1201,150 @@ public sealed class ConvergenceTests : IDisposable
         ((await a.ShownTotal(goal.Id)), (await b.ShownTotal(goal.Id))).Should().Be((expected, expected));
         b.Snapshot().Lines.Should().Equal(a.Snapshot().Lines);
         (a.Pending, b.Pending).Should().Be((0, 0));
+    }
+
+    // Tags (spec Tags_v1 §4.4)
+
+    private static int LiveTagBlobs(FakeSyncServer server) => LiveBlobs(server).Count(e => e.Kind == SyncRecordKind.Tag);
+
+    private static async Task<Tag> TagNamed(SimulatedDevice device, string name) => (await device.ListTags()).Single(t => t.Name == name);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Tag_created_on_both_devices_converges_to_one_row(bool newestSyncsFirst)
+    {
+        var a = await DeviceAsync();
+        var b = await DeviceAsync();
+
+        await a.SaveTag("leitura", GoalColor.Pink);
+        Tick(Minute);
+        await b.SaveTag("leitura", GoalColor.Green);
+        await (newestSyncsFirst ? b : a).SyncAsync();
+        await (newestSyncsFirst ? a : b).SyncAsync();
+
+        await ConvergeAsync();
+        foreach (var device in _devices)
+            (await device.ListTags()).Where(t => t.Name == "leitura").Should().ContainSingle()
+                .Which.Color.Should().Be(GoalColor.Green, "vale o updated_at mais novo");
+        LiveTagBlobs(_server).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Deleted_default_tag_stays_deleted_on_new_device()
+    {
+        var a = await DeviceAsync();
+        await a.DeleteTag("tarefas");
+        await ConvergeAsync();
+        Tick(Minute);
+
+        var b = await DeviceAsync();
+        await ConvergeAsync();
+
+        (await TagNamed(b, "tarefas")).DeletedAt.Should().NotBeNull();
+        LiveTagBlobs(_server).Should().Be(1, "as tags padrão intocadas não sobem");
+    }
+
+    /// <summary>Review Focus 2: marcar a tag numa meta, em outro aparelho, depois da exclusão a traz de volta, com a cor antiga.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Link_added_after_deletion_revives_tag_everywhere(bool linkSyncsFirst)
+    {
+        var a = await DeviceAsync();
+        var b = await DeviceAsync();
+        var goal = await a.CreateGoal("Ler");
+        await a.SaveTag("leitura", GoalColor.Pink);
+        await ConvergeAsync();
+
+        await a.DeleteTag("leitura");
+        Tick(Minute);
+        await b.LinkTag(goal.Id, "leitura");
+        await (linkSyncsFirst ? b : a).SyncAsync();
+        await (linkSyncsFirst ? a : b).SyncAsync();
+
+        await ConvergeAsync();
+        foreach (var device in _devices)
+        {
+            (await device.TagsOf(goal.Id)).Should().Equal(["leitura"], $"{device.Name} mostra a tag marcada depois da exclusão");
+            var tag = await TagNamed(device, "leitura");
+            tag.Color.Should().Be(GoalColor.Pink);
+            TagVisibility.IsTagVisible(tag, (await device.ListLinks()).Where(l => l.TagName == "leitura")).Should().BeTrue();
+        }
+    }
+
+    /// <summary>Review Focus 2: a ligação marcada antes da exclusão, ainda sem chegar a quem excluiu, não traz a tag de volta.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Link_added_before_deletion_stays_hidden(bool linkSyncsFirst)
+    {
+        var a = await DeviceAsync();
+        var b = await DeviceAsync();
+        var goal = await a.CreateGoal("Ler");
+        await a.SaveTag("leitura", GoalColor.Pink);
+        await ConvergeAsync();
+
+        await b.LinkTag(goal.Id, "leitura");
+        Tick(Minute);
+        await a.DeleteTag("leitura");
+        await (linkSyncsFirst ? b : a).SyncAsync();
+        await (linkSyncsFirst ? a : b).SyncAsync();
+
+        await ConvergeAsync();
+        foreach (var device in _devices)
+        {
+            (await device.TagsOf(goal.Id)).Should().BeEmpty($"{device.Name} esconde a ligação anterior à exclusão");
+            var tag = await TagNamed(device, "leitura");
+            TagVisibility.IsTagVisible(tag, (await device.ListLinks()).Where(l => l.TagName == "leitura")).Should().BeFalse();
+        }
+    }
+
+    /// <summary>Review Focus 3: a edição de meta que esperava na fila, sem tags no conteúdo, não apaga as ligações de outro aparelho.</summary>
+    [Fact]
+    public async Task Queued_goal_edit_from_before_upgrade_keeps_links()
+    {
+        var a = await DeviceAsync();
+        var b = await DeviceAsync();
+        var goal = await a.CreateGoal("Ler");
+        await ConvergeAsync();
+
+        await a.EditGoal(goal.Id, "Ler mais");
+        Tick(Minute);
+        await b.LinkTag(goal.Id, "leitura");
+        await b.LinkTag(goal.Id, "estudos");
+        await b.SyncAsync();
+        await a.SyncAsync();
+
+        await ConvergeAsync();
+        foreach (var device in _devices)
+        {
+            (await device.TagsOf(goal.Id)).Should().Equal(["estudos", "leitura"], $"{device.Name} mantém as ligações");
+            device.Snapshot().Goals.Should().ContainSingle().Which.Title.Should().Be("Ler mais");
+        }
+    }
+
+    /// <summary>Meta excluída leva as ligações dela, nos aparelhos e no servidor, mesmo a marcada depois, offline.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Goal_deletion_takes_its_links_everywhere(bool linkSyncsFirst)
+    {
+        var a = await DeviceAsync();
+        var b = await DeviceAsync();
+        var goal = await a.CreateGoal("Ler");
+        await a.LinkTag(goal.Id, "leitura");
+        await ConvergeAsync();
+
+        await a.DeleteGoal(goal.Id);
+        Tick(Minute);
+        await b.LinkTag(goal.Id, "estudos");
+        await (linkSyncsFirst ? b : a).SyncAsync();
+        await (linkSyncsFirst ? a : b).SyncAsync();
+
+        await ConvergeAsync();
+        foreach (var device in _devices)
+            (await device.ListLinks()).Should().BeEmpty($"{device.Name} não guarda ligação de meta excluída");
+        ServerShouldHoldNothingOf(goal.Id);
     }
 }

@@ -16,6 +16,7 @@ public class SyncLocalStoreOutboxTests : IDisposable
     private SyncLocalStore Store => new(_db.Factory);
     private GoalRepository Goals => new(_db.Factory);
     private CheckinRepository Checkins => new(_db.Factory);
+    private TagRepository Tags => new(_db.Factory);
 
     public SyncLocalStoreOutboxTests() => _db.Anchor.Execute("UPDATE sync_state SET enabled = 1");
 
@@ -202,6 +203,41 @@ public class SyncLocalStoreOutboxTests : IDisposable
 
         QueueRow(id).Should().BeNull();
         Record(id).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Outbox_builds_tag_and_goal_tag_items()
+    {
+        var goalId = Guid.CreateVersion7();
+        var tag = new Tag { Id = TagIds.ForTag("leitura"), Name = "leitura", Color = GoalColor.Amber, UpdatedAt = T0, DeletedAt = T0 };
+        var link = new GoalTag { Id = TagIds.ForLink(goalId, "leitura"), GoalId = goalId, TagName = "leitura", UpdatedAt = T0 };
+        await Tags.SaveAsync(new TagChanges([tag], [link]));
+
+        var items = await Store.ReadOutboxAsync(10);
+
+        items.Select(i => (i.RecordId, i.Kind, i.IsDelete)).Should().Equal(
+            (tag.Id, SyncRecordKind.Tag, false), (link.Id, SyncRecordKind.GoalTag, false));
+        SyncCodec.DecodeTag(items[0].Payload!).Should().Be(tag);
+        SyncCodec.DecodeGoalTag(items[1].Payload!).Should().Be(link);
+    }
+
+    [Fact]
+    public async Task Confirm_maps_new_kinds()
+    {
+        var tagId = Guid.CreateVersion7();
+        var linkId = Guid.CreateVersion7();
+        var deletedLink = Guid.CreateVersion7();
+        QueueDelete(deletedLink, "goal_tag", 2);
+
+        await Store.ConfirmPushAsync([
+            new PushConfirmation(tagId, SyncRecordKind.Tag, false, "kt", 3, 1),
+            new PushConfirmation(linkId, SyncRecordKind.GoalTag, false, "kl", 4, 1),
+            new PushConfirmation(deletedLink, SyncRecordKind.GoalTag, true, "kd", 5, 1),
+        ]);
+
+        _db.Anchor.Query<(string, string)>("SELECT record_id, kind FROM sync_records ORDER BY seq").Should().Equal(
+            (tagId.ToString("D"), "tag"), (linkId.ToString("D"), "goal_tag"));
+        QueueRow(deletedLink).Should().BeNull();
     }
 
     [Fact]
