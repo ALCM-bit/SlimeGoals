@@ -489,4 +489,22 @@ public class SettingsPageViewModelTests
 
         shown.Should().BeEmpty();
     }
+
+    [Fact]
+    public void Leaving_settings_forgets_the_return_to()
+    {
+        var navigator = new PageNavigator();
+        var shown = new List<Type>();
+        navigator.Requested += shown.Add;
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()), navigator: navigator);
+
+        navigator.ShowSettings(SettingsSection.Tags, typeof(GoalsPageViewModel));
+        vm.Deactivate();
+        vm.Activate();
+        shown.Clear();
+        vm.TryGoBack().Should().BeTrue();
+
+        shown.Should().BeEmpty();
+        vm.IsMainOpen.Should().BeTrue();
+    }
 }

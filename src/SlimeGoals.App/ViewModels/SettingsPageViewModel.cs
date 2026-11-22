@@ -396,7 +396,11 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     }
 
     /// <summary>Ao sair de Configurações, senhas e o código de recuperação digitados saem da memória da tela.</summary>
-    public override void Deactivate() => Account?.ClearSecretInputs();
+    public override void Deactivate()
+    {
+        _returnTo = null; // quem sai de Configurações por outro caminho não volta à página que pediu o grupo
+        Account?.ClearSecretInputs();
+    }
 
     [RelayCommand]
     private async Task LoadAsync()
