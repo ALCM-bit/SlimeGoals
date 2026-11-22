@@ -1,6 +1,6 @@
 namespace SlimeGoals.Core.Sync;
 
-public enum SyncRecordKind { Goal, Checkin }
+public enum SyncRecordKind { Goal, Checkin, Tag, GoalTag }
 
 /// <summary>Conteúdo que o aparelho cifra: versão do formato, tipo, ids e o payload em JSON.</summary>
 public sealed record SyncEnvelope(int Version, SyncRecordKind Kind, Guid RecordId, Guid DeviceId, string Payload);

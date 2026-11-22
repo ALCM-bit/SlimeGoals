@@ -9,12 +9,13 @@ namespace SlimeGoals.Core.Sync;
 /// Converte metas e registros no conteúdo (JSON) que o envelope carrega (spec de sincronização §6).
 /// Formatos invariantes: datas yyyy-MM-dd, horas HH:mm, instantes "O". <c>DeletedAt</c> não entra. Toda falha de leitura é <see cref="FormatException"/>.
 /// Formato 2: metas de tempo e os registros delas em segundos. O formato 1 (minutos) ainda chega de aparelhos antigos e
-/// é lido com conversão ×60 (spec Segundos_nas_metas_de_tempo_v1 §4.5); só se envia o formato 2.
+/// é lido com conversão ×60 (spec Segundos_nas_metas_de_tempo_v1 §4.5); só se envia o formato atual.
+/// Formato 3: tags e ligações de meta (spec Tags_v1 §4.4); a meta e o registro de check-in não mudam.
 /// </summary>
 public static partial class SyncCodec
 {
     /// <summary>Versão que este aparelho envia.</summary>
-    public const int FormatVersion = 2;
+    public const int FormatVersion = 3;
 
     /// <summary>Versão mais antiga que este aparelho ainda lê.</summary>
     public const int MinReadableVersion = 1;
@@ -112,6 +113,61 @@ public static partial class SyncCodec
                     (dto.Compensation.Seen ?? throw new FormatException("Campo ausente: compensation.seen.")).ToList()),
         };
     });
+
+    public static string Encode(Tag tag) => JsonSerializer.Serialize(new TagDto
+    {
+        Name = tag.Name,
+        Color = tag.Color.ToString(),
+        UpdatedAt = FormatInstant(tag.UpdatedAt),
+        DeletedAt = FormatInstant(tag.DeletedAt),
+    }, SyncJsonContext.Default.TagDto);
+
+    /// <exception cref="FormatException">Conteúdo inválido, nome não normalizado ou fora das regras de <see cref="TagName"/>.</exception>
+    public static Tag DecodeTag(string json) => Read(() =>
+    {
+        var dto = JsonSerializer.Deserialize(json, SyncJsonContext.Default.TagDto) ?? throw new FormatException("Conteúdo vazio.");
+        var name = RequiredTagName(dto.Name, "name");
+        return new Tag
+        {
+            Id = TagIds.ForTag(name),
+            Name = name,
+            Color = ParseEnum<GoalColor>(dto.Color, "color"),
+            UpdatedAt = ParseInstant(Required(dto.UpdatedAt, "updatedAt")),
+            DeletedAt = ParseOptionalInstant(dto.DeletedAt),
+        };
+    });
+
+    public static string Encode(GoalTag link) => JsonSerializer.Serialize(new GoalTagDto
+    {
+        GoalId = link.GoalId,
+        TagName = link.TagName,
+        UpdatedAt = FormatInstant(link.UpdatedAt),
+        RemovedAt = FormatInstant(link.RemovedAt),
+    }, SyncJsonContext.Default.GoalTagDto);
+
+    /// <exception cref="FormatException">Conteúdo inválido, nome não normalizado ou fora das regras de <see cref="TagName"/>.</exception>
+    public static GoalTag DecodeGoalTag(string json) => Read(() =>
+    {
+        var dto = JsonSerializer.Deserialize(json, SyncJsonContext.Default.GoalTagDto) ?? throw new FormatException("Conteúdo vazio.");
+        var goalId = Required(dto.GoalId, "goalId");
+        var name = RequiredTagName(dto.TagName, "tagName");
+        return new GoalTag
+        {
+            Id = TagIds.ForLink(goalId, name),
+            GoalId = goalId,
+            TagName = name,
+            UpdatedAt = ParseInstant(Required(dto.UpdatedAt, "updatedAt")),
+            RemovedAt = ParseOptionalInstant(dto.RemovedAt),
+        };
+    });
+
+    private static string RequiredTagName(string? value, string field)
+    {
+        var name = Required(value, field);
+        if (!string.Equals(TagName.Normalize(name), name, StringComparison.Ordinal) || TagName.Validate(name) is not null)
+            throw new FormatException($"Nome de tag inválido em {field}.");
+        return name;
+    }
 
     /// <summary>
     /// Registro do formato 1 de uma meta de tempo: minutos para segundos. Só quem conhece a medida da meta sabe chamar;
@@ -219,8 +275,26 @@ public static partial class SyncCodec
         public List<Guid>? Seen { get; set; }
     }
 
+    internal sealed class TagDto
+    {
+        public string? Name { get; set; }
+        public string? Color { get; set; }
+        public string? UpdatedAt { get; set; }
+        public string? DeletedAt { get; set; }
+    }
+
+    internal sealed class GoalTagDto
+    {
+        public Guid? GoalId { get; set; }
+        public string? TagName { get; set; }
+        public string? UpdatedAt { get; set; }
+        public string? RemovedAt { get; set; }
+    }
+
     [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonSerializable(typeof(GoalDto))]
     [JsonSerializable(typeof(CheckinDto))]
+    [JsonSerializable(typeof(TagDto))]
+    [JsonSerializable(typeof(GoalTagDto))]
     internal sealed partial class SyncJsonContext : JsonSerializerContext;
 }
