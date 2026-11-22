@@ -19,6 +19,9 @@ public sealed class PageNavigator
 
     public void Show<T>() where T : PageViewModel => Requested?.Invoke(typeof(T));
 
+    /// <summary>Mostra a página do tipo dado (o destino de "voltar" guardado como <see cref="Type"/>).</summary>
+    public void Show(Type page) => Requested?.Invoke(page);
+
     /// <summary>Mostra as configurações já com o grupo aberto; <paramref name="returnTo"/> é a página a que se volta dele.</summary>
     public void ShowSettings(SettingsSection section, Type? returnTo = null)
     {

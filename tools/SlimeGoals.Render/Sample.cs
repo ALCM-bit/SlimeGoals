@@ -86,7 +86,8 @@ public sealed class Sample : IDisposable
             new ReportsPageViewModel(s.GetRequiredService<ReportService>(), TimeProvider.System,
                 s.GetRequiredService<DataChangeNotifier>()),
             new SettingsPageViewModel(s.GetRequiredService<AppSettings>(), capabilities: capabilities, permissions: permissions,
-                changes: s.GetRequiredService<DataChangeNotifier>(), account: account, navigator: navigator),
+                changes: s.GetRequiredService<DataChangeNotifier>(), account: account, navigator: navigator,
+                tags: new TagsSettingsViewModel(s.GetRequiredService<TagService>())),
         ];
         return new ShellViewModel(pages, capabilities: capabilities, navigator: navigator);
     }
@@ -99,13 +100,14 @@ public sealed class Sample : IDisposable
         var until = new TimeOnly(22, 0);
 
         var water = await goals.CreateAsync(new GoalDraft("Beber água", Recurrence.Daily, 8, "water", GoalColor.Pink,
-            120, from, until, WeekDays.All, null, null, Measure.Quantity, "copos"));
+            120, from, until, WeekDays.All, null, null, Measure.Quantity, "copos") with { Tags = ["saúde"] });
         var reading = await goals.CreateAsync(new GoalDraft("Leitura", Recurrence.Daily, 9000, "book", GoalColor.Purple,
-            180, from, until, WeekDays.All, null, null, Measure.Duration));
+            180, from, until, WeekDays.All, null, null, Measure.Duration) with { Tags = ["estudos"] });
         var workout = await goals.CreateAsync(new GoalDraft("Treino", Recurrence.Weekly, 18000, "workout", GoalColor.Green,
-            180, from, until, WeekDays.All, null, null, Measure.Duration));
+            180, from, until, WeekDays.All, null, null, Measure.Duration) with { Tags = ["saúde", "treino"] });
         var english = await goals.CreateAsync(new GoalDraft("Aula de inglês com a professora particular às terças", Recurrence.Weekly, 1, "language", GoalColor.Amber,
-            180, from, until, WeekDays.All, null, null, Measure.Completion));
+            180, from, until, WeekDays.All, null, null, Measure.Completion) with { Tags = ["estudos", "idiomas"] });
+        await _services.GetRequiredService<TagService>().CreateAsync("trabalho");
 
         var now = DateTimeOffset.Now;
         int[] waterCups = [8, 6, 8, 3, 8, 7, 9, 8, 5, 4];

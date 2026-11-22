@@ -25,6 +25,7 @@ public static class AppServiceCollectionExtensions
         services.AddSingleton<DataChangeNotifier>();
         services.AddSingleton<GoalService>();
         services.AddSingleton<TagService>();
+        services.AddSingleton<TagsSettingsViewModel>();
         services.AddSingleton<CheckinService>();
         services.AddSingleton<TimerService>();
         services.AddSingleton<FocusService>();

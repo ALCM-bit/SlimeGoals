@@ -429,4 +429,64 @@ public class SettingsPageViewModelTests
 
         public Task RemoveAsync(string key, CancellationToken ct = default) => _inner.RemoveAsync(key, ct);
     }
+
+    [Fact]
+    public void Settings_close_with_return_to_goes_back_to_goals_page()
+    {
+        var navigator = new PageNavigator();
+        var shown = new List<Type>();
+        navigator.Requested += shown.Add;
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()), navigator: navigator);
+
+        navigator.ShowSettings(SettingsSection.Tags, typeof(GoalsPageViewModel));
+        (vm.Section, vm.IsTagsOpen, vm.HeaderTitle).Should().Be((SettingsSection.Tags, true, "Tags"));
+        shown.Clear();
+        vm.CloseSectionCommand.Execute(null);
+
+        shown.Should().Equal(typeof(GoalsPageViewModel));
+        vm.Section.Should().Be(SettingsSection.None);
+
+        navigator.ShowSettings(SettingsSection.Tags, typeof(GoalsPageViewModel));
+        shown.Clear();
+        vm.TryGoBack().Should().BeTrue();
+        shown.Should().Equal(typeof(GoalsPageViewModel));
+
+        // O returnTo foi consumido: abrir de novo pela lista e fechar fica em Configurações.
+        vm.OpenSectionCommand.Execute(SettingsSection.Tags);
+        shown.Clear();
+        vm.CloseSectionCommand.Execute(null);
+        shown.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Settings_close_without_return_to_goes_to_group_list()
+    {
+        var navigator = new PageNavigator();
+        var shown = new List<Type>();
+        navigator.Requested += shown.Add;
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()), navigator: navigator);
+
+        navigator.ShowSettings(SettingsSection.Tags);
+        shown.Clear();
+        vm.CloseSectionCommand.Execute(null);
+
+        (vm.Section, vm.IsMainOpen).Should().Be((SettingsSection.None, true));
+        shown.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_stale_return_to_is_cleared_when_a_section_opens_from_the_list()
+    {
+        var navigator = new PageNavigator();
+        var shown = new List<Type>();
+        navigator.Requested += shown.Add;
+        var vm = new SettingsPageViewModel(new AppSettings(new RecordingSettings()), navigator: navigator);
+
+        navigator.ShowSettings(SettingsSection.Tags, typeof(GoalsPageViewModel));
+        shown.Clear();
+        vm.OpenSectionCommand.Execute(SettingsSection.About);
+        vm.CloseSectionCommand.Execute(null);
+
+        shown.Should().BeEmpty();
+    }
 }

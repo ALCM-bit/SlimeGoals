@@ -575,17 +575,38 @@ void Render(bool phone, string suffix, int width, int height)
 
     Show("settings", settings);
     // Cada grupo de Configurações na página dele (os que a plataforma tem).
-    foreach (var section in new[] { SettingsSection.Reminders, SettingsSection.Window, SettingsSection.General, SettingsSection.About })
+    foreach (var section in new[] { SettingsSection.Reminders, SettingsSection.Tags, SettingsSection.Window, SettingsSection.General, SettingsSection.About })
     {
         settings.OpenSectionCommand.Execute(section);
         if (settings.Section != section)
             continue;
         Pump();
         Capture($"settings-{section.ToString().ToLowerInvariant()}");
+        if (section == SettingsSection.Tags)
+            CaptureTagStates();
         settings.CloseSectionCommand.Execute(null);
     }
 
     window.Close();
+
+    // Uma linha em cada estado (cores, edição com erro, junção, exclusão) e o campo de nova tag.
+    void CaptureTagStates()
+    {
+        var tags = settings.Tags!;
+        tags.LoadCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+        tags.Rows[0].TogglePickerCommand.Execute(null);
+        tags.Rows[1].BeginEditCommand.Execute(null);
+        tags.Rows[1].EditText = "a".PadRight(25, 'a');
+        tags.Rows[1].ConfirmEditCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+        tags.Rows[2].BeginEditCommand.Execute(null);
+        tags.Rows[2].EditText = "estudos";
+        tags.Rows[2].ConfirmEditCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+        tags.Rows[3].BeginDeleteCommand.Execute(null);
+        tags.BeginCreateCommand.Execute(null);
+        tags.NewName = "organização da casa";
+        Pump();
+        Capture("settings-tags-states");
+    }
 
     void Show(string name, PageViewModel page)
     {
