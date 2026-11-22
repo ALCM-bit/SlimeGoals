@@ -37,6 +37,7 @@ public sealed partial class PomodoroViewModel : ObservableObject
     private readonly DataChangeNotifier _changes;
     private readonly PageNavigator? _navigator;
 
+    private readonly TagService _tags;
     private bool _subscribed;
     private bool _seeded;
     private int _loadVersion;
@@ -44,11 +45,12 @@ public sealed partial class PomodoroViewModel : ObservableObject
     private FocusSession? _session;
     private string? _sessionGoalTitle;
 
-    public PomodoroViewModel(FocusService focus, GoalService goals, TimeProvider time, DataChangeNotifier changes,
+    public PomodoroViewModel(FocusService focus, GoalService goals, TagService tags, TimeProvider time, DataChangeNotifier changes,
         PageNavigator? navigator = null)
     {
         _focus = focus;
         _goals = goals;
+        _tags = tags;
         _time = time;
         _changes = changes;
         _navigator = navigator;

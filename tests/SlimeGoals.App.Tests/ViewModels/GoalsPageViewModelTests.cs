@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Time.Testing;
+using SlimeGoals.App.Hosting;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
@@ -14,12 +15,15 @@ public class GoalsPageViewModelTests
     private readonly InMemoryGoalRepository _repo = new();
     private readonly InMemoryCheckinRepository _checkins = new();
     private readonly GoalService _service;
+    private readonly InMemoryTagRepository _tagRepo = new();
+    private readonly TagService _tags;
     private readonly GoalsPageViewModel _vm;
 
     public GoalsPageViewModelTests()
     {
         _service = new GoalService(_repo, _checkins, new InMemoryTimerRepository(), _time);
-        _vm = new GoalsPageViewModel(_service, _time);
+        _tags = new TagService(_tagRepo, _repo, _time);
+        _vm = new GoalsPageViewModel(_service, _time, _tags, new PageNavigator());
     }
 
     private Task<Goal> Create(string title, Recurrence r = Recurrence.Daily, DateOnly? end = null) =>
@@ -273,5 +277,20 @@ public class GoalsPageViewModelTests
         await _vm.ArchiveCommand.ExecuteAsync(_vm.Goals.Single());
 
         _vm.ErrorMessage.Should().Be("Não foi possível concluir a ação.");
+    }
+
+    [Fact]
+    public async Task Activate_reloads_tags_of_the_open_editor()
+    {
+        await _tags.CreateAsync("casa");
+        _vm.NewCommand.Execute(null);
+        await _vm.Editor!.Tags.ReloadCommand.ExecuteAsync(null);
+        _vm.Editor.Tags.Chips.Select(c => c.Name).Should().Equal("casa");
+
+        await _tags.CreateAsync("estudos");
+        _vm.Activate();
+        await Task.Delay(50);
+
+        _vm.Editor.Tags.Chips.Select(c => c.Name).Should().Equal("casa", "estudos");
     }
 }

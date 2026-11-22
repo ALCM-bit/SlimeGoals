@@ -149,7 +149,7 @@ public class TodayPageViewModelTests
         var shown = new List<Type>();
         var sections = new List<SettingsSection>();
         navigator.Requested += shown.Add;
-        navigator.SettingsRequested += sections.Add;
+        navigator.SettingsRequested += (section, _) => sections.Add(section);
         var account = new FakeSyncAccount { Status = SignedInSince(TimeSpan.FromDays(4)) };
         var page = NewPageWithAccount(account, navigator);
         await page.LoadCommand.ExecuteAsync(null);

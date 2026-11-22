@@ -2,6 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:SlimeGoals.App.ViewModels"
              xmlns:validation="using:SlimeGoals.Core.Validation"
+             xmlns:domain="using:SlimeGoals.Core.Domain"
+             xmlns:views="using:SlimeGoals.App.Views"
              x:Class="SlimeGoals.App.Views.GoalEditView"
              x:DataType="vm:GoalEditViewModel">
   <UserControl.Resources>
@@ -153,6 +155,39 @@
                 </DataTemplate>
               </ListBox.ItemTemplate>
             </ListBox>
+          </StackPanel>
+
+          <StackPanel Classes="field">
+            <Border Classes="tag-box">
+              <StackPanel Spacing="12" DataContext="{Binding Tags}" x:DataType="vm:TagPickerViewModel">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Classes="field-label" Text="Tags" VerticalAlignment="Center" />
+                  <Button Grid.Column="1" Classes="back" Content="Gerenciar tags ›" MinHeight="32" Padding="8,0"
+                          Command="{Binding $parent[UserControl].((vm:GoalEditViewModel)DataContext).ManageTagsCommand}"
+                          IsVisible="{Binding $parent[UserControl].((vm:GoalEditViewModel)DataContext).CanManageTags}" />
+                </Grid>
+                <ItemsControl ItemsSource="{Binding Chips}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8" /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:TagChipViewModel">
+                      <views:TagChip Command="{Binding $parent[ItemsControl].((vm:TagPickerViewModel)DataContext).ToggleCommand}" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                  <TextBox Text="{Binding NewName}" MaxLength="{x:Static domain:TagName.MaxLength}" PlaceholderText="Nova tag…"
+                           AutomationProperties.Name="Nova tag">
+                    <TextBox.KeyBindings>
+                      <KeyBinding Gesture="Enter" Command="{Binding CreateCommand}" />
+                    </TextBox.KeyBindings>
+                  </TextBox>
+                  <Button Grid.Column="1" Classes="ghost" Content="Criar" Command="{Binding CreateCommand}" />
+                </Grid>
+                <TextBlock Classes="field-error" Text="{Binding NewNameError}" IsVisible="{Binding HasNewNameError}" />
+              </StackPanel>
+            </Border>
           </StackPanel>
 
           <StackPanel Classes="field">

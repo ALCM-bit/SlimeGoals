@@ -552,6 +552,11 @@ void Render(bool phone, string suffix, int width, int height)
     Show("goals", goals);
 
     goals.NewCommand.Execute(null);
+    // O quadro de tags: um chip marcado e outro digitado, para ver os dois estados e a quebra de linha.
+    goals.Editor!.Tags.ReloadCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+    goals.Editor.Tags.ToggleCommand.Execute(goals.Editor.Tags.Chips[0]);
+    goals.Editor.Tags.NewName = "organização da casa";
+    goals.Editor.Tags.CreateCommand.Execute(null);
     Pump();
     Capture("goal-edit");
     // O fim do formulário (horários, período e, no layout estreito, as ações) fica abaixo da dobra

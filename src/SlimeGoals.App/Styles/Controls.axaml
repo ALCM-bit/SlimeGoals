@@ -312,6 +312,27 @@
     <Setter Property="BorderThickness" Value="2" />
   </Style>
 
+  <!-- Chip de tag: o botão é só a área de toque; o visual é do Border dentro dele -->
+  <Style Selector="Button.tag-chip">
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="CornerRadius" Value="999" />
+  </Style>
+  <Style Selector="Button.tag-chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.tag-chip:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <!-- Quadro de tags da página da meta -->
+  <Style Selector="Border.tag-box">
+    <Setter Property="Background" Value="{DynamicResource Tile}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Padding" Value="14" />
+  </Style>
+
   <!-- Campos do formulário -->
   <Style Selector="StackPanel.field">
     <Setter Property="Spacing" Value="6" />

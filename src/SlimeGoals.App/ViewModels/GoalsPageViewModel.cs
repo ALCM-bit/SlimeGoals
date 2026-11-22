@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SlimeGoals.App.Hosting;
 using SlimeGoals.Core;
 using SlimeGoals.Core.Services;
 
@@ -10,7 +11,8 @@ namespace SlimeGoals.App.ViewModels;
 /// Tela Metas: lista (ativas ou arquivadas) e, quando <see cref="Editor"/> não é nulo,
 /// a página de edição no lugar da lista (spec §7).
 /// </summary>
-public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider time) : PageViewModel
+public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider time, TagService tags, PageNavigator navigator)
+    : PageViewModel
 {
     private int _loadVersion;
 
@@ -27,7 +29,12 @@ public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider
     public bool IsEmpty => Goals.Count == 0;
     public string EmptyMessage => ShowArchived ? "Nenhuma meta arquivada." : "Nenhuma meta ativa. Crie a primeira!";
 
-    public override void Activate() => LoadCommand.Execute(null);
+    public override void Activate()
+    {
+        LoadCommand.Execute(null);
+        // O editor sobrevive à ida a Configurações › Tags: na volta, cores, nomes e exclusões de lá já aparecem nos chips.
+        Editor?.Tags.ReloadCommand.Execute(null);
+    }
 
     partial void OnShowArchivedChanged(bool value)
     {
@@ -68,7 +75,7 @@ public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider
     }
 
     [RelayCommand]
-    private void New() => Editor = new GoalEditViewModel(service, null, measureLocked: false, CloseEditor);
+    private void New() => Editor = new GoalEditViewModel(service, tags, null, measureLocked: false, CloseEditor, navigator: navigator);
 
     /// <summary>Abre o editor; meta com registros abre com a medida travada (spec §5.2).</summary>
     [RelayCommand(CanExecute = nameof(CanEdit))]
@@ -80,7 +87,7 @@ public sealed partial class GoalsPageViewModel(GoalService service, TimeProvider
         try
         {
             var locked = await service.HasRecordsAsync(item.Goal.Id);
-            Editor = new GoalEditViewModel(service, item.Goal, locked, CloseEditor);
+            Editor = new GoalEditViewModel(service, tags, item.Goal, locked, CloseEditor, navigator: navigator);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

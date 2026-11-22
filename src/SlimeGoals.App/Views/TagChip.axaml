@@ -1,0 +1,41 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SlimeGoals.App.ViewModels"
+             xmlns:conv="using:SlimeGoals.App.Converters"
+             x:Class="SlimeGoals.App.Views.TagChip"
+             x:DataType="vm:TagChipViewModel">
+  <UserControl.Resources>
+    <conv:TagChipBrushConverter x:Key="ChipBrush" />
+  </UserControl.Resources>
+  <!-- Chip de tag: ponto + nome (+ contagem). Marcado, ganha o fundo e a borda da cor da tag. -->
+  <Button Classes="tag-chip" Click="OnClick" AutomationProperties.Name="{Binding Name}">
+    <Border Classes="tag-chip" BorderThickness="1" CornerRadius="999" Padding="12,0" MinHeight="36">
+      <Border.Background>
+        <MultiBinding Converter="{StaticResource ChipBrush}" ConverterParameter="Back">
+          <Binding Path="IsSelected" />
+          <Binding Path="Color" />
+        </MultiBinding>
+      </Border.Background>
+      <Border.BorderBrush>
+        <MultiBinding Converter="{StaticResource ChipBrush}" ConverterParameter="Line">
+          <Binding Path="IsSelected" />
+          <Binding Path="Color" />
+        </MultiBinding>
+      </Border.BorderBrush>
+      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                 Fill="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
+        <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center">
+          <TextBlock.Foreground>
+            <MultiBinding Converter="{StaticResource ChipBrush}" ConverterParameter="Text">
+              <Binding Path="IsSelected" />
+              <Binding Path="Color" />
+            </MultiBinding>
+          </TextBlock.Foreground>
+        </TextBlock>
+        <TextBlock Text="{Binding Count}" FontSize="13" Foreground="{DynamicResource Muted}" VerticalAlignment="Center"
+                   IsVisible="{Binding Count, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
+    </Border>
+  </Button>
+</UserControl>

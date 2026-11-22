@@ -17,6 +17,7 @@ public enum SettingsSection
     None,
     Sync,
     Reminders,
+    Tags,
     Window,
     General,
     About,
@@ -63,7 +64,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         VersionText = "SlimeGoals " + (appVersion ?? DefaultVersion());
         Account = account;
         if (navigator is not null)
-            navigator.SettingsRequested += OpenSection;
+            navigator.SettingsRequested += (section, _) => OpenSection(section);
         if (account is not null)
             account.PropertyChanged += (_, e) =>
             {

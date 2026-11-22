@@ -14,7 +14,9 @@ public class ShellViewModelTests
     private static GoalsPageViewModel Goals()
     {
         var time = new FakeTimeProvider();
-        return new GoalsPageViewModel(new GoalService(new InMemoryGoalRepository(), new InMemoryCheckinRepository(), new InMemoryTimerRepository(), time), time);
+        var goals = new InMemoryGoalRepository();
+        return new GoalsPageViewModel(new GoalService(goals, new InMemoryCheckinRepository(), new InMemoryTimerRepository(), time), time,
+            new TagService(new InMemoryTagRepository(), goals, time), new PageNavigator());
     }
 
     internal static TodayPageViewModel Today()
@@ -41,7 +43,8 @@ public class ShellViewModelTests
         var (goals, checkins, timers) = (new InMemoryGoalRepository(), new InMemoryCheckinRepository(), new InMemoryTimerRepository());
         var focus = new FocusService(goals, new InMemoryFocusSessionRepository(checkins, timers), timers,
             new CheckinService(goals, checkins, time), new AppSettings(new InMemorySettingsRepository()), time);
-        return new TimePageViewModel(new PomodoroViewModel(focus, new GoalService(goals, checkins, timers, time), time,
+        return new TimePageViewModel(new PomodoroViewModel(focus, new GoalService(goals, checkins, timers, time),
+            new TagService(new InMemoryTagRepository(), goals, time), time,
             new DataChangeNotifier()));
     }
 
@@ -117,8 +120,9 @@ public class ShellViewModelBackTests
     private static ShellViewModel Create(PlatformCapabilities? capabilities = null)
     {
         var time = new FakeTimeProvider();
-        var goals = new GoalsPageViewModel(new GoalService(new InMemoryGoalRepository(), new InMemoryCheckinRepository(),
-            new InMemoryTimerRepository(), time), time);
+        var goalRepo = new InMemoryGoalRepository();
+        var goals = new GoalsPageViewModel(new GoalService(goalRepo, new InMemoryCheckinRepository(),
+            new InMemoryTimerRepository(), time), time, new TagService(new InMemoryTagRepository(), goalRepo, time), new PageNavigator());
         var reports = new ReportsPageViewModel(new ReportService(new InMemoryGoalRepository(), new InMemoryCheckinRepository(),
             new InMemoryReminderLogRepository(), time), time, new DataChangeNotifier());
         return new ShellViewModel([ShellViewModelTests.Today(), goals, reports, ShellViewModelTests.Settings()],

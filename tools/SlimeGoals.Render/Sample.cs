@@ -27,6 +27,7 @@ public sealed class Sample : IDisposable
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<DataChangeNotifier>();
         services.AddSingleton<GoalService>();
+        services.AddSingleton<TagService>();
         services.AddSingleton<CheckinService>();
         services.AddSingleton<TimerService>();
         services.AddSingleton<AppSettings>();
@@ -79,8 +80,8 @@ public sealed class Sample : IDisposable
                 s.GetRequiredService<ReminderService>(), s.GetRequiredService<DataChangeNotifier>(),
                 s.GetRequiredService<ReminderPause>(), s.GetRequiredService<ReportService>(), capabilities, permissions,
                 focus, navigator, syncAccount),
-            new GoalsPageViewModel(s.GetRequiredService<GoalService>(), TimeProvider.System),
-            new TimePageViewModel(new PomodoroViewModel(focus, s.GetRequiredService<GoalService>(), Clock,
+            new GoalsPageViewModel(s.GetRequiredService<GoalService>(), TimeProvider.System, s.GetRequiredService<TagService>(), navigator),
+            new TimePageViewModel(new PomodoroViewModel(focus, s.GetRequiredService<GoalService>(), s.GetRequiredService<TagService>(), Clock,
                 s.GetRequiredService<DataChangeNotifier>(), navigator)),
             new ReportsPageViewModel(s.GetRequiredService<ReportService>(), TimeProvider.System,
                 s.GetRequiredService<DataChangeNotifier>()),
