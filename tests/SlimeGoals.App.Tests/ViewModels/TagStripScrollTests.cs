@@ -28,4 +28,19 @@ public class TagStripScrollTests
     [InlineData(0, 300, 250, 350, 250)]   // cortado na ponta direita
     public void RevealOffset_moves_only_when_the_chip_is_not_fully_visible(double offset, double viewport, double left, double right, double expected) =>
         TagStripScroll.RevealOffset(offset, viewport, left, right).Should().Be(expected);
+
+    [Fact]
+    public void RevealAny_keeps_the_row_when_one_of_the_chips_is_already_in_view()
+    {
+        // Marcados em 50–150 (fora, à esquerda) e 400–500 (à vista com a linha em 300).
+        TagStripScroll.RevealAnyOffset(300, 300, [(50, 150), (400, 500)]).Should().Be(300);
+    }
+
+    [Fact]
+    public void RevealAny_brings_the_first_chip_when_none_is_in_view()
+    {
+        TagStripScroll.RevealAnyOffset(600, 300, [(50, 150), (400, 500)]).Should().Be(50);
+        TagStripScroll.RevealAnyOffset(120, 300, []).Should().Be(120);
+    }
 }
+

@@ -31,15 +31,25 @@ public sealed partial class TodayTagFilterViewModel : ObservableObject
     /// <summary>Há seleção e nenhum cartão passa por ela.</summary>
     [ObservableProperty] public partial bool IsFilteredEmpty { get; private set; }
 
+    /// <summary>
+    /// Pede à view que deixe à vista um dos chips dados: os marcados, depois de uma recarga (os chips são outros); o
+    /// tocado, quando o toque fez o "Limpar" aparecer e estreitou a linha. Os outros toques não mexem na rolagem: a
+    /// pessoa rolou até o chip que tocou.
+    /// </summary>
+    public event EventHandler<IReadOnlyList<TagChipViewModel>>? RevealRequested;
+
     [RelayCommand]
     private void Toggle(TagChipViewModel? chip)
     {
         if (chip is null)
             return;
+        var hadSelection = _selected.Count > 0;
         if (!_selected.Remove(chip.Name))
             _selected.Add(chip.Name);
         chip.IsSelected = _selected.Contains(chip.Name);
         Apply();
+        if (!hadSelection && chip.IsSelected)
+            RevealRequested?.Invoke(this, [chip]);
     }
 
     [RelayCommand]
@@ -63,6 +73,8 @@ public sealed partial class TodayTagFilterViewModel : ObservableObject
         foreach (var row in rows)
             Chips.Add(new TagChipViewModel(row.Name, row.Color, _selected.Contains(row.Name), row.Count));
         Apply();
+        if (Chips.Where(c => c.IsSelected).ToList() is { Count: > 0 } selected)
+            RevealRequested?.Invoke(this, selected);
     }
 
     private void Apply()

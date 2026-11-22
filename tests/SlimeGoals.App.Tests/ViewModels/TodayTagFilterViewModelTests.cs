@@ -136,4 +136,30 @@ public class TodayTagFilterViewModelTests
         Toggle("x");
         _filter.IsFilteredEmpty.Should().BeFalse();
     }
+
+    [Fact]
+    public void Reveal_asks_for_the_selected_chips_on_reload_and_for_the_tapped_one_only_when_clear_appears()
+    {
+        var revealed = new List<string>();
+        _filter.RevealRequested += (_, chips) => revealed.Add(string.Join(",", chips.Select(c => c.Name)));
+        var goals = new[] { Card("a", "x"), Card("b", "y"), Card("c", "z") };
+        Refreshed(goals);
+        revealed.Should().BeEmpty("sem seleção, a linha não se mexe");
+
+        // O primeiro toque faz o "Limpar" aparecer e estreita a linha: o chip tocado é que fica à vista.
+        Toggle("z");
+        revealed.Should().Equal("z");
+        // Tocar outro chip mais à direita não traz a linha de volta para o primeiro marcado.
+        Toggle("y");
+        Toggle("y");
+        Toggle("y");
+        revealed.Should().Equal("z");
+
+        Refreshed(goals); // recarga: os chips são outros; a view mantém a linha se um dos marcados está à vista
+        revealed.Should().Equal("z", "y,z");
+
+        _filter.ClearCommand.Execute(null);
+        Refreshed(goals);
+        revealed.Should().Equal("z", "y,z");
+    }
 }

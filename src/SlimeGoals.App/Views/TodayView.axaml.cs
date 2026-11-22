@@ -41,38 +41,30 @@ public partial class TodayView : UserControl
     {
         base.OnDataContextChanged(e);
         if (_filter is not null)
-        {
-            _filter.Chips.CollectionChanged -= OnChipsChanged;
-            _filter.PropertyChanged -= OnFilterChanged;
-        }
+            _filter.RevealRequested -= OnRevealRequested;
         _filter = (DataContext as TodayPageViewModel)?.Filter;
         if (_filter is not null)
-        {
-            _filter.Chips.CollectionChanged += OnChipsChanged;
-            _filter.PropertyChanged += OnFilterChanged;
-        }
+            _filter.RevealRequested += OnRevealRequested;
     }
 
-    private void OnChipsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) => RevealSelectedChip();
-
-    private void OnFilterChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    /// <summary>
+    /// Deixa um dos chips pedidos à vista; se algum já está, a linha não se mexe. Espera o layout: os chips novos de uma
+    /// recarga, ou o "Limpar" que acabou de aparecer, ainda não têm lugar quando o pedido chega.
+    /// </summary>
+    private void OnRevealRequested(object? sender, IReadOnlyList<TagChipViewModel> targets) => Dispatcher.UIThread.Post(() =>
     {
-        if (e.PropertyName == nameof(TodayTagFilterViewModel.SummaryText))
-            RevealSelectedChip();
-    }
-
-    /// <summary>Com seleção, o primeiro chip marcado fica à vista; se já está, a linha não se mexe.</summary>
-    private void RevealSelectedChip() => Dispatcher.UIThread.Post(() =>
-    {
-        if (_filter?.Chips.FirstOrDefault(c => c.IsSelected) is not { } selected)
-            return;
-        var chip = TagChips.GetVisualDescendants().OfType<TagChip>().FirstOrDefault(c => c.DataContext == selected);
-        if (chip?.TranslatePoint(default, TagStrip) is not { } at)
-            return;
         var offset = TagStrip.Offset.X;
-        var target = TagStripScroll.RevealOffset(offset, TagStrip.Viewport.Width, at.X + offset, at.X + offset + chip.Bounds.Width);
-        if (target != offset)
-            TagStrip.Offset = TagStrip.Offset.WithX(target);
+        var shown = TagChips.GetVisualDescendants().OfType<TagChip>().ToList();
+        var bounds = new List<(double Left, double Right)>();
+        foreach (var target in targets)
+        {
+            var chip = shown.FirstOrDefault(c => c.DataContext == target);
+            if (chip?.TranslatePoint(default, TagStrip) is { } at)
+                bounds.Add((at.X + offset, at.X + offset + chip.Bounds.Width));
+        }
+        var revealed = TagStripScroll.RevealAnyOffset(offset, TagStrip.Viewport.Width, bounds);
+        if (revealed != offset)
+            TagStrip.Offset = TagStrip.Offset.WithX(revealed);
     }, DispatcherPriority.Loaded);
 
     private void UpdateTagStripHint()

@@ -15,4 +15,16 @@ public static class TagStripScroll
     /// </summary>
     public static double RevealOffset(double offset, double viewport, double chipLeft, double chipRight) =>
         chipLeft >= offset && chipRight <= offset + viewport ? offset : Math.Max(0, chipLeft);
+
+    /// <summary>
+    /// Para vários chips (os marcados, na ordem da linha): o mesmo deslocamento se algum já cabe inteiro na janela;
+    /// senão, o que deixa o primeiro à vista.
+    /// </summary>
+    public static double RevealAnyOffset(double offset, double viewport, IReadOnlyList<(double Left, double Right)> chips)
+    {
+        if (chips.Count == 0 || chips.Any(c => c.Left >= offset && c.Right <= offset + viewport))
+            return offset;
+        return RevealOffset(offset, viewport, chips[0].Left, chips[0].Right);
+    }
 }
+
