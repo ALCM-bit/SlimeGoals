@@ -844,6 +844,68 @@ public class AccountViewModelTests
         _account.Calls.Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData(AccountPage.Register)]
+    [InlineData(AccountPage.Login)]
+    [InlineData(AccountPage.Recover)]
+    [InlineData(AccountPage.ChangePassword)]
+    public async Task Account_page_protects_the_screen_while_open(AccountPage page)
+    {
+        var account = await LoadedAsync();
+        var screen = new RecordingSecureScreen();
+        var settings = new SettingsPageViewModel(new AppSettings(_repo),
+            capabilities: PlatformCapabilities.Desktop with { Sync = true }, account: account, secureScreen: screen);
+        var shell = new ShellViewModel(new PageViewModel[] { ShellViewModelTests.Today(), settings });
+        shell.CurrentPage = settings;
+        screen.Calls.Should().BeEmpty();
+
+        Open(account, page);
+        screen.Calls.Should().Equal(true);
+
+        settings.TryGoBack().Should().BeTrue();
+        screen.Calls.Should().Equal(true, false);
+    }
+
+    [Fact]
+    public async Task Leaving_settings_lifts_the_protection_and_coming_back_restores_it()
+    {
+        var account = await LoadedAsync();
+        var screen = new RecordingSecureScreen();
+        var settings = new SettingsPageViewModel(new AppSettings(_repo),
+            capabilities: PlatformCapabilities.Desktop with { Sync = true }, account: account, secureScreen: screen);
+        var today = ShellViewModelTests.Today();
+        var shell = new ShellViewModel(new PageViewModel[] { today, settings });
+        shell.CurrentPage = settings;
+        account.OpenLoginCommand.Execute(null);
+
+        shell.CurrentPage = today;
+        screen.Calls.Should().Equal(true, false);
+
+        // A página de conta continua aberta dentro de Configurações: voltar a ela protege de novo.
+        shell.CurrentPage = settings;
+        screen.Calls.Should().Equal(true, false, true);
+    }
+
+    [Fact]
+    public async Task Account_page_open_outside_settings_does_not_protect_the_screen()
+    {
+        var account = await LoadedAsync();
+        var screen = new RecordingSecureScreen();
+        _ = new SettingsPageViewModel(new AppSettings(_repo),
+            capabilities: PlatformCapabilities.Desktop with { Sync = true }, account: account, secureScreen: screen);
+
+        account.OpenLoginCommand.Execute(null);
+
+        screen.Calls.Should().BeEmpty();
+    }
+
+    private sealed class RecordingSecureScreen : ISecureScreen
+    {
+        public List<bool> Calls { get; } = [];
+
+        public void SetProtected(bool value) => Calls.Add(value);
+    }
+
     private static void Open(AccountViewModel vm, AccountPage page)
     {
         switch (page)
