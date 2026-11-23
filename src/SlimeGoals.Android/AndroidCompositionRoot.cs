@@ -57,12 +57,15 @@ internal static class AndroidCompositionRoot
 
     /// <summary>
     /// Conta e sincronização em todos os builds (9.5b): cofre sobre o Keystore, nome do aparelho do sistema e a área de
-    /// transferência que marca o código de recuperação como sensível. O resto é o mesmo do head Linux. Só o APK de
-    /// desenvolvimento sugere um servidor (o de teste local); no Release o campo começa vazio, com a dica.
+    /// transferência que marca o código de recuperação como sensível, e a tela protegida nas páginas de conta. O resto é o
+    /// mesmo do head Linux. Só o APK de desenvolvimento sugere um servidor (o de teste local); no Release o campo começa
+    /// vazio, com a dica.
     /// </summary>
     private static void AddSync(IServiceCollection services, Context context)
     {
         services.AddSingleton<ITextClipboard>(_ => new AndroidSensitiveClipboard(context));
+        services.AddSingleton<AndroidSecureScreen>();
+        services.AddSingleton<ISecureScreen>(sp => sp.GetRequiredService<AndroidSecureScreen>());
 #if SYNC_DEV
         var defaultServer = new Uri("http://127.0.0.1:8080");
 #else

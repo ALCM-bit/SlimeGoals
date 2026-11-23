@@ -39,12 +39,17 @@ public class MainActivity : AvaloniaMainActivity
     private static AndroidReminderPermissions? Permissions
         => AndroidApplication.Services?.GetService<AndroidReminderPermissions>();
 
+    private static Sync.AndroidSecureScreen? SecureScreen
+        => AndroidApplication.Services?.GetService<Sync.AndroidSecureScreen>();
+
     /// <summary>Registra-se como a Activity dos pedidos de permissão.</summary>
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
         if (Permissions is { } permissions)
             permissions.CurrentActivity = this;
+        if (SecureScreen is { } secureScreen)
+            secureScreen.CurrentActivity = this;
         if (AndroidApplication.StartupFailure is { } failure)
             failure.CloseRequested += OnStartupFailureClose;
         // Recriada (processo morto) ou aberta pelos recentes, a Activity recebe de novo o intent original: o "Parar"
@@ -107,6 +112,8 @@ public class MainActivity : AvaloniaMainActivity
     {
         if (Permissions is { } permissions && ReferenceEquals(permissions.CurrentActivity, this))
             permissions.CurrentActivity = null;
+        if (SecureScreen is { } secureScreen)
+            secureScreen.CurrentActivity = null;
         if (AndroidApplication.StartupFailure is { } failure)
             failure.CloseRequested -= OnStartupFailureClose;
         base.OnDestroy();
