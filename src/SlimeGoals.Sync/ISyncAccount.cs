@@ -23,6 +23,12 @@ public enum AccountState
 
     /// <summary>A sessão gravada aponta para http:// fora do loopback: o motor não liga, e só sair funciona, sem rede.</summary>
     InsecureSession,
+
+    /// <summary>
+    /// O app não passou na conferência de integridade (assinatura diferente ou depurador): o cofre não é lido, o motor não
+    /// liga e nenhuma operação de conta sai. "Tentar de novo" confere outra vez.
+    /// </summary>
+    UntrustedApp,
 }
 
 /// <summary>O que a tela mostra da conta e da sincronização.</summary>
