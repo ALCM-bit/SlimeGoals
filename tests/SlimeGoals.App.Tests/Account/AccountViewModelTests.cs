@@ -6,6 +6,7 @@ using SlimeGoals.Core.Services;
 using SlimeGoals.Sync;
 using SlimeGoals.Sync.Account;
 using SlimeGoals.Sync.Contracts;
+using SlimeGoals.Sync.Integrity;
 using SlimeGoals.Testing;
 
 namespace SlimeGoals.App.Tests.Account;
@@ -31,6 +32,36 @@ public class AccountViewModelTests
         new AccountViewModel(_account, new AppSettings(_repo), new AccountDefaults("x"), a => a(), _time, clipboard)
             .PlatformClipboard.Should().BeSameAs(clipboard);
         Create().PlatformClipboard.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Untrusted_app_shows_why_and_offers_retry()
+    {
+        _account.Status = WithState(AccountState.UntrustedApp);
+
+        var vm = await LoadedAsync();
+
+        (vm.IsUntrustedApp, vm.IsSignedOut, vm.IsSignedIn).Should().Be((true, false, false));
+        vm.RetryVaultCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Rooted_device_shows_a_warning(bool rooted)
+    {
+        var integrity = new FixedIntegrity(rooted ? [IntegrityIssue.Rooted] : []);
+        var vm = new AccountViewModel(_account, new AppSettings(_repo), new AccountDefaults("x"), a => a(), _time,
+            integrity: integrity);
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        vm.IsDeviceRooted.Should().Be(rooted);
+    }
+
+    private sealed class FixedIntegrity(HashSet<IntegrityIssue> issues) : IAppIntegrity
+    {
+        public IntegrityReport Check() => new(issues);
     }
 
     private sealed class NullClipboard : ITextClipboard
@@ -781,6 +812,7 @@ public class AccountViewModelTests
     [InlineData(AccountState.SessionExpired, "Entre de novo para continuar")]
     [InlineData(AccountState.VaultLocked, "Chaveiro travado")]
     [InlineData(AccountState.SessionUnreadable, "Sessão ilegível")]
+    [InlineData(AccountState.UntrustedApp, "Conferência de segurança falhou")]
     public async Task Summary_for_the_settings_list_follows_the_state(AccountState state, string summary)
     {
         _account.Status = new AccountStatus(state, "ana@exemplo.com", Local, null, 0, null);

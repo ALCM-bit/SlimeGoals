@@ -12,6 +12,7 @@ using SlimeGoals.Infrastructure.Data;
 using SlimeGoals.Sync;
 using SlimeGoals.Sync.Account;
 using SlimeGoals.Sync.Contracts;
+using SlimeGoals.Sync.Integrity;
 
 namespace SlimeGoals.Render;
 
@@ -199,8 +200,15 @@ public sealed class Sample : IDisposable
     }
 
     /// <summary>A seção da conta sobre uma conta falsa (nenhuma rede), com o despacho direto na thread da Render.</summary>
-    public AccountViewModel CreateAccount(SampleAccount account) =>
-        new(account, _services.GetRequiredService<AppSettings>(), new AccountDefaults("notebook-da-ana"), a => a());
+    public AccountViewModel CreateAccount(SampleAccount account, IAppIntegrity? integrity = null) =>
+        new(account, _services.GetRequiredService<AppSettings>(), new AccountDefaults("notebook-da-ana"), a => a(),
+            integrity: integrity);
+
+    /// <summary>Conferência de integridade fixa, para os quadros do app reprovado e do aparelho com root.</summary>
+    public sealed class SampleIntegrity(params IntegrityIssue[] issues) : IAppIntegrity
+    {
+        public IntegrityReport Check() => new(issues.ToHashSet());
+    }
 
     public void Dispose()
     {

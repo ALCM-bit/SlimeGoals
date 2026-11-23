@@ -7,6 +7,7 @@ using SlimeGoals.Core.Services;
 using SlimeGoals.Sync;
 using SlimeGoals.Sync.Account;
 using SlimeGoals.Sync.Contracts;
+using SlimeGoals.Sync.Integrity;
 
 namespace SlimeGoals.App.Account;
 
@@ -88,6 +89,7 @@ public sealed partial class AccountViewModel : ObservableObject
     private readonly AppSettings _settings;
     private readonly Action<Action> _dispatch;
     private readonly TimeProvider _time;
+    private readonly IAppIntegrity? _integrity;
     private PendingRegistration? _pending;
     private readonly Uri? _defaultServer;
     private string _savedServer;
@@ -100,10 +102,13 @@ public sealed partial class AccountViewModel : ObservableObject
     public ITextClipboard? PlatformClipboard { get; }
 
     /// <param name="dispatch">Leva o recarregar do status à thread da interface; padrão, o <see cref="Dispatcher"/> do Avalonia.</param>
+    /// <param name="integrity">Conferência de integridade do app; dela a tela só usa o aviso de root.</param>
     public AccountViewModel(ISyncAccount account, AppSettings settings, AccountDefaults defaults,
-        Action<Action>? dispatch = null, TimeProvider? time = null, ITextClipboard? platformClipboard = null)
+        Action<Action>? dispatch = null, TimeProvider? time = null, ITextClipboard? platformClipboard = null,
+        IAppIntegrity? integrity = null)
     {
         PlatformClipboard = platformClipboard;
+        _integrity = integrity;
         _account = account;
         _settings = settings;
         _dispatch = dispatch ?? (a => Dispatcher.UIThread.Post(a));
@@ -138,8 +143,9 @@ public sealed partial class AccountViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSignedOut), nameof(IsSignedIn), nameof(IsSessionExpired), nameof(IsVaultLocked),
-        nameof(IsSessionUnreadable), nameof(IsInsecureSession), nameof(IsServerEditable), nameof(ConnectedText), nameof(ServerLineText),
-        nameof(LastSyncText), nameof(PendingText), nameof(LastError), nameof(SummaryText))]
+        nameof(IsSessionUnreadable), nameof(IsInsecureSession), nameof(IsUntrustedApp), nameof(IsServerEditable),
+        nameof(ConnectedText), nameof(ServerLineText), nameof(LastSyncText), nameof(PendingText), nameof(LastError),
+        nameof(SummaryText))]
     public partial AccountStatus Status { get; private set; } = new(AccountState.SignedOut, null, null, null, 0, null);
 
     // Campos dos formulários.
@@ -211,6 +217,17 @@ public sealed partial class AccountViewModel : ObservableObject
     public bool IsVaultLocked => Status.State == AccountState.VaultLocked;
     public bool IsSessionUnreadable => Status.State == AccountState.SessionUnreadable;
     public bool IsInsecureSession => Status.State == AccountState.InsecureSession;
+    public bool IsUntrustedApp => Status.State == AccountState.UntrustedApp;
+
+    /// <summary>O aparelho parece ter root: só um aviso, a conta segue ligada.</summary>
+    [ObservableProperty] public partial bool IsDeviceRooted { get; private set; }
+
+    public const string UntrustedAppText = "Este app não passou na conferência de segurança: a assinatura não é a oficial " +
+        "ou há um depurador conectado. A conta fica desligada neste aparelho; metas e lembretes continuam funcionando. " +
+        "Instale o app oficial ou desconecte o depurador e tente de novo.";
+
+    public const string DeviceRootedText = "Este aparelho parece ter root. Outros apps podem ler os dados do SlimeGoals, " +
+        "inclusive a sessão da conta.";
 
     /// <summary>Com a conta ligada vale o servidor da sessão: o campo não muda (decisão 5).</summary>
     public bool IsServerEditable => IsSignedOut;
@@ -248,6 +265,7 @@ public sealed partial class AccountViewModel : ObservableObject
         AccountState.VaultLocked => "Chaveiro travado",
         AccountState.SessionUnreadable => "Sessão ilegível",
         AccountState.InsecureSession => "Sessão sem https",
+        AccountState.UntrustedApp => "Conferência de segurança falhou",
         _ => "Sem conta",
     };
 
@@ -272,6 +290,7 @@ public sealed partial class AccountViewModel : ObservableObject
             Trace.TraceError($"Falha ao ler o servidor de sincronização: {ex.GetType().FullName}");
         }
 
+        IsDeviceRooted = _integrity?.Check().Issues.Contains(IntegrityIssue.Rooted) == true;
         await RefreshAsync(reloadServer: true);
     }
 
@@ -517,7 +536,10 @@ public sealed partial class AccountViewModel : ObservableObject
             await LoadDevicesAsync();
     }
 
-    /// <summary>Em <see cref="AccountState.VaultLocked"/>: o coordenador só lança no cancelamento, então a ação pouco importa.</summary>
+    /// <summary>
+    /// Em <see cref="AccountState.VaultLocked"/> e <see cref="AccountState.UntrustedApp"/>: o coordenador só lança no
+    /// cancelamento, então a ação pouco importa.
+    /// </summary>
     [RelayCommand(CanExecute = nameof(IsIdle))]
     private Task RetryVaultAsync() => RunAsync(AccountAction.Reauthenticate, () => _account.RetryVaultAsync());
 
