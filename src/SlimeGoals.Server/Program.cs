@@ -70,6 +70,9 @@ builder.Services.AddOptions<ForwardedHeadersOptions>().Configure<IOptions<Server
 
 var app = builder.Build();
 
+// Antes de tudo: vale para toda resposta, inclusive a de erro e as de limite.
+app.UseSecurityHeaders();
+
 // Fora de Development, erro inesperado responde só o código genérico: nada de pilha nem nome de exceção.
 // Pedido que o host recusou ao ler (corpo truncado, por exemplo) continua com o status dele. Em Development
 // fica a página de erro do ASP.NET Core.

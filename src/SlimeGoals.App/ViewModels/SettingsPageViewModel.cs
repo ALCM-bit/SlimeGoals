@@ -38,7 +38,14 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     private readonly IReminderPermissions? _permissions;
     private readonly DataChangeNotifier? _changes;
     private readonly PageNavigator? _navigator;
+    private readonly ISecureScreen? _secureScreen;
     private Type? _returnTo;
+
+    /// <summary>Configurações é a página atual do shell (entre <see cref="Activate"/> e <see cref="Deactivate"/>).</summary>
+    private bool _active;
+
+    /// <summary>O último estado pedido a <see cref="_secureScreen"/>.</summary>
+    private bool _screenProtected;
 
     private const string SaveError = "Não foi possível salvar a configuração.";
     private const string AutostartError = "Não foi possível alterar o início com o sistema.";
@@ -53,11 +60,13 @@ public sealed partial class SettingsPageViewModel : PageViewModel
 
     /// <summary>Versão do app: a informada, ou a do assembly sem o sufixo depois de "+".</summary>
     /// <param name="account">Seção "Conta e sincronização"; só aparece com <see cref="PlatformCapabilities.Sync"/>.</param>
+    /// <param name="secureScreen">Esconde a tela de capturas enquanto uma subpágina da conta está à vista.</param>
     public SettingsPageViewModel(AppSettings settings, IAutostart? autostart = null,
         PlatformCapabilities? capabilities = null, IReminderPermissions? permissions = null,
         DataChangeNotifier? changes = null, string? appVersion = null, AccountViewModel? account = null,
-        PageNavigator? navigator = null, TagsSettingsViewModel? tags = null)
+        PageNavigator? navigator = null, TagsSettingsViewModel? tags = null, ISecureScreen? secureScreen = null)
     {
+        _secureScreen = secureScreen;
         _settings = settings;
         _autostart = autostart;
         _capabilities = capabilities ?? PlatformCapabilities.Desktop;
@@ -88,6 +97,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
                     OnPropertyChanged(nameof(IsMainOpen));
                     OnPropertyChanged(nameof(IsAccountPageOpen));
                     NotifySectionChanged();
+                    UpdateScreenProtection();
                 }
             };
     }
@@ -389,6 +399,8 @@ public sealed partial class SettingsPageViewModel : PageViewModel
 
     public override void Activate()
     {
+        _active = true;
+        UpdateScreenProtection();
         LoadCommand.Execute(null);
         Tags?.LoadCommand.Execute(null);
         Tags?.StartWatching();
@@ -402,6 +414,21 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         _returnTo = null; // quem sai de Configurações por outro caminho não volta à página que pediu o grupo
         Tags?.StopWatching();
         Account?.ClearSecretInputs();
+        _active = false;
+        UpdateScreenProtection();
+    }
+
+    /// <summary>
+    /// MASVS-PLATFORM-3: senhas e o código de recuperação não vão para capturas nem para a miniatura dos recentes. Só
+    /// com Configurações à vista: a subpágina da conta continua aberta quando a pessoa troca de aba.
+    /// </summary>
+    private void UpdateScreenProtection()
+    {
+        var value = _active && IsAccountPageOpen;
+        if (_secureScreen is null || value == _screenProtected)
+            return;
+        _screenProtected = value;
+        _secureScreen.SetProtected(value);
     }
 
     [RelayCommand]

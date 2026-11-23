@@ -354,6 +354,13 @@
   <Style Selector="TextBox">
     <Setter Property="VerticalContentAlignment" Value="Center" />
   </Style>
+  <!-- Campo secreto (senha, código de recuperação, de confirmação ou de convite): o teclado não aprende nem sugere o que
+       se digita (MASVS-STORAGE-2). Vale no Android e no método de entrada do Linux. -->
+  <Style Selector="TextBox.secret">
+    <Setter Property="TextInputOptions.ContentType" Value="Password" />
+    <Setter Property="TextInputOptions.IsSensitive" Value="True" />
+    <Setter Property="TextInputOptions.ShowSuggestions" Value="False" />
+  </Style>
   <Style Selector="NumericUpDown">
     <Setter Property="VerticalContentAlignment" Value="Center" />
   </Style>

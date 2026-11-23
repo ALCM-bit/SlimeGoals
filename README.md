@@ -62,7 +62,7 @@ O app instalado guarda os dados em `~/.local/share/SlimeGoals/slimegoals.db`. Em
 As especificações ficam em [`specs/`](specs/):
 
 - [Especificação geral (v1.4)](specs/Planejamento_v3.md): requisitos, modelo de dados, regras de lembrete e design system
-- [Sincronização](specs/Sincronizacao_v1.md), [Endurecimento do servidor](specs/Endurecimento_do_servidor_v1.md) e [Publicação na tailnet](specs/Publicacao_na_tailnet_v1.md)
+- [Sincronização](specs/Sincronizacao_v1.md), [Endurecimento do servidor](specs/Endurecimento_do_servidor_v1.md), [Publicação na tailnet](specs/Publicacao_na_tailnet_v1.md) e [Segurança segundo a OWASP](specs/Seguranca_OWASP_v1.md)
 - [Cronômetro fora do app](specs/Cronometro_fora_do_app_v1.md), [Tarefas no cronômetro](specs/Tarefas_no_cronometro_v1.md), [Pomodoro](specs/Pomodoro_v1.md) e [Segundos nas metas de tempo](specs/Segundos_nas_metas_de_tempo_v1.md)
 - [Protótipos visuais](specs/design/) (desktop em `v4-bento-desktop.html`, celular em `v3-*-mobile.html`), [planos de implementação](specs/plans/) e [conclusões dos spikes](specs/spikes/)
 
