@@ -5,6 +5,9 @@
 	email "{$ACME_EMAIL}"
 	# A CA interna (localhost) não entra no repositório de confiança do contêiner, que é só de leitura.
 	skip_install_trust
+	# Só o Let's Encrypt, sem cair para o ZeroSSL: o app aceita só certificados sob as raízes dele (CertificatePins).
+	# O localhost continua com a CA interna.
+	acme_ca https://acme-v02.api.letsencrypt.org/directory
 }
 
 {$SLIMEGOALS_DOMAIN} {

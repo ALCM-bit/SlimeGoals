@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Raízes públicas do Let's Encrypt (X1, X2, YR e YE) e a cadeia do letsencrypt.org, para CertificatePins -->
+    <Content Include="Certificates\*.pem" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

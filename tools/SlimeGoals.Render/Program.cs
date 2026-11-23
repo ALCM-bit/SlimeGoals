@@ -8,6 +8,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using SlimeGoals.App.Account;
 using SlimeGoals.App.ViewModels;
+using SlimeGoals.Sync.Integrity;
 using SlimeGoals.App.Views;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Render;
@@ -107,6 +108,9 @@ void RenderAccount(int width, int height)
     Shot("session-unreadable", new AccountStatus(AccountState.SessionUnreadable, null, null, null, 0, null), _ => { });
     Shot("insecure-session", new AccountStatus(AccountState.InsecureSession, "ana@exemplo.com", new Uri("http://sync.exemplo.com/"), null, 2,
         null), _ => { });
+    Shot("untrusted-app", new AccountStatus(AccountState.UntrustedApp, null, null, null, 0, null), _ => { },
+        integrity: new Sample.SampleIntegrity(IntegrityIssue.Debugger));
+    Shot("rooted", signedIn, _ => { }, integrity: new Sample.SampleIntegrity(IntegrityIssue.Rooted));
 
     var signedOut = new AccountStatus(AccountState.SignedOut, null, null, null, 0, null);
     Shot("register", signedOut, vm => vm.OpenRegisterCommand.Execute(null));
@@ -156,11 +160,12 @@ void RenderAccount(int width, int height)
     Shot("sign-out", signedIn, vm => vm.OpenSignOutCommand.Execute(null), a => a.FlushResult = 3);
     Shot("delete-account", signedIn, vm => vm.OpenDeleteAccountCommand.Execute(null));
 
-    void Shot(string name, AccountStatus status, Action<AccountViewModel> open, Action<SampleAccount>? setup = null)
+    void Shot(string name, AccountStatus status, Action<AccountViewModel> open, Action<SampleAccount>? setup = null,
+        IAppIntegrity? integrity = null)
     {
         var fake = new SampleAccount { Status = status };
         setup?.Invoke(fake);
-        var account = sample.CreateAccount(fake);
+        var account = sample.CreateAccount(fake, integrity);
         var shell = sample.CreateShell(false, account);
         var window = new Window { Width = width, Height = height, Content = new ShellView { DataContext = shell } };
         window.Show();

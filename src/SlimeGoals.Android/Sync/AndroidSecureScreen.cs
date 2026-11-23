@@ -2,12 +2,16 @@ using Android.App;
 using Android.Views;
 using SlimeGoals.App.Account;
 
+// Para Window.SetHideOverlayWindows (API 31). Permissão normal: vem com a instalação, sem pedido.
+[assembly: UsesPermission("android.permission.HIDE_OVERLAY_WINDOWS")]
+
 namespace SlimeGoals.Android.Sync;
 
 /// <summary>
-/// <c>FLAG_SECURE</c> na janela da <see cref="MainActivity"/> enquanto uma página de conta está à vista: a tela sai preta
-/// em capturas, gravações e na miniatura dos recentes. A Activity recriada recebe o estado de novo em
-/// <see cref="CurrentActivity"/>.
+/// Enquanto uma página de conta está à vista, a janela da <see cref="MainActivity"/> liga o <c>FLAG_SECURE</c> (a tela
+/// sai preta em capturas, gravações e na miniatura dos recentes) e se defende de tapjacking: descarta o toque que chega
+/// com outra janela por cima e, da API 31 em diante, esconde as sobreposições de outros apps. A Activity recriada
+/// recebe o estado de novo em <see cref="CurrentActivity"/>.
 /// </summary>
 internal sealed class AndroidSecureScreen : ISecureScreen
 {
@@ -42,9 +46,14 @@ internal sealed class AndroidSecureScreen : ISecureScreen
 
     private static void Apply(Activity? activity, bool protect) => activity?.RunOnUiThread(() =>
     {
+        if (activity.Window is not { } window)
+            return;
         if (protect)
-            activity.Window?.AddFlags(WindowManagerFlags.Secure);
+            window.AddFlags(WindowManagerFlags.Secure);
         else
-            activity.Window?.ClearFlags(WindowManagerFlags.Secure);
+            window.ClearFlags(WindowManagerFlags.Secure);
+        window.DecorView.FilterTouchesWhenObscured = protect;
+        if (OperatingSystem.IsAndroidVersionAtLeast(31))
+            window.SetHideOverlayWindows(protect);
     });
 }

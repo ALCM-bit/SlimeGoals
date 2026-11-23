@@ -6,6 +6,7 @@ using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Core.Sync;
 using SlimeGoals.Sync;
+using SlimeGoals.Sync.Integrity;
 
 namespace SlimeGoals.App.Hosting;
 
@@ -55,7 +56,8 @@ public static class AppServiceCollectionExtensions
 
     /// <summary>
     /// Conta e sincronização, que os dois heads chamam em todos os builds. Um coordenador só atende a tela de conta e o
-    /// <see cref="SyncHost"/>. Um <see cref="ITextClipboard"/> registrado pelo head chega à tela de conta.
+    /// <see cref="SyncHost"/>. Um <see cref="ITextClipboard"/> registrado pelo head chega à tela de conta, e um
+    /// <see cref="IAppIntegrity"/>, ao coordenador e à tela.
     /// <paramref name="defaultServer"/> é o servidor que o campo da tela de conta sugere (nulo deixa o campo vazio).
     /// </summary>
     public static IServiceCollection AddSlimeGoalsSync(this IServiceCollection services,
@@ -69,7 +71,8 @@ public static class AppServiceCollectionExtensions
             sp.GetRequiredService<ReminderService>(),
             sp.GetRequiredService<DataChangeNotifier>(),
             sp.GetRequiredService<TimeProvider>(),
-            SyncHttp.Create));
+            SyncHttp.Create,
+            sp.GetService<IAppIntegrity>()));
         services.AddSingleton<ISyncAccount>(sp => sp.GetRequiredService<SyncCoordinator>());
         services.AddSingleton(new AccountDefaults(deviceName, defaultServer));
         services.AddSingleton<AccountViewModel>();
