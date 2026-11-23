@@ -25,16 +25,16 @@
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Senha" />
-            <TextBox Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Senha" />
+            <TextBox Classes="secret" Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Senha" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Confirmar senha" />
-            <TextBox Text="{Binding PasswordConfirmation}" PasswordChar="•" RevealPassword="False"
+            <TextBox Classes="secret" Text="{Binding PasswordConfirmation}" PasswordChar="•" RevealPassword="False"
                      AutomationProperties.Name="Confirmar senha" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Código de convite" />
-            <TextBox Text="{Binding InviteCode}" MaxLength="{x:Static acc:AccountViewModel.MaxInviteLength}"
+            <TextBox Classes="secret" Text="{Binding InviteCode}" MaxLength="{x:Static acc:AccountViewModel.MaxInviteLength}"
                      PlaceholderText="Peça a quem cuida do servidor." AutomationProperties.Name="Código de convite" />
           </StackPanel>
         </StackPanel>
@@ -64,7 +64,7 @@
         <StackPanel Spacing="18" IsEnabled="{Binding IsIdle}">
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Código" />
-            <TextBox Text="{Binding ConfirmationCode}" MaxLength="{x:Static acc:AccountViewModel.MaxConfirmationCodeLength}" AutomationProperties.Name="Código" />
+            <TextBox Classes="secret" Text="{Binding ConfirmationCode}" MaxLength="{x:Static acc:AccountViewModel.MaxConfirmationCodeLength}" AutomationProperties.Name="Código" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Nome do aparelho" />
@@ -89,7 +89,7 @@
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Senha" />
-            <TextBox Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Senha" />
+            <TextBox Classes="secret" Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Senha" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Nome do aparelho" />
@@ -112,16 +112,16 @@
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Código de recuperação" />
-            <TextBox Text="{Binding RecoveryCodeInput}" MaxLength="{x:Static acc:AccountViewModel.MaxRecoveryCodeLength}" PasswordChar="•" RevealPassword="False"
+            <TextBox Classes="secret" Text="{Binding RecoveryCodeInput}" MaxLength="{x:Static acc:AccountViewModel.MaxRecoveryCodeLength}" PasswordChar="•" RevealPassword="False"
                      AutomationProperties.Name="Código de recuperação" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Nova senha" />
-            <TextBox Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Nova senha" />
+            <TextBox Classes="secret" Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Nova senha" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Confirmar nova senha" />
-            <TextBox Text="{Binding PasswordConfirmation}" PasswordChar="•" RevealPassword="False"
+            <TextBox Classes="secret" Text="{Binding PasswordConfirmation}" PasswordChar="•" RevealPassword="False"
                      AutomationProperties.Name="Confirmar nova senha" />
           </StackPanel>
           <StackPanel Classes="field">
@@ -138,7 +138,7 @@
         <StackPanel Spacing="18" IsEnabled="{Binding IsIdle}">
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Senha" />
-            <TextBox Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Senha" />
+            <TextBox Classes="secret" Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Senha" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Nome do aparelho" />
@@ -154,16 +154,16 @@
         <StackPanel Spacing="18" IsEnabled="{Binding IsIdle}">
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Senha atual" />
-            <TextBox Text="{Binding CurrentPassword}" PasswordChar="•" RevealPassword="False"
+            <TextBox Classes="secret" Text="{Binding CurrentPassword}" PasswordChar="•" RevealPassword="False"
                      AutomationProperties.Name="Senha atual" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Nova senha" />
-            <TextBox Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Nova senha" />
+            <TextBox Classes="secret" Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Nova senha" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="field-label" Text="Confirmar nova senha" />
-            <TextBox Text="{Binding PasswordConfirmation}" PasswordChar="•" RevealPassword="False"
+            <TextBox Classes="secret" Text="{Binding PasswordConfirmation}" PasswordChar="•" RevealPassword="False"
                      AutomationProperties.Name="Confirmar nova senha" />
           </StackPanel>
         </StackPanel>
@@ -213,7 +213,7 @@
         </Border>
         <StackPanel Classes="field" IsEnabled="{Binding IsIdle}">
           <TextBlock Classes="field-label" Text="Senha" />
-          <TextBox Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Senha" />
+          <TextBox Classes="secret" Text="{Binding Password}" PasswordChar="•" RevealPassword="False" AutomationProperties.Name="Senha" />
         </StackPanel>
         <Button Classes="danger-solid" HorizontalAlignment="Left" Content="{x:Static acc:AccountViewModel.DeleteAccountLabel}"
                 Command="{Binding SubmitDeleteAccountCommand}" />
