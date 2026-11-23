@@ -17,6 +17,8 @@ publish/
 *.p12
 *.pfx
 *.pem
+# Certificados públicos (raízes do Let's Encrypt e uma cadeia de servidor) dos testes do pinning
+!tests/SlimeGoals.Sync.Tests/Certificates/*.pem
 
 # Dados e ambiente locais: o repositório é público
 .env*
