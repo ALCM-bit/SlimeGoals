@@ -8,6 +8,7 @@ using SlimeGoals.Core.Services;
 using SlimeGoals.Infrastructure;
 using SlimeGoals.Android.Sync;
 using SlimeGoals.App.Account;
+using SlimeGoals.Sync.Integrity;
 
 namespace SlimeGoals.Android;
 
@@ -59,7 +60,8 @@ internal static class AndroidCompositionRoot
     /// Conta e sincronização em todos os builds (9.5b): cofre sobre o Keystore, nome do aparelho do sistema e a área de
     /// transferência que marca o código de recuperação como sensível, e a tela protegida nas páginas de conta. O resto é o
     /// mesmo do head Linux. Só o APK de desenvolvimento sugere um servidor (o de teste local); no Release o campo começa
-    /// vazio, com a dica.
+    /// vazio, com a dica, e a conta passa pela conferência de integridade (o de desenvolvimento sai com a chave de
+    /// depuração).
     /// </summary>
     private static void AddSync(IServiceCollection services, Context context)
     {
@@ -70,6 +72,7 @@ internal static class AndroidCompositionRoot
         var defaultServer = new Uri("http://127.0.0.1:8080");
 #else
         Uri? defaultServer = null;
+        services.AddSingleton<IAppIntegrity>(_ => new AndroidAppIntegrity(context));
 #endif
         services.AddSlimeGoalsSync(_ => new AndroidKeystoreVault(context), AndroidDeviceName.Get(context), defaultServer);
     }

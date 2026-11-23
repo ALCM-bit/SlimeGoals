@@ -11,6 +11,7 @@ using SlimeGoals.Infrastructure.Data;
 using SlimeGoals.Infrastructure.Tests;
 using SlimeGoals.Sync;
 using SlimeGoals.Sync.Account;
+using SlimeGoals.Sync.Integrity;
 using SlimeGoals.Testing;
 
 namespace SlimeGoals.Server.Tests.Account;
@@ -307,6 +308,71 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
         a.Vault.Names.Should().BeEmpty();
         (await a.State.GetAsync()).Enabled.Should().BeFalse();
         a.Net.ClientsCreated.Should().Be(clientsBefore, "o token iria em texto puro");
+    }
+
+    [Theory]
+    [InlineData(IntegrityIssue.ForeignSignature)]
+    [InlineData(IntegrityIssue.Debugger)]
+    public async Task Start_on_an_untrusted_app_is_UntrustedApp_without_reading_the_vault(IntegrityIssue issue)
+    {
+        var a = NewDevice();
+        await SignUpAsync(a);
+        await a.ReplaceAccountAsync();
+        a.Integrity.Issues = [issue];
+        a.Vault.FailReadsWith = new InvalidOperationException("o cofre não pode ser lido");
+        var clientsBefore = a.Net.ClientsCreated;
+
+        await a.Account.StartAsync();
+        a.Account.SyncNow();
+
+        var status = await a.Account.GetStatusAsync();
+        status.State.Should().Be(AccountState.UntrustedApp);
+        status.Email.Should().BeNull();
+        a.Net.ClientsCreated.Should().Be(clientsBefore);
+    }
+
+    [Fact]
+    public async Task Untrusted_app_refuses_to_log_in_without_touching_the_network()
+    {
+        await CreateAccountAsync();
+        var a = NewDevice();
+        a.Integrity.Issues = [IntegrityIssue.ForeignSignature];
+        await a.Account.StartAsync();
+
+        var login = () => a.Account.LoginAsync(Server, _email, Password, "pc");
+
+        await login.Should().ThrowAsync<UntrustedAppException>();
+        a.Net.ClientsCreated.Should().Be(0);
+        (await a.Account.GetStatusAsync()).State.Should().Be(AccountState.UntrustedApp);
+    }
+
+    [Fact]
+    public async Task Rooted_device_still_syncs()
+    {
+        var a = NewDevice();
+        a.Integrity.Issues = [IntegrityIssue.Rooted];
+
+        await SignUpAsync(a);
+        await WaitUntilAsync(a.Account, s => s.LastSyncAt is not null);
+
+        (await a.Account.GetStatusAsync()).State.Should().Be(AccountState.SignedIn);
+    }
+
+    [Fact]
+    public async Task Retry_after_the_debugger_leaves_resumes_sync()
+    {
+        var a = NewDevice();
+        await SignUpAsync(a);
+        await a.ReplaceAccountAsync();
+        a.Integrity.Issues = [IntegrityIssue.Debugger];
+        await a.Account.StartAsync();
+        (await a.Account.GetStatusAsync()).State.Should().Be(AccountState.UntrustedApp);
+
+        a.Integrity.Issues = [];
+        await a.Account.RetryVaultAsync();
+
+        await WaitUntilAsync(a.Account, s => s.LastSyncAt is not null);
+        (await a.Account.GetStatusAsync()).State.Should().Be(AccountState.SignedIn);
     }
 
     [Fact]
@@ -613,6 +679,7 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
 
         public FakeTimeProvider Time { get; }
         public InMemorySecretVault Vault { get; } = new();
+        public FakeIntegrity Integrity { get; } = new();
         public Network Net { get; } = new();
         public ISyncStateStore State { get; }
         public RecordingState RecordingState { get; }
@@ -639,7 +706,15 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
         {
             Interlocked.Increment(ref Net.ClientsCreated);
             return _factory.CreateDefaultClient(server, new NetworkHandler(Net));
-        });
+        }, Integrity);
+    }
+
+    /// <summary>A conferência de integridade, com o resultado que o teste escolhe.</summary>
+    private sealed class FakeIntegrity : IAppIntegrity
+    {
+        public HashSet<IntegrityIssue> Issues { get; set; } = [];
+
+        public IntegrityReport Check() => new(Issues);
     }
 
     /// <summary>A rede de um aparelho: o que saiu, a queda simulada e um pull que fica preso até o teste soltar.</summary>

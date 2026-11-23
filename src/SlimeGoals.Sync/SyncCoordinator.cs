@@ -5,6 +5,7 @@ using SlimeGoals.Core.Services;
 using SlimeGoals.Core.Sync;
 using SlimeGoals.Sync.Account;
 using SlimeGoals.Sync.Contracts;
+using SlimeGoals.Sync.Integrity;
 
 namespace SlimeGoals.Sync;
 
@@ -21,8 +22,10 @@ namespace SlimeGoals.Sync;
 /// uma foto imutável do estado, e a tela não espera um Argon2id para mostrar o status.</para>
 /// </remarks>
 /// <param name="createHttp">Cliente com <c>BaseAddress</c> no servidor pedido; o coordenador fica dono dele.</param>
+/// <param name="integrity">Conferência de integridade do app; nula (Linux, builds de desenvolvimento) não confere.</param>
 public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, ISyncLocalStore store,
-    IRemoteDeletionGate gate, DataChangeNotifier changes, TimeProvider time, Func<Uri, HttpClient> createHttp)
+    IRemoteDeletionGate gate, DataChangeNotifier changes, TimeProvider time, Func<Uri, HttpClient> createHttp,
+    IAppIntegrity? integrity = null)
     : ISyncAccount, IAsyncDisposable
 {
     private const string SignInFirst = "Entre na conta antes.";
@@ -122,7 +125,7 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
 
     public Task RetryVaultAsync(CancellationToken ct = default) => RunOpAsync(async () =>
     {
-        if (_run is null && _snapshot.State == AccountState.VaultLocked)
+        if (_run is null && _snapshot.State is AccountState.VaultLocked or AccountState.UntrustedApp)
             await OpenAsync(ct).ConfigureAwait(false);
     }, ct);
 
@@ -155,8 +158,9 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
 
     /// <summary>
     /// Para o motor e espera o ciclo antes de sair: nenhum pedido do ciclo sai depois de limpar a fila. Com o segredo
-    /// ilegível (ou faltando, ou com uma falha inesperada do cofre ao ler, ou com servidor http:// fora do loopback), não há servidor nem token: só a limpeza
-    /// local, sem rede. Só o cofre indisponível (trancado) impede sair.
+    /// ilegível (ou faltando, ou com uma falha inesperada do cofre ao ler, ou com servidor http:// fora do loopback, ou com
+    /// o app reprovado na conferência de integridade), não há servidor nem token: só a limpeza local, sem rede. Só o cofre
+    /// indisponível (trancado) impede sair.
     /// </summary>
     public Task SignOutAsync(CancellationToken ct = default) => RunOpAsync(async () =>
     {
@@ -169,8 +173,12 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
             Uri? server = null;
             try
             {
-                using var session = await AccountService.OpenSessionAsync(vault, ct).ConfigureAwait(false);
-                server = session?.Server;
+                // App não confiável: nem lê a sessão; sai só com a limpeza local, e o token vence sozinho no servidor.
+                if (!IsUntrusted())
+                {
+                    using var session = await AccountService.OpenSessionAsync(vault, ct).ConfigureAwait(false);
+                    server = session?.Server;
+                }
             }
             catch (InvalidDataException)
             {
@@ -269,6 +277,7 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
     /// <summary>Um serviço de conta com cliente próprio, descartado no fim, com sucesso ou falha.</summary>
     private async Task<T> WithAccountAsync<T>(Uri server, Func<AccountService, Task<T>> action)
     {
+        RequireTrusted();
         using var http = createHttp(server);
         return await action(new AccountService(new HttpAccountApi(http), vault, state, server)).ConfigureAwait(false);
     }
@@ -287,6 +296,13 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
     {
         try
         {
+            // Antes do cofre: com o app alterado ou depurado, o token e a chave nem chegam à memória.
+            if (IsUntrusted())
+            {
+                SetState(AccountState.UntrustedApp);
+                return;
+            }
+
             if (!(await state.GetAsync(ct).ConfigureAwait(false)).Enabled)
             {
                 SetState(AccountState.SignedOut);
@@ -477,7 +493,23 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
         }
     }
 
-    private EngineRun RequireRun() => _run ?? throw new InvalidOperationException(SignInFirst);
+    private EngineRun RequireRun()
+    {
+        RequireTrusted();
+        return _run ?? throw new InvalidOperationException(SignInFirst);
+    }
+
+    private bool IsUntrusted() => integrity?.Check().BlocksSync == true;
+
+    /// <summary>
+    /// Toda operação de conta com rede passa aqui: um depurador conectado depois da abertura também barra. O estado só muda
+    /// na abertura; o motor já ligado continua até a próxima.
+    /// </summary>
+    private void RequireTrusted()
+    {
+        if (IsUntrusted())
+            throw new UntrustedAppException();
+    }
 
     /// <summary>
     /// Só endereço absoluto https, ou http em loopback, sem credenciais, consulta nem fragmento. Vale também para o

@@ -34,4 +34,14 @@ public class SyncStaleWarningTests
     [Fact]
     public void No_warning_when_the_last_sync_is_in_the_future() =>
         SyncStaleWarning.IsStale(Status(AccountState.SignedIn, Now + TimeSpan.FromDays(1)), Now).Should().BeFalse();
+
+    [Fact]
+    public void Text_points_to_the_connection_unless_the_app_failed_the_security_check()
+    {
+        var last = Now - TimeSpan.FromDays(4);
+
+        SyncStaleWarning.TextFor(Status(AccountState.SignedIn, last), Now).Should().Be(SyncStaleWarning.Text);
+        SyncStaleWarning.TextFor(Status(AccountState.UntrustedApp, last), Now).Should().Be(SyncStaleWarning.UntrustedText);
+        SyncStaleWarning.TextFor(Status(AccountState.SignedIn, Now), Now).Should().BeNull();
+    }
 }

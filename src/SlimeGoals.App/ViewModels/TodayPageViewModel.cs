@@ -141,7 +141,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         try
         {
             var status = await account.GetStatusAsync();
-            warning = SyncStaleWarning.IsStale(status, time.GetUtcNow()) ? SyncStaleWarning.Text : null;
+            warning = SyncStaleWarning.TextFor(status, time.GetUtcNow());
         }
         catch (Exception)
         {

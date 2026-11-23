@@ -86,6 +86,20 @@
         <Button Classes="ghost" HorizontalAlignment="Left" Content="Sair" Command="{Binding OpenSignOutCommand}" />
       </StackPanel>
 
+      <!-- App reprovado na conferência de integridade: nem o cofre é lido; só conferir de novo -->
+      <StackPanel Spacing="12" IsVisible="{Binding IsUntrustedApp}">
+        <Border Classes="warning-band">
+          <TextBlock Text="{x:Static acc:AccountViewModel.UntrustedAppText}" TextWrapping="Wrap" />
+        </Border>
+        <Button Classes="primary" HorizontalAlignment="Left" Content="{x:Static acc:AccountViewModel.RetryVaultLabel}"
+                Command="{Binding RetryVaultCommand}" />
+      </StackPanel>
+
+      <!-- Root: só aviso, em qualquer estado -->
+      <Border Classes="warning-band" IsVisible="{Binding IsDeviceRooted}">
+        <TextBlock Text="{x:Static acc:AccountViewModel.DeviceRootedText}" TextWrapping="Wrap" />
+      </Border>
+
       <!-- Sair (envia a fila) e "Tentar de novo" rodam daqui: ocupado e erro também na seção -->
       <ProgressBar Classes="busy" IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
       <TextBlock Classes="form-error" Text="{Binding Error}"
