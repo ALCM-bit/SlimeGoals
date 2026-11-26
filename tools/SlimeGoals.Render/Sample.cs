@@ -22,7 +22,8 @@ public sealed class Sample : IDisposable
     private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"slimegoals-render-{Guid.NewGuid():N}.db");
     private readonly ServiceProvider _services;
 
-    public Sample()
+    /// <param name="seed">Falso: o banco fica vazio, sem metas (o Hoje sem metas).</param>
+    public Sample(bool seed = true)
     {
         var services = new ServiceCollection();
         services.AddSingleton(TimeProvider.System);
@@ -43,7 +44,8 @@ public sealed class Sample : IDisposable
 
         using (var connection = _services.GetRequiredService<SqliteConnectionFactory>().Open())
             MigrationRunner.Migrate(connection);
-        SeedAsync().GetAwaiter().GetResult();
+        if (seed)
+            SeedAsync().GetAwaiter().GetResult();
     }
 
     /// <summary>
