@@ -456,6 +456,7 @@ Pedido do autor em 26/11/2026: um disparo manual, para enviar e buscar os dados 
   - `Unauthorized`: nada. A seção passa para "Entre de novo".
 - Uma exceção não deveria acontecer, porque o motor grava a falha em vez de lançar. Se acontecer, a seção mostra o erro genérico, "Algo deu errado. Tente de novo.", e nenhuma linha de resultado. No Trace, só o tipo.
 - A linha some quando o status muda depois dela (outro ciclo, uma mudança local, a sessão encerrada), quando outra ação da conta começa, ao abrir uma subpágina e ao voltar a Configurações. Ela não some por tempo: enquanto o status for o mesmo, continua verdadeira.
+- "Sincronização concluída." também fica quando outro ciclo termina bem e só a hora da última sincronização muda: a linha continua verdadeira. Quem aperta o botão costuma vir de uma falha, e o agendador, ainda na espera dela, tenta de novo logo depois do botão. Sem essa exceção, a linha sumia uns 2 s depois de aparecer (visto no emulador, 26/11). As outras linhas somem com qualquer ciclo que termine depois delas.
 
 ## 7. Interface e Android
 
