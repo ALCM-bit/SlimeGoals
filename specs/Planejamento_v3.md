@@ -453,7 +453,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 
 - Fechar a janela sempre oculta nesta fase; para encerrar: "Sair" no rodapé da barra lateral, `Ctrl+Q` ou bandeja. "Encerrar ao fechar" veio com as Configurações (Fase 6).
 - Instância única por banco: `slimegoals-<hash>.lock` e `.sock` (8 primeiros hex do SHA-256 do caminho do banco) em `$XDG_RUNTIME_DIR` (ou `Path.GetTempPath()/slimegoals-<usuário>/`); a segunda execução envia `show`, recebe `ok` e sai com código 0; socket órfão é apagado e recriado.
-- Pausa dos lembretes gravada em `settings` (`reminders.paused`); pausado, nada dispara e as pendentes saem da central como ignoradas; a tela Hoje mostra "Lembretes pausados" com **Retomar** e oculta "Próximos lembretes".
+- Pausa dos lembretes gravada em `settings` (`reminders.paused`); pausado, nada dispara e as pendentes saem da central como ignoradas; a tela Hoje mostra "Lembretes pausados" com **Retomar** e oculta "Próximos lembretes" (desde 26/11/2026, o horário do próximo lembrete nos cartões).
 - Ao retomar, `reminders.resumed_at` (UTC) reinicia o intervalo de cada meta naquele dia, sem rajada de atrasados.
 - Bandeja opcional (Abrir, Pausar/Retomar lembretes, Sair; clique no ícone abre); no GNOME exige a extensão AppIndicator e, sem ela, nada quebra; ícone provisório (Lucide "target", `#9B7BEA`) até a Fase 6, que trouxe o ícone do slime.
 - A segunda instância traz a janela pelo mesmo `MainWindowActivator` da notificação; no Wayland sem token de ativação o GNOME pode mostrar "SlimeGoals está pronto" (aceito, conferido à mão).
@@ -528,6 +528,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 13. Verificado no emulador (API 36): `adb shell appops set --uid dev.alcm.slimegoals SCHEDULE_EXACT_ALARM allow|deny` (a forma por pacote não tem efeito); `am kill` encerra como o sistema, `force-stop` cancela alarmes. Restrições de fabricantes ficam para a 7c.
 9. "Próximos lembretes" fica no fim da rolagem do Hoje, depois das metas, e não fixo embaixo: fixo, cada meta com lembrete tirava uma linha da lista no celular (corrigido depois da Fase 8).
 14. O Hoje rola inteiro abaixo do título: destaque, blocos, faixas de aviso, "Metas de hoje", filtro de tags, cartões e "Próximos lembretes" numa rolagem só. Antes, tudo acima dos cartões ficava preso e, no celular de 915 px de altura, sobravam uns 300 px para a lista (pouco mais de um cartão), menos ainda com uma faixa de aviso. Sem metas, o aviso fica logo abaixo do cabeçalho. Com o teclado aberto, o destaque e os blocos continuam escondidos (26/11/2026).
+15. O próximo lembrete fica no cartão da meta, e a lista "Próximos lembretes" do fim do Hoje sai: longe dos cartões, ela se lia mal. Na coluna dos botões, abaixo deles e alinhado à direita, um sino e a hora local ("15:00"). Só aparece o disparo que ainda cai hoje (o mesmo de `UpcomingTodayAsync`, com o adiar já contado); meta cumprida, com cronômetro rodando, fora da janela ou com os lembretes pausados não mostra nada. Vale no celular e no desktop (26/11/2026).
 
 **Decisões da Fase 8 (03/11/2026):**
 
