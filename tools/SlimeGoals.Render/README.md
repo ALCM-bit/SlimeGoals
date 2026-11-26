@@ -17,9 +17,10 @@ Sem o segundo argumento, vale `all`. Grava um PNG por tela e tamanho, sempre o `
 
 O modo `today-filter` (também incluído no `all`) grava o Hoje com o filtro de tags a 320, 360, 412 e 1100 px, como `<cena>-<largura>.png`: `today-filter-idle` (a linha de chips sem seleção), `today-filter` (duas tags marcadas: "✕ Limpar" fixo e "x de y metas"), `today-filter-single` (uma tag que esconde cartões) e `today-filter-empty` (nenhuma meta de hoje com tag: a linha de filtros some). A mensagem "Nenhuma meta de hoje com essas tags." não tem captura: é uma defesa que hoje não se alcança, porque uma tag marcada sempre tem meta na lista (ao sair a última, ela deixa a seleção). O `all` grava só 412 e 1100 px nas demais telas; `narrow` acrescenta 320 e 360.
 
-O modo `account` grava a seção "Conta e sincronização" de Configurações sobre uma conta falsa (`SampleAccount`, em `Sample.cs`: nenhuma rede, códigos de mentira), a 320×1400, 360×1400 e 1100×800, como `account-<tela>-<largura>.png`:
+O modo `account` grava a seção "Sincronização" de Configurações sobre uma conta falsa (`SampleAccount`, em `Sample.cs`: nenhuma rede, códigos de mentira), a 320×1400, 360×1400, 900×800 e 1100×800, como `account-<tela>-<largura>.png`:
 
-- estados da seção: `signed-out`, `signed-in-error` (com `last_error`), `session-expired`, `vault-locked`, `session-unreadable`;
+- estados da seção: `signed-out`, `signed-in-error` (com `last_error`), `session-expired`, `vault-locked`, `session-unreadable`, `insecure-session`, `untrusted-app`, `rooted`;
+- Sincronizar agora: `sync-running` (ciclo preso, com "Sincronizando…"), `sync-done` e `sync-failed` (a linha e, abaixo, a faixa com o motivo);
 - subpáginas: `register`, `recovery-code`, `confirm`, `login`, `login-busy` (operação presa, com a barra de ocupado), `login-error`, `recover`, `recovered-code`, `reauthenticate`, `change-password`, `devices`, `sign-out` (aviso com 3 pendências), `delete-account`.
 
 O cadastro pendente da conta falsa usa o construtor interno de `PendingRegistration` (`InternalsVisibleTo` no `SlimeGoals.Sync.csproj`).

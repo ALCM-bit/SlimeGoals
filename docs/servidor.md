@@ -107,7 +107,7 @@ Se a regra não puder ser instalada, a pilha sobe mesmo assim, e a porta fica pr
 
 ### 4. Criar a conta
 
-No app (Release), em Configurações, **Conta e sincronização**: preencha o servidor com `https://servidor.exemplo.ts.net`, o e-mail, a senha e o convite de `secrets/Server__InviteCode`. O código de confirmação chega por e-mail. Veja [Sincronização](sincronizacao.md).
+No app (Release), em Configurações, **Sincronização**: preencha o servidor com `https://servidor.exemplo.ts.net`, o e-mail, a senha e o convite de `secrets/Server__InviteCode`. O código de confirmação chega por e-mail. Veja [Sincronização](sincronizacao.md).
 
 ### 5. Atualizar
 
