@@ -15,9 +15,6 @@ using SlimeGoals.Sync;
 
 namespace SlimeGoals.App.ViewModels;
 
-/// <summary>Linha de "Próximos lembretes": hora local ("14:30") e título da meta.</summary>
-public sealed record UpcomingReminderViewModel(string Time, string Title);
-
 /// <summary>
 /// Tela Hoje (spec §7): resumo da semana, cartões das metas de hoje com controles por medida
 /// e os próximos lembretes do dia. Cada ação chama um serviço do Core e recarrega o instantâneo;
@@ -48,10 +45,6 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     /// <summary>Filtro por tags: muda só quais cartões aparecem; hero, contadores e slime contam <see cref="Goals"/> inteiro.</summary>
     public TodayTagFilterViewModel Filter { get; } = new();
 
-    public ObservableCollection<UpcomingReminderViewModel> Upcoming { get; } = [];
-
-    public bool HasUpcoming => Upcoming.Count > 0;
-
     /// <summary>Lembretes pausados: a tela mostra a faixa "Lembretes pausados" e esconde os próximos.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PauseButtonText), nameof(CanPause))]
@@ -62,7 +55,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     /// <summary>Botão "Pausar lembretes" do cabeçalho: só sem pausa e com a pausa disponível.</summary>
     public bool CanPause => _reminders && pause is not null && !IsPaused;
 
-    /// <summary>Próximos lembretes e pausa só existem onde a plataforma tem lembretes.</summary>
+    /// <summary>A hora do próximo lembrete nos cartões e a pausa só existem onde a plataforma tem lembretes.</summary>
     public bool ShowReminders => _reminders;
 
     /// <summary>Aviso do topo quando faltam permissões dos lembretes (Android); nulo se tudo certo ou sem a porta.</summary>
@@ -320,7 +313,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         StreakUnit = highlight?.Goal.Recurrence == Recurrence.Weekly ? (one ? "semana" : "semanas") : (one ? "dia" : "dias");
     }
 
-    /// <summary>Falha aqui só esconde a seção: o resto da tela Hoje continua valendo.</summary>
+    /// <summary>Hora do próximo lembrete em cada cartão. Falha aqui só tira as horas: o resto da tela Hoje continua valendo.</summary>
     private async Task LoadUpcomingAsync(int version)
     {
         if (!_reminders)
@@ -341,12 +334,10 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             return;
 
         IsPaused = paused;
-        Upcoming.Clear();
-        foreach (var item in upcoming)
-            Upcoming.Add(new UpcomingReminderViewModel(
-                TimeZoneInfo.ConvertTime(item.At, time.LocalTimeZone).ToString("HH:mm", CultureInfo.InvariantCulture),
-                item.Goal.Title));
-        OnPropertyChanged(nameof(HasUpcoming));
+        var next = upcoming.ToDictionary(u => u.Goal.Id,
+            u => TimeZoneInfo.ConvertTime(u.At, time.LocalTimeZone).ToString("HH:mm", CultureInfo.InvariantCulture));
+        foreach (var card in Goals)
+            card.NextReminder = next.GetValueOrDefault(card.Goal.Id);
     }
 
     /// <summary>Pausa ou retoma; a recarga chega pelo <see cref="DataChangeNotifier"/>.</summary>

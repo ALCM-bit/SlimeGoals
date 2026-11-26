@@ -108,7 +108,7 @@ public sealed class ProcessTimerReminderScheduler(ReminderService reminders, Dat
             if (_disposed)
                 return;
             // Virada do dia: avisa antes (telas trocam de dia) e reagenda. Lembrete: reagenda (dispara) e avisa depois,
-            // para a tela Hoje atualizar os "Próximos lembretes". Sem laço: o Changed só reagenda (SyncAsync idempotente)
+            // para a tela Hoje atualizar a hora do próximo lembrete nos cartões. Sem laço: o Changed só reagenda (SyncAsync idempotente)
             // e esse caminho nunca avisa.
             var midnight = ArmedFor == _midnight;
             if (midnight)

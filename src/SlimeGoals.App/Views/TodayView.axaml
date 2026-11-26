@@ -199,8 +199,9 @@
             <DataTemplate x:DataType="vm:TodayGoalViewModel">
               <Border Classes="card today" Classes.met="{Binding IsMet}" Margin="0,0,0,10" IsVisible="{Binding IsShown}">
                 <StackPanel Spacing="12">
-                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
-                    <Border Classes="icon-tile"
+                  <!-- Duas linhas: a segunda só tem, sob os botões, o próximo lembrete (decisão 15 da interface no Android) -->
+                  <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="14">
+                    <Border Classes="icon-tile" Grid.RowSpan="2"
                             Background="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Bg}">
                       <Viewbox Width="22" Height="22">
                         <Canvas Width="24" Height="24">
@@ -210,7 +211,7 @@
                       </Viewbox>
                     </Border>
 
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+                    <StackPanel Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center" Spacing="6">
                       <DockPanel LastChildFill="True">
                         <!-- Meta cumprida: a palavra na tela larga; na estreita, o ✓ dos Relatórios, que não espreme o título -->
                         <TextBlock DockPanel.Dock="Right" Classes="met-tag" Classes.met="{Binding IsMet}" Text="concluída" />
@@ -285,6 +286,12 @@
                               CommandParameter="{Binding}">
                         <Path Classes="btn-icon" Data="{StaticResource IconEllipsis}" />
                       </Button>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Grid.Column="2" Classes="next-reminder" IsVisible="{Binding HasNextReminder}"
+                                ToolTip.Tip="Próximo lembrete">
+                      <Path Data="{StaticResource IconBell}" />
+                      <TextBlock Text="{Binding NextReminder}" />
                     </StackPanel>
                   </Grid>
 
@@ -512,22 +519,6 @@
         </ItemsControl>
         <TextBlock Text="Nenhuma meta de hoje com essas tags." IsVisible="{Binding Filter.IsFilteredEmpty}"
                    Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" FontSize="15" Margin="0,24,0,24" />
-    <!-- Próximos lembretes do dia, depois das metas e dentro da rolagem (só com itens):
-         fora dela, cada meta com lembrete tirava uma linha da lista no celular -->
-    <StackPanel Margin="0,4,0,14" IsVisible="{Binding HasUpcoming}">
-      <TextBlock Classes="section-title" Text="Próximos lembretes" Margin="0,0,0,10" />
-      <ItemsControl ItemsSource="{Binding Upcoming}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="vm:UpcomingReminderViewModel">
-            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" Margin="0,0,0,6">
-              <TextBlock Text="{Binding Time}" FontWeight="SemiBold" />
-              <TextBlock Grid.Column="1" Text="{Binding Title}" Foreground="{DynamicResource Muted}"
-                         TextTrimming="CharacterEllipsis" />
-            </Grid>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-    </StackPanel>
         </StackPanel>
       </StackPanel>
     </ScrollViewer>

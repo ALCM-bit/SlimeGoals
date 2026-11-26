@@ -90,7 +90,7 @@ public class ProcessTimerReminderSchedulerTests : IDisposable
         _notifications.Shown.Should().HaveCount(1);
     }
 
-    // Revisão da Task 7: a tela Hoje recarrega os "Próximos lembretes" depois de cada disparo.
+    // Revisão da Task 7: a tela Hoje recarrega a hora do próximo lembrete depois de cada disparo.
     [Fact]
     public async Task Reminder_tick_notifies_change_without_firing_again()
     {

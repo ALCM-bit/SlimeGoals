@@ -101,6 +101,8 @@
   <!-- Lucide pause e skip-forward: controles do Pomodoro -->
   <StreamGeometry x:Key="IconPause">M 7 4 L 9 4 A 1 1 0 0 1 10 5 L 10 19 A 1 1 0 0 1 9 20 L 7 20 A 1 1 0 0 1 6 19 L 6 5 A 1 1 0 0 1 7 4 Z M 15 4 L 17 4 A 1 1 0 0 1 18 5 L 18 19 A 1 1 0 0 1 17 20 L 15 20 A 1 1 0 0 1 14 19 L 14 5 A 1 1 0 0 1 15 4 Z</StreamGeometry>
   <StreamGeometry x:Key="IconSkip">M 5 4 L 15 12 L 5 20 Z M 19 5 L 19 19</StreamGeometry>
+  <!-- Lucide bell (ISC): o próximo lembrete no cartão do Hoje -->
+  <StreamGeometry x:Key="IconBell">M 10.268 21 A 2 2 0 0 0 13.732 21 M 3.262 15.326 A 1 1 0 0 0 4 17 L 20 17 A 1 1 0 0 0 20.74 15.327 C 19.41 13.956 18 12.499 18 8 A 6 6 0 0 0 6 8 C 6 12.499 4.589 13.956 3.262 15.326</StreamGeometry>
   <StreamGeometry x:Key="IconEllipsis">M 5 12 L 5.01 12 M 12 12 L 12.01 12 M 19 12 L 19.01 12</StreamGeometry>
   <!-- Ícones da navegação inferior (Lucide, ISC: sun, list-checks, clock, chart-column, sliders-horizontal).
        A chave é "Icon" + PageViewModel.IconKey; resolvidos pelo NavIconConverter. -->
