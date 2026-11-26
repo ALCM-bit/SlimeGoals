@@ -118,6 +118,36 @@ public class SyncSchedulerTests
         _runs.Should().Be(2);
     }
 
+    /// <summary>Pulado é outro ciclo (o do botão Sincronizar agora, o do Sair) segurando o motor: logo ele termina.</summary>
+    [Fact]
+    public void Skipped_retries_after_the_change_delay()
+    {
+        _results.Enqueue(SyncCycleResult.Skipped);
+        using var scheduler = Create();
+        scheduler.Start();
+        _time.Advance(SyncScheduler.ChangeDelay - TimeSpan.FromSeconds(1));
+        _runs.Should().Be(1);
+        _time.Advance(TimeSpan.FromSeconds(1));
+        _runs.Should().Be(2);
+    }
+
+    [Fact]
+    public void Skipped_keeps_the_failure_count()
+    {
+        _results.Enqueue(SyncCycleResult.Failed);
+        _results.Enqueue(SyncCycleResult.Skipped);
+        _results.Enqueue(SyncCycleResult.Failed);
+        using var scheduler = Create();
+        scheduler.Start();
+        _time.Advance(SyncScheduler.FirstRetry);
+        _time.Advance(SyncScheduler.ChangeDelay);
+        _runs.Should().Be(3);
+        _time.Advance(TimeSpan.FromSeconds(59));
+        _runs.Should().Be(3, "a segunda falha espera 60 s: o pulo não zerou a contagem");
+        _time.Advance(TimeSpan.FromSeconds(1));
+        _runs.Should().Be(4);
+    }
+
     [Fact]
     public void Stop_cancels_timers_and_ignores_changes()
     {

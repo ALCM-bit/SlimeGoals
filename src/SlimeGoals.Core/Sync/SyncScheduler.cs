@@ -5,8 +5,9 @@ namespace SlimeGoals.Core.Sync;
 
 /// <summary>
 /// Decide quando o ciclo de sincronização roda (spec de sincronização §4, "Quando sincroniza"): ao iniciar,
-/// 5 s depois da última mudança, a cada 15 min e sob pedido. Falha espera 30 s, 60 s, 120 s... até 15 min.
-/// Um temporizador só reprograma o próximo ciclo, e nunca há dois ciclos ao mesmo tempo.
+/// 5 s depois da última mudança, a cada 15 min e sob pedido. Falha espera 30 s, 60 s, 120 s... até 15 min, e um ciclo
+/// pulado (outro segurava o motor) tenta de novo em 5 s. Um temporizador só reprograma o próximo ciclo, e nunca há dois
+/// ciclos ao mesmo tempo.
 /// </summary>
 public sealed class SyncScheduler : IDisposable
 {
@@ -178,7 +179,11 @@ public sealed class SyncScheduler : IDisposable
             case SyncCycleResult.Incomplete:
                 _failures = 0;
                 return Period;
-            default: // Skipped, Disabled, Paused e cancelado: não contam como sucesso nem como falha
+            // Outro ciclo (o do botão Sincronizar agora, o do Sair) segurava o motor e logo termina. Esperar o período
+            // deixaria por 15 min uma mudança feita durante ele. Não conta como sucesso nem como falha.
+            case SyncCycleResult.Skipped:
+                return ChangeDelay;
+            default: // Disabled, Paused e cancelado: não contam como sucesso nem como falha
                 return Period;
         }
     }
