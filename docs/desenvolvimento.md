@@ -64,6 +64,7 @@ A ferramenta grava um PNG por página, no tamanho do celular (412×915) e no do 
 | `time` | só a aba Tempo (Pomodoro), em quatro tamanhos |
 | `account` | a seção de conta, sobre uma conta falsa e sem rede |
 | `sync-warning` | a tela Hoje com o aviso de sincronização parada (320, 360, 412 e 1100 de largura) |
+| `wide` | a tela Hoje numa janela larga (1440×900 e 1920×1080), com o resumo na coluna da direita |
 | `mini` | a janelinha do cronômetro |
 | `mascot` | as quatro poses do slime |
 

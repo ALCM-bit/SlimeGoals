@@ -17,9 +17,9 @@ using SlimeGoals.Sync;
 using ScrollViewer = Avalonia.Controls.ScrollViewer;
 using Window = Avalonia.Controls.Window;
 
-if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini" or "sync-warning" or "today-filter")))
+if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini" or "sync-warning" or "today-filter" or "wide")))
 {
-    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning|today-filter]");
+    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning|today-filter|wide]");
     return 1;
 }
 
@@ -36,6 +36,11 @@ using var sample = new Sample();
 
 if (which is "phone" or "all")
     Render(true, "phone", 412, 915);
+if (which is "wide")
+{
+    RenderWide(1440, 900);
+    RenderWide(1920, 1080);
+}
 if (which is "desktop" or "all")
     Render(false, "desktop", 1100, 720);
 if (which == "narrow")
@@ -629,6 +634,25 @@ void RenderTodayWithTimer(int width)
         }
         Console.WriteLine(path);
     }
+}
+
+void RenderWide(int width, int height)
+{
+    var shell = sample.CreateShell(false);
+    var window = new Window { Width = width, Height = height, Content = new ShellView { DataContext = shell } };
+    window.Show();
+    shell.CurrentPage = shell.Pages.OfType<TodayPageViewModel>().Single();
+    Pump();
+    var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro.");
+    var path = Path.Combine(outDir, $"today-wide-{width}.png");
+    using (var stream = File.Create(path))
+    {
+#pragma warning disable CS0618
+        frame.Save(stream);
+#pragma warning restore CS0618
+    }
+    Console.WriteLine(path);
+    window.Close();
 }
 
 void Render(bool phone, string suffix, int width, int height)

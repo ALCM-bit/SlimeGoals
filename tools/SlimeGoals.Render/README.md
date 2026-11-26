@@ -5,7 +5,7 @@ Ferramenta de desenvolvimento que renderiza as telas do app sem janela (Avalonia
 ## Uso
 
 ```
-dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning|today-filter]
+dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning|today-filter|wide]
 ```
 
 Sem o segundo argumento, vale `all`. Grava um PNG por tela e tamanho, sempre o `ShellView` inteiro:
@@ -16,6 +16,8 @@ Sem o segundo argumento, vale `all`. Grava um PNG por tela e tamanho, sempre o `
 - `<tamanho>` é `phone` (412×915) ou `desktop` (1100×720).
 
 O modo `today-filter` (também incluído no `all`) grava o Hoje com o filtro de tags a 320, 360, 412 e 1100 px, como `<cena>-<largura>.png`: `today-filter-idle` (a linha de chips sem seleção), `today-filter` (duas tags marcadas: "✕ Limpar" fixo e "x de y metas"), `today-filter-single` (uma tag que esconde cartões) e `today-filter-empty` (nenhuma meta de hoje com tag: a linha de filtros some). A mensagem "Nenhuma meta de hoje com essas tags." não tem captura: é uma defesa que hoje não se alcança, porque uma tag marcada sempre tem meta na lista (ao sair a última, ela deixa a seleção). O `all` grava só 412 e 1100 px nas demais telas; `narrow` acrescenta 320 e 360. Grava também o Hoje sem metas, numa amostra vazia, a 360 e 1100 px (`today-empty-<largura>.png`): o aviso fica logo abaixo do cabeçalho.
+
+O modo `wide` grava o Hoje numa janela larga, a 1440×900 e 1920×1080 (`today-wide-<largura>.png`): as metas em linhas e o resumo, com "Esta semana", na coluna da direita (decisão 16). O `desktop` (1100×720) mostra a outra forma do desktop, com o destaque e os blocos numa faixa acima das linhas.
 
 O modo `account` grava a seção "Sincronização" de Configurações sobre uma conta falsa (`SampleAccount`, em `Sample.cs`: nenhuma rede, códigos de mentira), a 320×1400, 360×1400, 900×800 e 1100×800, como `account-<tela>-<largura>.png`:
 

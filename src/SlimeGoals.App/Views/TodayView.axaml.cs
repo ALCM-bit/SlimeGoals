@@ -24,6 +24,28 @@ public partial class TodayView : UserControl
         AddHandler(PointerPressedEvent, (_, _) => _pointerDown = true, RoutingStrategies.Tunnel, handledEventsToo: true);
         // Depois do Click do botão solto (que roda na bolha, antes de chegar aqui).
         AddHandler(PointerReleasedEvent, OnPointerReleasedAfterClick, RoutingStrategies.Bubble, handledEventsToo: true);
+        SizeChanged += (_, e) => ApplyLayout(e.NewSize.Width);
+    }
+
+    private TodayLayoutMode? _mode;
+
+    /// <summary>
+    /// Põe a forma do Hoje (<see cref="TodayLayout"/>) como classe do <c>PageRoot</c>, que os estilos da página usam, e
+    /// ajusta as colunas e linhas das grades, que estilo nenhum troca. A janela decide o celular, como a classe <c>compact</c>.
+    /// </summary>
+    private void ApplyLayout(double width)
+    {
+        var mode = TodayLayout.For(TopLevel.GetTopLevel(this)?.ClientSize.Width ?? width, width);
+        if (mode == _mode)
+            return;
+        _mode = mode;
+        PageRoot.Classes.Set("phone", mode == TodayLayoutMode.Phone);
+        PageRoot.Classes.Set("top", mode == TodayLayoutMode.Top);
+        PageRoot.Classes.Set("side", mode == TodayLayoutMode.Side);
+        PageGrid.ColumnDefinitions = new ColumnDefinitions(mode == TodayLayoutMode.Side ? "*,320" : "*");
+        Summary.ColumnDefinitions = new ColumnDefinitions(mode == TodayLayoutMode.Top ? "2*,3*" : "*");
+        // A linha de "Esta semana" só existe ao lado: vazia, ela ainda levaria o espaçamento entre linhas.
+        Summary.RowDefinitions = new RowDefinitions(mode == TodayLayoutMode.Side ? "Auto,Auto,Auto" : "Auto,Auto");
     }
 
     private void OnTagStripWheel(object? sender, PointerWheelEventArgs e)
