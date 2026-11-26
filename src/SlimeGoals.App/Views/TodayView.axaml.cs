@@ -15,6 +15,9 @@ public partial class TodayView : UserControl
         InitializeComponent();
         // Depois do AutoCompleteBox: o Enter que escolhe uma sugestão já pôs o texto no campo quando chega aqui.
         AddHandler(KeyDownEvent, OnTaskKeyDown, RoutingStrategies.Bubble, handledEventsToo: true);
+        // O ✎ e as sugestões ficam no TodayTimerTask, usado pelo cartão e pela linha; os eventos sobem até aqui.
+        AddHandler(Button.ClickEvent, OnEditTaskClick);
+        AddHandler(AutoCompleteBox.SelectionChangedEvent, OnTaskSelectionChanged);
         // A roda do mouse rola a linha de filtros de lado (o desktop não tem como arrastar com o dedo).
         TagStrip.PointerWheelChanged += OnTagStripWheel;
         TagStrip.ScrollChanged += (_, _) => UpdateTagStripHint();
@@ -185,7 +188,8 @@ public partial class TodayView : UserControl
     /// </summary>
     private void OnEditTaskClick(object? sender, RoutedEventArgs e)
     {
-        if ((sender as Visual)?.FindAncestorOfType<Grid>()?.Parent is not Panel area)
+        if (e.Source is not Button button || !button.Classes.Contains("edit-task")
+            || button.FindAncestorOfType<TodayTimerTask>() is not { } area)
             return;
         AfterRelease(() => Dispatcher.UIThread.Post(() =>
             area.GetVisualDescendants().OfType<AutoCompleteBox>().FirstOrDefault(b => b.Classes.Contains("timer-task"))?.Focus(),
@@ -199,7 +203,7 @@ public partial class TodayView : UserControl
     /// </summary>
     private void OnTaskSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (e.AddedItems.Count > 0 && sender is AutoCompleteBox { IsDropDownOpen: false } && TaskField(sender) is var (page, item))
+        if (e.AddedItems.Count > 0 && e.Source is AutoCompleteBox { IsDropDownOpen: false } box && TaskField(box) is var (page, item))
             page.SaveTaskCommand.Execute(item);
     }
 }

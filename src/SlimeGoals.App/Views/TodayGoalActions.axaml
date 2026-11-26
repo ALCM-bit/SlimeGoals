@@ -1,0 +1,70 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:SlimeGoals.App.Views"
+             xmlns:vm="using:SlimeGoals.App.ViewModels"
+             x:Class="SlimeGoals.App.Views.TodayGoalActions"
+             x:DataType="vm:TodayGoalViewModel">
+  <!-- Botões por medida da meta de hoje (conclusão, quantidade, tempo), com o tempo corrido ao lado na tela larga.
+       Usado pelo cartão (celular) e pela linha (desktop). -->
+  <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+    <!-- Conclusão -->
+    <Button Classes="ghost icon" AutomationProperties.Name="Desmarcar" ToolTip.Tip="Desmarcar"
+            IsVisible="{Binding IsCompletion}" IsEnabled="{Binding IsMet}"
+            Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).UncompleteCommand}"
+            CommandParameter="{Binding}">
+      <Path Classes="btn-icon" Data="{StaticResource IconX}" />
+    </Button>
+    <Button Classes="primary icon" AutomationProperties.Name="Feito" ToolTip.Tip="Marcar como feito"
+            IsVisible="{Binding IsCompletion}" IsEnabled="{Binding !IsMet}"
+            Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).CompleteCommand}"
+            CommandParameter="{Binding}">
+      <Path Classes="btn-icon" Data="{StaticResource IconCheck}" />
+    </Button>
+    <!-- Quantidade -->
+    <Button Classes="ghost icon" IsVisible="{Binding IsQuantity}"
+            AutomationProperties.Name="Remover 1" ToolTip.Tip="Remover 1"
+            Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).DecrementCommand}"
+            CommandParameter="{Binding}">
+      <Path Classes="btn-icon" Data="{StaticResource IconMinus}" />
+    </Button>
+    <Button Classes="primary icon" IsVisible="{Binding IsQuantity}"
+            AutomationProperties.Name="Adicionar 1" ToolTip.Tip="Adicionar 1"
+            Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).IncrementCommand}"
+            CommandParameter="{Binding}">
+      <Path Classes="btn-icon" Data="{StaticResource IconPlus}" />
+    </Button>
+    <!-- Tempo -->
+    <TextBlock Classes="elapsed wide" Classes.running="{Binding IsTimerRunning}" Text="{Binding Elapsed}" />
+    <Button Classes="primary icon" AutomationProperties.Name="Iniciar cronômetro" ToolTip.Tip="Iniciar cronômetro"
+            IsEnabled="{Binding CanStartTimer}"
+            Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).StartTimerCommand}"
+            CommandParameter="{Binding}">
+      <Button.IsVisible>
+        <MultiBinding Converter="{x:Static BoolConverters.And}">
+          <Binding Path="IsDuration" />
+          <Binding Path="HasNoTimer" />
+        </MultiBinding>
+      </Button.IsVisible>
+      <Path Classes="btn-icon" Data="{StaticResource IconPlay}" />
+    </Button>
+    <!-- No modo de troca, Trocar e Cancelar ocupam o lugar de ⇄ e ■ (abaixo do campo) -->
+    <Button Classes="danger-solid icon" AutomationProperties.Name="Parar cronômetro" ToolTip.Tip="Parar cronômetro"
+            Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).StopTimerCommand}"
+            CommandParameter="{Binding}">
+      <Button.IsVisible>
+        <MultiBinding Converter="{x:Static BoolConverters.And}">
+          <Binding Path="IsTimerRunning" />
+          <Binding Path="!IsSwitchingTask" />
+        </MultiBinding>
+      </Button.IsVisible>
+      <Path Classes="btn-icon" Data="{StaticResource IconStop}" />
+    </Button>
+    <!-- Mais opções (só tempo) -->
+    <Button Classes="ghost icon" AutomationProperties.Name="Lançar tempo" ToolTip.Tip="Lançar ou remover tempo"
+            IsVisible="{Binding IsDuration}"
+            Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).OpenPanelCommand}"
+            CommandParameter="{Binding}">
+      <Path Classes="btn-icon" Data="{StaticResource IconEllipsis}" />
+    </Button>
+  </StackPanel>
+</UserControl>
