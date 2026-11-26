@@ -906,6 +906,22 @@ public class AccountViewModelTests
         vm.SyncMessage.Should().BeNull("o ciclo seguinte terminou, e a linha ficou para trás");
     }
 
+    [Theory]
+    [InlineData(SyncCycleResult.Failed)]
+    [InlineData(SyncCycleResult.Incomplete)]
+    public async Task Unfinished_message_stays_when_a_later_cycle_ends_the_same_way(SyncCycleResult result)
+    {
+        _account.Status = SignedIn(pending: 1, error: "Sem conexão com o servidor.", lastSync: SyncedAt);
+        var vm = await LoadedAsync();
+        _account.SyncResult = result;
+        await vm.SyncNowCommand.ExecuteAsync(null);
+        var shown = vm.SyncMessage;
+
+        _account.RaiseStatusChanged(); // o agendador tenta de novo e termina igual: o status não muda
+
+        vm.SyncMessage.Should().NotBeNull().And.Be(shown, "o status é o mesmo, e a linha continua verdadeira");
+    }
+
     [Fact]
     public async Task Sync_message_goes_away_on_reload_and_on_other_pages()
     {
