@@ -289,8 +289,11 @@ public sealed partial class AccountViewModel : ObservableObject
     /// <summary>O ciclo do botão terminou e a linha espera o status que vai descrever, o do próximo recarregar.</summary>
     private bool _syncAwaitingStatus;
 
-    /// <summary>O status que a linha descreve: outro status depois dela a deixa desatualizada.</summary>
+    /// <summary>O status que a linha descreve: outro status depois dela a desmente.</summary>
     private AccountStatus? _syncShownFor;
+
+    /// <summary>A linha diz que o ciclo do botão terminou bem.</summary>
+    private bool _syncShownDone;
 
     /// <summary>Sincronizar agora: um ciclo inteiro na hora (envia a fila e busca o que chegou), e a linha diz como terminou.</summary>
     [RelayCommand(CanExecute = nameof(IsIdle))]
@@ -300,12 +303,13 @@ public sealed partial class AccountViewModel : ObservableObject
         var result = await _account.SyncNowAsync();
         // Já aqui, e não no recarregar: se a leitura do status falhar, "Sincronizando…" ficaria com os botões livres.
         SyncMessage = SyncResultText(result);
+        _syncShownDone = result == SyncCycleResult.Done;
         _syncAwaitingStatus = true;
     });
 
     /// <summary>
-    /// O primeiro recarregar depois do ciclo guarda o status que a linha descreve, e um status diferente depois dele a
-    /// apaga. O mesmo status de novo não apaga: o aviso do coordenador e o recarregar do comando chegam os dois, em
+    /// O primeiro recarregar depois do ciclo guarda o status que a linha descreve, e um status que a desmente depois dele
+    /// a apaga. O mesmo status de novo não apaga: o aviso do coordenador e o recarregar do comando chegam os dois, em
     /// qualquer ordem.
     /// </summary>
     private void TrackSyncMessage(AccountStatus status)
@@ -315,9 +319,17 @@ public sealed partial class AccountViewModel : ObservableObject
             _syncAwaitingStatus = false;
             _syncShownFor = status;
         }
-        else if (_syncShownFor is { } shown && shown != status)
+        else if (_syncShownFor is { } shown && !SyncMessageStillTrue(shown, status))
             ClearSyncMessage();
     }
+
+    /// <summary>
+    /// Qualquer mudança desmente a linha, menos a hora de outro ciclo que também terminou bem: "Sincronização concluída."
+    /// continua verdadeira. Quem aperta o botão costuma vir de uma falha, e o agendador, ainda na espera dela, tenta de
+    /// novo logo depois; sem isso, a linha sumiria antes de ser lida.
+    /// </summary>
+    private bool SyncMessageStillTrue(AccountStatus shown, AccountStatus status) =>
+        (_syncShownDone ? status with { LastSyncAt = shown.LastSyncAt } : status) == shown;
 
     private static string? SyncResultText(SyncCycleResult result) => result switch
     {
@@ -331,6 +343,7 @@ public sealed partial class AccountViewModel : ObservableObject
     {
         _syncAwaitingStatus = false;
         _syncShownFor = null;
+        _syncShownDone = false;
         SyncMessage = null;
     }
 

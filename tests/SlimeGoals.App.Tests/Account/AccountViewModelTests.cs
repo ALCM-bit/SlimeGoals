@@ -859,6 +859,53 @@ public class AccountViewModelTests
         vm.SyncMessage.Should().BeNull("uma mudança depois do ciclo deixa a linha desatualizada");
     }
 
+    private static readonly DateTimeOffset SyncedAt = new(2026, 11, 26, 4, 39, 0, TimeSpan.FromHours(-3));
+
+    [Fact]
+    public async Task Done_message_stays_when_a_later_cycle_also_succeeds()
+    {
+        _account.Status = SignedIn(pending: 1, error: "Sem conexão com o servidor.", lastSync: SyncedAt.AddMinutes(-4));
+        var vm = await LoadedAsync();
+        _account.Status = SignedIn(lastSync: SyncedAt); // o ciclo do botão enviou a fila
+        await vm.SyncNowCommand.ExecuteAsync(null);
+
+        // O agendador, ainda na espera das falhas de antes do botão, tenta de novo logo depois e também consegue.
+        _account.Status = SignedIn(lastSync: SyncedAt.AddSeconds(2));
+        _account.RaiseStatusChanged();
+
+        vm.SyncMessage.Should().Be("Sincronização concluída.", "outro ciclo que terminou bem não desmente a linha");
+    }
+
+    [Fact]
+    public async Task Done_message_goes_away_when_a_later_cycle_fails()
+    {
+        _account.Status = SignedIn(lastSync: SyncedAt);
+        var vm = await LoadedAsync();
+        await vm.SyncNowCommand.ExecuteAsync(null);
+
+        _account.Status = SignedIn(error: "Sem conexão com o servidor.", lastSync: SyncedAt);
+        _account.RaiseStatusChanged();
+
+        vm.SyncMessage.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(SyncCycleResult.Incomplete)]
+    [InlineData(SyncCycleResult.Failed)]
+    public async Task Unfinished_message_goes_away_when_a_later_cycle_succeeds(SyncCycleResult result)
+    {
+        _account.Status = SignedIn(lastSync: SyncedAt);
+        var vm = await LoadedAsync();
+        _account.SyncResult = result;
+        await vm.SyncNowCommand.ExecuteAsync(null);
+        vm.SyncMessage.Should().NotBeNull();
+
+        _account.Status = SignedIn(lastSync: SyncedAt.AddSeconds(30));
+        _account.RaiseStatusChanged();
+
+        vm.SyncMessage.Should().BeNull("o ciclo seguinte terminou, e a linha ficou para trás");
+    }
+
     [Fact]
     public async Task Sync_message_goes_away_on_reload_and_on_other_pages()
     {
