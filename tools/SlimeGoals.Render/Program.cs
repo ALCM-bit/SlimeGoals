@@ -77,6 +77,8 @@ if (which is "all" or "today-filter")
     RenderTodayTags(360, 900);
     RenderTodayTags(412, 915);
     RenderTodayTags(1100, 720);
+    RenderTodayEmpty(360, 900);
+    RenderTodayEmpty(1100, 720);
 }
 if (which == "sync-warning")
 {
@@ -439,6 +441,27 @@ void RenderNarrow(int width)
 #pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
     frame.Save(stream);
 #pragma warning restore CS0618
+    Console.WriteLine(path);
+    window.Close();
+}
+
+// Hoje sem metas (today-empty): o aviso logo abaixo do cabeçalho, numa amostra sem dados.
+void RenderTodayEmpty(int width, int height)
+{
+    using var empty = new Sample(seed: false);
+    var shell = empty.CreateShell(width < 720);
+    var window = new Window { Width = width, Height = height, Content = new ShellView { DataContext = shell } };
+    window.Show();
+    shell.CurrentPage = shell.Pages.OfType<TodayPageViewModel>().Single();
+    Pump();
+    var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para capturar.");
+    var path = Path.Combine(outDir, $"today-empty-{width}.png");
+    using (var stream = File.Create(path))
+    {
+#pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
+        frame.Save(stream);
+#pragma warning restore CS0618
+    }
     Console.WriteLine(path);
     window.Close();
 }

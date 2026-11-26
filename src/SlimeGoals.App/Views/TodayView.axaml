@@ -7,7 +7,7 @@
              x:DataType="vm:TodayPageViewModel">
   <UserControl.Styles>
     <!-- Teclado aberto (celular): some o destaque e os blocos, senão a lista fica sem altura e o campo em edição some -->
-    <Style Selector="DockPanel.keyboard > Border.hero, DockPanel.keyboard > UniformGrid.tiles">
+    <Style Selector="DockPanel.keyboard Border.hero, DockPanel.keyboard UniformGrid.tiles">
       <Setter Property="IsVisible" Value="False" />
     </Style>
     <!-- Trechos de hoje: o chevron aponta para cima com a lista aberta -->
@@ -23,8 +23,13 @@
   <DockPanel x:Name="PageRoot" Classes="page">
     <TextBlock DockPanel.Dock="Top" Classes="page-title" Text="{Binding Title}" Margin="0,0,0,16" />
 
+    <!-- Abaixo do título a página rola inteira (decisão 14 da interface no Android): presos, o destaque, os blocos,
+         as faixas e o filtro deixavam uns 300 px para os cartões no celular -->
+    <ScrollViewer Classes="page">
+      <StackPanel>
+
     <!-- Cartão de destaque: progresso da semana e mascote -->
-    <Border DockPanel.Dock="Top" Classes="hero" Margin="0,0,0,16">
+    <Border Classes="hero" Margin="0,0,0,16">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
         <StackPanel VerticalAlignment="Center" Spacing="4">
           <TextBlock Classes="hero-label" Text="Progresso da semana" TextWrapping="Wrap" />
@@ -46,7 +51,7 @@
 
     <!-- A linha do rótulo tem a mesma altura nos três blocos (SharedSizeGroup): os valores ficam alinhados mesmo
          quando um rótulo quebra em duas linhas na tela estreita -->
-    <UniformGrid DockPanel.Dock="Top" Classes="tiles" Grid.IsSharedSizeScope="True" Margin="0,0,0,16">
+    <UniformGrid Classes="tiles" Grid.IsSharedSizeScope="True" Margin="0,0,0,16">
       <Border Classes="stat">
         <Grid>
           <Grid.RowDefinitions>
@@ -85,13 +90,13 @@
       </Border>
     </UniformGrid>
 
-    <Border DockPanel.Dock="Top" Classes="warning-band" Margin="0,0,0,12"
+    <Border Classes="warning-band" Margin="0,0,0,12"
             IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
       <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
     </Border>
 
     <!-- Sessão de Pomodoro aberta: o ▶ dos cartões fica desligado, e a faixa leva à aba Tempo (spec Pomodoro §4.1) -->
-    <Border DockPanel.Dock="Top" Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasFocusBand}">
+    <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasFocusBand}">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
         <TextBlock Text="{Binding FocusBandText}" VerticalAlignment="Center" TextWrapping="Wrap" />
         <Button Grid.Column="1" Classes="ghost" Content="Abrir Tempo" Command="{Binding OpenTimePageCommand}" />
@@ -99,7 +104,7 @@
     </Border>
 
     <!-- Cronômetro de meta fora da lista de hoje (ex.: dia inativo): ainda dá para parar ou descartar -->
-    <Border DockPanel.Dock="Top" Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasOffscreenTimer}">
+    <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasOffscreenTimer}">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
         <TextBlock Text="{Binding OffscreenTimerText}" VerticalAlignment="Center" TextWrapping="Wrap" />
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
@@ -111,7 +116,7 @@
     </Border>
 
     <!-- Permissões dos lembretes em falta (Android) -->
-    <Border DockPanel.Dock="Top" Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasPermissionWarning}">
+    <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasPermissionWarning}">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
         <TextBlock Text="{Binding PermissionWarning}" VerticalAlignment="Center" TextWrapping="Wrap" />
         <Button Grid.Column="1" Classes="ghost" MinHeight="44" Content="Permitir" Command="{Binding RequestPermissionCommand}" />
@@ -119,7 +124,7 @@
     </Border>
 
     <!-- Sincronização parada há dias (conta ligada) -->
-    <Border DockPanel.Dock="Top" Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasSyncWarning}">
+    <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasSyncWarning}">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
         <TextBlock Text="{Binding SyncWarning}" VerticalAlignment="Center" TextWrapping="Wrap" />
         <Button Grid.Column="1" Classes="ghost" MinHeight="44" Content="Abrir" Command="{Binding OpenSyncCommand}" />
@@ -127,7 +132,7 @@
     </Border>
 
     <!-- Lembretes pausados (mesmo estilo da faixa do cronômetro) -->
-    <Border DockPanel.Dock="Top" Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding IsPaused}">
+    <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding IsPaused}">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
         <TextBlock Text="Lembretes pausados" VerticalAlignment="Center" TextWrapping="Wrap" />
         <Button Grid.Column="1" Classes="ghost" Content="Retomar" Command="{Binding TogglePauseCommand}" />
@@ -135,14 +140,14 @@
     </Border>
 
     <!-- Cabeçalho da lista; "Pausar lembretes" fica aqui para valer mesmo sem próximos lembretes -->
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
       <TextBlock Classes="section-title" Text="Metas de hoje" VerticalAlignment="Center" />
       <Button Grid.Column="1" Classes="ghost" Content="Pausar lembretes"
               IsVisible="{Binding CanPause}" Command="{Binding TogglePauseCommand}" />
     </Grid>
 
     <!-- Filtro por tags: "Limpar" fixo à esquerda, só com seleção; os chips rolam de lado (nunca quebram) -->
-    <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12" DataContext="{Binding Filter}"
+    <StackPanel Spacing="8" Margin="0,0,0,12" DataContext="{Binding Filter}"
                 x:DataType="vm:TodayTagFilterViewModel" IsVisible="{Binding IsVisible}">
       <Grid ColumnDefinitions="Auto,*">
         <Button Classes="ghost" Content="✕ Limpar" MinHeight="36" Padding="12,0" Margin="0,0,8,0" VerticalAlignment="Center"
@@ -185,11 +190,10 @@
                  IsVisible="{Binding HasSelection}" />
     </StackPanel>
 
-    <Panel>
-      <TextBlock Text="{Binding EmptyMessage}" IsVisible="{Binding IsEmpty}" Foreground="{DynamicResource Muted}"
-                 HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="15" />
-      <ScrollViewer Classes="page" IsVisible="{Binding !IsEmpty}">
-        <StackPanel>
+    <!-- Sem metas: o aviso logo abaixo do cabeçalho, sem a lista nem os próximos lembretes -->
+    <TextBlock Text="{Binding EmptyMessage}" IsVisible="{Binding IsEmpty}" Foreground="{DynamicResource Muted}"
+               HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" FontSize="15" Margin="0,24" />
+        <StackPanel IsVisible="{Binding !IsEmpty}">
         <ItemsControl ItemsSource="{Binding Goals}" Margin="0,0,0,14">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:TodayGoalViewModel">
@@ -525,7 +529,7 @@
       </ItemsControl>
     </StackPanel>
         </StackPanel>
-      </ScrollViewer>
-    </Panel>
+      </StackPanel>
+    </ScrollViewer>
   </DockPanel>
 </UserControl>
