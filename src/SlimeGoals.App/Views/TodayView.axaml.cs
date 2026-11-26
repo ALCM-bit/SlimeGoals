@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Platform;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -105,35 +104,40 @@ public partial class TodayView : UserControl
         }, DispatcherPriority.Background);
     }
 
-    private IInputPane? _inputPane;
+    private KeyboardWatch? _keyboard;
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
-        _inputPane = TopLevel.GetTopLevel(this)?.InputPane;
-        if (_inputPane is not null)
-            _inputPane.StateChanged += OnInputPaneChanged;
+        if (TopLevel.GetTopLevel(this) is { } topLevel && KeyboardWatch.Attach(topLevel) is { } keyboard)
+        {
+            _keyboard = keyboard;
+            keyboard.Changed += OnKeyboardChanged;
+            // A página nasce de novo a cada troca de aba: com o teclado já aberto, começa no modo dele.
+            keyboard.Refresh();
+        }
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        if (_inputPane is not null)
-            _inputPane.StateChanged -= OnInputPaneChanged;
-        _inputPane = null;
+        _keyboard?.Dispose();
+        _keyboard = null;
         base.OnDetachedFromVisualTree(e);
     }
 
     /// <summary>
     /// Teclado do celular aberto: esconde o destaque e os blocos (classe <c>keyboard</c>) e rola até o campo em edição,
-    /// que de outro modo ficaria atrás do teclado.
+    /// que de outro modo ficaria atrás do teclado. Eles voltam também quando o teclado some sem animar, na volta do
+    /// segundo plano (<see cref="KeyboardWatch"/>).
     /// </summary>
-    private void OnInputPaneChanged(object? sender, InputPaneStateEventArgs e)
+    private void OnKeyboardChanged(object? sender, EventArgs e)
     {
-        var open = e.NewState == InputPaneState.Open;
-        if (!open)
+        if (sender is not KeyboardWatch keyboard)
+            return;
+        if (!keyboard.IsOpen)
         {
             // O teclado fecha no toque que tira o foco do campo (■, ⇄): o destaque só volta depois de soltar.
-            AfterRelease(() => PageRoot.Classes.Set("keyboard", _inputPane?.State == InputPaneState.Open));
+            AfterRelease(() => PageRoot.Classes.Set("keyboard", _keyboard?.IsOpen == true));
             return;
         }
         PageRoot.Classes.Set("keyboard", true);
