@@ -96,6 +96,10 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     [ObservableProperty] public partial int StreakValue { get; set; }
     [ObservableProperty] public partial string StreakUnit { get; set; } = "dias";
     [ObservableProperty] public partial string? StreakGoal { get; set; }
+
+    /// <summary>"Esta semana" do painel lateral do desktop: metas com progresso por dia, como nos Relatórios.</summary>
+    public ObservableCollection<TodayWeekBarViewModel> WeekBars { get; } = [];
+    [ObservableProperty] public partial bool HasWeekBars { get; set; }
     [ObservableProperty] public partial string? ErrorMessage { get; set; }
 
     /// <summary>Cronômetro de meta que não está na lista de hoje (ex.: dia inativo): faixa com Parar/Descartar.</summary>
@@ -241,6 +245,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             if (running is not null)
                 await LoadTaskSuggestionsAsync(running, version);
             await LoadStreakAsync(version);
+            await LoadWeekBarsAsync(version);
             await LoadUpcomingAsync(version);
             if (version == _loadVersion)
             {
@@ -311,6 +316,37 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         StreakGoal = highlight?.Goal.Title;
         var one = StreakValue == 1;
         StreakUnit = highlight?.Goal.Recurrence == Recurrence.Weekly ? (one ? "semana" : "semanas") : (one ? "dia" : "dias");
+    }
+
+    /// <summary>Altura da maior barra da semana, em px.</summary>
+    private const double WeekBarMaxHeight = 80;
+
+    /// <summary>Falha aqui só tira o gráfico da semana: o resto da tela Hoje continua valendo.</summary>
+    private async Task LoadWeekBarsAsync(int version)
+    {
+        WeekReport? report = null;
+        try
+        {
+            if (reports is not null)
+                report = await reports.GetWeekAsync(DateOnly.FromDateTime(time.GetLocalNow().DateTime));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Trace.TraceError($"Falha ao carregar a semana: {TraceText.Of(ex)}");
+        }
+        if (version != _loadVersion)
+            return;
+
+        WeekBars.Clear();
+        if (report is not null)
+        {
+            var today = DateOnly.FromDateTime(time.GetLocalNow().DateTime);
+            var max = Math.Max(1, report.Days.Max(d => d.Goals.Count));
+            foreach (var day in report.Days)
+                WeekBars.Add(new TodayWeekBarViewModel(ReportsPageViewModel.WeekLabels[((int)day.Day.DayOfWeek + 6) % 7],
+                    Math.Max(4, (double)day.Goals.Count / max * WeekBarMaxHeight), day.Day == today));
+        }
+        HasWeekBars = WeekBars.Count > 0;
     }
 
     /// <summary>Hora do próximo lembrete em cada cartão. Falha aqui só tira as horas: o resto da tela Hoje continua valendo.</summary>
@@ -659,3 +695,6 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         _ticker = null;
     }
 }
+
+/// <summary>Barra de um dia em "Esta semana": rótulo ("Seg"), altura em px e se é hoje.</summary>
+public sealed record TodayWeekBarViewModel(string Label, double BarHeight, bool IsToday);

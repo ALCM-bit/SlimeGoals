@@ -45,7 +45,7 @@
   - `bool HasWeekBars` (observável).
 
 - [ ] **Passo 1:** testes que falham:
-  - `Week_bars_count_goals_with_progress_per_day`: duas metas com progresso hoje e uma ontem; a barra de hoje tem `BarHeight` 80 e a de ontem 40. São 7 barras, com os rótulos `S T Q Q S S D`.
+  - `Week_bars_count_goals_with_progress_per_day`: duas metas com progresso hoje e uma ontem; a barra de hoje tem `BarHeight` 80 e a de ontem 40. São 7 barras, com os rótulos dos Relatórios (`Seg` a `Dom`).
   - `Week_bar_of_today_is_marked`: só a barra do dia atual tem `IsToday`.
   - `Week_bars_without_progress_have_minimum_height`: dia sem progresso tem `BarHeight` 4.
 - [ ] **Passo 2:** `dotnet test --project tests/SlimeGoals.App.Tests`. Esperado: falha de compilação (`WeekBars` não existe).

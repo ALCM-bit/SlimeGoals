@@ -18,7 +18,7 @@ namespace SlimeGoals.App.ViewModels;
 public sealed partial class ReportsPageViewModel(ReportService reports, TimeProvider time, DataChangeNotifier changes)
     : PageViewModel
 {
-    private static readonly string[] WeekLabels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+    internal static readonly string[] WeekLabels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
     private bool _subscribed;
     private int _loadVersion;

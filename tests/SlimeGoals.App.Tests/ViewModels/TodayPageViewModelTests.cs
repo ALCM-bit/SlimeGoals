@@ -354,6 +354,54 @@ public class TodayPageViewModelTests
         Assert.Equal(4, page.StreakValue);
     }
 
+    /// <summary>Água com registro na terça e na quarta (hoje); Leitura só na quarta. As duas existem desde 31/10.</summary>
+    private async Task SeedWeekProgress()
+    {
+        var created = new DateTimeOffset(2026, 10, 31, 12, 0, 0, TimeSpan.Zero);
+        var water = await Create("Água");
+        await _goals.UpdateAsync(water with { CreatedAt = created });
+        var reading = await Create("Leitura");
+        await _goals.UpdateAsync(reading with { CreatedAt = created });
+        foreach (var (goal, day) in new[] { (water, 3), (water, 4), (reading, 4) })
+            await _checkins.AddAsync(new Checkin
+            {
+                Id = Guid.NewGuid(), GoalId = goal.Id, DoneAt = new DateTimeOffset(2026, 11, day, 13, 0, 0, TimeSpan.Zero),
+                Amount = 1, UpdatedAt = Now,
+            });
+    }
+
+    [Fact]
+    public async Task Week_bars_count_goals_with_progress_per_day()
+    {
+        await SeedWeekProgress();
+
+        var page = await Loaded();
+
+        page.HasWeekBars.Should().BeTrue();
+        page.WeekBars.Select(b => b.Label).Should().Equal("Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom");
+        (page.WeekBars[1].BarHeight, page.WeekBars[2].BarHeight).Should().Be((40, 80));
+    }
+
+    [Fact]
+    public async Task Week_bar_of_today_is_marked()
+    {
+        await SeedWeekProgress();
+
+        var page = await Loaded();
+
+        page.WeekBars.Select(b => b.IsToday).Should().Equal(false, false, true, false, false, false, false);
+    }
+
+    [Fact]
+    public async Task Week_bars_without_progress_have_minimum_height()
+    {
+        await SeedWeekProgress();
+
+        var page = await Loaded();
+
+        page.WeekBars[0].BarHeight.Should().Be(4);
+    }
+
     [Fact]
     public async Task Streak_tile_without_streak_shows_zero_days()
     {
