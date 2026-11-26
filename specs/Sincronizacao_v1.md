@@ -96,7 +96,7 @@ Migração `006_sync_engine.sql`:
 - Um `DataChangeNotifier.Defer` agrupa a página num único aviso.
 - Dados aplicados não voltam para a fila (inclusive a exclusão recebida, que usa o caminho sem fila).
 
-**Quando roda:** ao abrir o app, 5 s depois da última mudança, a cada 15 min com o app aberto e, no Android, ao voltar ao primeiro plano. Mudança é todo aviso do `DataChangeNotifier`, inclusive o de uma página aplicada: depois de baixar algo, roda mais um ciclo, que normalmente não encontra nada e não avisa. Falhas repetem com espera crescente, de 30 s até 15 min. Uma mudança durante essa espera a encurta para 5 s, e a contagem de falhas continua. Página que não foi aplicada não avisa, então não encurta a espera.
+**Quando roda:** ao abrir o app, 5 s depois da última mudança, a cada 15 min com o app aberto, a pedido pelo botão "Sincronizar agora" e, no Android, ao voltar ao primeiro plano. Mudança é todo aviso do `DataChangeNotifier`, inclusive o de uma página aplicada: depois de baixar algo, roda mais um ciclo, que normalmente não encontra nada e não avisa. Falhas repetem com espera crescente, de 30 s até 15 min. Uma mudança durante essa espera a encurta para 5 s, e a contagem de falhas continua. Página que não foi aplicada não avisa, então não encurta a espera. Um ciclo automático que encontra outro em andamento (o do botão ou o do "Sair") tenta de novo 5 s depois (decisões do botão Sincronizar agora, na seção 6).
 
 ## 5. Servidor
 
@@ -430,6 +430,33 @@ Conta e sincronização no Android, só no APK de desenvolvimento. Onde diferem 
 **Falha inesperada do cofre.** Uma exceção do Keystore ao ler a sessão (chave irrecuperável, `ProviderException`, `IllegalStateException`) vira "sessão ilegível", como a tag inválida. Se outra falha que o cofre não traduziu chegar ao coordenador, "Sair" ainda limpa a conta localmente, sem rede. Só o cofre indisponível (trancado) impede sair.
 
 Falta o celular (arm64, APK Release com `--dev`), que depende do autor.
+
+### Decisões do botão Sincronizar agora
+
+Pedido do autor em 26/11/2026: um disparo manual, para enviar e buscar os dados na hora, sem esperar o próximo ciclo. Onde diferem do texto acima, valem estes.
+
+**Onde.** Na seção Sincronização de Configurações, com a conta ligada, como primeiro botão da fileira e no estilo principal, antes de Aparelhos, Trocar senha, Sair e Apagar conta. É o lugar do "Entrar de novo" na sessão encerrada. O estado (última sincronização, pendências e erro) já fica ali, então o resultado aparece onde a pessoa está olhando. Linux e Android usam a mesma tela. Não há botão no Hoje nem atalho de teclado.
+
+**O que faz.** `ISyncAccount.SyncNowAsync` roda um ciclo inteiro agora, igual ao do agendador: baixa, aplica e envia a fila. Devolve o `SyncCycleResult`.
+- O ciclo passa pelo portão das operações de conta e roda fora da thread da interface, como o envio do "Sair" (`FlushAsync`). Os dois usam o mesmo trecho do coordenador.
+- Com um ciclo do agendador em andamento, o motor pula (`Skipped`). O botão então espera esse ciclo acabar e roda o seu, em até 3 tentativas: o ciclo que já estava rodando pode ter lido a fila antes da última mudança.
+- Um token recusado encerra a sessão na hora, como no ciclo automático, e a fila fica guardada.
+- Sem motor ligado, devolve `Disabled` sem ir à rede.
+- Como o ciclo automático, não refaz a conferência de integridade, que só barra a abertura e as operações de conta.
+- `SyncNow`, que não espera o resultado, continua sendo o pedido do `OnResume` no Android.
+
+**Agendador.** O botão não mexe no agendador: o próximo ciclo automático continua na hora marcada, e a contagem de falhas só muda nos ciclos dele. Até aqui, um ciclo do agendador que encontrava outro em andamento (o do botão ou o do "Sair") pulava e só voltava em 15 min. Agora ele tenta de novo 5 s depois, sem contar como falha nem como sucesso. Assim, uma mudança feita durante o ciclo do botão não espera 15 min.
+
+**Na tela.**
+- Durante o ciclo, as ações da conta ficam desligadas, a barra de ocupado aparece, e a linha de resultado, logo abaixo das pendências, diz "Sincronizando…".
+- No fim, a linha mostra:
+  - `Done`: "Sincronização concluída."
+  - `Incomplete` (a fila seguiu em conflito nas 3 voltas do motor) e `Skipped` (outro ciclo segurou o motor nas 3 tentativas): "A sincronização não terminou. Tente de novo em instantes."
+  - `Failed`, `Paused` e `Disabled`: "Não foi possível sincronizar." O motivo é o texto fixo do `last_error`, na faixa de aviso logo abaixo, como "Sem conexão com o servidor." ou "Atualize o app para continuar sincronizando."
+  - `Unauthorized`: nada. A seção passa para "Entre de novo".
+- Uma exceção não deveria acontecer, porque o motor grava a falha em vez de lançar. Se acontecer, a seção mostra o erro genérico, "Algo deu errado. Tente de novo.", e nenhuma linha de resultado. No Trace, só o tipo.
+- A linha some quando o status muda depois dela (outro ciclo, uma mudança local, a sessão encerrada), quando outra ação da conta começa, ao abrir uma subpágina e ao voltar a Configurações. Ela não some por tempo: enquanto o status for o mesmo, continua verdadeira.
+- "Sincronização concluída." também fica quando outro ciclo termina bem e só a hora da última sincronização muda: a linha continua verdadeira. Quem aperta o botão costuma vir de uma falha, e o agendador, ainda na espera dela, tenta de novo logo depois do botão. Sem essa exceção, a linha sumia uns 2 s depois de aparecer (visto no emulador, 26/11). As outras linhas seguem a regra de cima: outra falha pelo mesmo motivo deixa o status igual, e a linha fica; um ciclo que termina bem a apaga.
 
 ## 7. Interface e Android
 

@@ -28,12 +28,17 @@
           <TextBlock Text="{Binding ServerLineText}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
           <TextBlock Text="{Binding LastSyncText}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
           <TextBlock Text="{Binding PendingText}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+          <!-- Resultado do Sincronizar agora; o motivo de uma falha fica na faixa de aviso logo abaixo -->
+          <TextBlock Text="{Binding SyncMessage}" TextWrapping="Wrap"
+                     IsVisible="{Binding SyncMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         </StackPanel>
         <Border Classes="warning-band"
                 IsVisible="{Binding LastError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
           <TextBlock Text="{Binding LastError}" TextWrapping="Wrap" />
         </Border>
         <WrapPanel ItemSpacing="8" LineSpacing="8">
+          <!-- No lugar do "Entrar de novo" da sessão encerrada -->
+          <Button Classes="primary" Content="{x:Static acc:AccountViewModel.SyncNowLabel}" Command="{Binding SyncNowCommand}" />
           <Button Classes="ghost" Content="Aparelhos" Command="{Binding OpenDevicesCommand}" />
           <Button Classes="ghost" Content="Trocar senha" Command="{Binding OpenChangePasswordCommand}" />
           <Button Classes="ghost" Content="Sair" Command="{Binding OpenSignOutCommand}" />

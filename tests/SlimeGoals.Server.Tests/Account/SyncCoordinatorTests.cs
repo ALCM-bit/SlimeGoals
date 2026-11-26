@@ -7,6 +7,7 @@ using SlimeGoals.Core;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
+using SlimeGoals.Core.Sync;
 using SlimeGoals.Infrastructure.Data;
 using SlimeGoals.Infrastructure.Tests;
 using SlimeGoals.Sync;
@@ -59,6 +60,7 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
         status.State.Should().Be(AccountState.SignedOut);
         status.Email.Should().BeNull();
         (await a.Account.FlushAsync()).Should().Be(0);
+        (await a.Account.SyncNowAsync()).Should().Be(SyncCycleResult.Disabled);
         a.Net.ClientsCreated.Should().Be(0);
         a.Net.Calls.Should().BeEmpty();
     }
@@ -480,6 +482,88 @@ public sealed class SyncCoordinatorTests(PostgresFixture postgres) : IAsyncLifet
         status.State.Should().Be(AccountState.SignedIn);
         status.LastError.Should().Be("Sem conexão com o servidor.");
     }
+
+    [Fact]
+    public async Task SyncNow_sends_the_queue_and_brings_what_other_devices_sent()
+    {
+        var a = NewDevice();
+        await SignUpAsync(a);
+        await WaitUntilAsync(a.Account, s => s.LastSyncAt is not null);
+        var b = NewDevice();
+        await b.Account.LoginAsync(Server, _email, Password, "celular");
+        await WaitUntilAsync(b.Account, s => s.LastSyncAt is not null);
+
+        await a.Goals.CreateAsync(Draft("Ler"));
+        a.Time.Advance(TimeSpan.FromSeconds(1)); // o aviso da mudança só roda em 5 s: o ciclo abaixo é o do botão
+
+        (await a.Account.SyncNowAsync()).Should().Be(SyncCycleResult.Done);
+        var status = await a.Account.GetStatusAsync();
+        status.Pending.Should().Be(0);
+        status.LastSyncAt.Should().Be(T0 + TimeSpan.FromSeconds(1));
+
+        (await b.Account.SyncNowAsync()).Should().Be(SyncCycleResult.Done);
+        b.GoalTitles().Should().Equal("Ler");
+    }
+
+    [Fact]
+    public async Task SyncNow_waits_for_the_scheduler_cycle_and_runs_its_own()
+    {
+        var a = NewDevice();
+        await SignUpAsync(a);
+        await WaitUntilAsync(a.Account, s => s.LastSyncAt is not null);
+        var hold = a.Net.HoldNextRequest("/sync/pull");
+        a.Account.SyncNow();
+        await hold.Held.Task.WaitAsync(WaitLimit); // o ciclo do agendador está parado no pull
+        var pulls = Pulls(a);
+
+        var sync = a.Account.SyncNowAsync();
+        // A espera só dá tempo para um coordenador errado devolver o pulo; o certo nunca termina antes de soltar o pull.
+        (await Task.WhenAny(sync, Task.Delay(TimeSpan.FromMilliseconds(500)))).Should().NotBeSameAs(sync,
+            "o botão espera o ciclo que está rodando");
+        hold.Release.SetResult();
+
+        (await sync.WaitAsync(WaitLimit)).Should().Be(SyncCycleResult.Done);
+        Pulls(a).Should().Be(pulls + 1, "depois do ciclo do agendador, o botão roda o seu");
+    }
+
+    [Fact]
+    public async Task SyncNow_with_the_server_down_fails_and_keeps_the_queue()
+    {
+        var a = NewDevice();
+        await SignUpAsync(a);
+        await WaitUntilAsync(a.Account, s => s.LastSyncAt is not null);
+        a.Net.Down = true;
+        await a.Goals.CreateAsync(Draft("Ler"));
+
+        (await a.Account.SyncNowAsync()).Should().Be(SyncCycleResult.Failed);
+
+        var status = await a.Account.GetStatusAsync();
+        status.State.Should().Be(AccountState.SignedIn);
+        status.Pending.Should().Be(1);
+        status.LastError.Should().Be("Sem conexão com o servidor.");
+    }
+
+    [Fact]
+    public async Task SyncNow_with_a_revoked_token_ends_the_session_and_keeps_the_queue()
+    {
+        var a = NewDevice();
+        await SignUpAsync(a);
+        await WaitUntilAsync(a.Account, s => s.LastSyncAt is not null);
+        var b = NewDevice();
+        await b.Account.LoginAsync(Server, _email, Password, "celular");
+        await b.Account.ChangePasswordAsync(Password, NewPassword); // o token de A morre
+        await a.Goals.CreateAsync(Draft("Ler"));
+
+        (await a.Account.SyncNowAsync()).Should().Be(SyncCycleResult.Unauthorized);
+
+        var status = await a.Account.GetStatusAsync();
+        status.State.Should().Be(AccountState.SessionExpired, "o botão só devolve depois de encerrar a sessão");
+        status.Pending.Should().Be(1, "a fila sobrevive à revogação");
+        status.LastError.Should().Be(Expired);
+    }
+
+    private static int Pulls(Device device) =>
+        device.Net.Calls.Count(c => c.StartsWith("GET /sync/pull", StringComparison.Ordinal));
 
     [Fact]
     public async Task Revoking_the_current_device_is_refused()

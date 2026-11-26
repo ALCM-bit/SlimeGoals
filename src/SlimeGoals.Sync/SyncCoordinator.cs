@@ -140,21 +140,28 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
     public Task<int> FlushAsync(CancellationToken ct = default) => RunOpAsync(async () =>
     {
         if (_run is { } run)
-        {
-            var result = await run.Engine.RunCycleAsync(ct).ConfigureAwait(false);
-            // Skipped: o agendador está no meio de um ciclo. Espera ele e roda de novo, para a fila sair agora.
-            for (var attempt = 1; result == SyncCycleResult.Skipped && attempt < FlushAttempts; attempt++)
-            {
-                await WaitQuietlyAsync(run.CurrentCycle).ConfigureAwait(false);
-                result = await run.Engine.RunCycleAsync(ct).ConfigureAwait(false);
-            }
-
-            if (result == SyncCycleResult.Unauthorized)
-                await ExpireCoreAsync(run).ConfigureAwait(false);
-        }
-
+            await RunCycleNowAsync(run, ct).ConfigureAwait(false);
         return (await store.GetStatusAsync(ct).ConfigureAwait(false)).Pending;
     }, ct);
+
+    /// <summary>
+    /// Um ciclo pedido por uma operação (o envio do Sair, o botão Sincronizar agora), com o portão na mão. Pulado, o
+    /// agendador está no meio de um ciclo, que pode ter lido a fila antes da última mudança: espera ele e roda de novo.
+    /// Token recusado encerra a sessão antes de devolver.
+    /// </summary>
+    private async Task<SyncCycleResult> RunCycleNowAsync(EngineRun run, CancellationToken ct)
+    {
+        var result = await run.Engine.RunCycleAsync(ct).ConfigureAwait(false);
+        for (var attempt = 1; result == SyncCycleResult.Skipped && attempt < FlushAttempts; attempt++)
+        {
+            await WaitQuietlyAsync(run.CurrentCycle).ConfigureAwait(false);
+            result = await run.Engine.RunCycleAsync(ct).ConfigureAwait(false);
+        }
+
+        if (result == SyncCycleResult.Unauthorized)
+            await ExpireCoreAsync(run).ConfigureAwait(false);
+        return result;
+    }
 
     /// <summary>
     /// Para o motor e espera o ciclo antes de sair: nenhum pedido do ciclo sai depois de limpar a fila. Com o segredo
@@ -240,6 +247,10 @@ public sealed class SyncCoordinator(ISecretVault vault, ISyncStateStore state, I
     }, ct);
 
     public void SyncNow() => _run?.Scheduler.RequestNow();
+
+    /// <summary>Como o ciclo do agendador, não refaz a conferência de integridade: ela barra a abertura e as operações de conta.</summary>
+    public Task<SyncCycleResult> SyncNowAsync(CancellationToken ct = default) => RunOpAsync(
+        () => _run is { } run ? RunCycleNowAsync(run, ct) : Task.FromResult(SyncCycleResult.Disabled), ct);
 
     /// <summary>
     /// Portão e thread de cada operação: o corpo roda num <see cref="Task.Run(Func{Task})"/> com <c>_ops</c> na mão, e o

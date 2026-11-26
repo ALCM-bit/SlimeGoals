@@ -3,6 +3,7 @@ using SlimeGoals.App.Account;
 using SlimeGoals.App.Hosting;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.Core.Services;
+using SlimeGoals.Core.Sync;
 using SlimeGoals.Sync;
 using SlimeGoals.Sync.Account;
 using SlimeGoals.Sync.Contracts;
@@ -773,6 +774,209 @@ public class AccountViewModelTests
         _posted.Should().ContainSingle();
         _posted[0]();
         vm.IsSignedIn.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Sync_now_runs_a_cycle_and_says_it_finished()
+    {
+        _account.Status = SignedIn();
+        var vm = await LoadedAsync();
+
+        await vm.SyncNowCommand.ExecuteAsync(null);
+
+        _account.Calls.Should().Contain("sync-cycle");
+        vm.SyncMessage.Should().Be("Sincronização concluída.");
+        vm.Error.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(SyncCycleResult.Incomplete, "A sincronização não terminou. Tente de novo em instantes.")]
+    [InlineData(SyncCycleResult.Skipped, "A sincronização não terminou. Tente de novo em instantes.")]
+    [InlineData(SyncCycleResult.Failed, "Não foi possível sincronizar.")]
+    [InlineData(SyncCycleResult.Paused, "Não foi possível sincronizar.")]
+    [InlineData(SyncCycleResult.Disabled, "Não foi possível sincronizar.")]
+    public async Task Sync_now_says_when_it_did_not_finish(SyncCycleResult result, string message)
+    {
+        _account.Status = SignedIn();
+        var vm = await LoadedAsync();
+        _account.SyncResult = result;
+
+        await vm.SyncNowCommand.ExecuteAsync(null);
+
+        vm.SyncMessage.Should().Be(message);
+    }
+
+    [Fact]
+    public async Task Sync_now_that_ends_the_session_shows_no_message()
+    {
+        _account.Status = SignedIn();
+        var vm = await LoadedAsync();
+        _account.SyncResult = SyncCycleResult.Unauthorized;
+        _account.Status = WithState(AccountState.SessionExpired); // o coordenador já encerrou a sessão ao devolver
+
+        await vm.SyncNowCommand.ExecuteAsync(null);
+
+        vm.IsSessionExpired.Should().BeTrue();
+        vm.SyncMessage.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Sync_now_shows_progress_and_blocks_the_other_actions()
+    {
+        _account.Status = SignedIn();
+        var vm = await LoadedAsync();
+        _account.Gate = new TaskCompletionSource();
+
+        var sync = vm.SyncNowCommand.ExecuteAsync(null);
+
+        vm.IsBusy.Should().BeTrue();
+        vm.SyncMessage.Should().Be("Sincronizando…");
+        vm.SyncNowCommand.CanExecute(null).Should().BeFalse();
+        vm.OpenSignOutCommand.CanExecute(null).Should().BeFalse();
+        _account.RaiseStatusChanged(); // o ciclo do agendador termina enquanto o do botão espera
+        vm.SyncMessage.Should().Be("Sincronizando…");
+
+        _account.Gate.SetResult();
+        await sync;
+
+        vm.IsBusy.Should().BeFalse();
+        vm.SyncMessage.Should().Be("Sincronização concluída.");
+        vm.SyncNowCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Sync_message_stays_while_the_status_is_the_same()
+    {
+        _account.Status = SignedIn();
+        var vm = await LoadedAsync();
+        await vm.SyncNowCommand.ExecuteAsync(null);
+
+        _account.RaiseStatusChanged(); // o aviso do coordenador pode chegar depois do recarregar do comando
+        vm.SyncMessage.Should().Be("Sincronização concluída.");
+
+        _account.Status = SignedIn(pending: 1);
+        _account.RaiseStatusChanged();
+        vm.SyncMessage.Should().BeNull("uma mudança depois do ciclo deixa a linha desatualizada");
+    }
+
+    private static readonly DateTimeOffset SyncedAt = new(2026, 11, 26, 4, 39, 0, TimeSpan.FromHours(-3));
+
+    [Fact]
+    public async Task Done_message_stays_when_a_later_cycle_also_succeeds()
+    {
+        _account.Status = SignedIn(pending: 1, error: "Sem conexão com o servidor.", lastSync: SyncedAt.AddMinutes(-4));
+        var vm = await LoadedAsync();
+        _account.Status = SignedIn(lastSync: SyncedAt); // o ciclo do botão enviou a fila
+        await vm.SyncNowCommand.ExecuteAsync(null);
+
+        // O agendador, ainda na espera das falhas de antes do botão, tenta de novo logo depois e também consegue.
+        _account.Status = SignedIn(lastSync: SyncedAt.AddSeconds(2));
+        _account.RaiseStatusChanged();
+
+        vm.SyncMessage.Should().Be("Sincronização concluída.", "outro ciclo que terminou bem não desmente a linha");
+    }
+
+    [Fact]
+    public async Task Done_message_goes_away_when_a_later_cycle_fails()
+    {
+        _account.Status = SignedIn(lastSync: SyncedAt);
+        var vm = await LoadedAsync();
+        await vm.SyncNowCommand.ExecuteAsync(null);
+
+        _account.Status = SignedIn(error: "Sem conexão com o servidor.", lastSync: SyncedAt);
+        _account.RaiseStatusChanged();
+
+        vm.SyncMessage.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(SyncCycleResult.Incomplete)]
+    [InlineData(SyncCycleResult.Failed)]
+    public async Task Unfinished_message_goes_away_when_a_later_cycle_succeeds(SyncCycleResult result)
+    {
+        _account.Status = SignedIn(lastSync: SyncedAt);
+        var vm = await LoadedAsync();
+        _account.SyncResult = result;
+        await vm.SyncNowCommand.ExecuteAsync(null);
+        vm.SyncMessage.Should().NotBeNull();
+
+        _account.Status = SignedIn(lastSync: SyncedAt.AddSeconds(30));
+        _account.RaiseStatusChanged();
+
+        vm.SyncMessage.Should().BeNull("o ciclo seguinte terminou, e a linha ficou para trás");
+    }
+
+    [Theory]
+    [InlineData(SyncCycleResult.Failed)]
+    [InlineData(SyncCycleResult.Incomplete)]
+    public async Task Unfinished_message_stays_when_a_later_cycle_ends_the_same_way(SyncCycleResult result)
+    {
+        _account.Status = SignedIn(pending: 1, error: "Sem conexão com o servidor.", lastSync: SyncedAt);
+        var vm = await LoadedAsync();
+        _account.SyncResult = result;
+        await vm.SyncNowCommand.ExecuteAsync(null);
+        var shown = vm.SyncMessage;
+
+        _account.RaiseStatusChanged(); // o agendador tenta de novo e termina igual: o status não muda
+
+        vm.SyncMessage.Should().NotBeNull().And.Be(shown, "o status é o mesmo, e a linha continua verdadeira");
+    }
+
+    [Fact]
+    public async Task Sync_message_goes_away_on_reload_and_on_other_pages()
+    {
+        _account.Status = SignedIn();
+        var vm = await LoadedAsync();
+        await vm.SyncNowCommand.ExecuteAsync(null);
+        vm.SyncMessage.Should().NotBeNull();
+
+        await vm.LoadCommand.ExecuteAsync(null);
+        vm.SyncMessage.Should().BeNull("voltar a Configurações começa sem a linha");
+
+        await vm.SyncNowCommand.ExecuteAsync(null);
+        vm.OpenChangePasswordCommand.Execute(null);
+        vm.SyncMessage.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Reloading_while_syncing_keeps_the_progress_line()
+    {
+        _account.Status = SignedIn();
+        var vm = await LoadedAsync();
+        _account.Gate = new TaskCompletionSource();
+        var sync = vm.SyncNowCommand.ExecuteAsync(null);
+
+        await vm.LoadCommand.ExecuteAsync(null); // a pessoa sai de Configurações e volta no meio do ciclo
+        vm.SyncMessage.Should().Be("Sincronizando…");
+
+        _account.Gate.SetResult();
+        await sync;
+        vm.SyncMessage.Should().Be("Sincronização concluída.");
+    }
+
+    [Fact]
+    public async Task Sync_result_shows_even_when_the_status_cannot_be_read()
+    {
+        _account.Status = SignedIn();
+        var vm = await LoadedAsync();
+        _account.StatusFailure = new InvalidOperationException();
+
+        await vm.SyncNowCommand.ExecuteAsync(null);
+
+        vm.SyncMessage.Should().Be("Sincronização concluída.", "\"Sincronizando…\" com os botões livres diria que o ciclo não acabou");
+    }
+
+    [Fact]
+    public async Task Sync_now_exception_shows_the_generic_error_and_no_message()
+    {
+        _account.Status = SignedIn();
+        var vm = await LoadedAsync();
+        _account.Failure = new HttpRequestException();
+
+        await vm.SyncNowCommand.ExecuteAsync(null);
+
+        vm.Error.Should().Be("Algo deu errado. Tente de novo.");
+        vm.SyncMessage.Should().BeNull();
     }
 
     [Fact]

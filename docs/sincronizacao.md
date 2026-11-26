@@ -2,7 +2,7 @@
 
 Com uma conta, as metas e os registros passam de um aparelho para outro, cifrados de ponta a ponta. A conta existe em todos os builds, inclusive no app instalado (Release), no Linux e no Android. O servidor fica numa VM sua, alcançável só pela sua tailnet (veja [Servidor, "Na tailnet"](servidor.md#na-tailnet)). O que o build de desenvolvimento (Debug, `-p:SyncDev=true` no Linux, `build.sh --dev` no Android) muda é pouco: o servidor padrão passa a ser `http://127.0.0.1:8080`, o Android aceita texto puro para o loopback (`network_security_config_dev`) e o APK ganha o `CryptoSelfCheckReceiver`.
 
-Configurações ganha no topo a seção **Conta e sincronização**: criar conta, confirmar, entrar, recuperar, trocar a senha, ver e remover aparelhos, sair e apagar a conta. O app continua funcionando sem conta.
+Configurações ganha no topo a seção **Sincronização**: criar conta, confirmar, entrar, recuperar, sincronizar na hora, trocar a senha, ver e remover aparelhos, sair e apagar a conta. O app continua funcionando sem conta.
 
 ## O que fica protegido
 
@@ -50,7 +50,7 @@ XDG_DATA_HOME=/tmp/sg-a/data XDG_CONFIG_HOME=/tmp/sg-a/config dotnet run --proje
 XDG_DATA_HOME=/tmp/sg-b/data XDG_CONFIG_HOME=/tmp/sg-b/config dotnet run --project src/SlimeGoals.Desktop   # em outro terminal
 ```
 
-Uma edição sai do aparelho uns 5 s depois de feita, mas o outro só a busca no próximo ciclo dele. O app sincroniza ao abrir, 5 s depois de uma mudança local e a cada 15 min com o app aberto; no Android, também ao voltar ao primeiro plano. No Linux, ganhar foco não dispara um ciclo, e não há botão de sincronizar. Para ver a mudança no outro aparelho sem esperar os 15 min, feche e abra o app ou altere algo nele. As regras estão na [spec](../specs/Sincronizacao_v1.md), §4, "Quando roda".
+Uma edição sai do aparelho uns 5 s depois de feita, mas o outro só a busca no próximo ciclo dele. O app sincroniza ao abrir, 5 s depois de uma mudança local e a cada 15 min com o app aberto; no Android, também ao voltar ao primeiro plano. No Linux, ganhar foco não dispara um ciclo. Para ver a mudança no outro aparelho sem esperar os 15 min, aperte **Sincronizar agora** nele, em Configurações, **Sincronização**: o botão envia a fila e busca o que os outros aparelhos mandaram, na hora, e a linha abaixo das pendências diz como terminou. Quando não dá certo, o motivo aparece na faixa de aviso logo abaixo. As regras estão na [spec](../specs/Sincronizacao_v1.md): §4, "Quando roda", e as decisões do botão Sincronizar agora, na seção 6.
 
 ## No Android
 
