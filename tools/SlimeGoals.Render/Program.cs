@@ -11,6 +11,7 @@ using SlimeGoals.App.ViewModels;
 using SlimeGoals.Sync.Integrity;
 using SlimeGoals.App.Views;
 using SlimeGoals.Core.Domain;
+using SlimeGoals.Core.Sync;
 using SlimeGoals.Render;
 using SlimeGoals.Sync;
 using ScrollViewer = Avalonia.Controls.ScrollViewer;
@@ -159,6 +160,12 @@ void RenderAccount(int width, int height)
     Shot("devices", signedIn, vm => vm.OpenDevicesCommand.Execute(null));
     Shot("sign-out", signedIn, vm => vm.OpenSignOutCommand.Execute(null), a => a.FlushResult = 3);
     Shot("delete-account", signedIn, vm => vm.OpenDeleteAccountCommand.Execute(null));
+
+    // Sincronizar agora: rodando, concluído e sem conexão (o motivo na faixa, abaixo da linha).
+    var synced = signedIn with { LastSyncAt = DateTimeOffset.Now, Pending = 0, LastError = null };
+    Shot("sync-running", synced, vm => vm.SyncNowCommand.Execute(null), a => a.Hang = true);
+    Shot("sync-done", synced, vm => vm.SyncNowCommand.Execute(null));
+    Shot("sync-failed", signedIn, vm => vm.SyncNowCommand.Execute(null), a => a.SyncResult = SyncCycleResult.Failed);
 
     void Shot(string name, AccountStatus status, Action<AccountViewModel> open, Action<SampleAccount>? setup = null,
         IAppIntegrity? integrity = null)

@@ -4,6 +4,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SlimeGoals.Core.Services;
+using SlimeGoals.Core.Sync;
 using SlimeGoals.Sync;
 using SlimeGoals.Sync.Account;
 using SlimeGoals.Sync.Contracts;
@@ -78,6 +79,11 @@ public sealed partial class AccountViewModel : ObservableObject
     public const string SessionExpiredText = "A sessão deste aparelho foi encerrada (a senha mudou, o aparelho foi " +
         "removido ou ficou 30 dias sem sincronizar). Entre de novo para continuar sincronizando. Nada do que está na fila se perde.";
     public const string ReauthenticateLabel = "Entrar de novo";
+    public const string SyncNowLabel = "Sincronizar agora";
+    public const string SyncingText = "Sincronizando…";
+    public const string SyncDoneText = "Sincronização concluída.";
+    public const string SyncUnfinishedText = "A sincronização não terminou. Tente de novo em instantes.";
+    public const string SyncFailedText = "Não foi possível sincronizar.";
     public const string VaultLockedText = "O chaveiro do sistema está travado ou indisponível. Destrave-o para continuar " +
         "sincronizando.";
     public const string RetryVaultLabel = "Tentar de novo";
@@ -134,7 +140,7 @@ public sealed partial class AccountViewModel : ObservableObject
         nameof(SubmitRecoverCommand), nameof(SubmitReauthenticateCommand), nameof(SubmitChangePasswordCommand),
         nameof(SubmitSignOutCommand), nameof(SubmitDeleteAccountCommand))]
     [NotifyCanExecuteChangedFor(nameof(ContinueCommand), nameof(CloseCommand), nameof(RetryVaultCommand),
-        nameof(RevokeDeviceCommand))]
+        nameof(RevokeDeviceCommand), nameof(SyncNowCommand))]
     [NotifyPropertyChangedFor(nameof(IsIdle))]
     public partial bool IsBusy { get; private set; }
 
@@ -277,6 +283,57 @@ public sealed partial class AccountViewModel : ObservableObject
 
     public string? LastError => Status.LastError;
 
+    /// <summary>A linha do botão Sincronizar agora, abaixo das pendências; nula quando não há o que dizer.</summary>
+    [ObservableProperty] public partial string? SyncMessage { get; private set; }
+
+    /// <summary>O ciclo do botão terminou e a linha espera o status que vai descrever, o do próximo recarregar.</summary>
+    private bool _syncAwaitingStatus;
+
+    /// <summary>O status que a linha descreve: outro status depois dela a deixa desatualizada.</summary>
+    private AccountStatus? _syncShownFor;
+
+    /// <summary>Sincronizar agora: um ciclo inteiro na hora (envia a fila e busca o que chegou), e a linha diz como terminou.</summary>
+    [RelayCommand(CanExecute = nameof(IsIdle))]
+    private Task SyncNowAsync() => RunAsync(AccountAction.Sync, async () =>
+    {
+        SyncMessage = SyncingText;
+        var result = await _account.SyncNowAsync();
+        // Já aqui, e não no recarregar: se a leitura do status falhar, "Sincronizando…" ficaria com os botões livres.
+        SyncMessage = SyncResultText(result);
+        _syncAwaitingStatus = true;
+    });
+
+    /// <summary>
+    /// O primeiro recarregar depois do ciclo guarda o status que a linha descreve, e um status diferente depois dele a
+    /// apaga. O mesmo status de novo não apaga: o aviso do coordenador e o recarregar do comando chegam os dois, em
+    /// qualquer ordem.
+    /// </summary>
+    private void TrackSyncMessage(AccountStatus status)
+    {
+        if (_syncAwaitingStatus)
+        {
+            _syncAwaitingStatus = false;
+            _syncShownFor = status;
+        }
+        else if (_syncShownFor is { } shown && shown != status)
+            ClearSyncMessage();
+    }
+
+    private static string? SyncResultText(SyncCycleResult result) => result switch
+    {
+        SyncCycleResult.Done => SyncDoneText,
+        SyncCycleResult.Incomplete or SyncCycleResult.Skipped => SyncUnfinishedText,
+        SyncCycleResult.Unauthorized => null, // a seção passa para "Entre de novo"
+        _ => SyncFailedText, // Failed, Paused e Disabled: o motivo está na faixa de aviso, do last_error
+    };
+
+    private void ClearSyncMessage()
+    {
+        _syncAwaitingStatus = false;
+        _syncShownFor = null;
+        SyncMessage = null;
+    }
+
     /// <summary>Lê o status e, sem conta, o servidor gravado. Nunca lança.</summary>
     [RelayCommand]
     private async Task LoadAsync()
@@ -291,6 +348,9 @@ public sealed partial class AccountViewModel : ObservableObject
         }
 
         IsDeviceRooted = _integrity?.Check().Issues.Contains(IntegrityIssue.Rooted) == true;
+        // Voltar a Configurações começa sem a linha do botão, a não ser que o ciclo dele ainda esteja rodando.
+        if (!IsBusy)
+            ClearSyncMessage();
         await RefreshAsync(reloadServer: true);
     }
 
@@ -314,6 +374,7 @@ public sealed partial class AccountViewModel : ObservableObject
             return;
         var wasSignedOut = IsSignedOut;
         Status = status;
+        TrackSyncMessage(status);
         if (status.Server is { } server && !IsSignedOut)
             ServerText = ServerAddress.Display(server);
         else if (IsSignedOut && (reloadServer || !wasSignedOut))
@@ -584,6 +645,7 @@ public sealed partial class AccountViewModel : ObservableObject
             return;
         IsBusy = true;
         Error = null;
+        ClearSyncMessage();
         try
         {
             await op();
@@ -592,6 +654,7 @@ public sealed partial class AccountViewModel : ObservableObject
         {
             Trace.TraceWarning($"Falha na operação de conta {action}: {ex.GetType().FullName}");
             Error = AccountMessages.For(ex, action);
+            ClearSyncMessage();
         }
         finally
         {
@@ -665,6 +728,7 @@ public sealed partial class AccountViewModel : ObservableObject
     {
         ClearSecretInputs();
         Error = null;
+        ClearSyncMessage();
         if (oldValue is AccountPage.RecoveryCode or AccountPage.RecoveredCode)
         {
             ShownRecoveryCode = null;

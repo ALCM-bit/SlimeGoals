@@ -18,6 +18,7 @@ public enum AccountAction
     SignOut,
     DeleteAccount,
     Devices,
+    Sync,
 }
 
 /// <summary>
