@@ -1,3 +1,4 @@
+using SlimeGoals.Core.Sync;
 using SlimeGoals.Sync;
 using SlimeGoals.Sync.Account;
 using SlimeGoals.Sync.Contracts;
@@ -134,4 +135,13 @@ public sealed class FakeSyncAccount : ISyncAccount
     }
 
     public void SyncNow() => Calls.Add("sync-now");
+
+    /// <summary>O resultado do próximo <see cref="SyncNowAsync"/>.</summary>
+    public SyncCycleResult SyncResult { get; set; } = SyncCycleResult.Done;
+
+    public async Task<SyncCycleResult> SyncNowAsync(CancellationToken ct = default)
+    {
+        await OpAsync("sync-cycle");
+        return SyncResult;
+    }
 }

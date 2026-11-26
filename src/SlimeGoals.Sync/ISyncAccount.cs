@@ -1,3 +1,4 @@
+using SlimeGoals.Core.Sync;
 using SlimeGoals.Sync.Account;
 using SlimeGoals.Sync.Contracts;
 
@@ -89,4 +90,12 @@ public interface ISyncAccount
 
     /// <summary>Pede um ciclo já, sem esperar. Sem motor ligado, não faz nada.</summary>
     void SyncNow();
+
+    /// <summary>
+    /// O botão Sincronizar agora: roda um ciclo inteiro já, pelo portão das operações, e devolve como terminou. Com um
+    /// ciclo do agendador em andamento, espera ele acabar e roda o seu. Um token recusado encerra a sessão antes de
+    /// devolver. Sem motor ligado, devolve <see cref="SyncCycleResult.Disabled"/> sem ir à rede. Diferente de
+    /// <see cref="SyncNow"/>, que só pede o ciclo ao agendador.
+    /// </summary>
+    Task<SyncCycleResult> SyncNowAsync(CancellationToken ct = default);
 }

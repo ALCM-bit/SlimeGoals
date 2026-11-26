@@ -7,6 +7,7 @@ using SlimeGoals.App.ViewModels;
 using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Domain;
 using SlimeGoals.Core.Services;
+using SlimeGoals.Core.Sync;
 using SlimeGoals.Infrastructure;
 using SlimeGoals.Infrastructure.Data;
 using SlimeGoals.Sync;
@@ -336,5 +337,14 @@ public sealed class SampleAccount : ISyncAccount
 
     public void SyncNow()
     {
+    }
+
+    /// <summary>O resultado do botão Sincronizar agora, para as imagens dele.</summary>
+    public SyncCycleResult SyncResult { get; set; } = SyncCycleResult.Done;
+
+    public async Task<SyncCycleResult> SyncNowAsync(CancellationToken ct = default)
+    {
+        await OpAsync();
+        return SyncResult;
     }
 }
