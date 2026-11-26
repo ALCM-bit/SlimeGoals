@@ -2,7 +2,6 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using Avalonia;
-using Avalonia.Controls.Platform;
 using Avalonia.Threading;
 using SlimeGoals.App.ViewModels;
 
@@ -25,7 +24,7 @@ public partial class ShellView : UserControl
 
     private TopLevel? _topLevel;
     private bool _backSubscribed;
-    private IInputPane? _inputPane;
+    private KeyboardWatch? _keyboard;
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -40,10 +39,11 @@ public partial class ShellView : UserControl
         {
             _topLevel.BackRequested += OnBackRequested;
             _backSubscribed = true;
-            if (_topLevel.InputPane is { } inputPane)
+            _keyboard = KeyboardWatch.Attach(_topLevel);
+            if (_keyboard is not null)
             {
-                _inputPane = inputPane;
-                inputPane.StateChanged += OnInputPaneStateChanged;
+                _keyboard.Changed += OnKeyboardChanged;
+                _keyboard.Refresh();
             }
         }
     }
@@ -55,9 +55,8 @@ public partial class ShellView : UserControl
         if (_topLevel is not null && _backSubscribed)
             _topLevel.BackRequested -= OnBackRequested;
         _backSubscribed = false;
-        if (_inputPane is not null)
-            _inputPane.StateChanged -= OnInputPaneStateChanged;
-        _inputPane = null;
+        _keyboard?.Dispose();
+        _keyboard = null;
         _topLevel = null;
         base.OnDetachedFromVisualTree(e);
     }
@@ -66,13 +65,15 @@ public partial class ShellView : UserControl
     /// Teclado virtual (Android): o teclado cobre a janela sem redimensioná-la, então o ScrollViewer ainda "enxerga"
     /// a área sob ele. Reserva embaixo a altura ocupada e, depois do novo layout, traz o campo em foco para a vista.
     /// A reserva vai na margem do conteúdo, não no Padding do shell: o Avalonia põe ali as áreas das barras do
-    /// sistema, e um valor local apagaria essas margens de vez.
+    /// sistema, e um valor local apagaria essas margens de vez. Ela sai também quando o teclado some sem animar, na
+    /// volta do segundo plano (<see cref="KeyboardWatch"/>).
     /// </summary>
-    private void OnInputPaneStateChanged(object? sender, InputPaneStateEventArgs e)
+    private void OnKeyboardChanged(object? sender, EventArgs e)
     {
-        var open = e.NewState == InputPaneState.Open;
-        Root.Margin = new Thickness(0, 0, 0, open ? _inputPane?.OccludedRect.Height ?? 0 : 0);
-        if (!open)
+        if (sender is not KeyboardWatch keyboard)
+            return;
+        Root.Margin = new Thickness(0, 0, 0, keyboard.Height);
+        if (!keyboard.IsOpen)
             return;
         DispatcherTimer.RunOnce(
             () => (_topLevel?.FocusManager?.GetFocusedElement() as Control)?.BringIntoView(),
