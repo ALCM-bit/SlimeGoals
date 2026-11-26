@@ -527,6 +527,7 @@ Linux primeiro, Android em seguida. Cada fase (ou par de fases) recebe um plano 
 12. `ReminderHost` também no Android, com `NoopWindowActivator`: inicia o agendador ao abrir o app (recupera alarmes após "Forçar parada"); o `ActionReceived` do `AndroidNotificationService` nunca dispara, as ações chegam pelo receiver.
 13. Verificado no emulador (API 36): `adb shell appops set --uid dev.alcm.slimegoals SCHEDULE_EXACT_ALARM allow|deny` (a forma por pacote não tem efeito); `am kill` encerra como o sistema, `force-stop` cancela alarmes. Restrições de fabricantes ficam para a 7c.
 9. "Próximos lembretes" fica no fim da rolagem do Hoje, depois das metas, e não fixo embaixo: fixo, cada meta com lembrete tirava uma linha da lista no celular (corrigido depois da Fase 8).
+14. O Hoje rola inteiro abaixo do título: destaque, blocos, faixas de aviso, "Metas de hoje", filtro de tags, cartões e "Próximos lembretes" numa rolagem só. Antes, tudo acima dos cartões ficava preso e, no celular de 915 px de altura, sobravam uns 300 px para a lista (pouco mais de um cartão), menos ainda com uma faixa de aviso. Sem metas, o aviso fica logo abaixo do cabeçalho. Com o teclado aberto, o destaque e os blocos continuam escondidos (26/11/2026).
 
 **Decisões da Fase 8 (03/11/2026):**
 
