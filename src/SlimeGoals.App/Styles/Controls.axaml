@@ -613,6 +613,29 @@
     <Setter Property="CornerRadius" Value="8" />
   </Style>
   <!-- ✓ de meta cumprida no detalhe da barra -->
+  <!-- Próximo lembrete no cartão do Hoje: sino e hora, sob os botões e alinhados à direita.
+       A margem fica no painel (não no RowSpacing): sem lembrete, a linha some sem deixar espaço -->
+  <Style Selector="StackPanel.next-reminder">
+    <Setter Property="Orientation" Value="Horizontal" />
+    <Setter Property="Spacing" Value="5" />
+    <Setter Property="HorizontalAlignment" Value="Right" />
+    <Setter Property="Margin" Value="0,8,2,0" />
+  </Style>
+  <Style Selector="StackPanel.next-reminder > Path">
+    <Setter Property="Width" Value="13" />
+    <Setter Property="Height" Value="13" />
+    <Setter Property="Stretch" Value="Uniform" />
+    <Setter Property="StrokeThickness" Value="1.8" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+    <Setter Property="StrokeJoin" Value="Round" />
+    <Setter Property="Stroke" Value="{DynamicResource PrimarySoft}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="StackPanel.next-reminder > TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
   <Style Selector="Path.met-icon">
     <Setter Property="Width" Value="24" />
     <Setter Property="Height" Value="24" />

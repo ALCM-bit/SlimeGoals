@@ -170,13 +170,13 @@ public class TodayPageViewModelTests
     }
 
     [Fact]
-    public async Task Without_reminders_hides_upcoming_and_pause()
+    public async Task Without_reminders_hides_card_time_and_pause()
     {
         await Create("Água");
         var page = NewPage(new PlatformCapabilities(false, true, true, true));
         await page.LoadCommand.ExecuteAsync(null);
 
-        (page.Upcoming.Count, page.HasUpcoming, page.CanPause, page.ShowReminders).Should().Be((0, false, false, false));
+        (Card(page, "Água").HasNextReminder, page.CanPause, page.ShowReminders).Should().Be((false, false, false));
     }
 
     private const string NotificationsWarning = "Os lembretes estão desligados: permita as notificações do SlimeGoals.";
@@ -692,23 +692,40 @@ public class TodayPageViewModelTests
     }
 
     [Fact]
-    public async Task Today_lists_upcoming_reminders_of_today()
+    public async Task Card_shows_next_reminder_of_today()
     {
         await Create("Água");
         _time.Advance(TimeSpan.FromHours(19)); // quinta, 07:00 em São Paulo: primeiro lembrete às 08:00
 
         var page = await Loaded();
 
-        page.HasUpcoming.Should().BeTrue();
-        page.Upcoming.Should().Equal(new UpcomingReminderViewModel("08:00", "Água"));
+        (Card(page, "Água").NextReminder, Card(page, "Água").HasNextReminder).Should().Be(("08:00", true));
     }
 
     [Fact]
-    public async Task Today_without_upcoming_hides_section()
+    public async Task Card_without_reminder_today_shows_no_time()
     {
+        await Create("Água");
+        _time.Advance(TimeSpan.FromHours(9)); // quarta, 21:00: janela (08–20h) já acabou
+
         var page = await Loaded();
 
-        (page.HasUpcoming, page.Upcoming.Count).Should().Be((false, 0));
+        (Card(page, "Água").NextReminder, Card(page, "Água").HasNextReminder).Should().Be((null, false));
+    }
+
+    [Fact]
+    public async Task Met_goal_card_shows_no_time()
+    {
+        await Create("Mesa", Measure.Completion, 1);
+        await Create("Água");
+        _time.Advance(TimeSpan.FromHours(19)); // quinta, 07:00: as duas teriam lembrete às 08:00
+        var page = await Loaded();
+
+        await page.CompleteCommand.ExecuteAsync(Card(page, "Mesa"));
+        await page.LoadCommand.ExecutionTask!;
+
+        (Card(page, "Mesa").IsMet, Card(page, "Mesa").HasNextReminder).Should().Be((true, false));
+        Card(page, "Água").NextReminder.Should().Be("08:00");
     }
 
     [Fact]
@@ -720,7 +737,7 @@ public class TodayPageViewModelTests
 
         var page = await Loaded();
 
-        (page.IsPaused, page.HasUpcoming, page.Upcoming.Count).Should().Be((true, false, 0));
+        (page.IsPaused, Card(page, "Água").HasNextReminder).Should().Be((true, false));
         page.PauseButtonText.Should().Be("Retomar lembretes");
         page.Goals.Should().ContainSingle(); // o resto da tela continua
     }
@@ -731,16 +748,16 @@ public class TodayPageViewModelTests
         await Create("Água");
         _time.Advance(TimeSpan.FromHours(19));
         var page = await Loaded();
-        (page.IsPaused, page.PauseButtonText, page.HasUpcoming).Should().Be((false, "Pausar lembretes", true));
+        (page.IsPaused, page.PauseButtonText, Card(page, "Água").HasNextReminder).Should().Be((false, "Pausar lembretes", true));
 
         await page.TogglePauseCommand.ExecuteAsync(null);
         await page.LoadCommand.ExecutionTask!;
-        (page.IsPaused, page.PauseButtonText, page.HasUpcoming).Should().Be((true, "Retomar lembretes", false));
+        (page.IsPaused, page.PauseButtonText, Card(page, "Água").HasNextReminder).Should().Be((true, "Retomar lembretes", false));
         (await Pause.GetAsync()).IsPaused.Should().BeTrue();
 
         await page.TogglePauseCommand.ExecuteAsync(null);
         await page.LoadCommand.ExecutionTask!;
-        (page.IsPaused, page.PauseButtonText, page.HasUpcoming).Should().Be((false, "Pausar lembretes", true));
+        (page.IsPaused, page.PauseButtonText, Card(page, "Água").HasNextReminder).Should().Be((false, "Pausar lembretes", true));
     }
 
     [Fact]
@@ -761,7 +778,7 @@ public class TodayPageViewModelTests
         await Create("Água");
         _time.Advance(TimeSpan.FromHours(9)); // quarta, 21:00: janela (08–20h) já acabou
         var page = await Loaded();
-        (page.HasUpcoming, page.CanPause, page.TogglePauseCommand.CanExecute(null)).Should().Be((false, true, true));
+        (Card(page, "Água").HasNextReminder, page.CanPause, page.TogglePauseCommand.CanExecute(null)).Should().Be((false, true, true));
 
         await page.TogglePauseCommand.ExecuteAsync(null);
         await page.LoadCommand.ExecutionTask!;

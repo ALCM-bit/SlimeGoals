@@ -62,6 +62,12 @@ public sealed partial class TodayGoalViewModel : ObservableObject
     public IReadOnlyList<TagChipViewModel> Tags { get; }
     public bool HasTags => Tags.Count > 0;
 
+    /// <summary>Hora local ("15:00") do próximo lembrete de hoje; nulo se não há (cumprida, pausada, fora da janela).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNextReminder))]
+    public partial string? NextReminder { get; set; }
+    public bool HasNextReminder => NextReminder is not null;
+
     /// <summary>false quando o filtro de tags do Hoje esconde o cartão.</summary>
     [ObservableProperty] public partial bool IsShown { get; set; } = true;
     public string Title => Goal.Title;
