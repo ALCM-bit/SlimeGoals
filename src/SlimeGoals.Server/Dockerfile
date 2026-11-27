@@ -1,6 +1,6 @@
 # O contexto de build é a raiz do repositório: docker build -f src/SlimeGoals.Server/Dockerfile .
 # Imagens fixadas pelo digest (o Dependabot atualiza): uma tag pode passar a apontar para outra imagem.
-FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:bef136a371963aaa46ec97882845ef6f54dec15728bb4b128b1c2a400ffbc9b4 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:8c6edfb26c85153f236d26efebd9ad349aec403583f343f201ee67838b23658d AS build
 WORKDIR /src
 
 # Primeiro só o que a restauração precisa, para a camada de pacotes ficar em cache. O .editorconfig tem as exceções
