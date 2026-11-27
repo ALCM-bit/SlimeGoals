@@ -8,5 +8,14 @@
   <Window.KeyBindings>
     <KeyBinding Gesture="Ctrl+Q" Command="{Binding QuitCommand}" />
   </Window.KeyBindings>
-  <views:ShellView />
+  <Window.Styles>
+    <!-- Menus, listas e dicas abrem em janelas próprias: herdam o zoom de quem os abriu (UiScale) -->
+    <Style Selector="Popup">
+      <Setter Property="InheritsTransform" Value="True" />
+    </Style>
+  </Window.Styles>
+  <!-- Zoom do app numa janela grande (UiScale, posto pelo code-behind); o shell faz o layout no tamanho desenhado -->
+  <LayoutTransformControl x:Name="Zoom">
+    <views:ShellView />
+  </LayoutTransformControl>
 </Window>
