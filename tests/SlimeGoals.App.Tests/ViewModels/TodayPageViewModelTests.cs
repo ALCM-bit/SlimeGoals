@@ -920,6 +920,29 @@ public class TodayPageViewModelTests
     }
 
     [Fact]
+    public async Task Notification_card_stays_while_paused_without_the_next()
+    {
+        await Create("Água");
+        _time.Advance(TimeSpan.FromHours(19));
+        var page = await Loaded();
+        (page.ShowNotificationCard, page.HasNextNotification).Should().Be((true, true));
+
+        await page.TogglePauseCommand.ExecuteAsync(null);
+        await page.LoadCommand.ExecutionTask!;
+
+        // O cartão ao lado do sino diz "Lembretes pausados" e tem "Retomar" (decisão 21)
+        (page.ShowNotificationCard, page.HasNextNotification).Should().Be((true, false));
+    }
+
+    [Fact]
+    public async Task Notification_card_hides_without_reminders_and_without_pause()
+    {
+        var page = await Loaded();
+
+        page.ShowNotificationCard.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Toggle_pause_pauses_then_resumes()
     {
         await Create("Água");

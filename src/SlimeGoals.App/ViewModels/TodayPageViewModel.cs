@@ -49,7 +49,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
 
     /// <summary>Lembretes pausados: a tela mostra a faixa "Lembretes pausados" e esconde os próximos.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PauseButtonText), nameof(CanPause))]
+    [NotifyPropertyChangedFor(nameof(PauseButtonText), nameof(CanPause), nameof(ShowNotificationCard))]
     public partial bool IsPaused { get; set; }
 
     public string PauseButtonText => IsPaused ? "Retomar lembretes" : "Pausar lembretes";
@@ -108,7 +108,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     /// o seguinte, de amanhã ou de outro dia (decisão 19).
     /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasNextNotification))]
+    [NotifyPropertyChangedFor(nameof(HasNextNotification), nameof(ShowNotificationCard))]
     public partial string? NextNotificationTitle { get; set; }
 
     /// <summary>Quando: "Hoje às 11:34", "Amanhã às 08:00", "Sábado às 08:00" ou "11 de novembro às 08:00".</summary>
@@ -122,6 +122,12 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     public bool HasNextNotification => NextNotificationTitle is not null;
 
     public bool HasNextNotificationIn => NextNotificationIn is not null;
+
+    /// <summary>
+    /// O cartão ao lado do sino (desktop): com a próxima notificação ou, com a pausa, "Lembretes pausados" e "Retomar"
+    /// (decisão 21).
+    /// </summary>
+    public bool ShowNotificationCard => HasNextNotification || IsPaused;
 
     /// <summary>A bolinha do sino: ainda há lembrete hoje.</summary>
     [ObservableProperty] public partial bool HasReminderToday { get; set; }

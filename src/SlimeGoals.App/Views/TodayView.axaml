@@ -379,6 +379,22 @@
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Foreground" Value="{DynamicResource Text}" />
     </Style>
+    <!-- "Retomar" com a pausa: a mesma pílula do "em X min", clicável -->
+    <Style Selector="Button.next-notification-pill">
+      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="Padding" Value="14,6" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.next-notification-pill /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource SelectedStrong}" />
+      <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    </Style>
+    <Style Selector="Button.next-notification-pill:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Primary}" />
+      <Setter Property="Foreground" Value="{DynamicResource OnPrimary}" />
+    </Style>
     <Style Selector="Grid.today-list-header">
       <Setter Property="Margin" Value="0,0,0,10" />
     </Style>
@@ -610,12 +626,14 @@
             </Panel>
           </Button>
         </Panel>
-        <Border Classes="today-header-sep" IsVisible="{Binding HasNextNotification}" />
-        <Border Classes="next-notification" IsVisible="{Binding HasNextNotification}">
+        <Border Classes="today-header-sep" IsVisible="{Binding ShowNotificationCard}" />
+        <!-- Com a pausa, o mesmo cartão diz "Lembretes pausados" e troca o "em X min" por "Retomar" (decisão 21) -->
+        <Border Classes="next-notification" IsVisible="{Binding ShowNotificationCard}">
           <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
             <Viewbox Width="20" Height="20" VerticalAlignment="Center">
               <Canvas Width="24" Height="24">
-                <Path Classes="next-notification-icon" Data="{StaticResource IconBell}" />
+                <Path Classes="next-notification-icon" Data="{StaticResource IconBell}" IsVisible="{Binding !IsPaused}" />
+                <Path Classes="next-notification-icon" Data="{StaticResource IconBellOff}" IsVisible="{Binding IsPaused}" />
               </Canvas>
             </Viewbox>
             <!-- Rótulo, meta e quando ("Hoje às 11:34", "Amanhã às 08:00"); o "em X min" só para um lembrete de hoje
@@ -623,12 +641,17 @@
             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
               <TextBlock Text="Próxima notificação" FontSize="12" Foreground="{DynamicResource Muted}" />
               <TextBlock Text="{Binding NextNotificationTitle}" FontSize="16" FontWeight="SemiBold"
-                         TextTrimming="CharacterEllipsis" MaxWidth="200" />
-              <TextBlock Text="{Binding NextNotificationWhen}" FontSize="12" Foreground="{DynamicResource Muted}" />
+                         TextTrimming="CharacterEllipsis" MaxWidth="200" IsVisible="{Binding !IsPaused}" />
+              <TextBlock Text="Lembretes pausados" FontSize="16" FontWeight="SemiBold" IsVisible="{Binding IsPaused}" />
+              <TextBlock Text="{Binding NextNotificationWhen}" FontSize="12" Foreground="{DynamicResource Muted}"
+                         IsVisible="{Binding !IsPaused}" />
             </StackPanel>
             <Border Grid.Column="2" Classes="next-notification-pill" IsVisible="{Binding HasNextNotificationIn}">
               <TextBlock Text="{Binding NextNotificationIn}" />
             </Border>
+            <Button Grid.Column="2" Classes="next-notification-pill" Content="Retomar" VerticalAlignment="Center"
+                    IsVisible="{Binding IsPaused}" Command="{Binding TogglePauseCommand}"
+                    AutomationProperties.Name="Retomar lembretes" ToolTip.Tip="Retomar lembretes" />
           </Grid>
         </Border>
       </StackPanel>
@@ -814,13 +837,17 @@
             </Grid>
           </Border>
 
-          <!-- Lembretes pausados (mesmo estilo da faixa do cronômetro) -->
-          <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding IsPaused}">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-              <TextBlock Text="Lembretes pausados" VerticalAlignment="Center" TextWrapping="Wrap" />
-              <Button Grid.Column="1" Classes="ghost" Content="Retomar" Command="{Binding TogglePauseCommand}" />
-            </Grid>
-          </Border>
+          <!-- Lembretes pausados (mesmo estilo da faixa do cronômetro), só no celular: no desktop o sino cortado do
+               cabeçalho já mostra a pausa e retoma com um toque (decisão 21). Num painel: o IsVisible local da faixa
+               venceria o estilo phone-only -->
+          <Panel Classes="phone-only">
+            <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding IsPaused}">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                <TextBlock Text="Lembretes pausados" VerticalAlignment="Center" TextWrapping="Wrap" />
+                <Button Grid.Column="1" Classes="ghost" Content="Retomar" Command="{Binding TogglePauseCommand}" />
+              </Grid>
+            </Border>
+          </Panel>
 
           <!-- Cabeçalho da lista; "Pausar lembretes" fica aqui para valer mesmo sem próximos lembretes -->
           <Grid ColumnDefinitions="*,Auto" Classes="today-list-header">
