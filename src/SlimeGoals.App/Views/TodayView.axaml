@@ -877,7 +877,7 @@
                 <Button.Flyout>
                   <Flyout Placement="BottomEdgeAlignedRight" FlyoutPresenterClasses="tags-flyout">
                     <StackPanel Width="280" Spacing="10">
-                      <TextBox Text="{Binding SearchText}" Watermark="Buscar tag" />
+                      <TextBox Text="{Binding SearchText}" PlaceholderText="Buscar tag" />
                       <TextBlock Text="Nenhuma tag com esse nome." FontSize="13" Foreground="{DynamicResource Muted}"
                                  Margin="4,2" IsVisible="{Binding HasNoSearchResults}" />
                       <ScrollViewer MaxHeight="320" HorizontalScrollBarVisibility="Disabled">
