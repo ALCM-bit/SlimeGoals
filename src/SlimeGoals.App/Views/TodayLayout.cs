@@ -17,11 +17,4 @@ public static class TodayLayout
         windowWidth < ShellView.CompactBreakpoint ? TodayLayoutMode.Phone
         : pageWidth >= SideBreakpoint ? TodayLayoutMode.Side
         : TodayLayoutMode.Top;
-
-    /// <summary>
-    /// Se os extras da linha (sino com a hora, −, ✕, ⋯) ficam ocultos até passar o mouse ou chegar o foco (decisão 18).
-    /// Só no desktop com mouse: no Android (deitado ou tablet) a linha também aparece, e sem hover eles sumiriam de vez.
-    /// </summary>
-    public static bool HidesExtrasAtRest(TodayLayoutMode mode, bool isAndroid) =>
-        mode != TodayLayoutMode.Phone && !isAndroid;
 }

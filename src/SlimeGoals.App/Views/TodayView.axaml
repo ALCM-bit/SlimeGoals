@@ -112,57 +112,61 @@
                   </StackPanel>
                 </Border>
               </views:TitleBadgePanel>
-              <!-- Só a primeira tag, e "+N" para as outras (decisão 18) -->
-              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasTags}">
-                <views:TagChip Classes="small" DataContext="{Binding PrimaryTag}" IsHitTestVisible="False" Focusable="False" />
-                <!-- "+N" abre um balão com todas as tags da meta (decisão 19); botão, para o teclado chegar nele -->
-                <Button Classes="more-tags" IsVisible="{Binding HasMoreTags}" AutomationProperties.Name="{Binding TagsText}"
-                        ToolTip.Tip="Ver todas as tags">
-                  <TextBlock Classes="more-tags" Text="{Binding MoreTagsText}" />
-                  <Button.Flyout>
-                    <Flyout Placement="BottomEdgeAlignedLeft" FlyoutPresenterClasses="tags-flyout">
-                      <StackPanel Spacing="10" MaxWidth="320">
-                        <TextBlock Text="Tags da meta" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource Muted}" />
-                        <ItemsControl ItemsSource="{Binding Tags}">
-                          <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                              <WrapPanel ItemSpacing="6" LineSpacing="6" />
-                            </ItemsPanelTemplate>
-                          </ItemsControl.ItemsPanel>
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:TagChipViewModel">
-                              <Border Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource Border}"
-                                      BorderThickness="1" CornerRadius="999" Padding="10,4">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                  <Ellipse Width="8" Height="8" VerticalAlignment="Center"
-                                           Fill="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
-                                  <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold"
-                                             VerticalAlignment="Center" />
-                                </StackPanel>
-                              </Border>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                      </StackPanel>
-                    </Flyout>
-                  </Button.Flyout>
-                </Button>
+              <!-- Só a primeira tag, e "+N" para as outras (decisão 18); depois, o sino com a hora do próximo lembrete,
+                   sempre à vista (decisão 20) -->
+              <StackPanel Orientation="Horizontal" Spacing="14">
+                <StackPanel.IsVisible>
+                  <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                    <Binding Path="HasTags" />
+                    <Binding Path="HasNextReminder" />
+                  </MultiBinding>
+                </StackPanel.IsVisible>
+                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasTags}">
+                  <views:TagChip Classes="small" DataContext="{Binding PrimaryTag}" IsHitTestVisible="False" Focusable="False" />
+                  <!-- "+N" abre um balão com todas as tags da meta (decisão 19); botão, para o teclado chegar nele -->
+                  <Button Classes="more-tags" IsVisible="{Binding HasMoreTags}" AutomationProperties.Name="{Binding TagsText}"
+                          ToolTip.Tip="Ver todas as tags">
+                    <TextBlock Classes="more-tags" Text="{Binding MoreTagsText}" />
+                    <Button.Flyout>
+                      <Flyout Placement="BottomEdgeAlignedLeft" FlyoutPresenterClasses="tags-flyout">
+                        <StackPanel Spacing="10" MaxWidth="320">
+                          <TextBlock Text="Tags da meta" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource Muted}" />
+                          <ItemsControl ItemsSource="{Binding Tags}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate>
+                                <WrapPanel ItemSpacing="6" LineSpacing="6" />
+                              </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:TagChipViewModel">
+                                <Border Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource Border}"
+                                        BorderThickness="1" CornerRadius="999" Padding="10,4">
+                                  <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                             Fill="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
+                                    <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold"
+                                               VerticalAlignment="Center" />
+                                  </StackPanel>
+                                </Border>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </Flyout>
+                    </Button.Flyout>
+                  </Button>
+                </StackPanel>
+                <StackPanel Classes="next-reminder row-reminder" IsVisible="{Binding HasNextReminder}"
+                            ToolTip.Tip="Próximo lembrete">
+                  <Path Data="{StaticResource IconBell}" />
+                  <TextBlock Text="{Binding NextReminder}" />
+                </StackPanel>
               </StackPanel>
             </StackPanel>
 
-            <!-- O sino com a hora aparece por cima da ponta da linha do texto, com o fundo do cartão: assim ele não toma
-                 largura do texto nem da barra enquanto está oculto -->
             <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="10">
-              <Panel>
-                <TextBlock Text="{Binding ProgressText}" Foreground="{DynamicResource Muted}" FontSize="14"
-                           TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ProgressText}" />
-                <Border Classes="row-reminder reveal" IsVisible="{Binding HasNextReminder}" ToolTip.Tip="Próximo lembrete">
-                  <StackPanel Classes="next-reminder">
-                    <Path Data="{StaticResource IconBell}" />
-                    <TextBlock Text="{Binding NextReminder}" />
-                  </StackPanel>
-                </Border>
-              </Panel>
+              <TextBlock Text="{Binding ProgressText}" Foreground="{DynamicResource Muted}" FontSize="14"
+                         TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ProgressText}" />
               <ProgressBar Classes="goal" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
             </StackPanel>
 
@@ -394,18 +398,12 @@
       <Setter Property="Background" Value="{DynamicResource SuccessSoft}" />
     </Style>
     <Style Selector="Path.stat-icon-path">
-      <Setter Property="Width" Value="15" />
-      <Setter Property="Height" Value="15" />
-      <Setter Property="Stretch" Value="Uniform" />
-      <Setter Property="StrokeThickness" Value="2.2" />
+      <Setter Property="StrokeThickness" Value="2.6" />
       <Setter Property="StrokeLineCap" Value="Round" />
       <Setter Property="StrokeJoin" Value="Round" />
-      <Setter Property="HorizontalAlignment" Value="Center" />
-      <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style Selector="Border.stat-icon.progress Path.stat-icon-path">
       <Setter Property="Stroke" Value="{DynamicResource PrimarySoft}" />
-      <Setter Property="Margin" Value="2,0,0,0" />
     </Style>
     <Style Selector="Border.stat-icon.done Path.stat-icon-path">
       <Setter Property="Stroke" Value="{DynamicResource Success}" />
@@ -487,14 +485,9 @@
       <Setter Property="StrokeJoin" Value="Round" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
-    <Style Selector="Border.row-reminder">
-      <Setter Property="Background" Value="{DynamicResource Tile}" />
-      <Setter Property="Padding" Value="10,0,0,0" />
-      <Setter Property="HorizontalAlignment" Value="Right" />
-      <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-    <Style Selector="Border.row-reminder StackPanel.next-reminder">
+    <Style Selector="StackPanel.row-reminder">
       <Setter Property="Margin" Value="0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style Selector="Button.all-tags">
       <Setter Property="Margin" Value="10,0,0,0" />
@@ -549,22 +542,6 @@
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Foreground" Value="{DynamicResource Muted}" />
       <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-    <!-- Controles extras da linha: à vista só com o mouse sobre ela ou o foco do teclado dentro dela. Opacidade, e não
-         IsVisible, para a linha não mudar de tamanho. Só com a classe hover (onde há mouse, TodayLayout.HidesExtrasAtRest):
-         no Android deitado eles ficam sempre à vista. Oculto, o botão também não recebe o clique -->
-    <Style Selector="DockPanel.hover Border.today-row :is(Control).reveal">
-      <Setter Property="IsHitTestVisible" Value="False" />
-      <Setter Property="Opacity" Value="0" />
-      <Setter Property="Transitions">
-        <Transitions>
-          <DoubleTransition Property="Opacity" Duration="0:0:0.12" />
-        </Transitions>
-      </Setter>
-    </Style>
-    <Style Selector="DockPanel.hover Border.today-row:pointerover :is(Control).reveal, DockPanel.hover Border.today-row:focus-within :is(Control).reveal">
-      <Setter Property="Opacity" Value="1" />
-      <Setter Property="IsHitTestVisible" Value="True" />
     </Style>
     <!-- O "⋯" tem uma vaga no cartão (depois do ▶) e outra na linha (antes dele) -->
     <Style Selector="Panel.row-only">
@@ -693,7 +670,12 @@
                 </Grid>
                 <Grid Classes="wide-only stat-wide" ColumnDefinitions="Auto,*">
                   <Border Classes="stat-icon progress">
-                    <Path Classes="stat-icon-path" Data="{StaticResource IconPlay}" />
+                    <!-- Na grade 24×24 do ícone: com Stretch, o ícone que não é quadrado encostava no alto do círculo -->
+                    <Viewbox Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+                      <Canvas Width="24" Height="24">
+                        <Path Classes="stat-icon-path" Data="{StaticResource IconPlay}" />
+                      </Canvas>
+                    </Viewbox>
                   </Border>
                   <StackPanel Grid.Column="1" VerticalAlignment="Center">
                     <TextBlock Classes="stat-wide-value" Text="{Binding InProgress}" />
@@ -714,7 +696,12 @@
                 </Grid>
                 <Grid Classes="wide-only stat-wide" ColumnDefinitions="Auto,*">
                   <Border Classes="stat-icon done">
-                    <Path Classes="stat-icon-path" Data="{StaticResource IconCheck}" />
+                    <!-- Na grade 24×24 do ícone: com Stretch, o ícone que não é quadrado encostava no alto do círculo -->
+                    <Viewbox Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+                      <Canvas Width="24" Height="24">
+                        <Path Classes="stat-icon-path" Data="{StaticResource IconCheck}" />
+                      </Canvas>
+                    </Viewbox>
                   </Border>
                   <StackPanel Grid.Column="1" VerticalAlignment="Center">
                     <TextBlock Classes="stat-wide-value" Text="{Binding Completed}" />

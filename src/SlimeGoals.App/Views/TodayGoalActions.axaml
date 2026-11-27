@@ -10,7 +10,7 @@
        "⋯" que sobra vazia não ocupa espaço, e o botão principal fica na mesma ponta em todas as linhas -->
   <StackPanel Orientation="Horizontal" Margin="-8,0,0,0" VerticalAlignment="Center">
     <!-- Conclusão -->
-    <Button Classes="ghost icon reveal" Margin="8,0,0,0" AutomationProperties.Name="Desmarcar" ToolTip.Tip="Desmarcar"
+    <Button Classes="ghost icon" Margin="8,0,0,0" AutomationProperties.Name="Desmarcar" ToolTip.Tip="Desmarcar"
             IsVisible="{Binding IsCompletion}" IsEnabled="{Binding IsMet}"
             Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).UncompleteCommand}"
             CommandParameter="{Binding}">
@@ -23,7 +23,7 @@
       <Path Classes="btn-icon" Data="{StaticResource IconCheck}" />
     </Button>
     <!-- Quantidade -->
-    <Button Classes="ghost icon reveal" Margin="8,0,0,0" IsVisible="{Binding IsQuantity}"
+    <Button Classes="ghost icon" Margin="8,0,0,0" IsVisible="{Binding IsQuantity}"
             AutomationProperties.Name="Remover 1" ToolTip.Tip="Remover 1"
             Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).DecrementCommand}"
             CommandParameter="{Binding}">
@@ -39,7 +39,7 @@
     <TextBlock Margin="8,0,0,0" Classes="elapsed wide" Classes.running="{Binding IsTimerRunning}" Text="{Binding Elapsed}" />
     <!-- Na linha do desktop o "⋯" vem antes do botão principal, que fica na ponta como no mockup (decisão 18) -->
     <Panel Classes="row-only">
-      <Button Classes="ghost icon reveal" Margin="8,0,0,0" AutomationProperties.Name="Lançar tempo" ToolTip.Tip="Lançar ou remover tempo"
+      <Button Classes="ghost icon" Margin="8,0,0,0" AutomationProperties.Name="Lançar tempo" ToolTip.Tip="Lançar ou remover tempo"
               IsVisible="{Binding IsDuration}"
               Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).OpenPanelCommand}"
               CommandParameter="{Binding}">

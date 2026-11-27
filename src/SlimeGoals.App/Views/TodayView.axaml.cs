@@ -42,7 +42,6 @@ public partial class TodayView : UserControl
         PageRoot.Classes.Set("phone", mode == TodayLayoutMode.Phone);
         PageRoot.Classes.Set("top", mode == TodayLayoutMode.Top);
         PageRoot.Classes.Set("side", mode == TodayLayoutMode.Side);
-        PageRoot.Classes.Set("hover", TodayLayout.HidesExtrasAtRest(mode, OperatingSystem.IsAndroid()));
         PageGrid.ColumnDefinitions = new ColumnDefinitions(mode == TodayLayoutMode.Side ? "*,320" : "*");
         Summary.ColumnDefinitions = new ColumnDefinitions(mode == TodayLayoutMode.Top ? "2*,3*" : "*");
         // A linha de "Esta semana" só existe ao lado: vazia, ela ainda levaria o espaçamento entre linhas.
