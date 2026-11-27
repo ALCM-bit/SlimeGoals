@@ -50,7 +50,7 @@ Fora da meta, a pessoa pode **trocar a cor**, **renomear** e **excluir** uma tag
    1. normalização Unicode **NFC**. Um "é" digitado no Android e no GNOME pode chegar em formas Unicode diferentes;
    2. `Trim()` e cada sequência de espaços trocada por um espaço só;
    3. `ToLowerInvariant()`. Nunca `ToLower()`, que depende do idioma do aparelho.
-2. **O nome gravado e mostrado é o normalizado**, em minúsculas ("medicamentos", "estudos").
+2. **O nome gravado é o normalizado**, em minúsculas ("medicamentos", "estudos"). **Na tela, a primeira letra vem maiúscula** ("Medicamentos", "Estudos"), em todo o app: chips, Configurações › Tags, perguntas e o campo de renomear (decisão 22 do Planejamento_v3, 27/11/2026). Só a exibição muda; ids, busca, sincronização e lembretes usam o nome gravado.
 3. **Acentos contam:** "remédios" e "remedios" são tags diferentes.
 4. **Limite:** de 1 a **24** caracteres depois de normalizar (decisão do autor). Vazio é recusado com mensagem no campo.
 5. **Ids derivados:** um UUID versão 5 calculado com SHA-256 (os 16 primeiros bytes, com os bits de versão e de variante ajustados), sobre o texto em UTF-8:
