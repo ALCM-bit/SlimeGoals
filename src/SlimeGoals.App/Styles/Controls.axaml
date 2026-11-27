@@ -1107,8 +1107,10 @@
     <Setter Property="Width" Value="110" />
     <Setter Property="Height" Value="110" />
   </Style>
+  <!-- 10 px dos lados: a 320 px, "andamento" (66 px a 13 px) não cabia nos 65 px que sobravam com 12, e o Wrap o
+       partia em "andament/o" (o WrapWithOverflow do Avalonia 12 parte do mesmo jeito) -->
   <Style Selector=".compact UniformGrid.tiles Border.stat">
-    <Setter Property="Padding" Value="12,10" />
+    <Setter Property="Padding" Value="10,10" />
   </Style>
   <Style Selector=".compact UniformGrid.tiles TextBlock.stat-label">
     <Setter Property="TextWrapping" Value="Wrap" />
