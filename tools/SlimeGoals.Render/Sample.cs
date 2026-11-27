@@ -20,12 +20,21 @@ namespace SlimeGoals.Render;
 /// <summary>Banco temporário com metas e registros de exemplo, e a montagem do shell sobre ele.</summary>
 public sealed class Sample : IDisposable
 {
-    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"slimegoals-render-{Guid.NewGuid():N}.db");
+    private readonly string _databasePath;
+    private readonly bool _keep;
     private readonly ServiceProvider _services;
 
     /// <param name="seed">Falso: o banco fica vazio, sem metas (o Hoje sem metas).</param>
     public Sample(bool seed = true)
+        : this(Path.Combine(Path.GetTempPath(), $"slimegoals-render-{Guid.NewGuid():N}.db"), seed, keep: false)
     {
+    }
+
+    /// <param name="keep">Verdadeiro: o banco fica no fim (modo <c>seed</c>); senão, é apagado no <see cref="Dispose"/>.</param>
+    private Sample(string databasePath, bool seed, bool keep)
+    {
+        _databasePath = databasePath;
+        _keep = keep;
         var services = new ServiceCollection();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<DataChangeNotifier>();
@@ -96,6 +105,19 @@ public sealed class Sample : IDisposable
                 tags: new TagsSettingsViewModel(s.GetRequiredService<TagService>(), s.GetRequiredService<DataChangeNotifier>())),
         ];
         return new ShellViewModel(pages, capabilities: capabilities, navigator: navigator);
+    }
+
+    /// <summary>
+    /// Grava as metas e os registros de exemplo no banco do app em <paramref name="databasePath"/>, criado e migrado se
+    /// faltar, para abrir o app de desenvolvimento já populado. Falso, sem gravar nada, se o banco já tem metas.
+    /// </summary>
+    public static bool SeedInto(string databasePath)
+    {
+        using var sample = new Sample(databasePath, seed: false, keep: true);
+        if (sample.Goals.ListAsync().GetAwaiter().GetResult().Any())
+            return false;
+        sample.SeedAsync().GetAwaiter().GetResult();
+        return true;
     }
 
     private async Task SeedAsync()
@@ -217,6 +239,8 @@ public sealed class Sample : IDisposable
     {
         _services.Dispose();
         SqliteConnection.ClearAllPools();
+        if (_keep)
+            return;
         foreach (var path in new[] { _databasePath, _databasePath + "-wal", _databasePath + "-shm" })
             if (File.Exists(path))
                 File.Delete(path);

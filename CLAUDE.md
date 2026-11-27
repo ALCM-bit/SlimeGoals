@@ -28,7 +28,7 @@ XDG_DATA_HOME=/tmp/slimegoals-dev/data XDG_CONFIG_HOME=/tmp/slimegoals-dev/confi
   dotnet run --project src/SlimeGoals.Desktop
 ```
 
-O `XDG_CONFIG_HOME` próprio impede que "Iniciar com o sistema" grave a entrada de autostart de verdade.
+O `XDG_CONFIG_HOME` próprio impede que "Iniciar com o sistema" grave a entrada de autostart de verdade. Para mostrar uma tela ao autor, popule antes a pasta com a amostra: `dotnet run --project tools/SlimeGoals.Render -- /tmp/slimegoals-dev/data seed` (recusa a pasta real e banco que já tem metas).
 
 Para conferir telas sem abrir o app: `dotnet run --project tools/SlimeGoals.Render -- /tmp/render all` (ou `phone`, `desktop`) grava um PNG por página; os outros modos estão em `docs/desenvolvimento.md`. Leia os PNGs para verificar uma mudança visual.
 

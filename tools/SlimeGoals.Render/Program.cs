@@ -17,10 +17,33 @@ using SlimeGoals.Sync;
 using ScrollViewer = Avalonia.Controls.ScrollViewer;
 using Window = Avalonia.Controls.Window;
 
-if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini" or "sync-warning" or "today-filter" or "wide")))
+if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini" or "sync-warning" or "today-filter" or "wide" or "seed")))
 {
     Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning|today-filter|wide]");
+    Console.Error.WriteLine("     dotnet run --project tools/SlimeGoals.Render -- <XDG_DATA_HOME de desenvolvimento> seed");
     return 1;
+}
+
+// Popula o banco de uma pasta de dados de desenvolvimento com a amostra, para abrir o app com metas. Nunca a pasta real.
+if (args is [_, "seed"])
+{
+    var dataHome = Path.TrimEndingDirectorySeparator(Path.GetFullPath(args[0]));
+    var realDataHome = Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share"));
+    if (dataHome == realDataHome)
+    {
+        Console.Error.WriteLine($"Recusado: {dataHome} é a pasta de dados real do app.");
+        return 1;
+    }
+    // O mesmo caminho do XdgPaths.DatabasePath do desktop: $XDG_DATA_HOME/SlimeGoals/slimegoals.db
+    var database = Path.Combine(dataHome, "SlimeGoals", "slimegoals.db");
+    Directory.CreateDirectory(Path.GetDirectoryName(database)!);
+    if (!Sample.SeedInto(database))
+    {
+        Console.Error.WriteLine($"Recusado: {database} já tem metas.");
+        return 1;
+    }
+    Console.WriteLine(database);
+    return 0;
 }
 
 var outDir = Path.GetFullPath(args[0]);
@@ -40,6 +63,7 @@ if (which is "wide")
 {
     RenderWide(1440, 900);
     RenderWide(1920, 1080);
+    RenderWide(2544, 1358);
 }
 if (which is "desktop" or "all")
     Render(false, "desktop", 1100, 720);
@@ -639,7 +663,8 @@ void RenderTodayWithTimer(int width)
 void RenderWide(int width, int height)
 {
     var shell = sample.CreateShell(false);
-    var window = new Window { Width = width, Height = height, Content = new ShellView { DataContext = shell } };
+    // A janela do app, com o zoom das janelas grandes (UiScale)
+    var window = new MainWindow { Width = width, Height = height, DataContext = shell, AllowClose = true };
     window.Show();
     shell.CurrentPage = shell.Pages.OfType<TodayPageViewModel>().Single();
     Pump();
