@@ -7,7 +7,7 @@ using SlimeGoals.Core.Sync;
 
 namespace SlimeGoals.Core.Services;
 
-/// <summary>Próximo disparo de uma meta que ainda cai hoje.</summary>
+/// <summary>Próximo disparo de uma meta (hoje ou num dos próximos 14 dias).</summary>
 public sealed record UpcomingReminder(Goal Goal, DateTimeOffset At);
 
 /// <summary>
@@ -146,15 +146,26 @@ public sealed class ReminderService(IGoalRepository goals, ICheckinRepository ch
     {
         var now = time.GetUtcNow();
         var snapshot = await LoadAsync(now, ct);
-        if (snapshot.Paused)
-            return [];
-        return snapshot.Goals
-            .Select(g => (Goal: g, At: NextFor(g, snapshot, now)))
-            .Where(x => x.At is { } at && at < snapshot.TomorrowStart)
-            .Select(x => new UpcomingReminder(x.Goal, x.At!.Value))
-            .OrderBy(u => u.At)
-            .ToList();
+        return Upcoming(snapshot, now).Where(u => u.At < snapshot.TomorrowStart).ToList();
     }
+
+    /// <summary>
+    /// Próximo disparo de cada meta, hoje ou num dos próximos dias (até 14), ordenado por horário: o Hoje do desktop
+    /// mostra o de amanhã quando os de hoje acabam (decisão 19).
+    /// </summary>
+    public async Task<IReadOnlyList<UpcomingReminder>> UpcomingAsync(CancellationToken ct = default)
+    {
+        var now = time.GetUtcNow();
+        return Upcoming(await LoadAsync(now, ct), now).ToList();
+    }
+
+    private static IEnumerable<UpcomingReminder> Upcoming(Snapshot snapshot, DateTimeOffset now) =>
+        snapshot.Paused ? []
+        : snapshot.Goals
+            .Select(g => (Goal: g, At: NextFor(g, snapshot, now)))
+            .Where(x => x.At is not null)
+            .Select(x => new UpcomingReminder(x.Goal, x.At!.Value))
+            .OrderBy(u => u.At);
 
     /// <summary>Marca todos os pendentes como Ignore e os retira (ao abrir e ao encerrar o app).</summary>
     public async Task ExpirePendingAsync(CancellationToken ct = default)
