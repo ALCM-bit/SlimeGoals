@@ -105,11 +105,10 @@
               <views:TitleBadgePanel Spacing="12">
                 <TextBlock Classes="row-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis"
                            ToolTip.Tip="{Binding Title}" />
-                <Border Classes="met-badge" IsVisible="{Binding IsMet}">
-                  <StackPanel Orientation="Horizontal" Spacing="5">
-                    <Path Classes="met-badge-icon" Data="{StaticResource IconCheck}" />
-                    <TextBlock Text="Concluída" />
-                  </StackPanel>
+                <!-- Só o ✓ (decisão 24): com a palavra, o selo cortava o título numa linha estreita -->
+                <Border Classes="met-badge" IsVisible="{Binding IsMet}"
+                        ToolTip.Tip="Concluída" AutomationProperties.Name="Concluída">
+                  <Path Classes="met-badge-icon" Data="{StaticResource IconCheck}" />
                 </Border>
               </views:TitleBadgePanel>
               <!-- Só a primeira tag, e "+N" para as outras (decisão 18); depois, o sino com a hora do próximo lembrete,
@@ -404,10 +403,11 @@
     <Style Selector="TextBlock.today-list-title">
       <Setter Property="FontSize" Value="21" />
     </Style>
-    <!-- Blocos do desktop: ícone num círculo e o número sobre o rótulo -->
+    <!-- Blocos do desktop: ícone num círculo e o número, centrados no bloco (decisão 24) -->
     <Style Selector="Grid.stat-wide">
       <Setter Property="ColumnSpacing" Value="10" />
       <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
     </Style>
     <Style Selector="Border.stat-icon">
       <Setter Property="Width" Value="34" />
@@ -435,10 +435,6 @@
     <Style Selector="TextBlock.stat-wide-value">
       <Setter Property="FontSize" Value="28" />
       <Setter Property="FontWeight" Value="Bold" />
-    </Style>
-    <Style Selector="TextBlock.stat-wide-label">
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="Foreground" Value="{DynamicResource Muted}" />
     </Style>
     <Style Selector="Path.hero-sparkle">
       <Setter Property="Stroke" Value="#CCFFFFFF" />
@@ -480,17 +476,12 @@
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
-    <!-- Selo verde "✓ Concluída" ao lado do título (decisão 18) -->
+    <!-- Selo verde ao lado do título (decisão 18), só com o ✓, num círculo (decisão 24) -->
     <Style Selector="Border.met-badge">
       <Setter Property="Background" Value="{DynamicResource SuccessSoft}" />
       <Setter Property="CornerRadius" Value="999" />
-      <Setter Property="Padding" Value="9,3" />
-      <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-    <Style Selector="Border.met-badge TextBlock">
-      <Setter Property="FontSize" Value="13" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="{DynamicResource Success}" />
+      <Setter Property="Width" Value="24" />
+      <Setter Property="Height" Value="24" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style Selector="Path.met-badge-icon">
@@ -502,6 +493,7 @@
       <Setter Property="StrokeLineCap" Value="Round" />
       <Setter Property="StrokeJoin" Value="Round" />
       <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
     </Style>
     <!-- O próximo de todos já fica no cartão do cabeçalho: o de cada linha só aparece com o mouse sobre ela ou o foco
          dentro dela. Opacidade, e não IsVisible, para a linha não mudar quando ele aparece -->
@@ -703,7 +695,9 @@
                   <TextBlock Classes="stat-label" Text="Em andamento" />
                   <TextBlock Grid.Row="1" Classes="stat-value" Text="{Binding InProgress}" />
                 </Grid>
-                <Grid Classes="wide-only stat-wide" ColumnDefinitions="Auto,*">
+                <!-- Desktop: ícone e número; o nome fica na dica e no leitor de tela (decisão 24) -->
+                <Grid Classes="wide-only stat-wide" ColumnDefinitions="Auto,Auto" Background="Transparent"
+                      ToolTip.Tip="Em andamento" AutomationProperties.Name="Em andamento">
                   <Border Classes="stat-icon progress">
                     <!-- Na grade 24×24 do ícone: com Stretch, o ícone que não é quadrado encostava no alto do círculo -->
                     <Viewbox Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -712,10 +706,7 @@
                       </Canvas>
                     </Viewbox>
                   </Border>
-                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Classes="stat-wide-value" Text="{Binding InProgress}" />
-                    <TextBlock Classes="stat-wide-label" Text="Em andamento" />
-                  </StackPanel>
+                  <TextBlock Grid.Column="1" Classes="stat-wide-value" Text="{Binding InProgress}" VerticalAlignment="Center" />
                 </Grid>
               </Panel>
             </Border>
@@ -729,7 +720,8 @@
                   <TextBlock Classes="stat-label" Text="Concluídas hoje" />
                   <TextBlock Grid.Row="1" Classes="stat-value" Text="{Binding Completed}" />
                 </Grid>
-                <Grid Classes="wide-only stat-wide" ColumnDefinitions="Auto,*">
+                <Grid Classes="wide-only stat-wide" ColumnDefinitions="Auto,Auto" Background="Transparent"
+                      ToolTip.Tip="{Binding CompletedLabel}" AutomationProperties.Name="{Binding CompletedLabel}">
                   <Border Classes="stat-icon done">
                     <!-- Na grade 24×24 do ícone: com Stretch, o ícone que não é quadrado encostava no alto do círculo -->
                     <Viewbox Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -738,10 +730,7 @@
                       </Canvas>
                     </Viewbox>
                   </Border>
-                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Classes="stat-wide-value" Text="{Binding Completed}" />
-                    <TextBlock Classes="stat-wide-label" Text="{Binding CompletedLabel}" />
-                  </StackPanel>
+                  <TextBlock Grid.Column="1" Classes="stat-wide-value" Text="{Binding Completed}" VerticalAlignment="Center" />
                 </Grid>
               </Panel>
             </Border>
