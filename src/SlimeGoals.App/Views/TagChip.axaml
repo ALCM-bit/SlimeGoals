@@ -41,10 +41,11 @@
             </MultiBinding>
           </TextBlock.Foreground>
         </TextBlock>
-        <!-- A contagem fica num slot: o Hoje do desktop esconde o slot por estilo -->
-        <Panel Classes="tag-chip-count-slot" VerticalAlignment="Center">
-          <TextBlock Classes="tag-chip-count" Text="{Binding Count}" Foreground="{DynamicResource Muted}" VerticalAlignment="Center"
-                     IsVisible="{Binding Count, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <!-- A contagem fica num slot que só aparece com contagem (sem ela, o Spacing não soma uma vaga vazia); o Hoje do
+             desktop esconde o slot por estilo. Classe, não IsVisible local: um valor local venceria esse estilo -->
+        <Panel Classes="tag-chip-count-slot" VerticalAlignment="Center"
+               Classes.has-count="{Binding Count, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <TextBlock Classes="tag-chip-count" Text="{Binding Count}" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
         </Panel>
       </StackPanel>
     </Border>

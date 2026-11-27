@@ -70,6 +70,9 @@
   </Style>
   <!-- Nome capitalizado do TagChip ("Saúde"): oculto por padrão; o Hoje do desktop o liga. Fica aqui, e não no
        TagChip, porque o estilo do próprio controle venceria o da tela -->
+  <Style Selector="Panel.tag-chip-count-slot:not(.has-count)">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
   <Style Selector="TextBlock.tag-chip-display">
     <Setter Property="IsVisible" Value="False" />
   </Style>

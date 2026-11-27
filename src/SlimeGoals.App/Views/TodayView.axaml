@@ -473,8 +473,10 @@
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <!-- Controles extras da linha: à vista só com o mouse sobre ela ou o foco do teclado dentro dela. Opacidade, e não
-         IsVisible, para a linha não mudar de tamanho -->
-    <Style Selector="Border.today-row :is(Control).reveal">
+         IsVisible, para a linha não mudar de tamanho. Só com a classe hover (onde há mouse, TodayLayout.HidesExtrasAtRest):
+         no Android deitado eles ficam sempre à vista. Oculto, o botão também não recebe o clique -->
+    <Style Selector="DockPanel.hover Border.today-row :is(Control).reveal">
+      <Setter Property="IsHitTestVisible" Value="False" />
       <Setter Property="Opacity" Value="0" />
       <Setter Property="Transitions">
         <Transitions>
@@ -482,8 +484,9 @@
         </Transitions>
       </Setter>
     </Style>
-    <Style Selector="Border.today-row:pointerover :is(Control).reveal, Border.today-row:focus-within :is(Control).reveal">
+    <Style Selector="DockPanel.hover Border.today-row:pointerover :is(Control).reveal, DockPanel.hover Border.today-row:focus-within :is(Control).reveal">
       <Setter Property="Opacity" Value="1" />
+      <Setter Property="IsHitTestVisible" Value="True" />
     </Style>
     <!-- O "⋯" tem uma vaga no cartão (depois do ▶) e outra na linha (antes dele) -->
     <Style Selector="Panel.row-only">
