@@ -78,20 +78,20 @@
       </Border>
     </DataTemplate>
 
-    <!-- Linha da meta (desktop, decisão 16): ícone; título e tags; progresso e barra; sino e hora; botões. As colunas
-         Auto dividem a largura entre as linhas (SharedSizeGroup), para as barras ficarem alinhadas de uma meta a outra -->
+    <!-- Linha da meta (desktop, decisão 16), num cartão próprio: ícone; título e tags; progresso e barra; botões, com o
+         sino e a hora embaixo, como no cartão do celular. A coluna dos botões é a mesma em todas as linhas
+         (SharedSizeGroup), para as barras ficarem alinhadas de uma meta a outra -->
     <DataTemplate x:Key="TodayGoalRow" x:DataType="vm:TodayGoalViewModel">
       <Border Classes="today-row" Classes.met="{Binding IsMet}" IsVisible="{Binding IsShown}">
         <StackPanel Spacing="10">
-          <Grid ColumnSpacing="16">
+          <Grid ColumnSpacing="16" RowDefinitions="Auto,Auto">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
-              <ColumnDefinition Width="5*" />
               <ColumnDefinition Width="6*" />
-              <ColumnDefinition Width="Auto" SharedSizeGroup="RowReminder" />
+              <ColumnDefinition Width="5*" />
               <ColumnDefinition Width="Auto" SharedSizeGroup="RowActions" />
             </Grid.ColumnDefinitions>
-            <Border Classes="icon-tile"
+            <Border Classes="icon-tile" Grid.RowSpan="2"
                     Background="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Bg}">
               <Viewbox Width="22" Height="22">
                 <Canvas Width="24" Height="24">
@@ -101,17 +101,17 @@
               </Viewbox>
             </Border>
 
-            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+            <StackPanel Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center" Spacing="6">
               <DockPanel LastChildFill="True">
                 <TextBlock DockPanel.Dock="Right" Classes="met-tag" Classes.met="{Binding IsMet}" Text="concluída" />
                 <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
                            ToolTip.Tip="{Binding Title}" />
               </DockPanel>
-              <!-- Tags numa linha só: as que não cabem ficam cortadas, a linha não cresce -->
-              <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}" ClipToBounds="True">
+              <!-- As tags quebram linha, como no cartão do celular: cortadas, a última ficava pela metade -->
+              <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
-                    <StackPanel Orientation="Horizontal" Spacing="6" />
+                    <WrapPanel ItemSpacing="6" LineSpacing="6" />
                   </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
@@ -122,19 +122,19 @@
               </ItemsControl>
             </StackPanel>
 
-            <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="8">
+            <StackPanel Grid.Column="2" Grid.RowSpan="2" VerticalAlignment="Center" Spacing="8">
               <TextBlock Text="{Binding ProgressText}" Foreground="{DynamicResource Muted}" FontSize="13"
                          TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ProgressText}" />
               <ProgressBar Classes="goal" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
             </StackPanel>
 
-            <StackPanel Grid.Column="3" Classes="next-reminder in-row" IsVisible="{Binding HasNextReminder}"
+            <views:TodayGoalActions Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right" />
+
+            <StackPanel Grid.Row="1" Grid.Column="3" Classes="next-reminder" IsVisible="{Binding HasNextReminder}"
                         ToolTip.Tip="Próximo lembrete">
               <Path Data="{StaticResource IconBell}" />
               <TextBlock Text="{Binding NextReminder}" />
             </StackPanel>
-
-            <views:TodayGoalActions Grid.Column="4" VerticalAlignment="Center" />
           </Grid>
 
           <!-- Abaixo da linha, alinhados ao título: tarefa do cronômetro e os painéis da meta -->
@@ -231,6 +231,13 @@
       <Setter Property="Width" Value="110" />
       <Setter Property="Height" Value="110" />
     </Style>
+    <!-- Fora do celular, só dois blocos: a sequência saiu a pedido do autor -->
+    <Style Selector="DockPanel.top UniformGrid.tiles, DockPanel.side UniformGrid.tiles">
+      <Setter Property="Columns" Value="2" />
+    </Style>
+    <Style Selector="DockPanel.top Border.stat.streak, DockPanel.side Border.stat.streak">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
     <Style Selector="DockPanel.top UniformGrid.tiles Border.stat, DockPanel.side UniformGrid.tiles Border.stat">
       <Setter Property="Padding" Value="12,10" />
     </Style>
@@ -239,12 +246,6 @@
     </Style>
     <Style Selector="DockPanel.top UniformGrid.tiles TextBlock.stat-value, DockPanel.side UniformGrid.tiles TextBlock.stat-value">
       <Setter Property="FontSize" Value="24" />
-    </Style>
-    <Style Selector="DockPanel.top TextBlock.stat-caption, DockPanel.side TextBlock.stat-caption">
-      <Setter Property="Grid.Row" Value="1" />
-      <Setter Property="Grid.Column" Value="0" />
-      <Setter Property="Grid.ColumnSpan" Value="3" />
-      <Setter Property="Margin" Value="0" />
     </Style>
     <!-- Na faixa, o destaque mais baixo: os blocos ao lado têm a altura dele, e o espaço vai para as metas -->
     <Style Selector="DockPanel.top Border.hero">
@@ -258,19 +259,14 @@
       <Setter Property="Width" Value="80" />
       <Setter Property="Height" Value="80" />
     </Style>
-    <!-- As linhas num cartão só; no celular, cada meta é o seu cartão -->
-    <Style Selector="DockPanel.top Border.goal-list, DockPanel.side Border.goal-list">
+    <!-- Cada linha é um cartão, com o fundo e a borda do cartão do celular -->
+    <Style Selector="Border.today-row">
       <Setter Property="Background" Value="{DynamicResource Tile}" />
       <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
-      <Setter Property="Padding" Value="16,2" />
-      <Setter Property="Margin" Value="0,0,0,14" />
-    </Style>
-    <Style Selector="Border.today-row">
-      <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
-      <Setter Property="BorderThickness" Value="0,0,0,1" />
-      <Setter Property="Padding" Value="0,12" />
+      <Setter Property="Padding" Value="16,12" />
+      <Setter Property="Margin" Value="0,0,0,10" />
     </Style>
     <Style Selector="Border.today-row.met">
       <Setter Property="Opacity" Value="0.7" />
@@ -278,10 +274,6 @@
     <!-- Detalhes abaixo da linha começam na coluna do título: ícone (44) + espaço (16) -->
     <Style Selector=":is(UserControl).row-detail">
       <Setter Property="Margin" Value="60,0,0,0" />
-    </Style>
-    <Style Selector="StackPanel.next-reminder.in-row">
-      <Setter Property="Margin" Value="0" />
-      <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style Selector="Border.week-bar">
       <Setter Property="Width" Value="22" />
@@ -313,7 +305,13 @@
                   <TextBlock Classes="hero-value" Text="{Binding WeekPercent}" />
                   <TextBlock Classes="hero-unit" Text="%" />
                 </StackPanel>
-                <ProgressBar Classes="hero" Minimum="0" Maximum="100" Value="{Binding WeekPercent}" />
+                <!-- Até 170 px, encostada à esquerda; na coluna estreita do resumo, encolhe em vez de passar sob o slime -->
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MaxWidth="170" />
+                  </Grid.ColumnDefinitions>
+                  <ProgressBar Classes="hero" Minimum="0" Maximum="100" Value="{Binding WeekPercent}" />
+                </Grid>
               </StackPanel>
               <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6" IsVisible="{Binding HasMascot}">
                 <Border Classes="hero-bubble">
@@ -348,19 +346,19 @@
                 <TextBlock Grid.Row="1" Classes="stat-value" Text="{Binding Completed}" />
               </Grid>
             </Border>
-            <Border Classes="stat">
+            <Border Classes="stat streak">
               <Grid>
                 <Grid.RowDefinitions>
                   <RowDefinition Height="Auto" SharedSizeGroup="StatLabel" />
                   <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <TextBlock Classes="stat-label" Text="Sequência" />
-                <!-- A meta da sequência fica ao lado do valor na tela larga e embaixo na estreita (estilo stat-caption) -->
+                <!-- A meta da sequência fica ao lado do valor na tela larga e embaixo na estreita (estilo stat-caption).
+                     Sem sequência, a linha fica reservada (um espaço): ao aparecer a meta, os três blocos cresciam juntos -->
                 <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*" RowDefinitions="Auto,Auto">
                   <TextBlock Classes="stat-value" Text="{Binding StreakValue}" />
                   <TextBlock Grid.Column="1" Classes="stat-unit" Text="{Binding StreakUnit}" />
-                  <TextBlock Classes="stat-caption" Text="{Binding StreakGoal}"
-                             IsVisible="{Binding StreakGoal, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <TextBlock Classes="stat-caption" Text="{Binding StreakGoal, TargetNullValue=' '}" />
                 </Grid>
               </Grid>
             </Border>
@@ -498,9 +496,7 @@
           <TextBlock Text="{Binding EmptyMessage}" IsVisible="{Binding IsEmpty}" Foreground="{DynamicResource Muted}"
                      HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" FontSize="15" Margin="0,24" />
           <StackPanel IsVisible="{Binding !IsEmpty}">
-            <Border Classes="goal-list">
-              <ItemsControl Classes="today-goals" ItemsSource="{Binding Goals}" Grid.IsSharedSizeScope="True" />
-            </Border>
+            <ItemsControl Classes="today-goals" ItemsSource="{Binding Goals}" Grid.IsSharedSizeScope="True" />
             <TextBlock Text="Nenhuma meta de hoje com essas tags." IsVisible="{Binding Filter.IsFilteredEmpty}"
                        Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" FontSize="15" Margin="0,24,0,24" />
           </StackPanel>
