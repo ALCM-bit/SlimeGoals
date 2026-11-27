@@ -1,0 +1,165 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:SlimeGoals.App.Views"
+             xmlns:vm="using:SlimeGoals.App.ViewModels"
+             xmlns:services="using:SlimeGoals.Core.Services"
+             x:Class="SlimeGoals.App.Views.TodayGoalPanels"
+             x:DataType="vm:TodayGoalViewModel">
+  <!-- Painéis da meta de hoje: trechos (spec §7.2), lançar valor e cronômetro parado. Usado pelo cartão e pela linha. -->
+  <StackPanel Spacing="12">
+    <!-- Trechos de hoje (spec §7.2): recolhível, fechado por padrão; o editor abre no lugar da linha -->
+    <StackPanel Spacing="6" IsVisible="{Binding HasChunks}">
+      <Button Classes="ghost chunks-toggle" AutomationProperties.Name="Trechos de hoje"
+              Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).ToggleChunksCommand}"
+              CommandParameter="{Binding}">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <TextBlock Text="{Binding ChunksHeader}" VerticalAlignment="Center" />
+          <Path Grid.Column="1" Classes="btn-icon chunks-chevron" Classes.open="{Binding IsChunksOpen}"
+                Data="{StaticResource IconChevronDown}" />
+        </Grid>
+      </Button>
+      <ItemsControl ItemsSource="{Binding Chunks}" IsVisible="{Binding IsChunksOpen}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Spacing="6" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:TodayChunkViewModel">
+            <StackPanel>
+              <!-- Linha: nome, tempo e ✎; a coluna do ✎ fica reservada (44, a largura do Button.icon) para o
+                   tempo do trecho em andamento e o da compensação ficarem alinhados com os outros -->
+              <Grid ColumnDefinitions="*,Auto,44" ColumnSpacing="8" MinHeight="44" IsVisible="{Binding !IsEditing}">
+                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                           ToolTip.Tip="{Binding Name}" />
+                <TextBlock Grid.Column="1" Classes.running="{Binding IsRunning}" Text="{Binding Text}"
+                           VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
+                <Button Grid.Column="2" Classes="ghost icon" AutomationProperties.Name="Ajustar trecho" ToolTip.Tip="Ajustar trecho"
+                        Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).EditChunkCommand}" CommandParameter="{Binding}"
+                        IsVisible="{Binding ShowsEditButton}">
+                  <Path Classes="btn-icon" Data="{StaticResource IconPencil}" />
+                </Button>
+              </Grid>
+              <!-- Editor no lugar da linha -->
+              <Border Classes="inline-panel" IsVisible="{Binding IsEditing}">
+                <StackPanel Spacing="10">
+                  <!-- Título com Apagar à direita: na linha de Cancelar e Salvar ele não cabia a 320 px -->
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <TextBlock Text="Ajustar trecho" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
+                    <Button Grid.Column="1" Classes="danger" Content="Apagar"
+                            Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).DeleteChunkCommand}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                  <!-- Horas, minutos e segundos, quebrando linha quando não cabem -->
+                  <WrapPanel ItemSpacing="16" LineSpacing="10">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                      <NumericUpDown Value="{Binding HoursInput}" Minimum="0" Maximum="24" Increment="1"
+                                     FormatString="0" Width="110" AutomationProperties.Name="Horas" />
+                      <TextBlock Text="h" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                      <NumericUpDown Value="{Binding MinutesInput}" Minimum="0" Maximum="59" Increment="1"
+                                     FormatString="0" Width="110" AutomationProperties.Name="Minutos" />
+                      <TextBlock Text="min" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                      <NumericUpDown Value="{Binding SecondsInput}" Minimum="0" Maximum="59" Increment="1"
+                                     FormatString="0" Width="110" AutomationProperties.Name="Segundos" />
+                      <TextBlock Text="s" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </WrapPanel>
+                  <TextBox Text="{Binding NoteInput}" MaxLength="{x:Static services:CheckinService.MaxNoteLength}"
+                           PlaceholderText="Nome (opcional)" AutomationProperties.Name="Nome do trecho" />
+                  <TextBlock Classes="field-error" Text="{Binding Error}" TextWrapping="Wrap"
+                             IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                  <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                    <Button Classes="ghost" Content="Cancelar"
+                            Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).CancelChunkEditCommand}"
+                            CommandParameter="{Binding}" />
+                    <Button Classes="primary" Content="Salvar"
+                            Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).SaveChunkCommand}"
+                            CommandParameter="{Binding}" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
+    <!-- Painel de valor -->
+    <Border Classes="inline-panel" IsVisible="{Binding IsPanelOpen}">
+      <StackPanel Spacing="10">
+        <Border Classes="segment" HorizontalAlignment="Left">
+          <StackPanel Orientation="Horizontal">
+            <RadioButton Classes="segment" Content="Adicionar" IsChecked="{Binding PanelAdds}" />
+            <RadioButton Classes="segment" Content="Remover" IsChecked="{Binding PanelRemoves}" />
+          </StackPanel>
+        </Border>
+        <!-- Horas e minutos quebram linha quando não cabem lado a lado (320 e 360 px) -->
+        <WrapPanel ItemSpacing="16" LineSpacing="10">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <NumericUpDown Value="{Binding PanelHoursInput}" Minimum="0" Maximum="24" Increment="1"
+                           FormatString="0" Width="110" AutomationProperties.Name="Horas" />
+            <TextBlock Text="h" VerticalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <NumericUpDown Value="{Binding PanelMinutesInput}" Minimum="0" Maximum="59" Increment="1"
+                           FormatString="0" Width="110" AutomationProperties.Name="Minutos" />
+            <TextBlock Text="min" VerticalAlignment="Center" />
+          </StackPanel>
+        </WrapPanel>
+        <TextBox Text="{Binding PanelNote}" MaxLength="{x:Static services:CheckinService.MaxNoteLength}" PlaceholderText="Nota (opcional)"
+                 AutomationProperties.Name="Nota" />
+        <TextBlock Classes="field-error" Text="{Binding PanelError}"
+                   IsVisible="{Binding PanelError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <Button Classes="ghost" Content="Cancelar"
+                  Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).CancelPanelCommand}"
+                  CommandParameter="{Binding}" />
+          <Button Classes="primary" Content="Registrar"
+                  Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).ConfirmPanelCommand}"
+                  CommandParameter="{Binding}" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- Cronômetro parado: conferir e registrar -->
+    <Border Classes="inline-panel" IsVisible="{Binding IsTimerStopped}">
+      <StackPanel Spacing="10">
+        <TextBlock Text="{Binding StoppedText}" TextWrapping="Wrap" Foreground="{DynamicResource Muted}" />
+        <!-- Horas, minutos e segundos, quebrando linha quando não cabem -->
+        <WrapPanel ItemSpacing="16" LineSpacing="10">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <NumericUpDown Value="{Binding StoppedHoursInput}" Minimum="0" Maximum="24" Increment="1"
+                           FormatString="0" Width="110" AutomationProperties.Name="Horas cronometradas" />
+            <TextBlock Text="h" VerticalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <NumericUpDown Value="{Binding StoppedMinutesInput}" Minimum="0" Maximum="59" Increment="1"
+                           FormatString="0" Width="110" AutomationProperties.Name="Minutos cronometrados" />
+            <TextBlock Text="min" VerticalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <NumericUpDown Value="{Binding StoppedSecondsInput}" Minimum="0" Maximum="59" Increment="1"
+                           FormatString="0" Width="110" AutomationProperties.Name="Segundos cronometrados" />
+            <TextBlock Text="s" VerticalAlignment="Center" />
+          </StackPanel>
+        </WrapPanel>
+        <TextBox Text="{Binding PanelNote}" MaxLength="{x:Static services:CheckinService.MaxNoteLength}" PlaceholderText="Nota (opcional)"
+                 AutomationProperties.Name="Nota" />
+        <TextBlock Classes="field-error" Text="{Binding PanelError}"
+                   IsVisible="{Binding PanelError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <Button Classes="ghost" Content="Descartar"
+                  Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).DiscardTimerCommand}"
+                  CommandParameter="{Binding}" />
+          <Button Classes="primary" Content="Registrar"
+                  Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).RegisterTimerCommand}"
+                  CommandParameter="{Binding}" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</UserControl>

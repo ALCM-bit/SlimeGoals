@@ -5,6 +5,187 @@
              xmlns:services="using:SlimeGoals.Core.Services"
              x:Class="SlimeGoals.App.Views.TodayView"
              x:DataType="vm:TodayPageViewModel">
+  <UserControl.Resources>
+    <DataTemplate x:Key="TodayGoalCard" x:DataType="vm:TodayGoalViewModel">
+      <Border Classes="card today" Classes.met="{Binding IsMet}" Margin="0,0,0,10" IsVisible="{Binding IsShown}">
+        <StackPanel Spacing="12">
+          <!-- Duas linhas: a segunda só tem, sob os botões, o próximo lembrete (decisão 15 da interface no Android) -->
+          <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="14">
+            <Border Classes="icon-tile" Grid.RowSpan="2"
+                    Background="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Bg}">
+              <Viewbox Width="22" Height="22">
+                <Canvas Width="24" Height="24">
+                  <Path Classes="goal-icon" Data="{Binding IconKey, Converter={StaticResource IconGeometry}}"
+                        Stroke="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
+                </Canvas>
+              </Viewbox>
+            </Border>
+
+            <StackPanel Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center" Spacing="6">
+              <DockPanel LastChildFill="True">
+                <!-- Meta cumprida: a palavra na tela larga; na estreita, o ✓ dos Relatórios, que não espreme o título -->
+                <TextBlock DockPanel.Dock="Right" Classes="met-tag" Classes.met="{Binding IsMet}" Text="concluída" />
+                <Path DockPanel.Dock="Right" Classes="met-icon in-title" Classes.met="{Binding IsMet}"
+                      Data="{StaticResource IconCheck}" AutomationProperties.Name="concluída" ToolTip.Tip="Concluída" />
+                <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+              </DockPanel>
+              <!-- Na tela estreita o tempo corrido vem para cá: ao lado dos botões ele espremia o título -->
+              <TextBlock Classes="elapsed narrow" Classes.running="{Binding IsTimerRunning}" Text="{Binding Elapsed}" />
+              <TextBlock Text="{Binding ProgressText}" Foreground="{DynamicResource Muted}" FontSize="13"
+                         TextWrapping="Wrap" />
+            </StackPanel>
+
+            <views:TodayGoalActions Grid.Column="2" VerticalAlignment="Center" />
+
+            <StackPanel Grid.Row="1" Grid.Column="2" Classes="next-reminder" IsVisible="{Binding HasNextReminder}"
+                        ToolTip.Tip="Próximo lembrete">
+              <Path Data="{StaticResource IconBell}" />
+              <TextBlock Text="{Binding NextReminder}" />
+            </StackPanel>
+          </Grid>
+
+          <!-- Tarefa do cronômetro rodando: na largura do cartão, para não espremer o título na tela estreita -->
+          <views:TodayTimerTask IsVisible="{Binding IsTimerRunning}" />
+
+          <!-- Barra na largura do cartão: igual em todos, sem depender dos botões ao lado do texto -->
+          <ProgressBar Classes="goal" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
+
+          <!-- Tags da meta: chips pequenos, só se ela tem tags -->
+          <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel ItemSpacing="6" LineSpacing="6" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:TagChipViewModel">
+                <views:TagChip Classes="small" IsHitTestVisible="False" Focusable="False" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <!-- Trechos de hoje, lançar valor e cronômetro parado -->
+          <views:TodayGoalPanels>
+            <views:TodayGoalPanels.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                <Binding Path="HasChunks" />
+                <Binding Path="IsPanelOpen" />
+                <Binding Path="IsTimerStopped" />
+              </MultiBinding>
+            </views:TodayGoalPanels.IsVisible>
+          </views:TodayGoalPanels>
+        </StackPanel>
+      </Border>
+    </DataTemplate>
+
+    <!-- Linha da meta (desktop, decisões 16 e 18), num cartão próprio: ícone; título, selo "Concluída" e a primeira tag;
+         progresso e barra; à direita o botão principal. O sino com a hora, "−", "✕" e "⋯" aparecem ao passar o mouse.
+         A coluna dos botões é a mesma em todas as linhas (SharedSizeGroup), para as barras ficarem alinhadas -->
+    <DataTemplate x:Key="TodayGoalRow" x:DataType="vm:TodayGoalViewModel">
+      <Border Classes="today-row" Classes.met="{Binding IsMet}" IsVisible="{Binding IsShown}">
+        <StackPanel Spacing="12">
+          <Grid ColumnSpacing="18">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="5*" />
+              <ColumnDefinition Width="6*" />
+              <ColumnDefinition Width="Auto" SharedSizeGroup="RowActions" />
+            </Grid.ColumnDefinitions>
+            <Border Classes="icon-tile row-icon"
+                    Background="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Bg}">
+              <Viewbox Width="26" Height="26">
+                <Canvas Width="24" Height="24">
+                  <Path Classes="goal-icon" Data="{Binding IconKey, Converter={StaticResource IconGeometry}}"
+                        Stroke="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
+                </Canvas>
+              </Viewbox>
+            </Border>
+
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="8">
+              <views:TitleBadgePanel Spacing="12">
+                <TextBlock Classes="row-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis"
+                           ToolTip.Tip="{Binding Title}" />
+                <Border Classes="met-badge" IsVisible="{Binding IsMet}">
+                  <StackPanel Orientation="Horizontal" Spacing="5">
+                    <Path Classes="met-badge-icon" Data="{StaticResource IconCheck}" />
+                    <TextBlock Text="Concluída" />
+                  </StackPanel>
+                </Border>
+              </views:TitleBadgePanel>
+              <!-- Só a primeira tag, e "+N" para as outras (decisão 18); depois, o sino com a hora do próximo lembrete,
+                   que aparece com o mouse sobre a linha ou o foco nela (decisão 20). A coluna das tags tem a mesma largura
+                   em todas as linhas (SharedSizeGroup): os sinos ficam alinhados -->
+              <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" SharedSizeGroup="RowTags" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid.IsVisible>
+                  <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                    <Binding Path="HasTags" />
+                    <Binding Path="HasNextReminder" />
+                  </MultiBinding>
+                </Grid.IsVisible>
+                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasTags}">
+                  <views:TagChip Classes="small" DataContext="{Binding PrimaryTag}" IsHitTestVisible="False" Focusable="False" />
+                  <!-- "+N" abre um balão com todas as tags da meta (decisão 19); botão, para o teclado chegar nele -->
+                  <Button Classes="more-tags" IsVisible="{Binding HasMoreTags}" AutomationProperties.Name="{Binding TagsText}"
+                          ToolTip.Tip="Ver todas as tags">
+                    <TextBlock Classes="more-tags" Text="{Binding MoreTagsText}" />
+                    <Button.Flyout>
+                      <Flyout Placement="BottomEdgeAlignedLeft" FlyoutPresenterClasses="tags-flyout">
+                        <StackPanel Spacing="10" MaxWidth="320">
+                          <TextBlock Text="Tags da meta" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource Muted}" />
+                          <ItemsControl ItemsSource="{Binding Tags}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate>
+                                <WrapPanel ItemSpacing="6" LineSpacing="6" />
+                              </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:TagChipViewModel">
+                                <Border Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource Border}"
+                                        BorderThickness="1" CornerRadius="999" Padding="10,4">
+                                  <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                             Fill="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
+                                    <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold"
+                                               VerticalAlignment="Center" />
+                                  </StackPanel>
+                                </Border>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </Flyout>
+                    </Button.Flyout>
+                  </Button>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Classes="next-reminder row-reminder" IsVisible="{Binding HasNextReminder}"
+                            ToolTip.Tip="Próximo lembrete">
+                  <Path Data="{StaticResource IconBell}" />
+                  <TextBlock Text="{Binding NextReminder}" />
+                </StackPanel>
+              </Grid>
+            </StackPanel>
+
+            <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="10">
+              <TextBlock Text="{Binding ProgressText}" Foreground="{DynamicResource Muted}" FontSize="14"
+                         TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ProgressText}" />
+              <ProgressBar Classes="goal" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
+            </StackPanel>
+
+            <views:TodayGoalActions Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right" />
+          </Grid>
+
+          <!-- Abaixo da linha, alinhados ao título: tarefa do cronômetro e os painéis da meta -->
+          <views:TodayTimerTask Classes="row-detail" IsVisible="{Binding IsTimerRunning}" />
+          <views:TodayGoalPanels Classes="row-detail" IsVisible="{Binding ShowsRowPanels}" />
+        </StackPanel>
+      </Border>
+    </DataTemplate>
+  </UserControl.Resources>
+
   <UserControl.Styles>
     <!-- Teclado aberto (celular): some o destaque e os blocos, senão a lista fica sem altura e o campo em edição some -->
     <Style Selector="DockPanel.keyboard Border.hero, DockPanel.keyboard UniformGrid.tiles">
@@ -18,509 +199,750 @@
       <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     </Style>
+    <!-- Forma do Hoje (decisão 16; classe do PageRoot posta pelo code-behind): phone, top ou side.
+         Celular: destaque, blocos e cartões em coluna. Top: destaque e blocos numa faixa acima das linhas. Side: as
+         linhas à esquerda e o resumo, com "Esta semana", numa coluna de 320 px -->
+    <Style Selector="ItemsControl.today-goals">
+      <Setter Property="ItemTemplate" Value="{StaticResource TodayGoalCard}" />
+      <Setter Property="Margin" Value="0,0,0,14" />
+    </Style>
+    <Style Selector="DockPanel.top ItemsControl.today-goals, DockPanel.side ItemsControl.today-goals">
+      <Setter Property="ItemTemplate" Value="{StaticResource TodayGoalRow}" />
+      <Setter Property="Margin" Value="0" />
+    </Style>
+    <Style Selector="Grid.today-summary">
+      <Setter Property="RowSpacing" Value="16" />
+      <Setter Property="Margin" Value="0,0,0,16" />
+    </Style>
+    <Style Selector="Grid.today-summary > UniformGrid.tiles">
+      <Setter Property="Grid.Row" Value="1" />
+    </Style>
+    <Style Selector="Panel.today-week-slot">
+      <Setter Property="Grid.Row" Value="2" />
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="StackPanel.today-main">
+      <Setter Property="Grid.Row" Value="1" />
+    </Style>
+    <Style Selector="DockPanel.top Grid.today-summary">
+      <Setter Property="RowSpacing" Value="0" />
+      <Setter Property="ColumnSpacing" Value="12" />
+    </Style>
+    <Style Selector="DockPanel.top Grid.today-summary > UniformGrid.tiles">
+      <Setter Property="Grid.Row" Value="0" />
+      <Setter Property="Grid.Column" Value="1" />
+    </Style>
+    <Style Selector="DockPanel.side Grid.today-page">
+      <Setter Property="ColumnSpacing" Value="16" />
+    </Style>
+    <Style Selector="DockPanel.side Grid.today-summary">
+      <Setter Property="Grid.Row" Value="0" />
+      <Setter Property="Grid.Column" Value="1" />
+      <Setter Property="RowSpacing" Value="12" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+    <Style Selector="DockPanel.side Panel.today-week-slot">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="DockPanel.side StackPanel.today-main">
+      <Setter Property="Grid.Row" Value="0" />
+    </Style>
+    <!-- Destaque e blocos fora do celular: a mesma medida compacta do celular, que cabe na faixa e na coluna -->
+    <Style Selector="DockPanel.top Border.hero, DockPanel.side Border.hero">
+      <Setter Property="Padding" Value="16" />
+      <Setter Property="MinHeight" Value="150" />
+    </Style>
+    <Style Selector="DockPanel.top Border.hero TextBlock.hero-value, DockPanel.side Border.hero TextBlock.hero-value">
+      <Setter Property="FontSize" Value="44" />
+    </Style>
+    <Style Selector="DockPanel.top Border.hero TextBlock.hero-unit, DockPanel.side Border.hero TextBlock.hero-unit">
+      <Setter Property="FontSize" Value="22" />
+    </Style>
+    <Style Selector="DockPanel.top views|SlimeMascot.hero-slime, DockPanel.side views|SlimeMascot.hero-slime">
+      <Setter Property="Width" Value="120" />
+      <Setter Property="Height" Value="120" />
+    </Style>
+    <Style Selector="DockPanel.side Border.hero">
+      <Setter Property="Padding" Value="20,18" />
+      <Setter Property="MinHeight" Value="164" />
+    </Style>
+    <Style Selector="DockPanel.side Border.hero TextBlock.hero-value">
+      <Setter Property="FontSize" Value="50" />
+    </Style>
+    <!-- Fora do celular, só dois blocos: a sequência saiu a pedido do autor -->
+    <Style Selector="DockPanel.top UniformGrid.tiles, DockPanel.side UniformGrid.tiles">
+      <Setter Property="Columns" Value="2" />
+    </Style>
+    <Style Selector="DockPanel.top Border.stat.streak, DockPanel.side Border.stat.streak">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="DockPanel.top UniformGrid.tiles Border.stat, DockPanel.side UniformGrid.tiles Border.stat">
+      <Setter Property="Padding" Value="12,10" />
+    </Style>
+    <Style Selector="DockPanel.top UniformGrid.tiles TextBlock.stat-label, DockPanel.side UniformGrid.tiles TextBlock.stat-label">
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="DockPanel.top UniformGrid.tiles TextBlock.stat-value, DockPanel.side UniformGrid.tiles TextBlock.stat-value">
+      <Setter Property="FontSize" Value="24" />
+    </Style>
+    <!-- Na faixa, o destaque mais baixo: os blocos ao lado têm a altura dele, e o espaço vai para as metas -->
+    <Style Selector="DockPanel.top Border.hero">
+      <Setter Property="Padding" Value="16,12" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="DockPanel.top Border.hero TextBlock.hero-value">
+      <Setter Property="FontSize" Value="38" />
+    </Style>
+    <Style Selector="DockPanel.top views|SlimeMascot.hero-slime">
+      <Setter Property="Width" Value="80" />
+      <Setter Property="Height" Value="80" />
+    </Style>
+    <!-- ===== Decisão 18: o desktop igual ao mockup. wide-only só em top/side; phone-only só no celular ===== -->
+    <Style Selector="DockPanel.page :is(Control).wide-only">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="DockPanel.top :is(Control).wide-only, DockPanel.side :is(Control).wide-only">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="DockPanel.top :is(Control).phone-only, DockPanel.side :is(Control).phone-only">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Grid.today-header">
+      <Setter Property="Margin" Value="0,0,0,16" />
+    </Style>
+    <Style Selector="DockPanel.top Grid.today-header, DockPanel.side Grid.today-header">
+      <Setter Property="Margin" Value="0,0,0,24" />
+    </Style>
+    <Style Selector="DockPanel.top TextBlock.page-title, DockPanel.side TextBlock.page-title">
+      <Setter Property="FontSize" Value="32" />
+    </Style>
+    <Style Selector="TextBlock.today-date">
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    </Style>
+    <Style Selector="Button.today-bell">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="8" />
+      <Setter Property="MinHeight" Value="44" />
+      <Setter Property="CornerRadius" Value="12" />
+    </Style>
+    <Style Selector="Button.today-bell /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.today-bell:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource NavHover}" />
+    </Style>
+    <Style Selector="Path.today-bell-icon">
+      <Setter Property="Stroke" Value="{DynamicResource Text}" />
+      <Setter Property="StrokeThickness" Value="2" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="StrokeJoin" Value="Round" />
+    </Style>
+    <Style Selector="Button.today-bell.paused Path.today-bell-icon">
+      <Setter Property="Stroke" Value="{DynamicResource Muted}" />
+    </Style>
+    <Style Selector="Ellipse.today-bell-dot">
+      <Setter Property="Width" Value="9" />
+      <Setter Property="Height" Value="9" />
+      <Setter Property="Fill" Value="{DynamicResource Primary}" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+      <Setter Property="Margin" Value="0,-2,-2,0" />
+    </Style>
+    <Style Selector="Border.today-header-sep">
+      <Setter Property="Width" Value="1" />
+      <Setter Property="Height" Value="44" />
+      <Setter Property="Background" Value="{DynamicResource Border}" />
+    </Style>
+    <Style Selector="Border.next-notification">
+      <Setter Property="Background" Value="{DynamicResource Tile}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="18" />
+      <Setter Property="Padding" Value="20,8,14,8" />
+    </Style>
+    <Style Selector="Path.next-notification-icon">
+      <Setter Property="Stroke" Value="{DynamicResource Muted}" />
+      <Setter Property="StrokeThickness" Value="2" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="StrokeJoin" Value="Round" />
+    </Style>
+    <Style Selector="Border.next-notification-pill">
+      <Setter Property="Background" Value="{DynamicResource SelectedStrong}" />
+      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.next-notification-pill TextBlock">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    </Style>
+    <!-- "Retomar" com a pausa: a mesma pílula do "em X min", clicável -->
+    <Style Selector="Button.next-notification-pill">
+      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="Padding" Value="14,6" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.next-notification-pill /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource SelectedStrong}" />
+      <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    </Style>
+    <Style Selector="Button.next-notification-pill:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Primary}" />
+      <Setter Property="Foreground" Value="{DynamicResource OnPrimary}" />
+    </Style>
+    <Style Selector="Grid.today-list-header">
+      <Setter Property="Margin" Value="0,0,0,10" />
+    </Style>
+    <Style Selector="DockPanel.top Grid.today-list-header, DockPanel.side Grid.today-list-header">
+      <Setter Property="Margin" Value="0,0,0,16" />
+    </Style>
+    <Style Selector="TextBlock.today-list-title">
+      <Setter Property="FontSize" Value="21" />
+    </Style>
+    <!-- Blocos do desktop: ícone num círculo e o número sobre o rótulo -->
+    <Style Selector="Grid.stat-wide">
+      <Setter Property="ColumnSpacing" Value="10" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.stat-icon">
+      <Setter Property="Width" Value="34" />
+      <Setter Property="Height" Value="34" />
+      <Setter Property="CornerRadius" Value="17" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.stat-icon.progress">
+      <Setter Property="Background" Value="{DynamicResource SelectedStrong}" />
+    </Style>
+    <Style Selector="Border.stat-icon.done">
+      <Setter Property="Background" Value="{DynamicResource SuccessSoft}" />
+    </Style>
+    <Style Selector="Path.stat-icon-path">
+      <Setter Property="StrokeThickness" Value="2.6" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="StrokeJoin" Value="Round" />
+    </Style>
+    <Style Selector="Border.stat-icon.progress Path.stat-icon-path">
+      <Setter Property="Stroke" Value="{DynamicResource PrimarySoft}" />
+    </Style>
+    <Style Selector="Border.stat-icon.done Path.stat-icon-path">
+      <Setter Property="Stroke" Value="{DynamicResource Success}" />
+    </Style>
+    <Style Selector="TextBlock.stat-wide-value">
+      <Setter Property="FontSize" Value="28" />
+      <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+    <Style Selector="TextBlock.stat-wide-label">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    </Style>
+    <Style Selector="Path.hero-sparkle">
+      <Setter Property="Stroke" Value="#CCFFFFFF" />
+      <Setter Property="StrokeThickness" Value="2.2" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+      <Setter Property="Margin" Value="0,24,-2,0" />
+    </Style>
+    <!-- Chips do desktop: maiores, cantos de 14 e sem a contagem. O chip pequeno da linha fica pílula -->
+    <Style Selector="DockPanel.top views|TagChip Panel.tag-chip-count-slot, DockPanel.side views|TagChip Panel.tag-chip-count-slot">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="DockPanel.top views|TagChip:not(.small) Border.tag-chip, DockPanel.side views|TagChip:not(.small) Border.tag-chip">
+      <Setter Property="MinHeight" Value="42" />
+      <Setter Property="Padding" Value="18,0" />
+      <Setter Property="CornerRadius" Value="14" />
+    </Style>
+    <Style Selector="DockPanel.top views|TagChip:not(.small) TextBlock.tag-chip-name, DockPanel.side views|TagChip:not(.small) TextBlock.tag-chip-name">
+      <Setter Property="FontSize" Value="15" />
+    </Style>
+    <!-- Cada linha é um cartão, com o fundo e a borda do cartão do celular -->
+    <Style Selector="Border.today-row">
+      <Setter Property="Background" Value="{DynamicResource Tile}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="18" />
+      <Setter Property="Padding" Value="18,16" />
+      <Setter Property="Margin" Value="0,0,0,14" />
+    </Style>
+    <Style Selector="Border.row-icon">
+      <Setter Property="Width" Value="52" />
+      <Setter Property="Height" Value="52" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.row-title">
+      <Setter Property="FontSize" Value="18" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <!-- Selo verde "✓ Concluída" ao lado do título (decisão 18) -->
+    <Style Selector="Border.met-badge">
+      <Setter Property="Background" Value="{DynamicResource SuccessSoft}" />
+      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="Padding" Value="9,3" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.met-badge TextBlock">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource Success}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Path.met-badge-icon">
+      <Setter Property="Width" Value="12" />
+      <Setter Property="Height" Value="12" />
+      <Setter Property="Stretch" Value="Uniform" />
+      <Setter Property="Stroke" Value="{DynamicResource Success}" />
+      <Setter Property="StrokeThickness" Value="2.5" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="StrokeJoin" Value="Round" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <!-- O próximo de todos já fica no cartão do cabeçalho: o de cada linha só aparece com o mouse sobre ela ou o foco
+         dentro dela. Opacidade, e não IsVisible, para a linha não mudar quando ele aparece -->
+    <Style Selector="StackPanel.row-reminder">
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Opacity" Value="0" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.12" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.today-row:pointerover StackPanel.row-reminder, Border.today-row:focus-within StackPanel.row-reminder">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.all-tags">
+      <Setter Property="Margin" Value="10,0,0,0" />
+      <Setter Property="MinHeight" Value="42" />
+      <Setter Property="Padding" Value="16,0" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.tag-option">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="MinHeight" Value="38" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="CornerRadius" Value="10" />
+    </Style>
+    <Style Selector="Button.tag-option /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.tag-option:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    </Style>
+    <Style Selector="Path.tag-option-check">
+      <Setter Property="Width" Value="14" />
+      <Setter Property="Height" Value="14" />
+      <Setter Property="Stretch" Value="Uniform" />
+      <Setter Property="Stroke" Value="{DynamicResource PrimarySoft}" />
+      <Setter Property="StrokeThickness" Value="2.4" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="StrokeJoin" Value="Round" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.more-tags">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="6,2" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.more-tags /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.more-tags:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    </Style>
+    <Style Selector="Button.more-tags:pointerover TextBlock.more-tags">
+      <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    </Style>
+    <Style Selector="TextBlock.more-tags">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <!-- O "⋯" tem uma vaga no cartão (depois do ▶) e outra na linha (antes dele) -->
+    <Style Selector="Panel.row-only">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Border.today-row Panel.row-only">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="Border.today-row Panel.card-only">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <!-- Detalhes abaixo da linha começam na coluna do título: ícone (52) + espaço (18) -->
+    <Style Selector=":is(UserControl).row-detail">
+      <Setter Property="Margin" Value="70,0,0,0" />
+    </Style>
+    <Style Selector="Border.week-bar">
+      <Setter Property="Width" Value="22" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="Background" Value="{DynamicResource Primary}" />
+    </Style>
+    <Style Selector="Border.week-bar.today">
+      <Setter Property="Background" Value="{DynamicResource PrimarySoft}" />
+    </Style>
   </UserControl.Styles>
 
   <DockPanel x:Name="PageRoot" Classes="page">
-    <TextBlock DockPanel.Dock="Top" Classes="page-title" Text="{Binding Title}" Margin="0,0,0,16" />
+    <!-- Cabeçalho: no desktop, a data embaixo do título e, à direita, o sino (pausa) e a próxima notificação (decisão 18) -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Classes="today-header">
+      <StackPanel VerticalAlignment="Center" Spacing="2">
+        <TextBlock Classes="page-title" Text="{Binding Title}" />
+        <TextBlock Classes="today-date wide-only" Text="{Binding DateText}" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Classes="wide-only" Orientation="Horizontal" Spacing="18" VerticalAlignment="Center">
+        <Panel IsVisible="{Binding ShowReminders}">
+          <!-- Um toque pausa ou retoma os lembretes (decisão 21): com a pausa, o sino aparece cortado -->
+          <Button Classes="today-bell" Classes.paused="{Binding IsPaused}" Command="{Binding TogglePauseCommand}"
+                  AutomationProperties.Name="{Binding PauseButtonText}" ToolTip.Tip="{Binding PauseButtonText}">
+            <Panel>
+              <Viewbox Width="26" Height="26">
+                <Canvas Width="24" Height="24">
+                  <Path Classes="today-bell-icon" Data="{StaticResource IconBell}" IsVisible="{Binding !IsPaused}" />
+                  <Path Classes="today-bell-icon" Data="{StaticResource IconBellOff}" IsVisible="{Binding IsPaused}" />
+                </Canvas>
+              </Viewbox>
+              <Ellipse Classes="today-bell-dot" IsVisible="{Binding HasReminderToday}" />
+            </Panel>
+          </Button>
+        </Panel>
+        <Border Classes="today-header-sep" IsVisible="{Binding ShowNotificationCard}" />
+        <!-- Com a pausa, o mesmo cartão diz "Lembretes pausados" e troca o "em X min" por "Retomar" (decisão 21) -->
+        <Border Classes="next-notification" IsVisible="{Binding ShowNotificationCard}">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+            <Viewbox Width="20" Height="20" VerticalAlignment="Center">
+              <Canvas Width="24" Height="24">
+                <Path Classes="next-notification-icon" Data="{StaticResource IconBell}" IsVisible="{Binding !IsPaused}" />
+                <Path Classes="next-notification-icon" Data="{StaticResource IconBellOff}" IsVisible="{Binding IsPaused}" />
+              </Canvas>
+            </Viewbox>
+            <!-- Rótulo, meta e quando ("Hoje às 11:34", "Amanhã às 08:00"); o "em X min" só para um lembrete de hoje
+                 (decisão 19) -->
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+              <TextBlock Text="Próxima notificação" FontSize="12" Foreground="{DynamicResource Muted}" />
+              <TextBlock Text="{Binding NextNotificationTitle}" FontSize="16" FontWeight="SemiBold"
+                         TextTrimming="CharacterEllipsis" MaxWidth="200" IsVisible="{Binding !IsPaused}" />
+              <TextBlock Text="Lembretes pausados" FontSize="16" FontWeight="SemiBold" IsVisible="{Binding IsPaused}" />
+              <TextBlock Text="{Binding NextNotificationWhen}" FontSize="12" Foreground="{DynamicResource Muted}"
+                         IsVisible="{Binding !IsPaused}" />
+            </StackPanel>
+            <Border Grid.Column="2" Classes="next-notification-pill" IsVisible="{Binding HasNextNotificationIn}">
+              <TextBlock Text="{Binding NextNotificationIn}" />
+            </Border>
+            <Button Grid.Column="2" Classes="next-notification-pill" Content="Retomar" VerticalAlignment="Center"
+                    IsVisible="{Binding IsPaused}" Command="{Binding TogglePauseCommand}"
+                    AutomationProperties.Name="Retomar lembretes" ToolTip.Tip="Retomar lembretes" />
+          </Grid>
+        </Border>
+      </StackPanel>
+    </Grid>
 
     <!-- Abaixo do título a página rola inteira (decisão 14 da interface no Android): presos, o destaque, os blocos,
          as faixas e o filtro deixavam uns 300 px para os cartões no celular -->
     <ScrollViewer Classes="page">
-      <StackPanel>
-
-    <!-- Cartão de destaque: progresso da semana e mascote -->
-    <Border Classes="hero" Margin="0,0,0,16">
-      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-        <StackPanel VerticalAlignment="Center" Spacing="4">
-          <TextBlock Classes="hero-label" Text="Progresso da semana" TextWrapping="Wrap" />
-          <StackPanel Orientation="Horizontal" Spacing="2">
-            <TextBlock Classes="hero-value" Text="{Binding WeekPercent}" />
-            <TextBlock Classes="hero-unit" Text="%" />
-          </StackPanel>
-          <ProgressBar Classes="hero" Minimum="0" Maximum="100" Value="{Binding WeekPercent}" />
-        </StackPanel>
-        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6" IsVisible="{Binding HasMascot}">
-          <Border Classes="hero-bubble">
-            <TextBlock Text="{Binding Mascot.Message}" Foreground="{DynamicResource HeroBubbleText}"
-                       FontSize="13" FontWeight="Bold" TextWrapping="Wrap" />
+      <!-- Colunas postas pelo code-behind conforme a forma: "*" ou, com o resumo ao lado, "*,320" -->
+      <Grid x:Name="PageGrid" Classes="today-page" RowDefinitions="Auto,Auto">
+        <!-- Resumo: destaque, blocos e "Esta semana"; o lugar de cada um vem dos estilos acima -->
+        <Grid x:Name="Summary" Classes="today-summary" RowDefinitions="Auto,Auto">
+          <!-- Cartão de destaque: progresso da semana e mascote -->
+          <Border Classes="hero">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+              <StackPanel VerticalAlignment="Center" Spacing="4">
+                <TextBlock Classes="hero-label" Text="Progresso da semana" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="2">
+                  <TextBlock Classes="hero-value" Text="{Binding WeekPercent}" />
+                  <TextBlock Classes="hero-unit" Text="%" />
+                </StackPanel>
+                <!-- Até 170 px, encostada à esquerda; na coluna estreita do resumo, encolhe em vez de passar sob o slime -->
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MaxWidth="170" />
+                  </Grid.ColumnDefinitions>
+                  <ProgressBar Classes="hero" Minimum="0" Maximum="100" Value="{Binding WeekPercent}" />
+                </Grid>
+              </StackPanel>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6" IsVisible="{Binding HasMascot}">
+                <Border Classes="hero-bubble phone-only">
+                  <TextBlock Text="{Binding Mascot.Message}" Foreground="{DynamicResource HeroBubbleText}"
+                             FontSize="13" FontWeight="Bold" TextWrapping="Wrap" />
+                </Border>
+                <Panel>
+                  <views:SlimeMascot Classes="hero-slime" Pose="{Binding Mascot.Pose}" HorizontalAlignment="Center" />
+                  <!-- Três traços curtos acima e à direita do slime, como no mockup (decoração) -->
+                  <Path Classes="hero-sparkle wide-only" Data="M 2 0 L 4 8 M 12 4 L 9 11 M 20 12 L 13 15" />
+                </Panel>
+              </StackPanel>
+            </Grid>
           </Border>
-          <views:SlimeMascot Classes="hero-slime" Pose="{Binding Mascot.Pose}" HorizontalAlignment="Center" />
-        </StackPanel>
-      </Grid>
-    </Border>
 
-    <!-- A linha do rótulo tem a mesma altura nos três blocos (SharedSizeGroup): os valores ficam alinhados mesmo
-         quando um rótulo quebra em duas linhas na tela estreita -->
-    <UniformGrid Classes="tiles" Grid.IsSharedSizeScope="True" Margin="0,0,0,16">
-      <Border Classes="stat">
-        <Grid>
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" SharedSizeGroup="StatLabel" />
-            <RowDefinition Height="Auto" />
-          </Grid.RowDefinitions>
-          <TextBlock Classes="stat-label" Text="Em andamento" />
-          <TextBlock Grid.Row="1" Classes="stat-value" Text="{Binding InProgress}" />
-        </Grid>
-      </Border>
-      <Border Classes="stat">
-        <Grid>
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" SharedSizeGroup="StatLabel" />
-            <RowDefinition Height="Auto" />
-          </Grid.RowDefinitions>
-          <TextBlock Classes="stat-label" Text="Concluídas hoje" />
-          <TextBlock Grid.Row="1" Classes="stat-value" Text="{Binding Completed}" />
-        </Grid>
-      </Border>
-      <Border Classes="stat">
-        <Grid>
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" SharedSizeGroup="StatLabel" />
-            <RowDefinition Height="Auto" />
-          </Grid.RowDefinitions>
-          <TextBlock Classes="stat-label" Text="Sequência" />
-          <!-- A meta da sequência fica ao lado do valor na tela larga e embaixo na estreita (estilo stat-caption) -->
-          <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*" RowDefinitions="Auto,Auto">
-            <TextBlock Classes="stat-value" Text="{Binding StreakValue}" />
-            <TextBlock Grid.Column="1" Classes="stat-unit" Text="{Binding StreakUnit}" />
-            <TextBlock Classes="stat-caption" Text="{Binding StreakGoal}"
-                       IsVisible="{Binding StreakGoal, Converter={x:Static ObjectConverters.IsNotNull}}" />
-          </Grid>
-        </Grid>
-      </Border>
-    </UniformGrid>
-
-    <Border Classes="warning-band" Margin="0,0,0,12"
-            IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
-      <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
-    </Border>
-
-    <!-- Sessão de Pomodoro aberta: o ▶ dos cartões fica desligado, e a faixa leva à aba Tempo (spec Pomodoro §4.1) -->
-    <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasFocusBand}">
-      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-        <TextBlock Text="{Binding FocusBandText}" VerticalAlignment="Center" TextWrapping="Wrap" />
-        <Button Grid.Column="1" Classes="ghost" Content="Abrir Tempo" Command="{Binding OpenTimePageCommand}" />
-      </Grid>
-    </Border>
-
-    <!-- Cronômetro de meta fora da lista de hoje (ex.: dia inativo): ainda dá para parar ou descartar -->
-    <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasOffscreenTimer}">
-      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-        <TextBlock Text="{Binding OffscreenTimerText}" VerticalAlignment="Center" TextWrapping="Wrap" />
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-          <Button Classes="ghost" Content="Parar" IsVisible="{Binding IsOffscreenTimerRunning}"
-                  Command="{Binding StopOffscreenTimerCommand}" />
-          <Button Classes="ghost" Content="Descartar" Command="{Binding DiscardOffscreenTimerCommand}" />
-        </StackPanel>
-      </Grid>
-    </Border>
-
-    <!-- Permissões dos lembretes em falta (Android) -->
-    <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasPermissionWarning}">
-      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-        <TextBlock Text="{Binding PermissionWarning}" VerticalAlignment="Center" TextWrapping="Wrap" />
-        <Button Grid.Column="1" Classes="ghost" MinHeight="44" Content="Permitir" Command="{Binding RequestPermissionCommand}" />
-      </Grid>
-    </Border>
-
-    <!-- Sincronização parada há dias (conta ligada) -->
-    <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasSyncWarning}">
-      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-        <TextBlock Text="{Binding SyncWarning}" VerticalAlignment="Center" TextWrapping="Wrap" />
-        <Button Grid.Column="1" Classes="ghost" MinHeight="44" Content="Abrir" Command="{Binding OpenSyncCommand}" />
-      </Grid>
-    </Border>
-
-    <!-- Lembretes pausados (mesmo estilo da faixa do cronômetro) -->
-    <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding IsPaused}">
-      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-        <TextBlock Text="Lembretes pausados" VerticalAlignment="Center" TextWrapping="Wrap" />
-        <Button Grid.Column="1" Classes="ghost" Content="Retomar" Command="{Binding TogglePauseCommand}" />
-      </Grid>
-    </Border>
-
-    <!-- Cabeçalho da lista; "Pausar lembretes" fica aqui para valer mesmo sem próximos lembretes -->
-    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-      <TextBlock Classes="section-title" Text="Metas de hoje" VerticalAlignment="Center" />
-      <Button Grid.Column="1" Classes="ghost" Content="Pausar lembretes"
-              IsVisible="{Binding CanPause}" Command="{Binding TogglePauseCommand}" />
-    </Grid>
-
-    <!-- Filtro por tags: "Limpar" fixo à esquerda, só com seleção; os chips rolam de lado (nunca quebram) -->
-    <StackPanel Spacing="8" Margin="0,0,0,12" DataContext="{Binding Filter}"
-                x:DataType="vm:TodayTagFilterViewModel" IsVisible="{Binding IsVisible}">
-      <Grid ColumnDefinitions="Auto,*">
-        <Button Classes="ghost" Content="✕ Limpar" MinHeight="36" Padding="12,0" Margin="0,0,8,0" VerticalAlignment="Center"
-                IsVisible="{Binding HasSelection}" Command="{Binding ClearCommand}" />
-        <Panel Grid.Column="1">
-          <ScrollViewer x:Name="TagStrip" HorizontalScrollBarVisibility="Hidden"
-                        VerticalScrollBarVisibility="Disabled">
-            <ItemsControl x:Name="TagChips" ItemsSource="{Binding Chips}">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                  <StackPanel Orientation="Horizontal" Spacing="8" />
-                </ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:TagChipViewModel">
-                  <views:TagChip Command="{Binding $parent[ItemsControl].((vm:TodayTagFilterViewModel)DataContext).ToggleCommand}" />
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </ScrollViewer>
-          <!-- Há mais chips à direita: esmaecido até o fundo da página e a seta "›" que rola um passo (spec §4.8) -->
-          <Border x:Name="TagStripFade" Width="60" HorizontalAlignment="Right" IsHitTestVisible="False" IsVisible="False"
-                  Background="{DynamicResource Bg}">
-            <Border.OpacityMask>
-              <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
-                <GradientStop Offset="0" Color="#00000000" />
-                <GradientStop Offset="1" Color="#FF000000" />
-              </LinearGradientBrush>
-            </Border.OpacityMask>
-          </Border>
-          <Button x:Name="TagStripMore" Width="28" Height="28" MinHeight="28" Padding="0" CornerRadius="14"
-                  HorizontalAlignment="Right" VerticalAlignment="Center" IsVisible="False"
-                  Background="{DynamicResource Surface2}" AutomationProperties.Name="Mais tags" ToolTip.Tip="Mais tags"
-                  Click="OnTagStripMore">
-            <TextBlock Text="›" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-          </Button>
-        </Panel>
-      </Grid>
-      <TextBlock Text="{Binding SummaryText}" Foreground="{DynamicResource Muted}" FontSize="13"
-                 IsVisible="{Binding HasSelection}" />
-    </StackPanel>
-
-    <!-- Sem metas: o aviso logo abaixo do cabeçalho, sem a lista nem os próximos lembretes -->
-    <TextBlock Text="{Binding EmptyMessage}" IsVisible="{Binding IsEmpty}" Foreground="{DynamicResource Muted}"
-               HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" FontSize="15" Margin="0,24" />
-        <StackPanel IsVisible="{Binding !IsEmpty}">
-        <ItemsControl ItemsSource="{Binding Goals}" Margin="0,0,0,14">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:TodayGoalViewModel">
-              <Border Classes="card today" Classes.met="{Binding IsMet}" Margin="0,0,0,10" IsVisible="{Binding IsShown}">
-                <StackPanel Spacing="12">
-                  <!-- Duas linhas: a segunda só tem, sob os botões, o próximo lembrete (decisão 15 da interface no Android) -->
-                  <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="14">
-                    <Border Classes="icon-tile" Grid.RowSpan="2"
-                            Background="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Bg}">
-                      <Viewbox Width="22" Height="22">
-                        <Canvas Width="24" Height="24">
-                          <Path Classes="goal-icon" Data="{Binding IconKey, Converter={StaticResource IconGeometry}}"
-                                Stroke="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
-                        </Canvas>
-                      </Viewbox>
-                    </Border>
-
-                    <StackPanel Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center" Spacing="6">
-                      <DockPanel LastChildFill="True">
-                        <!-- Meta cumprida: a palavra na tela larga; na estreita, o ✓ dos Relatórios, que não espreme o título -->
-                        <TextBlock DockPanel.Dock="Right" Classes="met-tag" Classes.met="{Binding IsMet}" Text="concluída" />
-                        <Path DockPanel.Dock="Right" Classes="met-icon in-title" Classes.met="{Binding IsMet}"
-                              Data="{StaticResource IconCheck}" AutomationProperties.Name="concluída" ToolTip.Tip="Concluída" />
-                        <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                      </DockPanel>
-                      <!-- Na tela estreita o tempo corrido vem para cá: ao lado dos botões ele espremia o título -->
-                      <TextBlock Classes="elapsed narrow" Classes.running="{Binding IsTimerRunning}" Text="{Binding Elapsed}" />
-                      <TextBlock Text="{Binding ProgressText}" Foreground="{DynamicResource Muted}" FontSize="13"
-                                 TextWrapping="Wrap" />
-                    </StackPanel>
-
-                    <!-- Controles por medida -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                      <!-- Conclusão -->
-                      <Button Classes="ghost icon" AutomationProperties.Name="Desmarcar" ToolTip.Tip="Desmarcar"
-                              IsVisible="{Binding IsCompletion}" IsEnabled="{Binding IsMet}"
-                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).UncompleteCommand}"
-                              CommandParameter="{Binding}">
-                        <Path Classes="btn-icon" Data="{StaticResource IconX}" />
-                      </Button>
-                      <Button Classes="primary icon" AutomationProperties.Name="Feito" ToolTip.Tip="Marcar como feito"
-                              IsVisible="{Binding IsCompletion}" IsEnabled="{Binding !IsMet}"
-                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).CompleteCommand}"
-                              CommandParameter="{Binding}">
-                        <Path Classes="btn-icon" Data="{StaticResource IconCheck}" />
-                      </Button>
-                      <!-- Quantidade -->
-                      <Button Classes="ghost icon" IsVisible="{Binding IsQuantity}"
-                              AutomationProperties.Name="Remover 1" ToolTip.Tip="Remover 1"
-                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).DecrementCommand}"
-                              CommandParameter="{Binding}">
-                        <Path Classes="btn-icon" Data="{StaticResource IconMinus}" />
-                      </Button>
-                      <Button Classes="primary icon" IsVisible="{Binding IsQuantity}"
-                              AutomationProperties.Name="Adicionar 1" ToolTip.Tip="Adicionar 1"
-                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).IncrementCommand}"
-                              CommandParameter="{Binding}">
-                        <Path Classes="btn-icon" Data="{StaticResource IconPlus}" />
-                      </Button>
-                      <!-- Tempo -->
-                      <TextBlock Classes="elapsed wide" Classes.running="{Binding IsTimerRunning}" Text="{Binding Elapsed}" />
-                      <Button Classes="primary icon" AutomationProperties.Name="Iniciar cronômetro" ToolTip.Tip="Iniciar cronômetro"
-                              IsEnabled="{Binding CanStartTimer}"
-                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).StartTimerCommand}"
-                              CommandParameter="{Binding}">
-                        <Button.IsVisible>
-                          <MultiBinding Converter="{x:Static BoolConverters.And}">
-                            <Binding Path="IsDuration" />
-                            <Binding Path="HasNoTimer" />
-                          </MultiBinding>
-                        </Button.IsVisible>
-                        <Path Classes="btn-icon" Data="{StaticResource IconPlay}" />
-                      </Button>
-                      <!-- No modo de troca, Trocar e Cancelar ocupam o lugar de ⇄ e ■ (abaixo do campo) -->
-                      <Button Classes="danger-solid icon" AutomationProperties.Name="Parar cronômetro" ToolTip.Tip="Parar cronômetro"
-                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).StopTimerCommand}"
-                              CommandParameter="{Binding}">
-                        <Button.IsVisible>
-                          <MultiBinding Converter="{x:Static BoolConverters.And}">
-                            <Binding Path="IsTimerRunning" />
-                            <Binding Path="!IsSwitchingTask" />
-                          </MultiBinding>
-                        </Button.IsVisible>
-                        <Path Classes="btn-icon" Data="{StaticResource IconStop}" />
-                      </Button>
-                      <!-- Mais opções (só tempo) -->
-                      <Button Classes="ghost icon" AutomationProperties.Name="Lançar tempo" ToolTip.Tip="Lançar ou remover tempo"
-                              IsVisible="{Binding IsDuration}"
-                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).OpenPanelCommand}"
-                              CommandParameter="{Binding}">
-                        <Path Classes="btn-icon" Data="{StaticResource IconEllipsis}" />
-                      </Button>
-                    </StackPanel>
-
-                    <StackPanel Grid.Row="1" Grid.Column="2" Classes="next-reminder" IsVisible="{Binding HasNextReminder}"
-                                ToolTip.Tip="Próximo lembrete">
-                      <Path Data="{StaticResource IconBell}" />
-                      <TextBlock Text="{Binding NextReminder}" />
-                    </StackPanel>
-                  </Grid>
-
-                  <!-- Tarefa do cronômetro rodando: na largura do cartão, para não espremer o título na tela estreita -->
-                  <StackPanel Spacing="8" IsVisible="{Binding IsTimerRunning}">
-                    <!-- Nome gravado: texto, e não campo, é a confirmação de que ele está valendo (spec §7.1).
-                         ✎ e ⇄ aqui, e não junto do ■: a 320 px, três botões no cabeçalho cortavam o título e o tempo -->
-                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding ShowsTaskLabel}">
-                      <TextBlock Text="{Binding TaskLabel}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"
-                                 TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding TimerTask}" />
-                      <Button Grid.Column="1" Classes="ghost icon" AutomationProperties.Name="Editar tarefa" ToolTip.Tip="Editar tarefa"
-                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).BeginEditTaskCommand}"
-                              CommandParameter="{Binding}" Click="OnEditTaskClick">
-                        <Path Classes="btn-icon" Data="{StaticResource IconPencil}" />
-                      </Button>
-                      <Button Grid.Column="2" Classes="ghost icon" AutomationProperties.Name="Trocar de tarefa" ToolTip.Tip="Trocar de tarefa"
-                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).BeginSwitchTaskCommand}"
-                              CommandParameter="{Binding}">
-                        <Path Classes="btn-icon" Data="{StaticResource IconSwap}" />
-                      </Button>
-                    </Grid>
-                    <!-- Sem nome, editando ou trocando: o campo, com ✓ (e ✕ ao editar um nome que já existe) -->
-                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding ShowsTaskField}">
-                      <AutoCompleteBox Classes="timer-task" Text="{Binding TaskInput, Mode=TwoWay}" ItemsSource="{Binding TaskSuggestions}"
-                                       PlaceholderText="No que está trabalhando?" FilterMode="Contains" MinimumPrefixLength="0"
-                                       MaxLength="{x:Static services:CheckinService.MaxNoteLength}"
-                                       AutomationProperties.Name="Tarefa" SelectionChanged="OnTaskSelectionChanged" />
-                      <Button Grid.Column="1" Classes="primary icon" AutomationProperties.Name="Confirmar tarefa" ToolTip.Tip="Confirmar tarefa"
-                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).SaveTaskCommand}"
-                              CommandParameter="{Binding}" IsVisible="{Binding ShowsConfirmTask}">
-                        <Path Classes="btn-icon" Data="{StaticResource IconCheck}" />
-                      </Button>
-                      <Button Grid.Column="2" Classes="ghost icon" AutomationProperties.Name="Cancelar edição" ToolTip.Tip="Cancelar edição"
-                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).CancelEditTaskCommand}"
-                              CommandParameter="{Binding}" IsVisible="{Binding IsEditingTask}">
-                        <Path Classes="btn-icon" Data="{StaticResource IconX}" />
-                      </Button>
-                    </Grid>
-                    <!-- Trocar de tarefa: os botões abaixo do campo, como no painel de registro, para não espremê-lo no celular -->
-                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" IsVisible="{Binding IsSwitchingTask}">
-                      <Button Classes="ghost" Content="Cancelar"
-                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).CancelSwitchTaskCommand}"
-                              CommandParameter="{Binding}" />
-                      <Button Classes="primary" Content="Trocar"
-                              Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).ConfirmSwitchTaskCommand}"
-                              CommandParameter="{Binding}" />
-                    </StackPanel>
+          <!-- A linha do rótulo tem a mesma altura nos três blocos (SharedSizeGroup): os valores ficam alinhados mesmo
+               quando um rótulo quebra em duas linhas na tela estreita -->
+          <UniformGrid Classes="tiles" Grid.IsSharedSizeScope="True">
+            <Border Classes="stat">
+              <Panel>
+                <Grid Classes="phone-only">
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" SharedSizeGroup="StatLabel" />
+                    <RowDefinition Height="Auto" />
+                  </Grid.RowDefinitions>
+                  <TextBlock Classes="stat-label" Text="Em andamento" />
+                  <TextBlock Grid.Row="1" Classes="stat-value" Text="{Binding InProgress}" />
+                </Grid>
+                <Grid Classes="wide-only stat-wide" ColumnDefinitions="Auto,*">
+                  <Border Classes="stat-icon progress">
+                    <!-- Na grade 24×24 do ícone: com Stretch, o ícone que não é quadrado encostava no alto do círculo -->
+                    <Viewbox Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+                      <Canvas Width="24" Height="24">
+                        <Path Classes="stat-icon-path" Data="{StaticResource IconPlay}" />
+                      </Canvas>
+                    </Viewbox>
+                  </Border>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Classes="stat-wide-value" Text="{Binding InProgress}" />
+                    <TextBlock Classes="stat-wide-label" Text="Em andamento" />
                   </StackPanel>
+                </Grid>
+              </Panel>
+            </Border>
+            <Border Classes="stat">
+              <Panel>
+                <Grid Classes="phone-only">
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" SharedSizeGroup="StatLabel" />
+                    <RowDefinition Height="Auto" />
+                  </Grid.RowDefinitions>
+                  <TextBlock Classes="stat-label" Text="Concluídas hoje" />
+                  <TextBlock Grid.Row="1" Classes="stat-value" Text="{Binding Completed}" />
+                </Grid>
+                <Grid Classes="wide-only stat-wide" ColumnDefinitions="Auto,*">
+                  <Border Classes="stat-icon done">
+                    <!-- Na grade 24×24 do ícone: com Stretch, o ícone que não é quadrado encostava no alto do círculo -->
+                    <Viewbox Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+                      <Canvas Width="24" Height="24">
+                        <Path Classes="stat-icon-path" Data="{StaticResource IconCheck}" />
+                      </Canvas>
+                    </Viewbox>
+                  </Border>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Classes="stat-wide-value" Text="{Binding Completed}" />
+                    <TextBlock Classes="stat-wide-label" Text="{Binding CompletedLabel}" />
+                  </StackPanel>
+                </Grid>
+              </Panel>
+            </Border>
+            <Border Classes="stat streak">
+              <Grid>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" SharedSizeGroup="StatLabel" />
+                  <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock Classes="stat-label" Text="Sequência" />
+                <!-- A meta da sequência fica ao lado do valor na tela larga e embaixo na estreita (estilo stat-caption).
+                     Sem sequência, a linha fica reservada (um espaço): ao aparecer a meta, os três blocos cresciam juntos -->
+                <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*" RowDefinitions="Auto,Auto">
+                  <TextBlock Classes="stat-value" Text="{Binding StreakValue}" />
+                  <TextBlock Grid.Column="1" Classes="stat-unit" Text="{Binding StreakUnit}" />
+                  <TextBlock Classes="stat-caption" Text="{Binding StreakGoal, TargetNullValue=' '}" />
+                </Grid>
+              </Grid>
+            </Border>
+          </UniformGrid>
 
-                  <!-- Barra na largura do cartão: igual em todos, sem depender dos botões ao lado do texto -->
-                  <ProgressBar Classes="goal" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
+          <!-- Esta semana: só na coluna ao lado (side); a vaga some fora dela, e o cartão some sem dados -->
+          <Panel Classes="today-week-slot">
+            <Border Classes="card" IsVisible="{Binding HasWeekBars}">
+              <StackPanel Spacing="12">
+                <TextBlock Classes="section-title" Text="Esta semana" />
+                <ItemsControl ItemsSource="{Binding WeekBars}" Height="104">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <UniformGrid Rows="1" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:TodayWeekBarViewModel">
+                      <StackPanel VerticalAlignment="Bottom" Spacing="6">
+                        <Border Classes="week-bar" Classes.today="{Binding IsToday}" Height="{Binding BarHeight}" />
+                        <TextBlock Text="{Binding Label}" FontSize="11" Foreground="{DynamicResource Muted}"
+                                   HorizontalAlignment="Center" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="Metas com progresso por dia" FontSize="12" Foreground="{DynamicResource Muted}" />
+              </StackPanel>
+            </Border>
+          </Panel>
+        </Grid>
 
-                  <!-- Tags da meta: chips pequenos, só se ela tem tags -->
-                  <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}">
+        <StackPanel Classes="today-main">
+          <Border Classes="warning-band" Margin="0,0,0,12"
+                  IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
+          </Border>
+
+          <!-- Sessão de Pomodoro aberta: o ▶ dos cartões fica desligado, e a faixa leva à aba Tempo (spec Pomodoro §4.1) -->
+          <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasFocusBand}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+              <TextBlock Text="{Binding FocusBandText}" VerticalAlignment="Center" TextWrapping="Wrap" />
+              <Button Grid.Column="1" Classes="ghost" Content="Abrir Tempo" Command="{Binding OpenTimePageCommand}" />
+            </Grid>
+          </Border>
+
+          <!-- Cronômetro de meta fora da lista de hoje (ex.: dia inativo): ainda dá para parar ou descartar -->
+          <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasOffscreenTimer}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+              <TextBlock Text="{Binding OffscreenTimerText}" VerticalAlignment="Center" TextWrapping="Wrap" />
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button Classes="ghost" Content="Parar" IsVisible="{Binding IsOffscreenTimerRunning}"
+                        Command="{Binding StopOffscreenTimerCommand}" />
+                <Button Classes="ghost" Content="Descartar" Command="{Binding DiscardOffscreenTimerCommand}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <!-- Permissões dos lembretes em falta (Android) -->
+          <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasPermissionWarning}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+              <TextBlock Text="{Binding PermissionWarning}" VerticalAlignment="Center" TextWrapping="Wrap" />
+              <Button Grid.Column="1" Classes="ghost" MinHeight="44" Content="Permitir" Command="{Binding RequestPermissionCommand}" />
+            </Grid>
+          </Border>
+
+          <!-- Sincronização parada há dias (conta ligada) -->
+          <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding HasSyncWarning}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+              <TextBlock Text="{Binding SyncWarning}" VerticalAlignment="Center" TextWrapping="Wrap" />
+              <Button Grid.Column="1" Classes="ghost" MinHeight="44" Content="Abrir" Command="{Binding OpenSyncCommand}" />
+            </Grid>
+          </Border>
+
+          <!-- Lembretes pausados (mesmo estilo da faixa do cronômetro), só no celular: no desktop o sino cortado do
+               cabeçalho já mostra a pausa e retoma com um toque (decisão 21). Num painel: o IsVisible local da faixa
+               venceria o estilo phone-only -->
+          <Panel Classes="phone-only">
+            <Border Classes="inline-panel" Margin="0,0,0,12" IsVisible="{Binding IsPaused}">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                <TextBlock Text="Lembretes pausados" VerticalAlignment="Center" TextWrapping="Wrap" />
+                <Button Grid.Column="1" Classes="ghost" Content="Retomar" Command="{Binding TogglePauseCommand}" />
+              </Grid>
+            </Border>
+          </Panel>
+
+          <!-- Cabeçalho da lista; "Pausar lembretes" fica aqui para valer mesmo sem próximos lembretes -->
+          <Grid ColumnDefinitions="*,Auto" Classes="today-list-header">
+            <TextBlock Classes="section-title phone-only" Text="Metas de hoje" VerticalAlignment="Center" />
+            <TextBlock Classes="section-title today-list-title wide-only" Text="Suas metas de hoje" VerticalAlignment="Center" />
+            <!-- No desktop a pausa fica no sino do cabeçalho -->
+            <Panel Grid.Column="1" Classes="phone-only">
+              <Button Classes="ghost" Content="Pausar lembretes"
+                      IsVisible="{Binding CanPause}" Command="{Binding TogglePauseCommand}" />
+            </Panel>
+          </Grid>
+
+          <!-- Filtro por tags: "Limpar" fixo à esquerda, só com seleção; os chips rolam de lado (nunca quebram) -->
+          <StackPanel Spacing="8" Margin="0,0,0,12" DataContext="{Binding Filter}"
+                      x:DataType="vm:TodayTagFilterViewModel" IsVisible="{Binding IsVisible}">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <Button Classes="ghost" Content="✕ Limpar" MinHeight="36" Padding="12,0" Margin="0,0,8,0" VerticalAlignment="Center"
+                      IsVisible="{Binding HasSelection}" Command="{Binding ClearCommand}" />
+              <Panel Grid.Column="1">
+                <ScrollViewer x:Name="TagStrip" HorizontalScrollBarVisibility="Hidden"
+                              VerticalScrollBarVisibility="Disabled">
+                  <ItemsControl x:Name="TagChips" ItemsSource="{Binding Chips}">
                     <ItemsControl.ItemsPanel>
                       <ItemsPanelTemplate>
-                        <WrapPanel ItemSpacing="6" LineSpacing="6" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" />
                       </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:TagChipViewModel">
-                        <views:TagChip Classes="small" IsHitTestVisible="False" Focusable="False" />
+                        <views:TagChip Command="{Binding $parent[ItemsControl].((vm:TodayTagFilterViewModel)DataContext).ToggleCommand}" />
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
-
-                  <!-- Trechos de hoje (spec §7.2): recolhível, fechado por padrão; o editor abre no lugar da linha -->
-                  <StackPanel Spacing="6" IsVisible="{Binding HasChunks}">
-                    <Button Classes="ghost chunks-toggle" AutomationProperties.Name="Trechos de hoje"
-                            Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).ToggleChunksCommand}"
-                            CommandParameter="{Binding}">
-                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                        <TextBlock Text="{Binding ChunksHeader}" VerticalAlignment="Center" />
-                        <Path Grid.Column="1" Classes="btn-icon chunks-chevron" Classes.open="{Binding IsChunksOpen}"
-                              Data="{StaticResource IconChevronDown}" />
-                      </Grid>
-                    </Button>
-                    <ItemsControl ItemsSource="{Binding Chunks}" IsVisible="{Binding IsChunksOpen}">
-                      <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                          <StackPanel Spacing="6" />
-                        </ItemsPanelTemplate>
-                      </ItemsControl.ItemsPanel>
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:TodayChunkViewModel">
-                          <StackPanel>
-                            <!-- Linha: nome, tempo e ✎; a coluna do ✎ fica reservada (44, a largura do Button.icon) para o
-                                 tempo do trecho em andamento e o da compensação ficarem alinhados com os outros -->
-                            <Grid ColumnDefinitions="*,Auto,44" ColumnSpacing="8" MinHeight="44" IsVisible="{Binding !IsEditing}">
-                              <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                                         ToolTip.Tip="{Binding Name}" />
-                              <TextBlock Grid.Column="1" Classes.running="{Binding IsRunning}" Text="{Binding Text}"
-                                         VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
-                              <Button Grid.Column="2" Classes="ghost icon" AutomationProperties.Name="Ajustar trecho" ToolTip.Tip="Ajustar trecho"
-                                      Command="{Binding $parent[UserControl].((vm:TodayPageViewModel)DataContext).EditChunkCommand}" CommandParameter="{Binding}"
-                                      IsVisible="{Binding ShowsEditButton}">
-                                <Path Classes="btn-icon" Data="{StaticResource IconPencil}" />
-                              </Button>
-                            </Grid>
-                            <!-- Editor no lugar da linha -->
-                            <Border Classes="inline-panel" IsVisible="{Binding IsEditing}">
-                              <StackPanel Spacing="10">
-                                <!-- Título com Apagar à direita: na linha de Cancelar e Salvar ele não cabia a 320 px -->
-                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                                  <TextBlock Text="Ajustar trecho" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" />
-                                  <Button Grid.Column="1" Classes="danger" Content="Apagar"
-                                          Command="{Binding $parent[UserControl].((vm:TodayPageViewModel)DataContext).DeleteChunkCommand}"
-                                          CommandParameter="{Binding}" />
+                </ScrollViewer>
+                <!-- Há mais chips à direita: esmaecido até o fundo da página e a seta "›" que rola um passo (spec §4.8) -->
+                <Border x:Name="TagStripFade" Width="60" HorizontalAlignment="Right" IsHitTestVisible="False" IsVisible="False"
+                        Background="{DynamicResource Bg}">
+                  <Border.OpacityMask>
+                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                      <GradientStop Offset="0" Color="#00000000" />
+                      <GradientStop Offset="1" Color="#FF000000" />
+                    </LinearGradientBrush>
+                  </Border.OpacityMask>
+                </Border>
+                <Button x:Name="TagStripMore" Width="28" Height="28" MinHeight="28" Padding="0" CornerRadius="14"
+                        HorizontalAlignment="Right" VerticalAlignment="Center" IsVisible="False"
+                        Background="{DynamicResource Surface2}" AutomationProperties.Name="Mais tags" ToolTip.Tip="Mais tags"
+                        Click="OnTagStripMore">
+                  <TextBlock Text="›" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+              </Panel>
+              <!-- Todas as tags, com busca, no desktop (decisão 19): marcar ali é o mesmo que tocar o chip da linha -->
+              <Button Grid.Column="2" Classes="ghost all-tags wide-only" Content="Todas as tags"
+                      AutomationProperties.Name="Todas as tags">
+                <Button.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedRight" FlyoutPresenterClasses="tags-flyout">
+                    <StackPanel Width="280" Spacing="10">
+                      <TextBox Text="{Binding SearchText}" PlaceholderText="Buscar tag" />
+                      <TextBlock Text="Nenhuma tag com esse nome." FontSize="13" Foreground="{DynamicResource Muted}"
+                                 Margin="4,2" IsVisible="{Binding HasNoSearchResults}" />
+                      <ScrollViewer MaxHeight="320" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="AllTagsList" ItemsSource="{Binding SearchResults}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TagChipViewModel">
+                              <Button Classes="tag-option" AutomationProperties.Name="{Binding DisplayName}"
+                                      Command="{Binding $parent[ItemsControl].((vm:TodayTagFilterViewModel)DataContext).ToggleCommand}"
+                                      CommandParameter="{Binding}">
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
+                                  <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                           Fill="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
+                                  <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontSize="14" FontWeight="SemiBold"
+                                             VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                  <TextBlock Grid.Column="2" Text="{Binding Count}" FontSize="13"
+                                             Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
+                                  <Path Grid.Column="3" Classes="tag-option-check" Data="{StaticResource IconCheck}"
+                                        IsVisible="{Binding IsSelected}" />
                                 </Grid>
-                                <!-- Horas, minutos e segundos, quebrando linha quando não cabem -->
-                                <WrapPanel ItemSpacing="16" LineSpacing="10">
-                                  <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <NumericUpDown Value="{Binding HoursInput}" Minimum="0" Maximum="24" Increment="1"
-                                                   FormatString="0" Width="110" AutomationProperties.Name="Horas" />
-                                    <TextBlock Text="h" VerticalAlignment="Center" />
-                                  </StackPanel>
-                                  <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <NumericUpDown Value="{Binding MinutesInput}" Minimum="0" Maximum="59" Increment="1"
-                                                   FormatString="0" Width="110" AutomationProperties.Name="Minutos" />
-                                    <TextBlock Text="min" VerticalAlignment="Center" />
-                                  </StackPanel>
-                                  <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <NumericUpDown Value="{Binding SecondsInput}" Minimum="0" Maximum="59" Increment="1"
-                                                   FormatString="0" Width="110" AutomationProperties.Name="Segundos" />
-                                    <TextBlock Text="s" VerticalAlignment="Center" />
-                                  </StackPanel>
-                                </WrapPanel>
-                                <TextBox Text="{Binding NoteInput}" MaxLength="{x:Static services:CheckinService.MaxNoteLength}"
-                                         PlaceholderText="Nome (opcional)" AutomationProperties.Name="Nome do trecho" />
-                                <TextBlock Classes="field-error" Text="{Binding Error}" TextWrapping="Wrap"
-                                           IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                                  <Button Classes="ghost" Content="Cancelar"
-                                          Command="{Binding $parent[UserControl].((vm:TodayPageViewModel)DataContext).CancelChunkEditCommand}"
-                                          CommandParameter="{Binding}" />
-                                  <Button Classes="primary" Content="Salvar"
-                                          Command="{Binding $parent[UserControl].((vm:TodayPageViewModel)DataContext).SaveChunkCommand}"
-                                          CommandParameter="{Binding}" />
-                                </StackPanel>
-                              </StackPanel>
-                            </Border>
-                          </StackPanel>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                  </StackPanel>
-
-                  <!-- Painel de valor -->
-                  <Border Classes="inline-panel" IsVisible="{Binding IsPanelOpen}">
-                    <StackPanel Spacing="10">
-                      <Border Classes="segment" HorizontalAlignment="Left">
-                        <StackPanel Orientation="Horizontal">
-                          <RadioButton Classes="segment" Content="Adicionar" IsChecked="{Binding PanelAdds}" />
-                          <RadioButton Classes="segment" Content="Remover" IsChecked="{Binding PanelRemoves}" />
-                        </StackPanel>
-                      </Border>
-                      <!-- Horas e minutos quebram linha quando não cabem lado a lado (320 e 360 px) -->
-                      <WrapPanel ItemSpacing="16" LineSpacing="10">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                          <NumericUpDown Value="{Binding PanelHoursInput}" Minimum="0" Maximum="24" Increment="1"
-                                         FormatString="0" Width="110" AutomationProperties.Name="Horas" />
-                          <TextBlock Text="h" VerticalAlignment="Center" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                          <NumericUpDown Value="{Binding PanelMinutesInput}" Minimum="0" Maximum="59" Increment="1"
-                                         FormatString="0" Width="110" AutomationProperties.Name="Minutos" />
-                          <TextBlock Text="min" VerticalAlignment="Center" />
-                        </StackPanel>
-                      </WrapPanel>
-                      <TextBox Text="{Binding PanelNote}" MaxLength="{x:Static services:CheckinService.MaxNoteLength}" PlaceholderText="Nota (opcional)"
-                               AutomationProperties.Name="Nota" />
-                      <TextBlock Classes="field-error" Text="{Binding PanelError}"
-                                 IsVisible="{Binding PanelError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                        <Button Classes="ghost" Content="Cancelar"
-                                Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).CancelPanelCommand}"
-                                CommandParameter="{Binding}" />
-                        <Button Classes="primary" Content="Registrar"
-                                Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).ConfirmPanelCommand}"
-                                CommandParameter="{Binding}" />
-                      </StackPanel>
+                              </Button>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </ScrollViewer>
                     </StackPanel>
-                  </Border>
+                  </Flyout>
+                </Button.Flyout>
+              </Button>
+            </Grid>
+            <TextBlock Text="{Binding SummaryText}" Foreground="{DynamicResource Muted}" FontSize="13"
+                       IsVisible="{Binding HasSelection}" />
+          </StackPanel>
 
-                  <!-- Cronômetro parado: conferir e registrar -->
-                  <Border Classes="inline-panel" IsVisible="{Binding IsTimerStopped}">
-                    <StackPanel Spacing="10">
-                      <TextBlock Text="{Binding StoppedText}" TextWrapping="Wrap" Foreground="{DynamicResource Muted}" />
-                      <!-- Horas, minutos e segundos, quebrando linha quando não cabem -->
-                      <WrapPanel ItemSpacing="16" LineSpacing="10">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                          <NumericUpDown Value="{Binding StoppedHoursInput}" Minimum="0" Maximum="24" Increment="1"
-                                         FormatString="0" Width="110" AutomationProperties.Name="Horas cronometradas" />
-                          <TextBlock Text="h" VerticalAlignment="Center" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                          <NumericUpDown Value="{Binding StoppedMinutesInput}" Minimum="0" Maximum="59" Increment="1"
-                                         FormatString="0" Width="110" AutomationProperties.Name="Minutos cronometrados" />
-                          <TextBlock Text="min" VerticalAlignment="Center" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                          <NumericUpDown Value="{Binding StoppedSecondsInput}" Minimum="0" Maximum="59" Increment="1"
-                                         FormatString="0" Width="110" AutomationProperties.Name="Segundos cronometrados" />
-                          <TextBlock Text="s" VerticalAlignment="Center" />
-                        </StackPanel>
-                      </WrapPanel>
-                      <TextBox Text="{Binding PanelNote}" MaxLength="{x:Static services:CheckinService.MaxNoteLength}" PlaceholderText="Nota (opcional)"
-                               AutomationProperties.Name="Nota" />
-                      <TextBlock Classes="field-error" Text="{Binding PanelError}"
-                                 IsVisible="{Binding PanelError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                        <Button Classes="ghost" Content="Descartar"
-                                Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).DiscardTimerCommand}"
-                                CommandParameter="{Binding}" />
-                        <Button Classes="primary" Content="Registrar"
-                                Command="{Binding $parent[ItemsControl].((vm:TodayPageViewModel)DataContext).RegisterTimerCommand}"
-                                CommandParameter="{Binding}" />
-                      </StackPanel>
-                    </StackPanel>
-                  </Border>
-                </StackPanel>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <TextBlock Text="Nenhuma meta de hoje com essas tags." IsVisible="{Binding Filter.IsFilteredEmpty}"
-                   Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" FontSize="15" Margin="0,24,0,24" />
+          <!-- Sem metas: o aviso logo abaixo do cabeçalho, sem a lista nem os próximos lembretes -->
+          <TextBlock Text="{Binding EmptyMessage}" IsVisible="{Binding IsEmpty}" Foreground="{DynamicResource Muted}"
+                     HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" FontSize="15" Margin="0,24" />
+          <StackPanel IsVisible="{Binding !IsEmpty}">
+            <ItemsControl Classes="today-goals" ItemsSource="{Binding Goals}" Grid.IsSharedSizeScope="True" />
+            <TextBlock Text="Nenhuma meta de hoje com essas tags." IsVisible="{Binding Filter.IsFilteredEmpty}"
+                       Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" FontSize="15" Margin="0,24,0,24" />
+          </StackPanel>
         </StackPanel>
-      </StackPanel>
+      </Grid>
     </ScrollViewer>
   </DockPanel>
 </UserControl>

@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -17,10 +18,33 @@ using SlimeGoals.Sync;
 using ScrollViewer = Avalonia.Controls.ScrollViewer;
 using Window = Avalonia.Controls.Window;
 
-if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini" or "sync-warning" or "today-filter")))
+if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini" or "sync-warning" or "today-filter" or "wide" or "seed")))
 {
-    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning|today-filter]");
+    Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning|today-filter|wide]");
+    Console.Error.WriteLine("     dotnet run --project tools/SlimeGoals.Render -- <XDG_DATA_HOME de desenvolvimento> seed");
     return 1;
+}
+
+// Popula o banco de uma pasta de dados de desenvolvimento com a amostra, para abrir o app com metas. Nunca a pasta real.
+if (args is [_, "seed"])
+{
+    var dataHome = Path.TrimEndingDirectorySeparator(Path.GetFullPath(args[0]));
+    var realDataHome = Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share"));
+    if (dataHome == realDataHome)
+    {
+        Console.Error.WriteLine($"Recusado: {dataHome} é a pasta de dados real do app.");
+        return 1;
+    }
+    // O mesmo caminho do XdgPaths.DatabasePath do desktop: $XDG_DATA_HOME/SlimeGoals/slimegoals.db
+    var database = Path.Combine(dataHome, "SlimeGoals", "slimegoals.db");
+    Directory.CreateDirectory(Path.GetDirectoryName(database)!);
+    if (!Sample.SeedInto(database))
+    {
+        Console.Error.WriteLine($"Recusado: {database} já tem metas.");
+        return 1;
+    }
+    Console.WriteLine(database);
+    return 0;
 }
 
 var outDir = Path.GetFullPath(args[0]);
@@ -36,6 +60,12 @@ using var sample = new Sample();
 
 if (which is "phone" or "all")
     Render(true, "phone", 412, 915);
+if (which is "wide")
+{
+    RenderWide(1440, 900);
+    RenderWide(1920, 1080);
+    RenderWide(2544, 1358);
+}
 if (which is "desktop" or "all")
     Render(false, "desktop", 1100, 720);
 if (which == "narrow")
@@ -487,6 +517,35 @@ void RenderTodayTags(int width, int height)
     Pump();
     Capture($"today-filter-single-{width}.png");
     today.Filter.ClearCommand.Execute(null);
+    if (width >= 720)
+    {
+        // Desktop (decisão 19): "Todas as tags" com a busca "s" e o balão do "+N" da primeira meta; o balão é outro
+        // TopLevel, capturado sozinho
+        var allTags = window.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("all-tags"));
+        today.Filter.SearchText = "s";
+        today.Filter.ToggleCommand.Execute(today.Filter.Chips.Single(c => c.Name == "saúde"));
+        allTags.Flyout!.ShowAt(allTags);
+        Pump();
+        CapturePopup(allTags.Flyout, $"today-all-tags-{width}.png");
+        allTags.Flyout.Hide();
+        today.Filter.SearchText = "";
+        today.Filter.ClearCommand.Execute(null);
+        Pump();
+        var more = window.GetVisualDescendants().OfType<Button>().First(b => b.Classes.Contains("more-tags") && b.IsEffectivelyVisible);
+        more.Flyout!.ShowAt(more);
+        Pump();
+        CapturePopup(more.Flyout, $"today-more-tags-{width}.png");
+        more.Flyout.Hide();
+        Pump();
+        // Os lembretes pausados pelo sino do cabeçalho (decisão 21): o sino cortado; depois, retoma
+        today.TogglePauseCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+        today.LoadCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+        Pump();
+        Capture($"today-bell-paused-{width}.png");
+        today.TogglePauseCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+        today.LoadCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+        Pump();
+    }
     // O estado vazio que se alcança: nenhuma meta de hoje tem tag, então não há linha de filtros.
     // "Nenhuma meta de hoje com essas tags." não tem captura: hoje nenhuma combinação de chips esvazia a lista.
     var goalService = sample.Goals;
@@ -507,9 +566,15 @@ void RenderTodayTags(int width, int height)
                 .GetAwaiter().GetResult();
     }
 
-    void Capture(string name)
+    void Capture(string name) => Save(window, name);
+
+    // O balão aberto: o conteúdo vive no TopLevel do popup, e não na janela
+    void CapturePopup(FlyoutBase flyout, string name) =>
+        Save(TopLevel.GetTopLevel((Control)((Flyout)flyout).Content!)!, name);
+
+    void Save(TopLevel top, string name)
     {
-        var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para capturar.");
+        var frame = top.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para capturar.");
         using var stream = File.Create(Path.Combine(outDir, name));
 #pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
         frame.Save(stream);
@@ -629,6 +694,26 @@ void RenderTodayWithTimer(int width)
         }
         Console.WriteLine(path);
     }
+}
+
+void RenderWide(int width, int height)
+{
+    var shell = sample.CreateShell(false);
+    // A janela do app, com o zoom das janelas grandes (UiScale)
+    var window = new MainWindow { Width = width, Height = height, DataContext = shell, AllowClose = true };
+    window.Show();
+    shell.CurrentPage = shell.Pages.OfType<TodayPageViewModel>().Single();
+    Pump();
+    var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro.");
+    var path = Path.Combine(outDir, $"today-wide-{width}.png");
+    using (var stream = File.Create(path))
+    {
+#pragma warning disable CS0618
+        frame.Save(stream);
+#pragma warning restore CS0618
+    }
+    Console.WriteLine(path);
+    window.Close();
 }
 
 void Render(bool phone, string suffix, int width, int height)

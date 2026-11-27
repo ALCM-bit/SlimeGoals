@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SlimeGoals.Core.Domain;
@@ -30,6 +31,28 @@ public sealed partial class TodayTagFilterViewModel : ObservableObject
 
     /// <summary>Há seleção e nenhum cartão passa por ela.</summary>
     [ObservableProperty] public partial bool IsFilteredEmpty { get; private set; }
+
+    /// <summary>Busca de "Todas as tags" (desktop, decisão 19): parte do nome, sem diferença de maiúscula nem acento.</summary>
+    [ObservableProperty] public partial string SearchText { get; set; } = "";
+
+    /// <summary>Os chips da linha que casam com a busca, na mesma ordem; marcar um deles marca o chip da linha.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNoSearchResults))]
+    public partial IReadOnlyList<TagChipViewModel> SearchResults { get; private set; } = [];
+
+    public bool HasNoSearchResults => SearchResults.Count == 0;
+
+    private static readonly CompareInfo PtBr = CultureInfo.GetCultureInfo("pt-BR").CompareInfo;
+
+    partial void OnSearchTextChanged(string value) => Search();
+
+    private void Search()
+    {
+        var text = SearchText.Trim();
+        SearchResults = text.Length == 0 ? Chips.ToList()
+            : Chips.Where(c => PtBr.IndexOf(c.Name, text, CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace) >= 0)
+                .ToList();
+    }
 
     /// <summary>
     /// Pede à view que deixe à vista um dos chips dados: os marcados, depois de uma recarga (os chips são outros); o
@@ -72,6 +95,7 @@ public sealed partial class TodayTagFilterViewModel : ObservableObject
         Chips.Clear();
         foreach (var row in rows)
             Chips.Add(new TagChipViewModel(row.Name, row.Color, _selected.Contains(row.Name), row.Count));
+        Search();
         Apply();
         if (Chips.Where(c => c.IsSelected).ToList() is { Count: > 0 } selected)
             RevealRequested?.Invoke(this, selected);

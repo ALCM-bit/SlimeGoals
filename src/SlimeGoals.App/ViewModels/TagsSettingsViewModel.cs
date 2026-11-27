@@ -179,18 +179,23 @@ public sealed partial class TagRowViewModel : ObservableObject
         _owner = owner;
         _service = service;
         Name = summary.Name;
+        DisplayName = TagText.Display(Name);
         Color = summary.Color;
         _goalCount = summary.ActiveGoals + summary.ArchivedGoals;
         UsageText = BuildUsage(summary);
         DeleteQuestion = _goalCount switch
         {
-            0 => $"Excluir a tag \"{Name}\"?",
-            1 => $"Excluir a tag \"{Name}\"? Ela sai de 1 meta.",
-            var n => $"Excluir a tag \"{Name}\"? Ela sai de {n} metas.",
+            0 => $"Excluir a tag \"{DisplayName}\"?",
+            1 => $"Excluir a tag \"{DisplayName}\"? Ela sai de 1 meta.",
+            var n => $"Excluir a tag \"{DisplayName}\"? Ela sai de {n} metas.",
         };
     }
 
+    /// <summary>O nome gravado (normalizado, em minúsculas): é o que vai para o serviço.</summary>
     public string Name { get; }
+
+    /// <summary>O nome como aparece: "Saúde" (decisão 22).</summary>
+    public string DisplayName { get; }
 
     public GoalColor Color { get; }
 
@@ -267,7 +272,7 @@ public sealed partial class TagRowViewModel : ObservableObject
     {
         IsPickingColor = false;
         IsConfirmingDelete = false;
-        EditText = Name;
+        EditText = DisplayName; // ao gravar, a normalização volta às minúsculas
         EditError = null;
         IsEditing = true;
     }
@@ -287,7 +292,7 @@ public sealed partial class TagRowViewModel : ObservableObject
         {
             if (await _service.RenameNeedsMergeAsync(Name, EditText))
             {
-                MergeQuestion = $"Já existe a tag \"{TagName.Normalize(EditText)}\". Juntar as duas?";
+                MergeQuestion = $"Já existe a tag \"{TagText.Display(TagName.Normalize(EditText))}\". Juntar as duas?";
                 IsEditing = false;
                 IsConfirmingMerge = true;
                 return;

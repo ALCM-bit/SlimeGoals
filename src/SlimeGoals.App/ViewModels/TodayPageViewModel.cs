@@ -32,6 +32,8 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     private int _loadVersion;
     private int _syncWarningVersion;
     private ITimer? _ticker;
+    private ITimer? _minuteTicker;
+    private IReadOnlyList<UpcomingReminder> _upcoming = [];
     private SynchronizationContext? _ui;
     private ActiveTimer? _offscreenTimer;
     private string _offscreenTitle = "";
@@ -47,7 +49,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
 
     /// <summary>Lembretes pausados: a tela mostra a faixa "Lembretes pausados" e esconde os próximos.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PauseButtonText), nameof(CanPause))]
+    [NotifyPropertyChangedFor(nameof(PauseButtonText), nameof(CanPause), nameof(ShowNotificationCard))]
     public partial bool IsPaused { get; set; }
 
     public string PauseButtonText => IsPaused ? "Retomar lembretes" : "Pausar lembretes";
@@ -91,11 +93,52 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
 
     [ObservableProperty] public partial int WeekPercent { get; set; }
     [ObservableProperty] public partial int InProgress { get; set; }
-    [ObservableProperty] public partial int Completed { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CompletedLabel))]
+    public partial int Completed { get; set; }
+
+    /// <summary>Rótulo do bloco das concluídas no desktop: "Concluída" com 0 ou 1, "Concluídas" com mais.</summary>
+    public string CompletedLabel => Completed > 1 ? "Concluídas" : "Concluída";
+
+    /// <summary>Data de hoje por extenso, abaixo do título no desktop: "Quinta-feira, 27 de novembro".</summary>
+    [ObservableProperty] public partial string DateText { get; set; } = "";
+
+    /// <summary>
+    /// Cartão "Próxima notificação" do desktop: o próximo lembrete entre todas as metas. Quando os de hoje acabam, mostra
+    /// o seguinte, de amanhã ou de outro dia (decisão 19).
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNextNotification), nameof(ShowNotificationCard))]
+    public partial string? NextNotificationTitle { get; set; }
+
+    /// <summary>Quando: "Hoje às 11:34", "Amanhã às 08:00", "Sábado às 08:00" ou "11 de novembro às 08:00".</summary>
+    [ObservableProperty] public partial string? NextNotificationWhen { get; set; }
+
+    /// <summary>Quanto falta ("em 11 min"), atualizado a cada minuto; só para um lembrete de hoje.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNextNotificationIn))]
+    public partial string? NextNotificationIn { get; set; }
+
+    public bool HasNextNotification => NextNotificationTitle is not null;
+
+    public bool HasNextNotificationIn => NextNotificationIn is not null;
+
+    /// <summary>
+    /// O cartão ao lado do sino (desktop): com a próxima notificação ou, com a pausa, "Lembretes pausados" e "Retomar"
+    /// (decisão 21).
+    /// </summary>
+    public bool ShowNotificationCard => HasNextNotification || IsPaused;
+
+    /// <summary>A bolinha do sino: ainda há lembrete hoje.</summary>
+    [ObservableProperty] public partial bool HasReminderToday { get; set; }
     /// <summary>Tile "Sequência": maior sequência atual entre as metas ativas, com o título da meta.</summary>
     [ObservableProperty] public partial int StreakValue { get; set; }
     [ObservableProperty] public partial string StreakUnit { get; set; } = "dias";
     [ObservableProperty] public partial string? StreakGoal { get; set; }
+
+    /// <summary>"Esta semana" do painel lateral do desktop: metas com progresso por dia, como nos Relatórios.</summary>
+    public ObservableCollection<TodayWeekBarViewModel> WeekBars { get; } = [];
+    [ObservableProperty] public partial bool HasWeekBars { get; set; }
     [ObservableProperty] public partial string? ErrorMessage { get; set; }
 
     /// <summary>Cronômetro de meta que não está na lista de hoje (ex.: dia inativo): faixa com Parar/Descartar.</summary>
@@ -177,6 +220,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         var version = ++_loadVersion;
         ErrorMessage = null;
         RefreshPermissions();
+        DateText = LongDate(TimeZoneInfo.ConvertTime(time.GetUtcNow(), time.LocalTimeZone));
         try
         {
             await goals.ArchiveExpiredAsync();
@@ -241,6 +285,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             if (running is not null)
                 await LoadTaskSuggestionsAsync(running, version);
             await LoadStreakAsync(version);
+            await LoadWeekBarsAsync(version);
             await LoadUpcomingAsync(version);
             if (version == _loadVersion)
             {
@@ -313,6 +358,37 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         StreakUnit = highlight?.Goal.Recurrence == Recurrence.Weekly ? (one ? "semana" : "semanas") : (one ? "dia" : "dias");
     }
 
+    /// <summary>Altura da maior barra da semana, em px.</summary>
+    private const double WeekBarMaxHeight = 80;
+
+    /// <summary>Falha aqui só tira o gráfico da semana: o resto da tela Hoje continua valendo.</summary>
+    private async Task LoadWeekBarsAsync(int version)
+    {
+        WeekReport? report = null;
+        try
+        {
+            if (reports is not null)
+                report = await reports.GetWeekAsync(DateOnly.FromDateTime(time.GetLocalNow().DateTime));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Trace.TraceError($"Falha ao carregar a semana: {TraceText.Of(ex)}");
+        }
+        if (version != _loadVersion)
+            return;
+
+        WeekBars.Clear();
+        if (report is not null)
+        {
+            var today = DateOnly.FromDateTime(time.GetLocalNow().DateTime);
+            var max = Math.Max(1, report.Days.Max(d => d.Goals.Count));
+            foreach (var day in report.Days)
+                WeekBars.Add(new TodayWeekBarViewModel(ReportsPageViewModel.WeekLabels[((int)day.Day.DayOfWeek + 6) % 7],
+                    Math.Max(4, (double)day.Goals.Count / max * WeekBarMaxHeight), day.Day == today));
+        }
+        HasWeekBars = WeekBars.Count > 0;
+    }
+
     /// <summary>Hora do próximo lembrete em cada cartão. Falha aqui só tira as horas: o resto da tela Hoje continua valendo.</summary>
     private async Task LoadUpcomingAsync(int version)
     {
@@ -323,7 +399,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         try
         {
             paused = pause is not null && (await pause.GetAsync()).IsPaused;
-            upcoming = paused ? [] : await reminders.UpcomingTodayAsync();
+            upcoming = paused ? [] : await reminders.UpcomingAsync();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -334,8 +410,15 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             return;
 
         IsPaused = paused;
-        var next = upcoming.ToDictionary(u => u.Goal.Id,
-            u => TimeZoneInfo.ConvertTime(u.At, time.LocalTimeZone).ToString("HH:mm", CultureInfo.InvariantCulture));
+        _upcoming = upcoming;
+        UpdateNextNotification();
+        // Um só, pela vida da página (que vive com o app): o "em X min" anda mesmo sem recarga.
+        _minuteTicker ??= time.CreateTimer(_ => OnUi(UpdateNextNotification), null,
+            TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        // A hora na linha da meta é só a de hoje; a lista traz também os próximos dias, para o cartão.
+        var today = Today();
+        var next = upcoming.Where(u => DateOnly.FromDateTime(Local(u.At)) == today).ToDictionary(u => u.Goal.Id,
+            u => Local(u.At).ToString("HH:mm", CultureInfo.InvariantCulture));
         foreach (var card in Goals)
             card.NextReminder = next.GetValueOrDefault(card.Goal.Id);
     }
@@ -653,9 +736,65 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             _ui.Post(_ => action(), null);
     }
 
+    /// <summary>O menor disparo ainda por vir; o "em X min" e a bolinha do sino, só se ele cai hoje.</summary>
+    private void UpdateNextNotification()
+    {
+        var now = time.GetUtcNow();
+        var today = Today();
+        var next = _upcoming.Where(u => u.At > now).MinBy(u => u.At);
+        var isToday = next is not null && DateOnly.FromDateTime(Local(next.At)) == today;
+        NextNotificationTitle = next?.Goal.Title;
+        NextNotificationWhen = next is null ? null : WhenText(Local(next.At), today);
+        NextNotificationIn = isToday ? RelativeIn(next!.At - now) : null;
+        HasReminderToday = isToday;
+    }
+
+    private DateTime Local(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, time.LocalTimeZone).DateTime;
+
+    private DateOnly Today() => DateOnly.FromDateTime(Local(time.GetUtcNow()));
+
+    /// <summary>
+    /// Quando cai um lembrete, pelo dia local: "Hoje às 11:34", "Amanhã às 08:00", o dia da semana até 6 dias à frente
+    /// ("Sábado às 08:00") e, depois, a data ("11 de novembro às 08:00").
+    /// </summary>
+    public static string WhenText(DateTime local, DateOnly today)
+    {
+        var days = DateOnly.FromDateTime(local).DayNumber - today.DayNumber;
+        var day = days switch
+        {
+            0 => "Hoje",
+            1 => "Amanhã",
+            < 7 => Capitalize(local.ToString("dddd", PtBr)),
+            _ => local.ToString("d 'de' MMMM", PtBr),
+        };
+        return $"{day} às {local.ToString("HH:mm", CultureInfo.InvariantCulture)}";
+    }
+
+    private static string Capitalize(string text) => string.Concat(text[..1].ToUpper(PtBr), text[1..]);
+
+    /// <summary>Quanto falta, como no cartão da próxima notificação: "agora", "em 11 min", "em 1 h", "em 1 h 15 min".</summary>
+    public static string RelativeIn(TimeSpan span)
+    {
+        var minutes = (int)Math.Ceiling(span.TotalMinutes);
+        if (span < TimeSpan.FromMinutes(1))
+            return "agora";
+        var (h, m) = (minutes / 60, minutes % 60);
+        return h == 0 ? $"em {m} min" : m == 0 ? $"em {h} h" : $"em {h} h {m} min";
+    }
+
+    private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
+
+    private static string LongDate(DateTimeOffset local)
+    {
+        return Capitalize(local.ToString("dddd, d 'de' MMMM", PtBr));
+    }
+
     private void StopTicker()
     {
         _ticker?.Dispose();
         _ticker = null;
     }
 }
+
+/// <summary>Barra de um dia em "Esta semana": rótulo ("Seg"), altura em px e se é hoje.</summary>
+public sealed record TodayWeekBarViewModel(string Label, double BarHeight, bool IsToday);

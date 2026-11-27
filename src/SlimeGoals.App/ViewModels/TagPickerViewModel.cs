@@ -15,6 +15,9 @@ public sealed partial class TagChipViewModel(string name, GoalColor color, bool 
 {
     public string Name { get; } = name;
 
+    /// <summary>O nome como aparece ("Saúde"); o nome guardado não muda.</summary>
+    public string DisplayName { get; } = TagText.Display(name);
+
     public GoalColor Color { get; } = color;
 
     /// <summary>Quantas metas têm a tag; nulo onde a contagem não aparece (o quadro da meta).</summary>

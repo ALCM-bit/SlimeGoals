@@ -45,6 +45,12 @@ XDG_DATA_HOME=/tmp/slimegoals-dev/data XDG_CONFIG_HOME=/tmp/slimegoals-dev/confi
   dotnet run --project src/SlimeGoals.Desktop
 ```
 
+Para abrir já com metas e registros de exemplo, popule antes a pasta de dados com a amostra da Render (a mesma das capturas). O comando recusa a pasta real (`~/.local/share`) e um banco que já tem metas:
+
+```bash
+dotnet run --project tools/SlimeGoals.Render -- /tmp/slimegoals-dev/data seed
+```
+
 O `XDG_CONFIG_HOME` próprio impede que ligar "Iniciar com o sistema" grave a entrada de autostart de verdade (`~/.config/autostart/slimegoals.desktop`). Cada pasta de dados tem a sua instância, então essa cópia abre mesmo com o app instalado aberto.
 
 Em Debug, Configurações traz a seção de conta. Veja [Sincronização](sincronizacao.md).
@@ -64,6 +70,7 @@ A ferramenta grava um PNG por página, no tamanho do celular (412×915) e no do 
 | `time` | só a aba Tempo (Pomodoro), em quatro tamanhos |
 | `account` | a seção de conta, sobre uma conta falsa e sem rede |
 | `sync-warning` | a tela Hoje com o aviso de sincronização parada (320, 360, 412 e 1100 de largura) |
+| `wide` | a tela Hoje numa janela larga (1440×900, 1920×1080 e 2544×1358), na janela do app, com o zoom e o resumo na coluna da direita |
 | `mini` | a janelinha do cronômetro |
 | `mascot` | as quatro poses do slime |
 

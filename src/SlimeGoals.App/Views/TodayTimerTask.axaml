@@ -1,0 +1,54 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:SlimeGoals.App.Views"
+             xmlns:vm="using:SlimeGoals.App.ViewModels"
+             xmlns:services="using:SlimeGoals.Core.Services"
+             x:Class="SlimeGoals.App.Views.TodayTimerTask"
+             x:DataType="vm:TodayGoalViewModel">
+  <!-- Tarefa do cronômetro rodando: o nome gravado com ✎ e ⇄, ou o campo. Enter, Esc, o foco do ✎ e a escolha de
+       sugestão ficam no TodayView (eventos roteados). -->
+  <StackPanel Spacing="8">
+    <!-- Nome gravado: texto, e não campo, é a confirmação de que ele está valendo (spec §7.1).
+         ✎ e ⇄ aqui, e não junto do ■: a 320 px, três botões no cabeçalho cortavam o título e o tempo -->
+    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding ShowsTaskLabel}">
+      <TextBlock Text="{Binding TaskLabel}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"
+                 TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding TimerTask}" />
+      <Button Grid.Column="1" Classes="ghost icon edit-task" AutomationProperties.Name="Editar tarefa" ToolTip.Tip="Editar tarefa"
+              Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).BeginEditTaskCommand}"
+              CommandParameter="{Binding}">
+        <Path Classes="btn-icon" Data="{StaticResource IconPencil}" />
+      </Button>
+      <Button Grid.Column="2" Classes="ghost icon" AutomationProperties.Name="Trocar de tarefa" ToolTip.Tip="Trocar de tarefa"
+              Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).BeginSwitchTaskCommand}"
+              CommandParameter="{Binding}">
+        <Path Classes="btn-icon" Data="{StaticResource IconSwap}" />
+      </Button>
+    </Grid>
+    <!-- Sem nome, editando ou trocando: o campo, com ✓ (e ✕ ao editar um nome que já existe) -->
+    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding ShowsTaskField}">
+      <AutoCompleteBox Classes="timer-task" Text="{Binding TaskInput, Mode=TwoWay}" ItemsSource="{Binding TaskSuggestions}"
+                       PlaceholderText="No que está trabalhando?" FilterMode="Contains" MinimumPrefixLength="0"
+                       MaxLength="{x:Static services:CheckinService.MaxNoteLength}"
+                       AutomationProperties.Name="Tarefa" />
+      <Button Grid.Column="1" Classes="primary icon" AutomationProperties.Name="Confirmar tarefa" ToolTip.Tip="Confirmar tarefa"
+              Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).SaveTaskCommand}"
+              CommandParameter="{Binding}" IsVisible="{Binding ShowsConfirmTask}">
+        <Path Classes="btn-icon" Data="{StaticResource IconCheck}" />
+      </Button>
+      <Button Grid.Column="2" Classes="ghost icon" AutomationProperties.Name="Cancelar edição" ToolTip.Tip="Cancelar edição"
+              Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).CancelEditTaskCommand}"
+              CommandParameter="{Binding}" IsVisible="{Binding IsEditingTask}">
+        <Path Classes="btn-icon" Data="{StaticResource IconX}" />
+      </Button>
+    </Grid>
+    <!-- Trocar de tarefa: os botões abaixo do campo, como no painel de registro, para não espremê-lo no celular -->
+    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" IsVisible="{Binding IsSwitchingTask}">
+      <Button Classes="ghost" Content="Cancelar"
+              Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).CancelSwitchTaskCommand}"
+              CommandParameter="{Binding}" />
+      <Button Classes="primary" Content="Trocar"
+              Command="{Binding $parent[views:TodayView].((vm:TodayPageViewModel)DataContext).ConfirmSwitchTaskCommand}"
+              CommandParameter="{Binding}" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>

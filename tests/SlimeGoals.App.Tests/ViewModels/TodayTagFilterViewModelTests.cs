@@ -163,3 +163,61 @@ public class TodayTagFilterViewModelTests
         revealed.Should().Equal("z", "y,z");
     }
 }
+
+/// <summary>"Todas as tags" no Hoje do desktop (decisão 19): a lista com busca marca os mesmos chips da linha.</summary>
+public class TodayTagFilterSearchTests
+{
+    private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 11, 21, 15, 0, 0, TimeSpan.Zero));
+    private readonly TodayTagFilterViewModel _filter = new();
+
+    private TodayGoalViewModel Card(params string[] tags) => new(
+        new GoalProgress(new Goal
+        {
+            Id = Guid.NewGuid(), Title = "Meta", Recurrence = Recurrence.Daily, Target = 1, Icon = "water",
+            Color = GoalColor.Green, ReminderEveryMinutes = 60, ActiveFrom = new TimeOnly(8, 0),
+            ActiveUntil = new TimeOnly(20, 0), ActiveDays = WeekDays.All, CreatedAt = _time.GetUtcNow(),
+            UpdatedAt = _time.GetUtcNow(), Tags = tags,
+        }, 0, false), null, _time);
+
+    [Fact]
+    public void Without_search_lists_every_chip_in_strip_order()
+    {
+        _filter.Refresh([Card("saúde", "sono"), Card("saúde", "estudos")]);
+
+        _filter.SearchResults.Select(c => c.Name).Should().Equal("saúde", "estudos", "sono");
+    }
+
+    [Theory]
+    [InlineData("SAU", new[] { "saúde" })]
+    [InlineData("so", new[] { "sono" })]
+    [InlineData("  ", new[] { "saúde", "estudos", "sono" })]
+    public void Search_matches_part_of_the_name_ignoring_case_and_accents(string text, string[] expected)
+    {
+        _filter.Refresh([Card("saúde", "sono"), Card("saúde", "estudos")]);
+
+        _filter.SearchText = text;
+
+        _filter.SearchResults.Select(c => c.Name).Should().Equal(expected);
+    }
+
+    [Fact]
+    public void Toggling_a_result_selects_the_chip_of_the_strip()
+    {
+        _filter.Refresh([Card("saúde"), Card("estudos")]);
+        _filter.SearchText = "est";
+
+        _filter.ToggleCommand.Execute(_filter.SearchResults[0]);
+
+        (_filter.Chips.Single(c => c.Name == "estudos").IsSelected, _filter.HasSelection).Should().Be((true, true));
+    }
+
+    [Fact]
+    public void No_match_says_so()
+    {
+        _filter.Refresh([Card("saúde")]);
+
+        _filter.SearchText = "xyz";
+
+        (_filter.SearchResults.Count, _filter.HasNoSearchResults).Should().Be((0, true));
+    }
+}

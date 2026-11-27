@@ -337,6 +337,34 @@ public class ReminderServiceTests
     }
 
     [Fact]
+    public async Task Upcoming_goes_past_today_sorted()
+    {
+        await Add("Diária");
+        await _goals.AddAsync(G(Recurrence.Daily, days: WeekDays.Saturday) with
+        {
+            Title = "Sábado",
+            ReminderEveryMinutes = 60,
+            ActiveFrom = new TimeOnly(9, 0),
+            ActiveUntil = new TimeOnly(20, 0),
+        });
+        At(21);
+
+        var upcoming = await Service.UpcomingAsync();
+
+        upcoming.Select(u => (u.Goal.Title, u.At)).Should().Equal(
+            ("Diária", Today(8).AddDays(1)), ("Sábado", Today(9).AddDays(3)));
+    }
+
+    [Fact]
+    public async Task Paused_upcoming_after_today_is_empty()
+    {
+        await Add();
+        await Pause.PauseAsync();
+
+        (await PausableService.UpcomingAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Expire_pending_marks_ignore_and_withdraws()
     {
         await Add();

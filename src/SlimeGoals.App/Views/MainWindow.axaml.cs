@@ -1,11 +1,28 @@
 using Avalonia.Controls;
+using Avalonia.Media;
 
 namespace SlimeGoals.App.Views;
 
 /// <summary>Fechar a janela oculta (os lembretes continuam) ou encerra, conforme a configuração; o "Sair" sempre encerra.</summary>
 public partial class MainWindow : Window
 {
-    public MainWindow() => InitializeComponent();
+    public MainWindow()
+    {
+        InitializeComponent();
+        SizeChanged += (_, e) => ApplyZoom(e.NewSize.Width, e.NewSize.Height);
+    }
+
+    private double _zoom = 1;
+
+    /// <summary>Numa janela maior que a desenhada, o shell inteiro cresce na proporção dela (<see cref="UiScale"/>).</summary>
+    private void ApplyZoom(double width, double height)
+    {
+        var zoom = UiScale.For(width, height);
+        if (zoom == _zoom)
+            return;
+        _zoom = zoom;
+        Zoom.LayoutTransform = zoom == 1 ? null : new ScaleTransform(zoom, zoom);
+    }
 
     /// <summary>Ligado pela <see cref="App"/> quando o encerramento foi pedido: aí o fechamento segue.</summary>
     public bool AllowClose { get; set; }

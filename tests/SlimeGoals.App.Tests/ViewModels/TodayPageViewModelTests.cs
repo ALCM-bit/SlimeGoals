@@ -296,6 +296,36 @@ public class TodayPageViewModelTests
     }
 
     [Fact]
+    public async Task Card_shows_first_tag_and_count_of_the_rest()
+    {
+        await CreateTagged("Treino", "saúde", "treino", "zumba");
+        var page = await Loaded();
+
+        var card = Card(page, "Treino");
+        (card.PrimaryTag!.Name, card.PrimaryTag.DisplayName, card.MoreTagsText, card.HasMoreTags)
+            .Should().Be(("saúde", "Saúde", "+2", true));
+        card.TagsText.Should().Be("Saúde, Treino, Zumba"); // a dica do "+2" mostra todas
+    }
+
+    [Fact]
+    public async Task Card_without_tags_has_no_primary_tag()
+    {
+        await CreateTagged("Sem tag");
+        var page = await Loaded();
+
+        (Card(page, "Sem tag").PrimaryTag, Card(page, "Sem tag").HasMoreTags).Should().Be((null, false));
+    }
+
+    [Fact]
+    public async Task Card_with_one_tag_has_no_more_text()
+    {
+        await CreateTagged("Remédio", "estudos");
+        var page = await Loaded();
+
+        (Card(page, "Remédio").PrimaryTag!.DisplayName, Card(page, "Remédio").MoreTagsText).Should().Be(("Estudos", null));
+    }
+
+    [Fact]
     public async Task Filter_does_not_change_week_percent_counters_or_mascot()
     {
         await CreateTagged("A", "x");
@@ -352,6 +382,54 @@ public class TodayPageViewModelTests
         Assert.Equal((3, "dias", "Água"), (page.StreakValue, page.StreakUnit, page.StreakGoal));
         await page.CompleteCommand.ExecuteAsync(Card(page, "Água"));
         Assert.Equal(4, page.StreakValue);
+    }
+
+    /// <summary>Água com registro na terça e na quarta (hoje); Leitura só na quarta. As duas existem desde 31/10.</summary>
+    private async Task SeedWeekProgress()
+    {
+        var created = new DateTimeOffset(2026, 10, 31, 12, 0, 0, TimeSpan.Zero);
+        var water = await Create("Água");
+        await _goals.UpdateAsync(water with { CreatedAt = created });
+        var reading = await Create("Leitura");
+        await _goals.UpdateAsync(reading with { CreatedAt = created });
+        foreach (var (goal, day) in new[] { (water, 3), (water, 4), (reading, 4) })
+            await _checkins.AddAsync(new Checkin
+            {
+                Id = Guid.NewGuid(), GoalId = goal.Id, DoneAt = new DateTimeOffset(2026, 11, day, 13, 0, 0, TimeSpan.Zero),
+                Amount = 1, UpdatedAt = Now,
+            });
+    }
+
+    [Fact]
+    public async Task Week_bars_count_goals_with_progress_per_day()
+    {
+        await SeedWeekProgress();
+
+        var page = await Loaded();
+
+        page.HasWeekBars.Should().BeTrue();
+        page.WeekBars.Select(b => b.Label).Should().Equal("Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom");
+        (page.WeekBars[1].BarHeight, page.WeekBars[2].BarHeight).Should().Be((40, 80));
+    }
+
+    [Fact]
+    public async Task Week_bar_of_today_is_marked()
+    {
+        await SeedWeekProgress();
+
+        var page = await Loaded();
+
+        page.WeekBars.Select(b => b.IsToday).Should().Equal(false, false, true, false, false, false, false);
+    }
+
+    [Fact]
+    public async Task Week_bars_without_progress_have_minimum_height()
+    {
+        await SeedWeekProgress();
+
+        var page = await Loaded();
+
+        page.WeekBars[0].BarHeight.Should().Be(4);
     }
 
     [Fact]
@@ -729,6 +807,105 @@ public class TodayPageViewModelTests
     }
 
     [Fact]
+    public async Task Date_text_is_long_weekday_and_month()
+    {
+        var page = await Loaded();
+
+        page.DateText.Should().Be("Quarta-feira, 4 de novembro");
+    }
+
+    [Fact]
+    public async Task Completed_label_agrees_with_count()
+    {
+        await Create("Mesa", Measure.Completion, 1);
+        await Create("Cama", Measure.Completion, 1);
+        var page = await Loaded();
+        page.CompletedLabel.Should().Be("Concluída");
+
+        await page.CompleteCommand.ExecuteAsync(Card(page, "Mesa"));
+        await page.LoadCommand.ExecutionTask!;
+        page.CompletedLabel.Should().Be("Concluída");
+
+        await page.CompleteCommand.ExecuteAsync(Card(page, "Cama"));
+        await page.LoadCommand.ExecutionTask!;
+        page.CompletedLabel.Should().Be("Concluídas");
+    }
+
+    [Fact]
+    public async Task Next_notification_is_the_earliest_reminder_today()
+    {
+        await GoalService.CreateAsync(new GoalDraft("Leitura", Recurrence.Daily, 1, "book", GoalColor.Purple, 60,
+            new TimeOnly(9, 0), new TimeOnly(20, 0), WeekDays.All, null, null, Measure.Completion, null));
+        await Create("Água");
+        _time.Advance(TimeSpan.FromHours(19)); // quinta, 07:00: Água às 08:00, Leitura às 09:00
+
+        var page = await Loaded();
+
+        (page.NextNotificationTitle, page.NextNotificationIn, page.HasNextNotification).Should().Be(("Água", "em 1 h", true));
+        (page.NextNotificationWhen, page.HasReminderToday).Should().Be(("Hoje às 08:00", true));
+    }
+
+    [Fact]
+    public async Task Next_notification_after_today_shows_the_day_and_no_countdown()
+    {
+        await Create("Água");
+        _time.Advance(TimeSpan.FromHours(9)); // quarta, 21:00: a janela (08–20h) de hoje acabou
+
+        var page = await Loaded();
+
+        (page.NextNotificationTitle, page.NextNotificationWhen, page.NextNotificationIn).Should()
+            .Be(("Água", "Amanhã às 08:00", null));
+        (page.HasNextNotification, page.HasNextNotificationIn, page.HasReminderToday).Should().Be((true, false, false));
+        Card(page, "Água").HasNextReminder.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(0, "Hoje às 08:00")]
+    [InlineData(1, "Amanhã às 08:00")]
+    [InlineData(3, "Sábado às 08:00")]
+    [InlineData(6, "Terça-feira às 08:00")]
+    [InlineData(7, "11 de novembro às 08:00")]
+    public void When_text_names_the_day(int days, string expected) =>
+        TodayPageViewModel.WhenText(new DateTime(2026, 11, 4, 8, 0, 0).AddDays(days), new DateOnly(2026, 11, 4))
+            .Should().Be(expected);
+
+    [Fact]
+    public async Task Next_notification_hidden_when_paused()
+    {
+        await Create("Água");
+        _time.Advance(TimeSpan.FromHours(19));
+        await new ReminderPause(_settings, _time).PauseAsync();
+
+        var page = await Loaded();
+
+        page.HasNextNotification.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Next_notification_moves_on_each_minute()
+    {
+        await GoalService.CreateAsync(new GoalDraft("Água", Recurrence.Daily, 8, "water", GoalColor.Green, 60,
+            new TimeOnly(8, 0), new TimeOnly(8, 30), WeekDays.All, null, null, Measure.Quantity, "copos"));
+        _time.Advance(TimeSpan.FromHours(19) + TimeSpan.FromMinutes(49)); // quinta, 07:49
+        var page = await Loaded();
+        page.NextNotificationIn.Should().Be("em 11 min");
+
+        _time.Advance(TimeSpan.FromMinutes(1));
+        page.NextNotificationIn.Should().Be("em 10 min");
+
+        _time.Advance(TimeSpan.FromMinutes(11)); // 08:01: o único lembrete de hoje passou
+        page.HasNextNotification.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(30, "agora")]
+    [InlineData(11 * 60, "em 11 min")]
+    [InlineData(60 * 60, "em 1 h")]
+    [InlineData(75 * 60, "em 1 h 15 min")]
+    public void Relative_in_reads_like_the_mockup(int seconds, string expected) =>
+        TodayPageViewModel.RelativeIn(TimeSpan.FromSeconds(seconds)).Should().Be(expected);
+
+    [Fact]
     public async Task Today_shows_paused_state_and_hides_upcoming()
     {
         await Create("Água");
@@ -740,6 +917,29 @@ public class TodayPageViewModelTests
         (page.IsPaused, Card(page, "Água").HasNextReminder).Should().Be((true, false));
         page.PauseButtonText.Should().Be("Retomar lembretes");
         page.Goals.Should().ContainSingle(); // o resto da tela continua
+    }
+
+    [Fact]
+    public async Task Notification_card_stays_while_paused_without_the_next()
+    {
+        await Create("Água");
+        _time.Advance(TimeSpan.FromHours(19));
+        var page = await Loaded();
+        (page.ShowNotificationCard, page.HasNextNotification).Should().Be((true, true));
+
+        await page.TogglePauseCommand.ExecuteAsync(null);
+        await page.LoadCommand.ExecutionTask!;
+
+        // O cartão ao lado do sino diz "Lembretes pausados" e tem "Retomar" (decisão 21)
+        (page.ShowNotificationCard, page.HasNextNotification).Should().Be((true, false));
+    }
+
+    [Fact]
+    public async Task Notification_card_hides_without_reminders_and_without_pause()
+    {
+        var page = await Loaded();
+
+        page.ShowNotificationCard.Should().BeFalse();
     }
 
     [Fact]
@@ -1135,6 +1335,25 @@ public class TodayPageViewModelTests
 
     private static IEnumerable<(string Name, string Text)> Rows(TodayGoalViewModel card) =>
         card.Chunks.Select(c => (c.Name, c.Text));
+
+    [Fact]
+    public async Task Row_panels_open_with_the_ellipsis_and_stay_while_chunks_are_open()
+    {
+        await StudyWithRecordsAsync();
+        var page = await Loaded();
+        var card = Card(page, "Estudar");
+        card.ShowsRowPanels.Should().BeFalse(); // na linha do desktop, a faixa dos trechos não fica à vista
+
+        page.OpenPanelCommand.Execute(card);
+        (card.ShowsRowPanels, card.HasChunks).Should().Be((true, true));
+
+        page.ToggleChunksCommand.Execute(card);
+        page.CancelPanelCommand.Execute(card);
+        card.ShowsRowPanels.Should().BeTrue();
+
+        page.ToggleChunksCommand.Execute(card);
+        card.ShowsRowPanels.Should().BeFalse();
+    }
 
     [Fact]
     public async Task Duration_card_lists_todays_records_newest_first()
