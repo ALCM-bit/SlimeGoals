@@ -8,15 +8,15 @@ Ainda não há pacote pronto para baixar. Gere-o com o `build.sh`, que precisa d
 
 ```bash
 bash packaging/linux/build.sh
-tar -xzf artifacts/slimegoals-0.14.0-linux-x64.tar.gz
-cd slimegoals-0.14.0
+tar -xzf artifacts/slimegoals-0.15.0-linux-x64.tar.gz
+cd slimegoals-0.15.0
 ./install.sh
 ```
 
-O `build.sh` grava ao lado do pacote o `slimegoals-0.14.0-linux-x64.tar.gz.sha256`. Se o pacote for copiado para outro computador, leve os dois e, antes de extrair, confira na pasta onde eles estão:
+O `build.sh` grava ao lado do pacote o `slimegoals-0.15.0-linux-x64.tar.gz.sha256`. Se o pacote for copiado para outro computador, leve os dois e, antes de extrair, confira na pasta onde eles estão:
 
 ```bash
-sha256sum -c slimegoals-0.14.0-linux-x64.tar.gz.sha256
+sha256sum -c slimegoals-0.15.0-linux-x64.tar.gz.sha256
 ```
 
 A resposta `SUCESSO` (`OK` com o sistema em inglês) diz que o arquivo chegou inteiro e igual ao que o `build.sh` gerou. `FALHOU` (`FAILED`) diz que ele mudou no caminho: gere ou copie de novo, e não instale esse.
