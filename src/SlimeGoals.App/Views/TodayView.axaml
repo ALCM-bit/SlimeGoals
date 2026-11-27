@@ -228,8 +228,15 @@
       <Setter Property="FontSize" Value="22" />
     </Style>
     <Style Selector="DockPanel.top views|SlimeMascot.hero-slime, DockPanel.side views|SlimeMascot.hero-slime">
-      <Setter Property="Width" Value="110" />
-      <Setter Property="Height" Value="110" />
+      <Setter Property="Width" Value="120" />
+      <Setter Property="Height" Value="120" />
+    </Style>
+    <Style Selector="DockPanel.side Border.hero">
+      <Setter Property="Padding" Value="20,18" />
+      <Setter Property="MinHeight" Value="164" />
+    </Style>
+    <Style Selector="DockPanel.side Border.hero TextBlock.hero-value">
+      <Setter Property="FontSize" Value="50" />
     </Style>
     <!-- Fora do celular, só dois blocos: a sequência saiu a pedido do autor -->
     <Style Selector="DockPanel.top UniformGrid.tiles, DockPanel.side UniformGrid.tiles">
@@ -259,6 +266,161 @@
       <Setter Property="Width" Value="80" />
       <Setter Property="Height" Value="80" />
     </Style>
+    <!-- ===== Decisão 18: o desktop igual ao mockup. wide-only só em top/side; phone-only só no celular ===== -->
+    <Style Selector="DockPanel.page :is(Control).wide-only">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="DockPanel.top :is(Control).wide-only, DockPanel.side :is(Control).wide-only">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="DockPanel.top :is(Control).phone-only, DockPanel.side :is(Control).phone-only">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Grid.today-header">
+      <Setter Property="Margin" Value="0,0,0,16" />
+    </Style>
+    <Style Selector="DockPanel.top Grid.today-header, DockPanel.side Grid.today-header">
+      <Setter Property="Margin" Value="0,0,0,24" />
+    </Style>
+    <Style Selector="DockPanel.top TextBlock.page-title, DockPanel.side TextBlock.page-title">
+      <Setter Property="FontSize" Value="32" />
+    </Style>
+    <Style Selector="TextBlock.today-date">
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    </Style>
+    <Style Selector="Button.today-bell">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="8" />
+      <Setter Property="MinHeight" Value="44" />
+      <Setter Property="CornerRadius" Value="12" />
+    </Style>
+    <Style Selector="Button.today-bell /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.today-bell:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource NavHover}" />
+    </Style>
+    <Style Selector="Path.today-bell-icon">
+      <Setter Property="Stroke" Value="{DynamicResource Text}" />
+      <Setter Property="StrokeThickness" Value="2" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="StrokeJoin" Value="Round" />
+    </Style>
+    <Style Selector="Ellipse.today-bell-dot">
+      <Setter Property="Width" Value="9" />
+      <Setter Property="Height" Value="9" />
+      <Setter Property="Fill" Value="{DynamicResource Primary}" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+      <Setter Property="Margin" Value="0,-2,-2,0" />
+    </Style>
+    <Style Selector="Border.today-header-sep">
+      <Setter Property="Width" Value="1" />
+      <Setter Property="Height" Value="44" />
+      <Setter Property="Background" Value="{DynamicResource Border}" />
+    </Style>
+    <Style Selector="Border.next-notification">
+      <Setter Property="Background" Value="{DynamicResource Tile}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="18" />
+      <Setter Property="Padding" Value="20,12,14,12" />
+    </Style>
+    <Style Selector="Path.next-notification-icon">
+      <Setter Property="Stroke" Value="{DynamicResource Muted}" />
+      <Setter Property="StrokeThickness" Value="2" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="StrokeJoin" Value="Round" />
+    </Style>
+    <Style Selector="Border.next-notification-pill">
+      <Setter Property="Background" Value="{DynamicResource SelectedStrong}" />
+      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.next-notification-pill TextBlock">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    </Style>
+    <Style Selector="Grid.today-list-header">
+      <Setter Property="Margin" Value="0,0,0,10" />
+    </Style>
+    <Style Selector="DockPanel.top Grid.today-list-header, DockPanel.side Grid.today-list-header">
+      <Setter Property="Margin" Value="0,0,0,16" />
+    </Style>
+    <Style Selector="TextBlock.today-list-title">
+      <Setter Property="FontSize" Value="21" />
+    </Style>
+    <!-- Blocos do desktop: ícone num círculo e o número sobre o rótulo -->
+    <Style Selector="Grid.stat-wide">
+      <Setter Property="ColumnSpacing" Value="10" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.stat-icon">
+      <Setter Property="Width" Value="34" />
+      <Setter Property="Height" Value="34" />
+      <Setter Property="CornerRadius" Value="17" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.stat-icon.progress">
+      <Setter Property="Background" Value="{DynamicResource SelectedStrong}" />
+    </Style>
+    <Style Selector="Border.stat-icon.done">
+      <Setter Property="Background" Value="{DynamicResource SuccessSoft}" />
+    </Style>
+    <Style Selector="Path.stat-icon-path">
+      <Setter Property="Width" Value="15" />
+      <Setter Property="Height" Value="15" />
+      <Setter Property="Stretch" Value="Uniform" />
+      <Setter Property="StrokeThickness" Value="2.2" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="StrokeJoin" Value="Round" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.stat-icon.progress Path.stat-icon-path">
+      <Setter Property="Stroke" Value="{DynamicResource PrimarySoft}" />
+      <Setter Property="Margin" Value="2,0,0,0" />
+    </Style>
+    <Style Selector="Border.stat-icon.done Path.stat-icon-path">
+      <Setter Property="Stroke" Value="{DynamicResource Success}" />
+    </Style>
+    <Style Selector="TextBlock.stat-wide-value">
+      <Setter Property="FontSize" Value="28" />
+      <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+    <Style Selector="TextBlock.stat-wide-label">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    </Style>
+    <Style Selector="Path.hero-sparkle">
+      <Setter Property="Stroke" Value="#CCFFFFFF" />
+      <Setter Property="StrokeThickness" Value="2.2" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+      <Setter Property="Margin" Value="0,24,-2,0" />
+    </Style>
+    <!-- Chips do desktop: maiores, cantos de 14, nome capitalizado e sem a contagem. O chip pequeno da linha fica pílula -->
+    <Style Selector="DockPanel.top views|TagChip TextBlock.tag-chip-name, DockPanel.side views|TagChip TextBlock.tag-chip-name">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="DockPanel.top views|TagChip TextBlock.tag-chip-display, DockPanel.side views|TagChip TextBlock.tag-chip-display">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="DockPanel.top views|TagChip Panel.tag-chip-count-slot, DockPanel.side views|TagChip Panel.tag-chip-count-slot">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="DockPanel.top views|TagChip:not(.small) Border.tag-chip, DockPanel.side views|TagChip:not(.small) Border.tag-chip">
+      <Setter Property="MinHeight" Value="42" />
+      <Setter Property="Padding" Value="18,0" />
+      <Setter Property="CornerRadius" Value="14" />
+    </Style>
+    <Style Selector="DockPanel.top views|TagChip:not(.small) TextBlock.tag-chip-name, DockPanel.side views|TagChip:not(.small) TextBlock.tag-chip-name">
+      <Setter Property="FontSize" Value="15" />
+    </Style>
     <!-- Cada linha é um cartão, com o fundo e a borda do cartão do celular -->
     <Style Selector="Border.today-row">
       <Setter Property="Background" Value="{DynamicResource Tile}" />
@@ -287,7 +449,50 @@
   </UserControl.Styles>
 
   <DockPanel x:Name="PageRoot" Classes="page">
-    <TextBlock DockPanel.Dock="Top" Classes="page-title" Text="{Binding Title}" Margin="0,0,0,16" />
+    <!-- Cabeçalho: no desktop, a data embaixo do título e, à direita, o sino (pausa) e a próxima notificação (decisão 18) -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Classes="today-header">
+      <StackPanel VerticalAlignment="Center" Spacing="2">
+        <TextBlock Classes="page-title" Text="{Binding Title}" />
+        <TextBlock Classes="today-date wide-only" Text="{Binding DateText}" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Classes="wide-only" Orientation="Horizontal" Spacing="18" VerticalAlignment="Center">
+        <Panel IsVisible="{Binding ShowReminders}">
+          <Button Classes="today-bell" AutomationProperties.Name="Lembretes" ToolTip.Tip="Lembretes">
+            <Panel>
+              <Viewbox Width="26" Height="26">
+                <Canvas Width="24" Height="24">
+                  <Path Classes="today-bell-icon" Data="{StaticResource IconBell}" />
+                </Canvas>
+              </Viewbox>
+              <Ellipse Classes="today-bell-dot" IsVisible="{Binding HasNextNotification}" />
+            </Panel>
+            <Button.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedRight">
+                <MenuItem Header="{Binding PauseButtonText}" Command="{Binding TogglePauseCommand}" />
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
+        </Panel>
+        <Border Classes="today-header-sep" IsVisible="{Binding HasNextNotification}" />
+        <Border Classes="next-notification" IsVisible="{Binding HasNextNotification}">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+            <Viewbox Width="20" Height="20" VerticalAlignment="Center">
+              <Canvas Width="24" Height="24">
+                <Path Classes="next-notification-icon" Data="{StaticResource IconBell}" />
+              </Canvas>
+            </Viewbox>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+              <TextBlock Text="Próxima notificação" FontSize="12" Foreground="{DynamicResource Muted}" />
+              <TextBlock Text="{Binding NextNotificationTitle}" FontSize="16" FontWeight="SemiBold"
+                         TextTrimming="CharacterEllipsis" MaxWidth="200" />
+            </StackPanel>
+            <Border Grid.Column="2" Classes="next-notification-pill">
+              <TextBlock Text="{Binding NextNotificationIn}" />
+            </Border>
+          </Grid>
+        </Border>
+      </StackPanel>
+    </Grid>
 
     <!-- Abaixo do título a página rola inteira (decisão 14 da interface no Android): presos, o destaque, os blocos,
          as faixas e o filtro deixavam uns 300 px para os cartões no celular -->
@@ -314,11 +519,15 @@
                 </Grid>
               </StackPanel>
               <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6" IsVisible="{Binding HasMascot}">
-                <Border Classes="hero-bubble">
+                <Border Classes="hero-bubble phone-only">
                   <TextBlock Text="{Binding Mascot.Message}" Foreground="{DynamicResource HeroBubbleText}"
                              FontSize="13" FontWeight="Bold" TextWrapping="Wrap" />
                 </Border>
-                <views:SlimeMascot Classes="hero-slime" Pose="{Binding Mascot.Pose}" HorizontalAlignment="Center" />
+                <Panel>
+                  <views:SlimeMascot Classes="hero-slime" Pose="{Binding Mascot.Pose}" HorizontalAlignment="Center" />
+                  <!-- Três traços curtos acima e à direita do slime, como no mockup (decoração) -->
+                  <Path Classes="hero-sparkle wide-only" Data="M 2 0 L 4 8 M 12 4 L 9 11 M 20 12 L 13 15" />
+                </Panel>
               </StackPanel>
             </Grid>
           </Border>
@@ -327,24 +536,46 @@
                quando um rótulo quebra em duas linhas na tela estreita -->
           <UniformGrid Classes="tiles" Grid.IsSharedSizeScope="True">
             <Border Classes="stat">
-              <Grid>
-                <Grid.RowDefinitions>
-                  <RowDefinition Height="Auto" SharedSizeGroup="StatLabel" />
-                  <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <TextBlock Classes="stat-label" Text="Em andamento" />
-                <TextBlock Grid.Row="1" Classes="stat-value" Text="{Binding InProgress}" />
-              </Grid>
+              <Panel>
+                <Grid Classes="phone-only">
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" SharedSizeGroup="StatLabel" />
+                    <RowDefinition Height="Auto" />
+                  </Grid.RowDefinitions>
+                  <TextBlock Classes="stat-label" Text="Em andamento" />
+                  <TextBlock Grid.Row="1" Classes="stat-value" Text="{Binding InProgress}" />
+                </Grid>
+                <Grid Classes="wide-only stat-wide" ColumnDefinitions="Auto,*">
+                  <Border Classes="stat-icon progress">
+                    <Path Classes="stat-icon-path" Data="{StaticResource IconPlay}" />
+                  </Border>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Classes="stat-wide-value" Text="{Binding InProgress}" />
+                    <TextBlock Classes="stat-wide-label" Text="Em andamento" />
+                  </StackPanel>
+                </Grid>
+              </Panel>
             </Border>
             <Border Classes="stat">
-              <Grid>
-                <Grid.RowDefinitions>
-                  <RowDefinition Height="Auto" SharedSizeGroup="StatLabel" />
-                  <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <TextBlock Classes="stat-label" Text="Concluídas hoje" />
-                <TextBlock Grid.Row="1" Classes="stat-value" Text="{Binding Completed}" />
-              </Grid>
+              <Panel>
+                <Grid Classes="phone-only">
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" SharedSizeGroup="StatLabel" />
+                    <RowDefinition Height="Auto" />
+                  </Grid.RowDefinitions>
+                  <TextBlock Classes="stat-label" Text="Concluídas hoje" />
+                  <TextBlock Grid.Row="1" Classes="stat-value" Text="{Binding Completed}" />
+                </Grid>
+                <Grid Classes="wide-only stat-wide" ColumnDefinitions="Auto,*">
+                  <Border Classes="stat-icon done">
+                    <Path Classes="stat-icon-path" Data="{StaticResource IconCheck}" />
+                  </Border>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Classes="stat-wide-value" Text="{Binding Completed}" />
+                    <TextBlock Classes="stat-wide-label" Text="{Binding CompletedLabel}" />
+                  </StackPanel>
+                </Grid>
+              </Panel>
             </Border>
             <Border Classes="stat streak">
               <Grid>
@@ -442,10 +673,14 @@
           </Border>
 
           <!-- Cabeçalho da lista; "Pausar lembretes" fica aqui para valer mesmo sem próximos lembretes -->
-          <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-            <TextBlock Classes="section-title" Text="Metas de hoje" VerticalAlignment="Center" />
-            <Button Grid.Column="1" Classes="ghost" Content="Pausar lembretes"
-                    IsVisible="{Binding CanPause}" Command="{Binding TogglePauseCommand}" />
+          <Grid ColumnDefinitions="*,Auto" Classes="today-list-header">
+            <TextBlock Classes="section-title phone-only" Text="Metas de hoje" VerticalAlignment="Center" />
+            <TextBlock Classes="section-title today-list-title wide-only" Text="Suas metas de hoje" VerticalAlignment="Center" />
+            <!-- No desktop a pausa fica no sino do cabeçalho -->
+            <Panel Grid.Column="1" Classes="phone-only">
+              <Button Classes="ghost" Content="Pausar lembretes"
+                      IsVisible="{Binding CanPause}" Command="{Binding TogglePauseCommand}" />
+            </Panel>
           </Grid>
 
           <!-- Filtro por tags: "Limpar" fixo à esquerda, só com seleção; os chips rolam de lado (nunca quebram) -->

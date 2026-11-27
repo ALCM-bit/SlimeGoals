@@ -46,6 +46,8 @@
   <SolidColorBrush x:Key="BarIdle" Color="{StaticResource BarIdleColor}" />
   <SolidColorBrush x:Key="OnPrimary" Color="{StaticResource OnPrimaryColor}" />
   <SolidColorBrush x:Key="Success" Color="{StaticResource SuccessColor}" />
+  <!-- Fundo do selo "Concluída" e do círculo do bloco das concluídas (decisão 18) -->
+  <SolidColorBrush x:Key="SuccessSoft" Color="#1C3A2F" />
   <SolidColorBrush x:Key="Warning" Color="{StaticResource WarningColor}" />
 
   <!-- Interruptor ligado na cor do app (o Fluent usaria o azul do sistema) -->

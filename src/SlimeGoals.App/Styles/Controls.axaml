@@ -38,7 +38,43 @@
     <Setter Property="FontWeight" Value="Bold" />
   </Style>
 
-  <!-- Navegação lateral: ListBox com itens de 44px, raio 14 -->
+  <!-- TagChip: os tamanhos ficam aqui, e não no controle, para o Hoje do desktop poder trocá-los (o estilo do
+       próprio controle venceria o da tela) -->
+  <!-- Tamanho normal e o pequeno (classe "small", nos cartões do Hoje). Valores em estilo, e não locais, para o small valer -->
+  <Style Selector="Border.tag-chip">
+    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="CornerRadius" Value="999" />
+  </Style>
+  <Style Selector="StackPanel.tag-chip-content">
+    <Setter Property="Spacing" Value="8" />
+  </Style>
+  <Style Selector="TextBlock.tag-chip-name">
+    <Setter Property="FontSize" Value="14" />
+  </Style>
+  <Style Selector="TextBlock.tag-chip-count">
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style Selector=":is(UserControl).small Border.tag-chip">
+    <Setter Property="MinHeight" Value="24" />
+    <Setter Property="Padding" Value="9,0" />
+  </Style>
+  <Style Selector=":is(UserControl).small StackPanel.tag-chip-content">
+    <Setter Property="Spacing" Value="6" />
+  </Style>
+  <Style Selector=":is(UserControl).small TextBlock.tag-chip-name">
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+  <Style Selector=":is(UserControl).small TextBlock.tag-chip-count">
+    <Setter Property="FontSize" Value="11" />
+  </Style>
+  <!-- Nome capitalizado do TagChip ("Saúde"): oculto por padrão; o Hoje do desktop o liga. Fica aqui, e não no
+       TagChip, porque o estilo do próprio controle venceria o da tela -->
+  <Style Selector="TextBlock.tag-chip-display">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+
+  <!-- Navegação lateral: ListBox com itens de 54px -->
   <Style Selector="ListBox.nav">
     <Setter Property="Background" Value="Transparent" />
   </Style>
