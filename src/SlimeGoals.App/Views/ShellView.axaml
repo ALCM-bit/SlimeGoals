@@ -5,7 +5,7 @@
              xmlns:views="using:SlimeGoals.App.Views"
              x:Class="SlimeGoals.App.Views.ShellView"
              x:DataType="vm:ShellViewModel">
-  <!-- Largo (desktop): barra lateral de 260px encostada na borda + conteúdo (decisão 18).
+  <!-- Largo (desktop): barra lateral de 224px encostada na borda + conteúdo (decisão 18).
        Estreito (classe compact, abaixo de 720px; ver code-behind): navegação inferior, sem barra lateral. -->
   <DockPanel x:Name="Root">
     <Border DockPanel.Dock="Bottom" Classes="bottom-nav">

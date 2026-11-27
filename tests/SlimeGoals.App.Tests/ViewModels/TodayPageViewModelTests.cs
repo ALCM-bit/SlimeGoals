@@ -304,6 +304,7 @@ public class TodayPageViewModelTests
         var card = Card(page, "Treino");
         (card.PrimaryTag!.Name, card.PrimaryTag.DisplayName, card.MoreTagsText, card.HasMoreTags)
             .Should().Be(("saúde", "Saúde", "+2", true));
+        card.TagsText.Should().Be("Saúde, Treino, Zumba"); // a dica do "+2" mostra todas
     }
 
     [Fact]
@@ -1286,6 +1287,25 @@ public class TodayPageViewModelTests
 
     private static IEnumerable<(string Name, string Text)> Rows(TodayGoalViewModel card) =>
         card.Chunks.Select(c => (c.Name, c.Text));
+
+    [Fact]
+    public async Task Row_panels_open_with_the_ellipsis_and_stay_while_chunks_are_open()
+    {
+        await StudyWithRecordsAsync();
+        var page = await Loaded();
+        var card = Card(page, "Estudar");
+        card.ShowsRowPanels.Should().BeFalse(); // na linha do desktop, a faixa dos trechos não fica à vista
+
+        page.OpenPanelCommand.Execute(card);
+        (card.ShowsRowPanels, card.HasChunks).Should().Be((true, true));
+
+        page.ToggleChunksCommand.Execute(card);
+        page.CancelPanelCommand.Execute(card);
+        card.ShowsRowPanels.Should().BeTrue();
+
+        page.ToggleChunksCommand.Execute(card);
+        card.ShowsRowPanels.Should().BeFalse();
+    }
 
     [Fact]
     public async Task Duration_card_lists_todays_records_newest_first()

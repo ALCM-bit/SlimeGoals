@@ -80,7 +80,7 @@
   </Style>
   <Style Selector="ListBox.nav ListBoxItem">
     <Setter Property="MinHeight" Value="54" />
-    <Setter Property="Padding" Value="22,0" />
+    <Setter Property="Padding" Value="18,0" />
     <Setter Property="Margin" Value="0,3" />
     <Setter Property="FontSize" Value="16" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -114,11 +114,11 @@
   </Style>
   <!-- Barra lateral (decisão 18): encostada na borda, só a borda da direita -->
   <Style Selector="Border.sidebar">
-    <Setter Property="Width" Value="260" />
+    <Setter Property="Width" Value="224" />
     <Setter Property="Background" Value="{DynamicResource Panel}" />
     <Setter Property="BorderBrush" Value="{DynamicResource PanelBorder}" />
     <Setter Property="BorderThickness" Value="0,0,1,0" />
-    <Setter Property="Padding" Value="16,28,16,20" />
+    <Setter Property="Padding" Value="14,28,14,20" />
   </Style>
   <Style Selector="Border.sidebar-divider">
     <Setter Property="Height" Value="1" />
@@ -131,7 +131,7 @@
     <Setter Property="HorizontalAlignment" Value="Stretch" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />
     <Setter Property="MinHeight" Value="54" />
-    <Setter Property="Padding" Value="22,0" />
+    <Setter Property="Padding" Value="18,0" />
     <Setter Property="FontSize" Value="16" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />

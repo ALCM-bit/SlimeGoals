@@ -54,7 +54,9 @@ public sealed partial class TodayGoalViewModel : ObservableObject
     public bool HasChunks { get; }
     /// <summary>Soma só dos registros gravados, limitada a 0; o trecho em andamento fica de fora.</summary>
     public string ChunksHeader { get; }
-    [ObservableProperty] public partial bool IsChunksOpen { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsRowPanels))]
+    public partial bool IsChunksOpen { get; set; }
 
     public Goal Goal { get; }
 
@@ -66,6 +68,7 @@ public sealed partial class TodayGoalViewModel : ObservableObject
     public TagChipViewModel? PrimaryTag => Tags.Count > 0 ? Tags[0] : null;
     public string? MoreTagsText => Tags.Count > 1 ? $"+{Tags.Count - 1}" : null;
     public bool HasMoreTags => Tags.Count > 1;
+    public string TagsText => string.Join(", ", Tags.Select(t => t.DisplayName));
 
     /// <summary>Hora local ("15:00") do próximo lembrete de hoje; nulo se não há (cumprida, pausada, fora da janela).</summary>
     [ObservableProperty]
@@ -86,7 +89,15 @@ public sealed partial class TodayGoalViewModel : ObservableObject
     public bool IsMet { get; }
 
     // ---- Painel de valor (só tempo; a quantidade usa só −/+) ----
-    [ObservableProperty] public partial bool IsPanelOpen { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsRowPanels))]
+    public partial bool IsPanelOpen { get; set; }
+
+    /// <summary>
+    /// Painéis abaixo da linha do desktop (decisão 18): abrem com o "⋯" (lançar tempo, com a faixa dos trechos), com
+    /// os trechos abertos ou com o cronômetro parado. O cartão do celular mostra a faixa dos trechos sempre.
+    /// </summary>
+    public bool ShowsRowPanels => IsPanelOpen || IsChunksOpen || IsTimerStopped;
     /// <summary>false = Adicionar; true = Remover.</summary>
     [ObservableProperty] public partial bool PanelRemoves { get; set; }
     [ObservableProperty] public partial decimal? PanelHoursInput { get; set; }

@@ -78,22 +78,22 @@
       </Border>
     </DataTemplate>
 
-    <!-- Linha da meta (desktop, decisão 16), num cartão próprio: ícone; título e tags; progresso e barra; botões, com o
-         sino e a hora embaixo, como no cartão do celular. A coluna dos botões é a mesma em todas as linhas
-         (SharedSizeGroup), para as barras ficarem alinhadas de uma meta a outra -->
+    <!-- Linha da meta (desktop, decisões 16 e 18), num cartão próprio: ícone; título, selo "Concluída" e a primeira tag;
+         progresso e barra; à direita o botão principal. O sino com a hora, "−", "✕" e "⋯" aparecem ao passar o mouse.
+         A coluna dos botões é a mesma em todas as linhas (SharedSizeGroup), para as barras ficarem alinhadas -->
     <DataTemplate x:Key="TodayGoalRow" x:DataType="vm:TodayGoalViewModel">
       <Border Classes="today-row" Classes.met="{Binding IsMet}" IsVisible="{Binding IsShown}">
-        <StackPanel Spacing="10">
-          <Grid ColumnSpacing="16" RowDefinitions="Auto,Auto">
+        <StackPanel Spacing="12">
+          <Grid ColumnSpacing="18">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
-              <ColumnDefinition Width="6*" />
               <ColumnDefinition Width="5*" />
+              <ColumnDefinition Width="6*" />
               <ColumnDefinition Width="Auto" SharedSizeGroup="RowActions" />
             </Grid.ColumnDefinitions>
-            <Border Classes="icon-tile" Grid.RowSpan="2"
+            <Border Classes="icon-tile row-icon"
                     Background="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Bg}">
-              <Viewbox Width="22" Height="22">
+              <Viewbox Width="26" Height="26">
                 <Canvas Width="24" Height="24">
                   <Path Classes="goal-icon" Data="{Binding IconKey, Converter={StaticResource IconGeometry}}"
                         Stroke="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
@@ -101,54 +101,47 @@
               </Viewbox>
             </Border>
 
-            <StackPanel Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center" Spacing="6">
-              <DockPanel LastChildFill="True">
-                <TextBlock DockPanel.Dock="Right" Classes="met-tag" Classes.met="{Binding IsMet}" Text="concluída" />
-                <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="8">
+              <views:TitleBadgePanel Spacing="12">
+                <TextBlock Classes="row-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis"
                            ToolTip.Tip="{Binding Title}" />
-              </DockPanel>
-              <!-- As tags quebram linha, como no cartão do celular: cortadas, a última ficava pela metade -->
-              <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <WrapPanel ItemSpacing="6" LineSpacing="6" />
-                  </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:TagChipViewModel">
-                    <views:TagChip Classes="small" IsHitTestVisible="False" Focusable="False" />
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+                <Border Classes="met-badge" IsVisible="{Binding IsMet}">
+                  <StackPanel Orientation="Horizontal" Spacing="5">
+                    <Path Classes="met-badge-icon" Data="{StaticResource IconCheck}" />
+                    <TextBlock Text="Concluída" />
+                  </StackPanel>
+                </Border>
+              </views:TitleBadgePanel>
+              <!-- Só a primeira tag, e "+N" para as outras (decisão 18) -->
+              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasTags}">
+                <views:TagChip Classes="small" DataContext="{Binding PrimaryTag}" IsHitTestVisible="False" Focusable="False" />
+                <TextBlock Classes="more-tags" Text="{Binding MoreTagsText}" IsVisible="{Binding HasMoreTags}"
+                           ToolTip.Tip="{Binding TagsText}" />
+              </StackPanel>
             </StackPanel>
 
-            <StackPanel Grid.Column="2" Grid.RowSpan="2" VerticalAlignment="Center" Spacing="8">
-              <TextBlock Text="{Binding ProgressText}" Foreground="{DynamicResource Muted}" FontSize="13"
-                         TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ProgressText}" />
+            <!-- O sino com a hora aparece por cima da ponta da linha do texto, com o fundo do cartão: assim ele não toma
+                 largura do texto nem da barra enquanto está oculto -->
+            <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="10">
+              <Panel>
+                <TextBlock Text="{Binding ProgressText}" Foreground="{DynamicResource Muted}" FontSize="14"
+                           TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ProgressText}" />
+                <Border Classes="row-reminder reveal" IsVisible="{Binding HasNextReminder}" ToolTip.Tip="Próximo lembrete">
+                  <StackPanel Classes="next-reminder">
+                    <Path Data="{StaticResource IconBell}" />
+                    <TextBlock Text="{Binding NextReminder}" />
+                  </StackPanel>
+                </Border>
+              </Panel>
               <ProgressBar Classes="goal" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
             </StackPanel>
 
             <views:TodayGoalActions Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right" />
-
-            <StackPanel Grid.Row="1" Grid.Column="3" Classes="next-reminder" IsVisible="{Binding HasNextReminder}"
-                        ToolTip.Tip="Próximo lembrete">
-              <Path Data="{StaticResource IconBell}" />
-              <TextBlock Text="{Binding NextReminder}" />
-            </StackPanel>
           </Grid>
 
           <!-- Abaixo da linha, alinhados ao título: tarefa do cronômetro e os painéis da meta -->
           <views:TodayTimerTask Classes="row-detail" IsVisible="{Binding IsTimerRunning}" />
-          <views:TodayGoalPanels Classes="row-detail">
-            <views:TodayGoalPanels.IsVisible>
-
-              <MultiBinding Converter="{x:Static BoolConverters.Or}">
-                <Binding Path="HasChunks" />
-                <Binding Path="IsPanelOpen" />
-                <Binding Path="IsTimerStopped" />
-              </MultiBinding>
-            </views:TodayGoalPanels.IsVisible>
-          </views:TodayGoalPanels>
+          <views:TodayGoalPanels Classes="row-detail" IsVisible="{Binding ShowsRowPanels}" />
         </StackPanel>
       </Border>
     </DataTemplate>
@@ -426,16 +419,85 @@
       <Setter Property="Background" Value="{DynamicResource Tile}" />
       <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
-      <Setter Property="Padding" Value="16,12" />
-      <Setter Property="Margin" Value="0,0,0,10" />
+      <Setter Property="CornerRadius" Value="18" />
+      <Setter Property="Padding" Value="18,16" />
+      <Setter Property="Margin" Value="0,0,0,14" />
     </Style>
-    <Style Selector="Border.today-row.met">
-      <Setter Property="Opacity" Value="0.7" />
+    <Style Selector="Border.row-icon">
+      <Setter Property="Width" Value="52" />
+      <Setter Property="Height" Value="52" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
-    <!-- Detalhes abaixo da linha começam na coluna do título: ícone (44) + espaço (16) -->
+    <Style Selector="TextBlock.row-title">
+      <Setter Property="FontSize" Value="18" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <!-- Selo verde "✓ Concluída" ao lado do título (decisão 18) -->
+    <Style Selector="Border.met-badge">
+      <Setter Property="Background" Value="{DynamicResource SuccessSoft}" />
+      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="Padding" Value="9,3" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.met-badge TextBlock">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource Success}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Path.met-badge-icon">
+      <Setter Property="Width" Value="12" />
+      <Setter Property="Height" Value="12" />
+      <Setter Property="Stretch" Value="Uniform" />
+      <Setter Property="Stroke" Value="{DynamicResource Success}" />
+      <Setter Property="StrokeThickness" Value="2.5" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="StrokeJoin" Value="Round" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.row-reminder">
+      <Setter Property="Background" Value="{DynamicResource Tile}" />
+      <Setter Property="Padding" Value="10,0,0,0" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.row-reminder StackPanel.next-reminder">
+      <Setter Property="Margin" Value="0" />
+    </Style>
+    <Style Selector="TextBlock.more-tags">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <!-- Controles extras da linha: à vista só com o mouse sobre ela ou o foco do teclado dentro dela. Opacidade, e não
+         IsVisible, para a linha não mudar de tamanho -->
+    <Style Selector="Border.today-row :is(Control).reveal">
+      <Setter Property="Opacity" Value="0" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.12" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.today-row:pointerover :is(Control).reveal, Border.today-row:focus-within :is(Control).reveal">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <!-- O "⋯" tem uma vaga no cartão (depois do ▶) e outra na linha (antes dele) -->
+    <Style Selector="Panel.row-only">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Border.today-row Panel.row-only">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="Border.today-row Panel.card-only">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <!-- Detalhes abaixo da linha começam na coluna do título: ícone (52) + espaço (18) -->
     <Style Selector=":is(UserControl).row-detail">
-      <Setter Property="Margin" Value="60,0,0,0" />
+      <Setter Property="Margin" Value="70,0,0,0" />
     </Style>
     <Style Selector="Border.week-bar">
       <Setter Property="Width" Value="22" />
