@@ -84,6 +84,8 @@ if (which == "narrow")
     RenderTodayWithTimer(320);
     RenderTodayWithTimer(360);
     RenderTodayWithTimer(1100);
+    // A janela estreita do desktop: cabeçalho do Hoje com a data, o sino e o cartão da próxima notificação
+    RenderTodayWithTimer(900);
 }
 // A aba Tempo vem no narrow e, sozinha, no time (bem mais rápido para conferir só o Pomodoro)
 if (which is "narrow" or "time")

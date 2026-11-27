@@ -598,11 +598,12 @@
   </UserControl.Styles>
 
   <DockPanel x:Name="PageRoot" Classes="page">
-    <!-- Cabeçalho: no desktop, a data embaixo do título e, à direita, o sino (pausa) e a próxima notificação (decisão 18) -->
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Classes="today-header">
+    <!-- Cabeçalho: no desktop, a data embaixo do título e, à direita, o sino (pausa) e a próxima notificação (decisão 18).
+         Numa página estreita, a data quebra linha em vez de passar sob o sino -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="16" Classes="today-header">
       <StackPanel VerticalAlignment="Center" Spacing="2">
         <TextBlock Classes="page-title" Text="{Binding Title}" />
-        <TextBlock Classes="today-date wide-only" Text="{Binding DateText}" />
+        <TextBlock Classes="today-date wide-only" Text="{Binding DateText}" TextWrapping="Wrap" />
       </StackPanel>
       <StackPanel Grid.Column="1" Classes="wide-only" Orientation="Horizontal" Spacing="18" VerticalAlignment="Center">
         <Panel IsVisible="{Binding ShowReminders}">
