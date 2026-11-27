@@ -342,7 +342,10 @@ public class ReminderServiceTests
         await Add("Diária");
         await _goals.AddAsync(G(Recurrence.Daily, days: WeekDays.Saturday) with
         {
-            Title = "Sábado", ReminderEveryMinutes = 60, ActiveFrom = new TimeOnly(9, 0), ActiveUntil = new TimeOnly(20, 0),
+            Title = "Sábado",
+            ReminderEveryMinutes = 60,
+            ActiveFrom = new TimeOnly(9, 0),
+            ActiveUntil = new TimeOnly(20, 0),
         });
         At(21);
 
