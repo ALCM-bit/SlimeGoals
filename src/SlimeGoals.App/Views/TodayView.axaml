@@ -115,8 +115,38 @@
               <!-- Só a primeira tag, e "+N" para as outras (decisão 18) -->
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasTags}">
                 <views:TagChip Classes="small" DataContext="{Binding PrimaryTag}" IsHitTestVisible="False" Focusable="False" />
-                <TextBlock Classes="more-tags" Text="{Binding MoreTagsText}" IsVisible="{Binding HasMoreTags}"
-                           ToolTip.Tip="{Binding TagsText}" />
+                <!-- "+N" abre um balão com todas as tags da meta (decisão 19); botão, para o teclado chegar nele -->
+                <Button Classes="more-tags" IsVisible="{Binding HasMoreTags}" AutomationProperties.Name="{Binding TagsText}"
+                        ToolTip.Tip="Ver todas as tags">
+                  <TextBlock Classes="more-tags" Text="{Binding MoreTagsText}" />
+                  <Button.Flyout>
+                    <Flyout Placement="BottomEdgeAlignedLeft" FlyoutPresenterClasses="tags-flyout">
+                      <StackPanel Spacing="10" MaxWidth="320">
+                        <TextBlock Text="Tags da meta" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource Muted}" />
+                        <ItemsControl ItemsSource="{Binding Tags}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                              <WrapPanel ItemSpacing="6" LineSpacing="6" />
+                            </ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TagChipViewModel">
+                              <Border Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource Border}"
+                                      BorderThickness="1" CornerRadius="999" Padding="10,4">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                  <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                           Fill="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
+                                  <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold"
+                                             VerticalAlignment="Center" />
+                                </StackPanel>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </Flyout>
+                  </Button.Flyout>
+                </Button>
               </StackPanel>
             </StackPanel>
 
@@ -318,7 +348,7 @@
       <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="18" />
-      <Setter Property="Padding" Value="20,12,14,12" />
+      <Setter Property="Padding" Value="20,8,14,8" />
     </Style>
     <Style Selector="Path.next-notification-icon">
       <Setter Property="Stroke" Value="{DynamicResource Muted}" />
@@ -466,6 +496,54 @@
     <Style Selector="Border.row-reminder StackPanel.next-reminder">
       <Setter Property="Margin" Value="0" />
     </Style>
+    <Style Selector="Button.all-tags">
+      <Setter Property="Margin" Value="10,0,0,0" />
+      <Setter Property="MinHeight" Value="42" />
+      <Setter Property="Padding" Value="16,0" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.tag-option">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="MinHeight" Value="38" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="CornerRadius" Value="10" />
+    </Style>
+    <Style Selector="Button.tag-option /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.tag-option:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    </Style>
+    <Style Selector="Path.tag-option-check">
+      <Setter Property="Width" Value="14" />
+      <Setter Property="Height" Value="14" />
+      <Setter Property="Stretch" Value="Uniform" />
+      <Setter Property="Stroke" Value="{DynamicResource PrimarySoft}" />
+      <Setter Property="StrokeThickness" Value="2.4" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="StrokeJoin" Value="Round" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.more-tags">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="6,2" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.more-tags /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.more-tags:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    </Style>
+    <Style Selector="Button.more-tags:pointerover TextBlock.more-tags">
+      <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    </Style>
     <Style Selector="TextBlock.more-tags">
       <Setter Property="FontSize" Value="13" />
       <Setter Property="FontWeight" Value="SemiBold" />
@@ -529,7 +607,7 @@
                   <Path Classes="today-bell-icon" Data="{StaticResource IconBell}" />
                 </Canvas>
               </Viewbox>
-              <Ellipse Classes="today-bell-dot" IsVisible="{Binding HasNextNotification}" />
+              <Ellipse Classes="today-bell-dot" IsVisible="{Binding HasReminderToday}" />
             </Panel>
             <Button.Flyout>
               <MenuFlyout Placement="BottomEdgeAlignedRight">
@@ -546,12 +624,15 @@
                 <Path Classes="next-notification-icon" Data="{StaticResource IconBell}" />
               </Canvas>
             </Viewbox>
-            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+            <!-- Rótulo, meta e quando ("Hoje às 11:34", "Amanhã às 08:00"); o "em X min" só para um lembrete de hoje
+                 (decisão 19) -->
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
               <TextBlock Text="Próxima notificação" FontSize="12" Foreground="{DynamicResource Muted}" />
               <TextBlock Text="{Binding NextNotificationTitle}" FontSize="16" FontWeight="SemiBold"
                          TextTrimming="CharacterEllipsis" MaxWidth="200" />
+              <TextBlock Text="{Binding NextNotificationWhen}" FontSize="12" Foreground="{DynamicResource Muted}" />
             </StackPanel>
-            <Border Grid.Column="2" Classes="next-notification-pill">
+            <Border Grid.Column="2" Classes="next-notification-pill" IsVisible="{Binding HasNextNotificationIn}">
               <TextBlock Text="{Binding NextNotificationIn}" />
             </Border>
           </Grid>
@@ -751,7 +832,7 @@
           <!-- Filtro por tags: "Limpar" fixo à esquerda, só com seleção; os chips rolam de lado (nunca quebram) -->
           <StackPanel Spacing="8" Margin="0,0,0,12" DataContext="{Binding Filter}"
                       x:DataType="vm:TodayTagFilterViewModel" IsVisible="{Binding IsVisible}">
-            <Grid ColumnDefinitions="Auto,*">
+            <Grid ColumnDefinitions="Auto,*,Auto">
               <Button Classes="ghost" Content="✕ Limpar" MinHeight="36" Padding="12,0" Margin="0,0,8,0" VerticalAlignment="Center"
                       IsVisible="{Binding HasSelection}" Command="{Binding ClearCommand}" />
               <Panel Grid.Column="1">
@@ -787,6 +868,41 @@
                   <TextBlock Text="›" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
               </Panel>
+              <!-- Todas as tags, com busca, no desktop (decisão 19): marcar ali é o mesmo que tocar o chip da linha -->
+              <Button Grid.Column="2" Classes="ghost all-tags wide-only" Content="Todas as tags"
+                      AutomationProperties.Name="Todas as tags">
+                <Button.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedRight" FlyoutPresenterClasses="tags-flyout">
+                    <StackPanel Width="280" Spacing="10">
+                      <TextBox Text="{Binding SearchText}" Watermark="Buscar tag" />
+                      <TextBlock Text="Nenhuma tag com esse nome." FontSize="13" Foreground="{DynamicResource Muted}"
+                                 Margin="4,2" IsVisible="{Binding HasNoSearchResults}" />
+                      <ScrollViewer MaxHeight="320" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="AllTagsList" ItemsSource="{Binding SearchResults}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TagChipViewModel">
+                              <Button Classes="tag-option" AutomationProperties.Name="{Binding DisplayName}"
+                                      Command="{Binding $parent[ItemsControl].((vm:TodayTagFilterViewModel)DataContext).ToggleCommand}"
+                                      CommandParameter="{Binding}">
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
+                                  <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                           Fill="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
+                                  <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontSize="14" FontWeight="SemiBold"
+                                             VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                  <TextBlock Grid.Column="2" Text="{Binding Count}" FontSize="13"
+                                             Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
+                                  <Path Grid.Column="3" Classes="tag-option-check" Data="{StaticResource IconCheck}"
+                                        IsVisible="{Binding IsSelected}" />
+                                </Grid>
+                              </Button>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </ScrollViewer>
+                    </StackPanel>
+                  </Flyout>
+                </Button.Flyout>
+              </Button>
             </Grid>
             <TextBlock Text="{Binding SummaryText}" Foreground="{DynamicResource Muted}" FontSize="13"
                        IsVisible="{Binding HasSelection}" />

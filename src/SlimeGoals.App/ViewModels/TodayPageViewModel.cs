@@ -103,15 +103,28 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     /// <summary>Data de hoje por extenso, abaixo do título no desktop: "Quinta-feira, 27 de novembro".</summary>
     [ObservableProperty] public partial string DateText { get; set; } = "";
 
-    /// <summary>Cartão "Próxima notificação" do desktop: o próximo lembrete de hoje entre todas as metas.</summary>
+    /// <summary>
+    /// Cartão "Próxima notificação" do desktop: o próximo lembrete entre todas as metas. Quando os de hoje acabam, mostra
+    /// o seguinte, de amanhã ou de outro dia (decisão 19).
+    /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasNextNotification))]
     public partial string? NextNotificationTitle { get; set; }
 
-    /// <summary>Quanto falta para a próxima notificação ("em 11 min"), atualizado a cada minuto.</summary>
-    [ObservableProperty] public partial string? NextNotificationIn { get; set; }
+    /// <summary>Quando: "Hoje às 11:34", "Amanhã às 08:00", "Sábado às 08:00" ou "11 de novembro às 08:00".</summary>
+    [ObservableProperty] public partial string? NextNotificationWhen { get; set; }
+
+    /// <summary>Quanto falta ("em 11 min"), atualizado a cada minuto; só para um lembrete de hoje.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNextNotificationIn))]
+    public partial string? NextNotificationIn { get; set; }
 
     public bool HasNextNotification => NextNotificationTitle is not null;
+
+    public bool HasNextNotificationIn => NextNotificationIn is not null;
+
+    /// <summary>A bolinha do sino: ainda há lembrete hoje.</summary>
+    [ObservableProperty] public partial bool HasReminderToday { get; set; }
     /// <summary>Tile "Sequência": maior sequência atual entre as metas ativas, com o título da meta.</summary>
     [ObservableProperty] public partial int StreakValue { get; set; }
     [ObservableProperty] public partial string StreakUnit { get; set; } = "dias";
@@ -380,7 +393,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         try
         {
             paused = pause is not null && (await pause.GetAsync()).IsPaused;
-            upcoming = paused ? [] : await reminders.UpcomingTodayAsync();
+            upcoming = paused ? [] : await reminders.UpcomingAsync();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -396,8 +409,10 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         // Um só, pela vida da página (que vive com o app): o "em X min" anda mesmo sem recarga.
         _minuteTicker ??= time.CreateTimer(_ => OnUi(UpdateNextNotification), null,
             TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
-        var next = upcoming.ToDictionary(u => u.Goal.Id,
-            u => TimeZoneInfo.ConvertTime(u.At, time.LocalTimeZone).ToString("HH:mm", CultureInfo.InvariantCulture));
+        // A hora na linha da meta é só a de hoje; a lista traz também os próximos dias, para o cartão.
+        var today = Today();
+        var next = upcoming.Where(u => DateOnly.FromDateTime(Local(u.At)) == today).ToDictionary(u => u.Goal.Id,
+            u => Local(u.At).ToString("HH:mm", CultureInfo.InvariantCulture));
         foreach (var card in Goals)
             card.NextReminder = next.GetValueOrDefault(card.Goal.Id);
     }
@@ -715,14 +730,41 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             _ui.Post(_ => action(), null);
     }
 
-    /// <summary>O menor disparo ainda por vir entre os lembretes de hoje; some quando nenhum resta.</summary>
+    /// <summary>O menor disparo ainda por vir; o "em X min" e a bolinha do sino, só se ele cai hoje.</summary>
     private void UpdateNextNotification()
     {
         var now = time.GetUtcNow();
+        var today = Today();
         var next = _upcoming.Where(u => u.At > now).MinBy(u => u.At);
+        var isToday = next is not null && DateOnly.FromDateTime(Local(next.At)) == today;
         NextNotificationTitle = next?.Goal.Title;
-        NextNotificationIn = next is null ? null : RelativeIn(next.At - now);
+        NextNotificationWhen = next is null ? null : WhenText(Local(next.At), today);
+        NextNotificationIn = isToday ? RelativeIn(next!.At - now) : null;
+        HasReminderToday = isToday;
     }
+
+    private DateTime Local(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, time.LocalTimeZone).DateTime;
+
+    private DateOnly Today() => DateOnly.FromDateTime(Local(time.GetUtcNow()));
+
+    /// <summary>
+    /// Quando cai um lembrete, pelo dia local: "Hoje às 11:34", "Amanhã às 08:00", o dia da semana até 6 dias à frente
+    /// ("Sábado às 08:00") e, depois, a data ("11 de novembro às 08:00").
+    /// </summary>
+    public static string WhenText(DateTime local, DateOnly today)
+    {
+        var days = DateOnly.FromDateTime(local).DayNumber - today.DayNumber;
+        var day = days switch
+        {
+            0 => "Hoje",
+            1 => "Amanhã",
+            < 7 => Capitalize(local.ToString("dddd", PtBr)),
+            _ => local.ToString("d 'de' MMMM", PtBr),
+        };
+        return $"{day} às {local.ToString("HH:mm", CultureInfo.InvariantCulture)}";
+    }
+
+    private static string Capitalize(string text) => string.Concat(text[..1].ToUpper(PtBr), text[1..]);
 
     /// <summary>Quanto falta, como no cartão da próxima notificação: "agora", "em 11 min", "em 1 h", "em 1 h 15 min".</summary>
     public static string RelativeIn(TimeSpan span)
@@ -738,8 +780,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
 
     private static string LongDate(DateTimeOffset local)
     {
-        var text = local.ToString("dddd, d 'de' MMMM", PtBr);
-        return string.Concat(text[..1].ToUpper(PtBr), text[1..]);
+        return Capitalize(local.ToString("dddd, d 'de' MMMM", PtBr));
     }
 
     private void StopTicker()

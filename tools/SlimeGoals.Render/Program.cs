@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -516,6 +517,27 @@ void RenderTodayTags(int width, int height)
     Pump();
     Capture($"today-filter-single-{width}.png");
     today.Filter.ClearCommand.Execute(null);
+    if (width >= 720)
+    {
+        // Desktop (decisão 19): "Todas as tags" com a busca "s" e o balão do "+N" da primeira meta; o balão é outro
+        // TopLevel, capturado sozinho
+        var allTags = window.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("all-tags"));
+        today.Filter.SearchText = "s";
+        today.Filter.ToggleCommand.Execute(today.Filter.Chips.Single(c => c.Name == "saúde"));
+        allTags.Flyout!.ShowAt(allTags);
+        Pump();
+        CapturePopup(allTags.Flyout, $"today-all-tags-{width}.png");
+        allTags.Flyout.Hide();
+        today.Filter.SearchText = "";
+        today.Filter.ClearCommand.Execute(null);
+        Pump();
+        var more = window.GetVisualDescendants().OfType<Button>().First(b => b.Classes.Contains("more-tags") && b.IsEffectivelyVisible);
+        more.Flyout!.ShowAt(more);
+        Pump();
+        CapturePopup(more.Flyout, $"today-more-tags-{width}.png");
+        more.Flyout.Hide();
+        Pump();
+    }
     // O estado vazio que se alcança: nenhuma meta de hoje tem tag, então não há linha de filtros.
     // "Nenhuma meta de hoje com essas tags." não tem captura: hoje nenhuma combinação de chips esvazia a lista.
     var goalService = sample.Goals;
@@ -536,9 +558,15 @@ void RenderTodayTags(int width, int height)
                 .GetAwaiter().GetResult();
     }
 
-    void Capture(string name)
+    void Capture(string name) => Save(window, name);
+
+    // O balão aberto: o conteúdo vive no TopLevel do popup, e não na janela
+    void CapturePopup(FlyoutBase flyout, string name) =>
+        Save(TopLevel.GetTopLevel((Control)((Flyout)flyout).Content!)!, name);
+
+    void Save(TopLevel top, string name)
     {
-        var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para capturar.");
+        var frame = top.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro para capturar.");
         using var stream = File.Create(Path.Combine(outDir, name));
 #pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
         frame.Save(stream);

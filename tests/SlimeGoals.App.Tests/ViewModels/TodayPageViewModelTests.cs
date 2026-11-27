@@ -842,7 +842,32 @@ public class TodayPageViewModelTests
         var page = await Loaded();
 
         (page.NextNotificationTitle, page.NextNotificationIn, page.HasNextNotification).Should().Be(("Água", "em 1 h", true));
+        (page.NextNotificationWhen, page.HasReminderToday).Should().Be(("Hoje às 08:00", true));
     }
+
+    [Fact]
+    public async Task Next_notification_after_today_shows_the_day_and_no_countdown()
+    {
+        await Create("Água");
+        _time.Advance(TimeSpan.FromHours(9)); // quarta, 21:00: a janela (08–20h) de hoje acabou
+
+        var page = await Loaded();
+
+        (page.NextNotificationTitle, page.NextNotificationWhen, page.NextNotificationIn).Should()
+            .Be(("Água", "Amanhã às 08:00", null));
+        (page.HasNextNotification, page.HasNextNotificationIn, page.HasReminderToday).Should().Be((true, false, false));
+        Card(page, "Água").HasNextReminder.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(0, "Hoje às 08:00")]
+    [InlineData(1, "Amanhã às 08:00")]
+    [InlineData(3, "Sábado às 08:00")]
+    [InlineData(6, "Terça-feira às 08:00")]
+    [InlineData(7, "11 de novembro às 08:00")]
+    public void When_text_names_the_day(int days, string expected) =>
+        TodayPageViewModel.WhenText(new DateTime(2026, 11, 4, 8, 0, 0).AddDays(days), new DateOnly(2026, 11, 4))
+            .Should().Be(expected);
 
     [Fact]
     public async Task Next_notification_hidden_when_paused()

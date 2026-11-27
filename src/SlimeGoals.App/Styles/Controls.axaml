@@ -420,6 +420,15 @@
     <Setter Property="FontSize" Value="12" />
     <Setter Property="Foreground" Value="{DynamicResource Warning}" />
   </Style>
+  <!-- Balões de tags do Hoje ("+N" e "Todas as tags"): o fundo e a borda dos cartões, no lugar do cinza do Fluent.
+       Aqui, e não no TodayView: o balão é outro TopLevel -->
+  <Style Selector="FlyoutPresenter.tags-flyout">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Padding" Value="14" />
+  </Style>
   <Style Selector="TextBox, NumericUpDown, ComboBox, TimePicker, CalendarDatePicker, AutoCompleteBox">
     <Setter Property="MinHeight" Value="44" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
