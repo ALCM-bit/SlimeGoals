@@ -113,7 +113,7 @@
                 </Border>
               </views:TitleBadgePanel>
               <!-- Só a primeira tag, e "+N" para as outras (decisão 18); depois, o sino com a hora do próximo lembrete,
-                   sempre à vista (decisão 20) -->
+                   que aparece com o mouse sobre a linha ou o foco nela (decisão 20) -->
               <StackPanel Orientation="Horizontal" Spacing="14">
                 <StackPanel.IsVisible>
                   <MultiBinding Converter="{x:Static BoolConverters.Or}">
@@ -485,9 +485,20 @@
       <Setter Property="StrokeJoin" Value="Round" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
+    <!-- O próximo de todos já fica no cartão do cabeçalho: o de cada linha só aparece com o mouse sobre ela ou o foco
+         dentro dela. Opacidade, e não IsVisible, para a linha não mudar quando ele aparece -->
     <Style Selector="StackPanel.row-reminder">
       <Setter Property="Margin" Value="0" />
       <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Opacity" Value="0" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.12" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.today-row:pointerover StackPanel.row-reminder, Border.today-row:focus-within StackPanel.row-reminder">
+      <Setter Property="Opacity" Value="1" />
     </Style>
     <Style Selector="Button.all-tags">
       <Setter Property="Margin" Value="10,0,0,0" />
