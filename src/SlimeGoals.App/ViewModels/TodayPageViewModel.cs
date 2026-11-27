@@ -32,6 +32,8 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
     private int _loadVersion;
     private int _syncWarningVersion;
     private ITimer? _ticker;
+    private ITimer? _minuteTicker;
+    private IReadOnlyList<UpcomingReminder> _upcoming = [];
     private SynchronizationContext? _ui;
     private ActiveTimer? _offscreenTimer;
     private string _offscreenTitle = "";
@@ -91,7 +93,25 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
 
     [ObservableProperty] public partial int WeekPercent { get; set; }
     [ObservableProperty] public partial int InProgress { get; set; }
-    [ObservableProperty] public partial int Completed { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CompletedLabel))]
+    public partial int Completed { get; set; }
+
+    /// <summary>Rótulo do bloco das concluídas no desktop: "Concluída" com 0 ou 1, "Concluídas" com mais.</summary>
+    public string CompletedLabel => Completed > 1 ? "Concluídas" : "Concluída";
+
+    /// <summary>Data de hoje por extenso, abaixo do título no desktop: "Quinta-feira, 27 de novembro".</summary>
+    [ObservableProperty] public partial string DateText { get; set; } = "";
+
+    /// <summary>Cartão "Próxima notificação" do desktop: o próximo lembrete de hoje entre todas as metas.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNextNotification))]
+    public partial string? NextNotificationTitle { get; set; }
+
+    /// <summary>Quanto falta para a próxima notificação ("em 11 min"), atualizado a cada minuto.</summary>
+    [ObservableProperty] public partial string? NextNotificationIn { get; set; }
+
+    public bool HasNextNotification => NextNotificationTitle is not null;
     /// <summary>Tile "Sequência": maior sequência atual entre as metas ativas, com o título da meta.</summary>
     [ObservableProperty] public partial int StreakValue { get; set; }
     [ObservableProperty] public partial string StreakUnit { get; set; } = "dias";
@@ -181,6 +201,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         var version = ++_loadVersion;
         ErrorMessage = null;
         RefreshPermissions();
+        DateText = LongDate(TimeZoneInfo.ConvertTime(time.GetUtcNow(), time.LocalTimeZone));
         try
         {
             await goals.ArchiveExpiredAsync();
@@ -370,6 +391,11 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             return;
 
         IsPaused = paused;
+        _upcoming = upcoming;
+        UpdateNextNotification();
+        // Um só, pela vida da página (que vive com o app): o "em X min" anda mesmo sem recarga.
+        _minuteTicker ??= time.CreateTimer(_ => OnUi(UpdateNextNotification), null,
+            TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
         var next = upcoming.ToDictionary(u => u.Goal.Id,
             u => TimeZoneInfo.ConvertTime(u.At, time.LocalTimeZone).ToString("HH:mm", CultureInfo.InvariantCulture));
         foreach (var card in Goals)
@@ -687,6 +713,33 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
             action();
         else
             _ui.Post(_ => action(), null);
+    }
+
+    /// <summary>O menor disparo ainda por vir entre os lembretes de hoje; some quando nenhum resta.</summary>
+    private void UpdateNextNotification()
+    {
+        var now = time.GetUtcNow();
+        var next = _upcoming.Where(u => u.At > now).MinBy(u => u.At);
+        NextNotificationTitle = next?.Goal.Title;
+        NextNotificationIn = next is null ? null : RelativeIn(next.At - now);
+    }
+
+    /// <summary>Quanto falta, como no cartão da próxima notificação: "agora", "em 11 min", "em 1 h", "em 1 h 15 min".</summary>
+    public static string RelativeIn(TimeSpan span)
+    {
+        var minutes = (int)Math.Ceiling(span.TotalMinutes);
+        if (span < TimeSpan.FromMinutes(1))
+            return "agora";
+        var (h, m) = (minutes / 60, minutes % 60);
+        return h == 0 ? $"em {m} min" : m == 0 ? $"em {h} h" : $"em {h} h {m} min";
+    }
+
+    private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
+
+    private static string LongDate(DateTimeOffset local)
+    {
+        var text = local.ToString("dddd, d 'de' MMMM", PtBr);
+        return string.Concat(text[..1].ToUpper(PtBr), text[1..]);
     }
 
     private void StopTicker()

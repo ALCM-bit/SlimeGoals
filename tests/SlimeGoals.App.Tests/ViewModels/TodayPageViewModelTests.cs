@@ -777,6 +777,80 @@ public class TodayPageViewModelTests
     }
 
     [Fact]
+    public async Task Date_text_is_long_weekday_and_month()
+    {
+        var page = await Loaded();
+
+        page.DateText.Should().Be("Quarta-feira, 4 de novembro");
+    }
+
+    [Fact]
+    public async Task Completed_label_agrees_with_count()
+    {
+        await Create("Mesa", Measure.Completion, 1);
+        await Create("Cama", Measure.Completion, 1);
+        var page = await Loaded();
+        page.CompletedLabel.Should().Be("Concluída");
+
+        await page.CompleteCommand.ExecuteAsync(Card(page, "Mesa"));
+        await page.LoadCommand.ExecutionTask!;
+        page.CompletedLabel.Should().Be("Concluída");
+
+        await page.CompleteCommand.ExecuteAsync(Card(page, "Cama"));
+        await page.LoadCommand.ExecutionTask!;
+        page.CompletedLabel.Should().Be("Concluídas");
+    }
+
+    [Fact]
+    public async Task Next_notification_is_the_earliest_reminder_today()
+    {
+        await GoalService.CreateAsync(new GoalDraft("Leitura", Recurrence.Daily, 1, "book", GoalColor.Purple, 60,
+            new TimeOnly(9, 0), new TimeOnly(20, 0), WeekDays.All, null, null, Measure.Completion, null));
+        await Create("Água");
+        _time.Advance(TimeSpan.FromHours(19)); // quinta, 07:00: Água às 08:00, Leitura às 09:00
+
+        var page = await Loaded();
+
+        (page.NextNotificationTitle, page.NextNotificationIn, page.HasNextNotification).Should().Be(("Água", "em 1 h", true));
+    }
+
+    [Fact]
+    public async Task Next_notification_hidden_when_paused()
+    {
+        await Create("Água");
+        _time.Advance(TimeSpan.FromHours(19));
+        await new ReminderPause(_settings, _time).PauseAsync();
+
+        var page = await Loaded();
+
+        page.HasNextNotification.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Next_notification_moves_on_each_minute()
+    {
+        await GoalService.CreateAsync(new GoalDraft("Água", Recurrence.Daily, 8, "water", GoalColor.Green, 60,
+            new TimeOnly(8, 0), new TimeOnly(8, 30), WeekDays.All, null, null, Measure.Quantity, "copos"));
+        _time.Advance(TimeSpan.FromHours(19) + TimeSpan.FromMinutes(49)); // quinta, 07:49
+        var page = await Loaded();
+        page.NextNotificationIn.Should().Be("em 11 min");
+
+        _time.Advance(TimeSpan.FromMinutes(1));
+        page.NextNotificationIn.Should().Be("em 10 min");
+
+        _time.Advance(TimeSpan.FromMinutes(11)); // 08:01: o único lembrete de hoje passou
+        page.HasNextNotification.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(30, "agora")]
+    [InlineData(11 * 60, "em 11 min")]
+    [InlineData(60 * 60, "em 1 h")]
+    [InlineData(75 * 60, "em 1 h 15 min")]
+    public void Relative_in_reads_like_the_mockup(int seconds, string expected) =>
+        TodayPageViewModel.RelativeIn(TimeSpan.FromSeconds(seconds)).Should().Be(expected);
+
+    [Fact]
     public async Task Today_shows_paused_state_and_hides_upcoming()
     {
         await Create("Água");
