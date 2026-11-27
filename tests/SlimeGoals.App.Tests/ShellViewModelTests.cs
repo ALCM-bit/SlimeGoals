@@ -2,6 +2,7 @@ using Microsoft.Extensions.Time.Testing;
 using SlimeGoals.App.Goals;
 using SlimeGoals.App.Hosting;
 using SlimeGoals.App.ViewModels;
+using SlimeGoals.Core.Abstractions;
 using SlimeGoals.Core.Services;
 using SlimeGoals.Testing;
 
@@ -278,5 +279,122 @@ public class ShellViewModelQuitTests
         var shell = new ShellViewModel([ShellViewModelTests.Settings()]);
 
         shell.QuitCommand.CanExecute(null).Should().BeFalse();
+    }
+}
+
+public class ShellViewModelSidebarTests
+{
+    private readonly InMemorySettingsRepository _store = new();
+
+    private ShellViewModel Create(ISettingsRepository? store = null) =>
+        new([ShellViewModelTests.Settings()], settings: new AppSettings(store ?? _store));
+
+    [Fact]
+    public async Task Sidebar_starts_open_without_a_saved_choice()
+    {
+        var shell = Create();
+        await shell.SidebarLoad;
+
+        shell.IsSidebarCollapsed.Should().BeFalse();
+        shell.SidebarToggleText.Should().Be("Recolher menu");
+    }
+
+    [Fact]
+    public async Task Sidebar_starts_collapsed_when_it_was_saved_collapsed()
+    {
+        await _store.SetAsync(AppSettings.SidebarKey, "collapsed");
+
+        var shell = Create();
+        await shell.SidebarLoad;
+
+        shell.IsSidebarCollapsed.Should().BeTrue();
+        shell.SidebarToggleText.Should().Be("Abrir menu");
+    }
+
+    [Fact]
+    public async Task Toggle_flips_the_sidebar_and_saves_the_choice()
+    {
+        var shell = Create();
+        await shell.SidebarLoad;
+        var changed = new List<string?>();
+        shell.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        shell.ToggleSidebarCommand.Execute(null);
+        await shell.LastSidebarSave;
+
+        shell.IsSidebarCollapsed.Should().BeTrue();
+        (await _store.GetAsync(AppSettings.SidebarKey)).Should().Be("collapsed");
+        changed.Should().Contain([nameof(ShellViewModel.IsSidebarCollapsed), nameof(ShellViewModel.SidebarToggleText)]);
+
+        shell.ToggleSidebarCommand.Execute(null);
+        await shell.LastSidebarSave;
+
+        shell.IsSidebarCollapsed.Should().BeFalse();
+        (await _store.GetAsync(AppSettings.SidebarKey)).Should().Be("open");
+    }
+
+    [Fact]
+    public async Task A_toggle_before_the_saved_choice_arrives_wins()
+    {
+        var gated = new GatedSettings();
+        await gated.SetAsync(AppSettings.SidebarKey, "collapsed");
+        var shell = Create(gated);
+
+        shell.ToggleSidebarCommand.Execute(null);
+        gated.Release();
+        await shell.SidebarLoad;
+
+        shell.IsSidebarCollapsed.Should().BeTrue("a pessoa recolheu antes de a leitura chegar");
+    }
+
+    [Fact]
+    public async Task Storage_failures_keep_the_sidebar_working()
+    {
+        var shell = Create(new ThrowingSettings());
+        await shell.SidebarLoad;
+
+        shell.IsSidebarCollapsed.Should().BeFalse();
+
+        shell.ToggleSidebarCommand.Execute(null);
+        await shell.LastSidebarSave;
+
+        shell.IsSidebarCollapsed.Should().BeTrue("a falha ao gravar não desfaz a escolha desta sessão");
+    }
+
+    [Fact]
+    public async Task Without_settings_the_sidebar_still_toggles()
+    {
+        var shell = new ShellViewModel([ShellViewModelTests.Settings()]);
+        await shell.SidebarLoad;
+
+        shell.ToggleSidebarCommand.Execute(null);
+        await shell.LastSidebarSave;
+
+        shell.IsSidebarCollapsed.Should().BeTrue();
+    }
+
+    /// <summary>Leituras esperam <see cref="Release"/>; gravações vão direto.</summary>
+    private sealed class GatedSettings : ISettingsRepository
+    {
+        private readonly InMemorySettingsRepository _inner = new();
+        private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void Release() => _gate.SetResult();
+
+        public async Task<string?> GetAsync(string key, CancellationToken ct = default)
+        {
+            await _gate.Task;
+            return await _inner.GetAsync(key, ct);
+        }
+
+        public Task SetAsync(string key, string value, CancellationToken ct = default) => _inner.SetAsync(key, value, ct);
+        public Task RemoveAsync(string key, CancellationToken ct = default) => _inner.RemoveAsync(key, ct);
+    }
+
+    private sealed class ThrowingSettings : ISettingsRepository
+    {
+        public Task<string?> GetAsync(string key, CancellationToken ct = default) => throw new InvalidOperationException("boom");
+        public Task SetAsync(string key, string value, CancellationToken ct = default) => throw new InvalidOperationException("boom");
+        public Task RemoveAsync(string key, CancellationToken ct = default) => throw new InvalidOperationException("boom");
     }
 }

@@ -120,12 +120,15 @@
     <Setter Property="BorderThickness" Value="0,0,1,0" />
     <Setter Property="Padding" Value="14,28,14,20" />
   </Style>
+  <Style Selector="StackPanel.sidebar-brand">
+    <Setter Property="Margin" Value="14,0,0,28" />
+  </Style>
   <Style Selector="Border.sidebar-divider">
     <Setter Property="Height" Value="1" />
     <Setter Property="Background" Value="{DynamicResource PanelBorder}" />
     <Setter Property="Margin" Value="14,0,14,12" />
   </Style>
-  <Style Selector="Button.sidebar-quit">
+  <Style Selector="Button.sidebar-action">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource Muted}" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -136,13 +139,34 @@
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
   </Style>
-  <Style Selector="Button.sidebar-quit /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="Button.sidebar-action /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource Muted}" />
   </Style>
-  <Style Selector="Button.sidebar-quit:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="Button.sidebar-action:pointerover /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource NavHover}" />
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
+  </Style>
+  <!-- Barra recolhida (decisão 23): 86 px, só os ícones, centrados; o slime sem o nome. Depois dos estilos
+       de base, que ela sobrepõe -->
+  <Style Selector="Border.sidebar.collapsed">
+    <Setter Property="Width" Value="86" />
+  </Style>
+  <Style Selector="Border.sidebar.collapsed TextBlock.sidebar-label">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Border.sidebar.collapsed StackPanel.sidebar-brand">
+    <Setter Property="Margin" Value="0,0,0,28" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.sidebar.collapsed ListBox.nav ListBoxItem">
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.sidebar.collapsed Button.sidebar-action">
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.sidebar.collapsed Border.sidebar-divider">
+    <Setter Property="Margin" Value="8,0,8,12" />
   </Style>
   <Style Selector="Path.sidebar-icon">
     <Setter Property="StrokeThickness" Value="2" />

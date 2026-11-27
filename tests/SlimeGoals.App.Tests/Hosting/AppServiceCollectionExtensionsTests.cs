@@ -3,6 +3,7 @@ using SlimeGoals.App.Account;
 using SlimeGoals.App.Hosting;
 using SlimeGoals.App.ViewModels;
 using SlimeGoals.Core.Abstractions;
+using SlimeGoals.Core.Services;
 using SlimeGoals.Core.Sync;
 using SlimeGoals.Sync;
 using SlimeGoals.Testing;
@@ -22,6 +23,18 @@ public class AppServiceCollectionExtensionsTests
         provider.GetServices<PageViewModel>().Select(p => p.GetType()).Should().Equal(
             typeof(TodayPageViewModel), typeof(GoalsPageViewModel), typeof(TimePageViewModel),
             typeof(ReportsPageViewModel), typeof(SettingsPageViewModel));
+    }
+
+    [Fact]
+    public async Task The_shell_reads_the_saved_sidebar_choice()
+    {
+        await using var provider = Ports().AddSlimeGoalsApp().BuildServiceProvider(Validate);
+        await provider.GetRequiredService<ISettingsRepository>().SetAsync(AppSettings.SidebarKey, "collapsed");
+
+        var shell = provider.GetRequiredService<ShellViewModel>();
+        await shell.SidebarLoad;
+
+        shell.IsSidebarCollapsed.Should().BeTrue();
     }
 
     [Fact]

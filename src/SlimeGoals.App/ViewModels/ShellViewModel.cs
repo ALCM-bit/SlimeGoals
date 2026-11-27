@@ -1,6 +1,9 @@
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SlimeGoals.App.Hosting;
+using SlimeGoals.Core.Diagnostics;
+using SlimeGoals.Core.Services;
 
 namespace SlimeGoals.App.ViewModels;
 
@@ -14,11 +17,15 @@ public sealed partial class ShellViewModel : ObservableObject
 
     private readonly PlatformCapabilities _capabilities;
 
+    private readonly AppSettings? _settings;
+
     /// <param name="navigator">Pedidos de troca de página feitos por dentro das páginas.</param>
+    /// <param name="settings">Onde fica guardado se a barra lateral está recolhida; sem ele, ela começa aberta.</param>
     public ShellViewModel(IEnumerable<PageViewModel> pages, IAppLifetime? lifetime = null,
-        PlatformCapabilities? capabilities = null, PageNavigator? navigator = null)
+        PlatformCapabilities? capabilities = null, PageNavigator? navigator = null, AppSettings? settings = null)
     {
         _lifetime = lifetime;
+        _settings = settings;
         _capabilities = capabilities ?? PlatformCapabilities.Desktop;
         Pages = pages.ToList();
         if (Pages.Count == 0)
@@ -26,6 +33,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _currentPage = Pages[0];
         _currentPage.Activate();
         navigator?.Requested += Show;
+        SidebarLoad = LoadSidebarAsync();
     }
 
     /// <summary>Vai para a primeira página do tipo pedido; um tipo que o shell não tem não muda nada.</summary>
@@ -83,6 +91,62 @@ public sealed partial class ShellViewModel : ObservableObject
 
     /// <summary>O app voltou ao primeiro plano: avisa só a página aberta.</summary>
     public void Resume() => CurrentPage.Resume();
+
+    /// <summary>Barra lateral do desktop só com os ícones (decisão 23). O celular, com a navegação inferior, ignora.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SidebarToggleText))]
+    public partial bool IsSidebarCollapsed { get; set; }
+
+    /// <summary>Dica e nome, para leitores de tela, do botão que recolhe ou abre a barra.</summary>
+    public string SidebarToggleText => IsSidebarCollapsed ? "Abrir menu" : "Recolher menu";
+
+    /// <summary>Leitura da escolha guardada, começada no construtor (os testes esperam por ela).</summary>
+    public Task SidebarLoad { get; }
+
+    /// <summary>Última gravação da escolha (os testes esperam por ela).</summary>
+    public Task LastSidebarSave { get; private set; } = Task.CompletedTask;
+
+    /// <summary>A pessoa já trocou a barra: a leitura que chegar depois não desfaz a troca.</summary>
+    private bool _sidebarToggled;
+
+    private async Task LoadSidebarAsync()
+    {
+        if (_settings is null)
+            return;
+        try
+        {
+            var collapsed = await _settings.GetSidebarCollapsedAsync();
+            if (!_sidebarToggled)
+                IsSidebarCollapsed = collapsed;
+        }
+        catch (Exception e)
+        {
+            Trace.TraceError($"Falha ao ler a barra lateral; ela fica aberta: {TraceText.Of(e)}");
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleSidebar()
+    {
+        _sidebarToggled = true;
+        IsSidebarCollapsed = !IsSidebarCollapsed;
+        LastSidebarSave = SaveSidebarAsync(IsSidebarCollapsed);
+    }
+
+    private async Task SaveSidebarAsync(bool collapsed)
+    {
+        if (_settings is null)
+            return;
+        try
+        {
+            await _settings.SetSidebarCollapsedAsync(collapsed);
+        }
+        catch (Exception e)
+        {
+            // A escolha vale nesta sessão mesmo sem gravar: é só uma preferência de forma
+            Trace.TraceError($"Falha ao gravar a barra lateral: {TraceText.Of(e)}");
+        }
+    }
 
     [RelayCommand]
     private void Navigate(PageViewModel page) => CurrentPage = page;
