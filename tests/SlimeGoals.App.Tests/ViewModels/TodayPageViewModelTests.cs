@@ -296,6 +296,35 @@ public class TodayPageViewModelTests
     }
 
     [Fact]
+    public async Task Card_shows_first_tag_and_count_of_the_rest()
+    {
+        await CreateTagged("Treino", "saúde", "treino", "zumba");
+        var page = await Loaded();
+
+        var card = Card(page, "Treino");
+        (card.PrimaryTag!.Name, card.PrimaryTag.DisplayName, card.MoreTagsText, card.HasMoreTags)
+            .Should().Be(("saúde", "Saúde", "+2", true));
+    }
+
+    [Fact]
+    public async Task Card_without_tags_has_no_primary_tag()
+    {
+        await CreateTagged("Sem tag");
+        var page = await Loaded();
+
+        (Card(page, "Sem tag").PrimaryTag, Card(page, "Sem tag").HasMoreTags).Should().Be((null, false));
+    }
+
+    [Fact]
+    public async Task Card_with_one_tag_has_no_more_text()
+    {
+        await CreateTagged("Remédio", "estudos");
+        var page = await Loaded();
+
+        (Card(page, "Remédio").PrimaryTag!.DisplayName, Card(page, "Remédio").MoreTagsText).Should().Be(("Estudos", null));
+    }
+
+    [Fact]
     public async Task Filter_does_not_change_week_percent_counters_or_mascot()
     {
         await CreateTagged("A", "x");
