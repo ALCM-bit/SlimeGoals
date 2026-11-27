@@ -2,9 +2,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:SlimeGoals.App.ViewModels"
              xmlns:conv="using:SlimeGoals.App.Converters"
+             xmlns:views="using:SlimeGoals.App.Views"
              x:Class="SlimeGoals.App.Views.ShellView"
              x:DataType="vm:ShellViewModel">
-  <!-- Largo (desktop): bento v4, barra lateral de 220px + conteúdo, espaçamento de 14px.
+  <!-- Largo (desktop): barra lateral de 260px encostada na borda + conteúdo (decisão 18).
        Estreito (classe compact, abaixo de 720px; ver code-behind): navegação inferior, sem barra lateral. -->
   <DockPanel x:Name="Root">
     <Border DockPanel.Dock="Bottom" Classes="bottom-nav">
@@ -33,18 +34,41 @@
     </Border>
 
     <DockPanel Classes="shell-body">
-      <Border DockPanel.Dock="Left" Classes="panel sidebar" Padding="14,20">
+      <!-- Barra lateral do desktop (decisão 18): encostada na borda; slime e nome no topo, páginas com ícone,
+           "Sair" no rodapé abaixo de uma divisória -->
+      <Border DockPanel.Dock="Left" Classes="sidebar">
         <DockPanel>
-          <TextBlock DockPanel.Dock="Top" Text="SlimeGoals" FontSize="17" FontWeight="ExtraBold"
-                     Margin="12,0,0,18" />
-          <Button DockPanel.Dock="Bottom" Classes="ghost" Content="Sair" HorizontalAlignment="Stretch"
-                  IsVisible="{Binding ShowQuit}" Command="{Binding QuitCommand}" ToolTip.Tip="Sair (Ctrl+Q)" />
+          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="14,0,0,28">
+            <views:SlimeMascot Width="44" Height="44" Pose="Happy" IsStill="True" IsHitTestVisible="False" />
+            <TextBlock Text="SlimeGoals" FontSize="21" FontWeight="ExtraBold" VerticalAlignment="Center" />
+          </StackPanel>
+          <StackPanel DockPanel.Dock="Bottom" IsVisible="{Binding ShowQuit}">
+            <Border Classes="sidebar-divider" />
+            <Button Classes="sidebar-quit" Command="{Binding QuitCommand}" ToolTip.Tip="Sair (Ctrl+Q)"
+                    AutomationProperties.Name="Sair">
+              <StackPanel Orientation="Horizontal" Spacing="16">
+                <Viewbox Width="22" Height="22">
+                  <Canvas Width="24" Height="24">
+                    <Path Classes="sidebar-icon" Data="{StaticResource IconLogout}" />
+                  </Canvas>
+                </Viewbox>
+                <TextBlock Text="Sair" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
           <ListBox Classes="nav" ItemsSource="{Binding Pages}" SelectionMode="Single,AlwaysSelected"
                    SelectedItem="{Binding CurrentPage, Mode=TwoWay}"
                    AutomationProperties.Name="Navegação principal">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:PageViewModel">
-                <TextBlock Text="{Binding Title}" />
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                  <Viewbox Width="22" Height="22">
+                    <Canvas Width="24" Height="24">
+                      <Path Classes="nav-icon" Data="{Binding IconKey, Converter={x:Static conv:NavIconConverter.Instance}, ConverterParameter=Side}" />
+                    </Canvas>
+                  </Viewbox>
+                  <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                </StackPanel>
               </DataTemplate>
             </ListBox.ItemTemplate>
           </ListBox>

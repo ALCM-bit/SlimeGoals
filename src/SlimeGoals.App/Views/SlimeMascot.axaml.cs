@@ -19,6 +19,10 @@ public partial class SlimeMascot : UserControl
     public static readonly StyledProperty<MascotPose> PoseProperty =
         AvaloniaProperty.Register<SlimeMascot, MascotPose>(nameof(Pose), MascotPose.Idle);
 
+    /// <summary>Slime sempre parado na pose (o logo da barra lateral), sem a animação ao entrar na tela.</summary>
+    public static readonly StyledProperty<bool> IsStillProperty =
+        AvaloniaProperty.Register<SlimeMascot, bool>(nameof(IsStill));
+
     // O Avalonia 12.1.4 não casa nenhum animador com RenderTransform (ITransform), então os estilos animam estas
     // propriedades numéricas e o código as repassa às transformações do desenho.
     public static readonly StyledProperty<double> BodyScaleXProperty =
@@ -64,6 +68,15 @@ public partial class SlimeMascot : UserControl
         get => GetValue(PoseProperty);
         set => SetValue(PoseProperty, value);
     }
+
+    public bool IsStill
+    {
+        get => GetValue(IsStillProperty);
+        set => SetValue(IsStillProperty, value);
+    }
+
+    /// <summary>Se a animação liga: só à vista e sem <see cref="IsStill"/>.</summary>
+    public static bool Animates(bool isStill, bool onScreen) => !isStill && onScreen;
 
     /// <summary>Escala horizontal do corpo (alvo de animação de estilo).</summary>
     public double BodyScaleX
@@ -182,7 +195,7 @@ public partial class SlimeMascot : UserControl
     private void ArmLive()
     {
         var visible = _topLevel is { IsVisible: true } && (_topLevel is not Window window || window.IsActive) && !_inBackground;
-        if (!visible)
+        if (!Animates(IsStill, visible))
         {
             StopLive();
             return;

@@ -43,9 +43,10 @@
     <Setter Property="Background" Value="Transparent" />
   </Style>
   <Style Selector="ListBox.nav ListBoxItem">
-    <Setter Property="MinHeight" Value="44" />
-    <Setter Property="Padding" Value="12,0" />
-    <Setter Property="Margin" Value="0,2" />
+    <Setter Property="MinHeight" Value="54" />
+    <Setter Property="Padding" Value="22,0" />
+    <Setter Property="Margin" Value="0,3" />
+    <Setter Property="FontSize" Value="16" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
     <Setter Property="Foreground" Value="{DynamicResource Muted}" />
@@ -59,11 +60,11 @@
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
   </Style>
   <Style Selector="ListBox.nav ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource Selected}" />
+    <Setter Property="Background" Value="{DynamicResource SelectedStrong}" />
     <Setter Property="Foreground" Value="{DynamicResource NavSelectedText}" />
   </Style>
   <Style Selector="ListBox.nav ListBoxItem:selected">
-    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="ListBox.nav ListBoxItem:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="BorderBrush" Value="{DynamicResource PrimarySoft}" />
@@ -72,12 +73,46 @@
 
   <!-- ===== Fase 7a: shell adaptativo. Largo = barra lateral; classe compact (ShellView < 720px) =
        navegação inferior, margens menores e os ajustes de cada tela (fim deste arquivo). ===== -->
-  <Style Selector="DockPanel.shell-body">
-    <Setter Property="Margin" Value="14,14,0,14" />
+  <Style Selector="DockPanel.shell-body > ContentControl">
+    <Setter Property="Margin" Value="32,24,0,14" />
   </Style>
+  <!-- Barra lateral (decisão 18): encostada na borda, só a borda da direita -->
   <Style Selector="Border.sidebar">
-    <Setter Property="Width" Value="220" />
-    <Setter Property="Margin" Value="0,0,14,0" />
+    <Setter Property="Width" Value="260" />
+    <Setter Property="Background" Value="{DynamicResource Panel}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PanelBorder}" />
+    <Setter Property="BorderThickness" Value="0,0,1,0" />
+    <Setter Property="Padding" Value="16,28,16,20" />
+  </Style>
+  <Style Selector="Border.sidebar-divider">
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource PanelBorder}" />
+    <Setter Property="Margin" Value="14,0,14,12" />
+  </Style>
+  <Style Selector="Button.sidebar-quit">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="MinHeight" Value="54" />
+    <Setter Property="Padding" Value="22,0" />
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+  </Style>
+  <Style Selector="Button.sidebar-quit /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="Button.sidebar-quit:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource NavHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+  </Style>
+  <Style Selector="Path.sidebar-icon">
+    <Setter Property="StrokeThickness" Value="2" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+    <Setter Property="StrokeJoin" Value="Round" />
+    <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource FindAncestor, AncestorType=ContentPresenter, Tree=Visual}}" />
   </Style>
   <Style Selector="Border.bottom-nav">
     <Setter Property="IsVisible" Value="False" />
@@ -975,7 +1010,7 @@
   <Style Selector=".compact Border.sidebar">
     <Setter Property="IsVisible" Value="False" />
   </Style>
-  <Style Selector=".compact DockPanel.shell-body">
+  <Style Selector=".compact DockPanel.shell-body > ContentControl">
     <Setter Property="Margin" Value="12,12,0,12" />
   </Style>
   <Style Selector=".compact DockPanel.page">
