@@ -71,6 +71,7 @@ A ferramenta grava um PNG por página, no tamanho do celular (412×915) e no do 
 | `account` | a seção de conta, sobre uma conta falsa e sem rede |
 | `sync-warning` | a tela Hoje com o aviso de sincronização parada (320, 360, 412 e 1100 de largura) |
 | `wide` | a tela Hoje numa janela larga (1440×900, 1920×1080 e 2544×1358), na janela do app, com o zoom e o resumo na coluna da direita |
+| `sidebar` | a barra lateral aberta e recolhida, no Hoje e nas Metas, a 1100×720 e 1280×800 |
 | `mini` | a janelinha do cronômetro |
 | `mascot` | as quatro poses do slime |
 

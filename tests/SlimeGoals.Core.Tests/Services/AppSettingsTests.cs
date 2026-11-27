@@ -114,6 +114,34 @@ public class AppSettingsTests
         _notified.Should().Be(0, "a posição não muda dado nenhum que outra tela mostre");
     }
 
+    [Fact]
+    public async Task Sidebar_starts_open_and_round_trips_without_notifying()
+    {
+        (await Sut.GetSidebarCollapsedAsync()).Should().BeFalse();
+
+        await Sut.SetSidebarCollapsedAsync(true);
+
+        (await _settings.GetAsync(AppSettings.SidebarKey)).Should().Be("collapsed");
+        (await Sut.GetSidebarCollapsedAsync()).Should().BeTrue();
+
+        await Sut.SetSidebarCollapsedAsync(false);
+
+        (await _settings.GetAsync(AppSettings.SidebarKey)).Should().Be("open");
+        (await Sut.GetSidebarCollapsedAsync()).Should().BeFalse();
+        _notified.Should().Be(0, "nenhuma tela mostra a forma da barra lateral");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("Collapsed")]
+    [InlineData("yes")]
+    public async Task Sidebar_other_values_read_as_open(string stored)
+    {
+        await _settings.SetAsync(AppSettings.SidebarKey, stored);
+
+        (await Sut.GetSidebarCollapsedAsync()).Should().BeFalse();
+    }
+
     [Theory]
     [InlineData("abc")]
     [InlineData("1")]

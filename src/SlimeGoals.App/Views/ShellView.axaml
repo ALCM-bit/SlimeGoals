@@ -35,39 +35,57 @@
 
     <DockPanel Classes="shell-body">
       <!-- Barra lateral do desktop (decisão 18): encostada na borda; slime e nome no topo, páginas com ícone,
-           "Sair" no rodapé abaixo de uma divisória -->
-      <Border DockPanel.Dock="Left" Classes="sidebar">
+           no rodapé "Recolher menu" e "Sair", este abaixo de uma divisória. Recolhida (classe collapsed, decisão 23),
+           só os ícones, com o nome da página na dica -->
+      <Border DockPanel.Dock="Left" Classes="sidebar" Classes.collapsed="{Binding IsSidebarCollapsed}">
         <DockPanel>
-          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="14,0,0,28">
+          <StackPanel DockPanel.Dock="Top" Classes="sidebar-brand" Orientation="Horizontal" Spacing="10">
             <views:SlimeMascot Width="44" Height="44" Pose="Happy" IsStill="True" IsHitTestVisible="False" />
-            <TextBlock Text="SlimeGoals" FontSize="21" FontWeight="ExtraBold" VerticalAlignment="Center" />
+            <TextBlock Classes="sidebar-label" Text="SlimeGoals" FontSize="21" FontWeight="ExtraBold" VerticalAlignment="Center" />
           </StackPanel>
-          <StackPanel DockPanel.Dock="Bottom" IsVisible="{Binding ShowQuit}">
-            <Border Classes="sidebar-divider" />
-            <Button Classes="sidebar-quit" Command="{Binding QuitCommand}" ToolTip.Tip="Sair (Ctrl+Q)"
-                    AutomationProperties.Name="Sair">
+          <StackPanel DockPanel.Dock="Bottom">
+            <!-- Aberta: ícone de recolher e "Recolher menu"; recolhida: só o ícone de abrir (decisão 23) -->
+            <Button Classes="sidebar-action" Command="{Binding ToggleSidebarCommand}" Margin="0,0,0,8"
+                    ToolTip.Tip="{Binding SidebarToggleText}" AutomationProperties.Name="{Binding SidebarToggleText}">
               <StackPanel Orientation="Horizontal" Spacing="16">
                 <Viewbox Width="22" Height="22">
                   <Canvas Width="24" Height="24">
-                    <Path Classes="sidebar-icon" Data="{StaticResource IconLogout}" />
+                    <Path Classes="sidebar-icon" Data="{StaticResource IconPanelLeftClose}" IsVisible="{Binding !IsSidebarCollapsed}" />
+                    <Path Classes="sidebar-icon" Data="{StaticResource IconPanelLeftOpen}" IsVisible="{Binding IsSidebarCollapsed}" />
                   </Canvas>
                 </Viewbox>
-                <TextBlock Text="Sair" VerticalAlignment="Center" />
+                <TextBlock Classes="sidebar-label" Text="Recolher menu" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
+            <StackPanel IsVisible="{Binding ShowQuit}">
+              <Border Classes="sidebar-divider" />
+              <Button Classes="sidebar-action" Command="{Binding QuitCommand}" ToolTip.Tip="Sair (Ctrl+Q)"
+                      AutomationProperties.Name="Sair">
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                  <Viewbox Width="22" Height="22">
+                    <Canvas Width="24" Height="24">
+                      <Path Classes="sidebar-icon" Data="{StaticResource IconLogout}" />
+                    </Canvas>
+                  </Viewbox>
+                  <TextBlock Classes="sidebar-label" Text="Sair" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
           </StackPanel>
           <ListBox Classes="nav" ItemsSource="{Binding Pages}" SelectionMode="Single,AlwaysSelected"
                    SelectedItem="{Binding CurrentPage, Mode=TwoWay}"
                    AutomationProperties.Name="Navegação principal">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:PageViewModel">
-                <StackPanel Orientation="Horizontal" Spacing="16">
+                <StackPanel Orientation="Horizontal" Spacing="16" Background="Transparent"
+                            ToolTip.Tip="{Binding Title}"
+                            ToolTip.ServiceEnabled="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).IsSidebarCollapsed}">
                   <Viewbox Width="22" Height="22">
                     <Canvas Width="24" Height="24">
                       <Path Classes="nav-icon" Data="{Binding IconKey, Converter={x:Static conv:NavIconConverter.Instance}, ConverterParameter=Side}" />
                     </Canvas>
                   </Viewbox>
-                  <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                  <TextBlock Classes="sidebar-label" Text="{Binding Title}" VerticalAlignment="Center" />
                 </StackPanel>
               </DataTemplate>
             </ListBox.ItemTemplate>

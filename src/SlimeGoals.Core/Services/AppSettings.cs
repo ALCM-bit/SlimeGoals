@@ -26,6 +26,9 @@ public sealed class AppSettings(ISettingsRepository settings, DataChangeNotifier
     /// <summary>Chave: posição da janelinha do cronômetro, "x,y" em pixels da tela.</summary>
     public const string MiniTimerPositionKey = "timer.mini_window_position";
 
+    /// <summary>Chave: "collapsed" ou "open" para a barra lateral do desktop (decisão 23).</summary>
+    public const string SidebarKey = "window.sidebar";
+
     /// <summary>Chave: sequência da última sessão de Pomodoro começada, em JSON (sem a meta).</summary>
     public const string FocusPlanKey = "focus.plan";
 
@@ -120,6 +123,17 @@ public sealed class AppSettings(ISettingsRepository settings, DataChangeNotifier
     /// </summary>
     public Task SetMiniTimerPositionAsync(int x, int y, CancellationToken ct = default) =>
         settings.SetAsync(MiniTimerPositionKey, string.Create(CultureInfo.InvariantCulture, $"{x},{y}"), ct);
+
+    /// <summary>Barra lateral recolhida; ausente, ou qualquer valor que não "collapsed", vale aberta.</summary>
+    public async Task<bool> GetSidebarCollapsedAsync(CancellationToken ct = default) =>
+        await settings.GetAsync(SidebarKey, ct) == "collapsed";
+
+    /// <summary>
+    /// Grava se a barra lateral está recolhida. Não avisa o <see cref="DataChangeNotifier"/>: nenhuma tela mostra
+    /// essa escolha, e avisar faria todas recarregarem à toa.
+    /// </summary>
+    public Task SetSidebarCollapsedAsync(bool collapsed, CancellationToken ct = default) =>
+        settings.SetAsync(SidebarKey, collapsed ? "collapsed" : "open", ct);
 
     /// <summary>Sequência sugerida para a próxima sessão; ausente, ilegível ou fora dos limites vale <see cref="FocusPlan.Default"/>.</summary>
     public async Task<FocusPlan> GetFocusPlanAsync(CancellationToken ct = default)
