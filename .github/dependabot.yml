@@ -37,3 +37,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Versão maior do PostgreSQL (18 para 19) é uma migração, e não um bump: a imagem guarda os dados numa pasta por
+    # versão, e a nova subiria com um banco vazio. Pede dump e restauração na VM e a imagem dos testes
+    # (PostgresFixture) junto.
+    ignore:
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
