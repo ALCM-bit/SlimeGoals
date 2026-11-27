@@ -18,7 +18,7 @@ using SlimeGoals.Sync;
 using ScrollViewer = Avalonia.Controls.ScrollViewer;
 using Window = Avalonia.Controls.Window;
 
-if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini" or "sync-warning" or "today-filter" or "wide" or "seed")))
+if (args.Length < 1 || args.Length > 2 || (args.Length == 2 && args[1] is not ("phone" or "desktop" or "all" or "mascot" or "narrow" or "time" or "account" or "mini" or "sync-warning" or "today-filter" or "wide" or "seed" or "sidebar")))
 {
     Console.Error.WriteLine("Uso: dotnet run --project tools/SlimeGoals.Render -- <pasta-saída> [phone|desktop|all|mascot|narrow|time|account|mini|sync-warning|today-filter|wide]");
     Console.Error.WriteLine("     dotnet run --project tools/SlimeGoals.Render -- <XDG_DATA_HOME de desenvolvimento> seed");
@@ -68,6 +68,12 @@ if (which is "wide")
 }
 if (which is "desktop" or "all")
     Render(false, "desktop", 1100, 720);
+if (which is "sidebar")
+{
+    foreach (var (w, h) in new[] { (1100, 720), (1280, 800) })
+        foreach (var collapsed in new[] { false, true })
+            RenderSidebar(w, h, collapsed);
+}
 if (which == "narrow")
 {
     // As páginas do celular também nas larguras mais estreitas (Hoje e Relatórios com os textos longos de tempo)
@@ -820,4 +826,33 @@ static void Pump()
         Thread.Sleep(40);
     }
     Dispatcher.UIThread.RunJobs();
+}
+
+// Barra lateral aberta e recolhida (decisão 23), no Hoje e nas Metas.
+void RenderSidebar(int width, int height, bool collapsed)
+{
+    var shell = sample.CreateShell(false);
+    shell.IsSidebarCollapsed = collapsed;
+    var window = new Window { Width = width, Height = height, Content = new ShellView { DataContext = shell } };
+    window.Show();
+    var pages = new (string Name, PageViewModel Page)[]
+    {
+        ("today", shell.Pages.OfType<TodayPageViewModel>().Single()),
+        ("goals", shell.Pages.OfType<GoalsPageViewModel>().Single()),
+    };
+    foreach (var (name, page) in pages)
+    {
+        shell.CurrentPage = page;
+        Pump();
+        var path = Path.Combine(outDir, $"sidebar-{(collapsed ? "collapsed" : "open")}-{name}-{width}.png");
+        var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Sem quadro da barra lateral.");
+        using (var stream = File.Create(path))
+        {
+#pragma warning disable CS0618 // a sobrecarga nova exige opções de codificação que não importam aqui
+            frame.Save(stream);
+#pragma warning restore CS0618
+        }
+        Console.WriteLine(path);
+    }
+    window.Close();
 }
