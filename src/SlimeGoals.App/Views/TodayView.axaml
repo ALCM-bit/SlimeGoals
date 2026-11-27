@@ -339,6 +339,9 @@
       <Setter Property="StrokeLineCap" Value="Round" />
       <Setter Property="StrokeJoin" Value="Round" />
     </Style>
+    <Style Selector="Button.today-bell.paused Path.today-bell-icon">
+      <Setter Property="Stroke" Value="{DynamicResource Muted}" />
+    </Style>
     <Style Selector="Ellipse.today-bell-dot">
       <Setter Property="Width" Value="9" />
       <Setter Property="Height" Value="9" />
@@ -593,20 +596,18 @@
       </StackPanel>
       <StackPanel Grid.Column="1" Classes="wide-only" Orientation="Horizontal" Spacing="18" VerticalAlignment="Center">
         <Panel IsVisible="{Binding ShowReminders}">
-          <Button Classes="today-bell" AutomationProperties.Name="Lembretes" ToolTip.Tip="Lembretes">
+          <!-- Um toque pausa ou retoma os lembretes (decisão 21): com a pausa, o sino aparece cortado -->
+          <Button Classes="today-bell" Classes.paused="{Binding IsPaused}" Command="{Binding TogglePauseCommand}"
+                  AutomationProperties.Name="{Binding PauseButtonText}" ToolTip.Tip="{Binding PauseButtonText}">
             <Panel>
               <Viewbox Width="26" Height="26">
                 <Canvas Width="24" Height="24">
-                  <Path Classes="today-bell-icon" Data="{StaticResource IconBell}" />
+                  <Path Classes="today-bell-icon" Data="{StaticResource IconBell}" IsVisible="{Binding !IsPaused}" />
+                  <Path Classes="today-bell-icon" Data="{StaticResource IconBellOff}" IsVisible="{Binding IsPaused}" />
                 </Canvas>
               </Viewbox>
               <Ellipse Classes="today-bell-dot" IsVisible="{Binding HasReminderToday}" />
             </Panel>
-            <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedRight">
-                <MenuItem Header="{Binding PauseButtonText}" Command="{Binding TogglePauseCommand}" />
-              </MenuFlyout>
-            </Button.Flyout>
           </Button>
         </Panel>
         <Border Classes="today-header-sep" IsVisible="{Binding HasNextNotification}" />

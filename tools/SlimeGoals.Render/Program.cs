@@ -537,12 +537,13 @@ void RenderTodayTags(int width, int height)
         CapturePopup(more.Flyout, $"today-more-tags-{width}.png");
         more.Flyout.Hide();
         Pump();
-        // O menu do sino do cabeçalho (pausar os lembretes), para conferir que os balões seguem o mesmo cartão
-        var bell = window.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("today-bell"));
-        bell.Flyout!.ShowAt(bell);
+        // Os lembretes pausados pelo sino do cabeçalho (decisão 21): o sino cortado; depois, retoma
+        today.TogglePauseCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+        today.LoadCommand.ExecuteAsync(null).GetAwaiter().GetResult();
         Pump();
-        CapturePopup(bell.Flyout, $"today-bell-menu-{width}.png");
-        bell.Flyout.Hide();
+        Capture($"today-bell-paused-{width}.png");
+        today.TogglePauseCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+        today.LoadCommand.ExecuteAsync(null).GetAwaiter().GetResult();
         Pump();
     }
     // O estado vazio que se alcança: nenhuma meta de hoje tem tag, então não há linha de filtros.
@@ -569,7 +570,7 @@ void RenderTodayTags(int width, int height)
 
     // O balão aberto: o conteúdo vive no TopLevel do popup, e não na janela
     void CapturePopup(FlyoutBase flyout, string name) =>
-        Save(TopLevel.GetTopLevel(flyout is Flyout f ? (Control)f.Content! : (Control)((MenuFlyout)flyout).Items[0]!)!, name);
+        Save(TopLevel.GetTopLevel((Control)((Flyout)flyout).Content!)!, name);
 
     void Save(TopLevel top, string name)
     {
