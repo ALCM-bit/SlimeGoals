@@ -58,6 +58,15 @@ public class TagsSettingsViewModelTests
     }
 
     [Fact]
+    public async Task Row_shows_the_name_capitalized_and_keeps_the_stored_one()
+    {
+        await _tags.CreateAsync("saúde");
+        var vm = await Loaded();
+
+        (vm.Rows.Single().Name, vm.Rows.Single().DisplayName).Should().Be(("saúde", "Saúde"));
+    }
+
+    [Fact]
     public async Task Delete_question_counts_goals()
     {
         await _tags.CreateAsync("vazia");
@@ -71,9 +80,9 @@ public class TagsSettingsViewModelTests
         foreach (var row in rows.Values)
             row.BeginDeleteCommand.Execute(null);
 
-        rows["vazia"].DeleteQuestion.Should().Be("Excluir a tag \"vazia\"?");
-        rows["uma"].DeleteQuestion.Should().Be("Excluir a tag \"uma\"? Ela sai de 1 meta.");
-        rows["duas"].DeleteQuestion.Should().Be("Excluir a tag \"duas\"? Ela sai de 2 metas.");
+        rows["vazia"].DeleteQuestion.Should().Be("Excluir a tag \"Vazia\"?");
+        rows["uma"].DeleteQuestion.Should().Be("Excluir a tag \"Uma\"? Ela sai de 1 meta.");
+        rows["duas"].DeleteQuestion.Should().Be("Excluir a tag \"Duas\"? Ela sai de 2 metas.");
         rows["uma"].IsConfirmingDelete.Should().BeTrue();
 
         rows["uma"].CancelDeleteCommand.Execute(null);
@@ -97,7 +106,7 @@ public class TagsSettingsViewModelTests
         await row.ConfirmEditCommand.ExecuteAsync(null);
 
         (row.IsConfirmingMerge, row.IsEditing).Should().Be((true, false));
-        row.MergeQuestion.Should().Be("Já existe a tag \"nova\". Juntar as duas?");
+        row.MergeQuestion.Should().Be("Já existe a tag \"Nova\". Juntar as duas?");
         (await _goalRepo.GetAsync(goal.Id))!.Tags.Should().Equal("velha");
 
         await row.ConfirmMergeCommand.ExecuteAsync(null);
@@ -114,7 +123,7 @@ public class TagsSettingsViewModelTests
         var row = vm.Rows.Single();
 
         row.BeginEditCommand.Execute(null);
-        row.EditText.Should().Be("velha");
+        row.EditText.Should().Be("Velha"); // como aparece; o nome gravado continua em minúsculas
         row.EditText = "Nova";
         await row.ConfirmEditCommand.ExecuteAsync(null);
 

@@ -56,7 +56,7 @@
                   <Ellipse Width="16" Height="16" Fill="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
                 </Button>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="4,0">
-                  <TextBlock Classes="nav-row-title" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Classes="nav-row-title" Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
                   <TextBlock Classes="nav-row-summary" Text="{Binding UsageText}" />
                 </StackPanel>
                 <Button Grid.Column="2" Classes="ghost icon" AutomationProperties.Name="Renomear" ToolTip.Tip="Renomear"

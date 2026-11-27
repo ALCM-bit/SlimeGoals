@@ -68,12 +68,9 @@
   <Style Selector=":is(UserControl).small TextBlock.tag-chip-count">
     <Setter Property="FontSize" Value="11" />
   </Style>
-  <!-- Nome capitalizado do TagChip ("Saúde"): oculto por padrão; o Hoje do desktop o liga. Fica aqui, e não no
-       TagChip, porque o estilo do próprio controle venceria o da tela -->
+  <!-- O slot da contagem só aparece com contagem. Fica aqui, e não no TagChip, porque o estilo do próprio controle
+       venceria o do Hoje do desktop, que o esconde -->
   <Style Selector="Panel.tag-chip-count-slot:not(.has-count)">
-    <Setter Property="IsVisible" Value="False" />
-  </Style>
-  <Style Selector="TextBlock.tag-chip-display">
     <Setter Property="IsVisible" Value="False" />
   </Style>
 

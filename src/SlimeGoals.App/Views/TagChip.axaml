@@ -8,7 +8,7 @@
     <conv:TagChipBrushConverter x:Key="ChipBrush" />
   </UserControl.Resources>
   <!-- Chip de tag: ponto + nome (+ contagem). Marcado, ganha o fundo e a borda da cor da tag. -->
-  <Button Classes="tag-chip" Click="OnClick" AutomationProperties.Name="{Binding Name}">
+  <Button Classes="tag-chip" Click="OnClick" AutomationProperties.Name="{Binding DisplayName}">
     <Border Classes="tag-chip" BorderThickness="1">
       <Border.Background>
         <MultiBinding Converter="{StaticResource ChipBrush}" ConverterParameter="Back">
@@ -25,15 +25,8 @@
       <StackPanel Classes="tag-chip-content" Orientation="Horizontal" VerticalAlignment="Center">
         <Ellipse Width="8" Height="8" VerticalAlignment="Center"
                  Fill="{Binding Color, Converter={StaticResource GoalColorBrush}, ConverterParameter=Fg}" />
-        <TextBlock Classes="tag-chip-name" Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center">
-          <TextBlock.Foreground>
-            <MultiBinding Converter="{StaticResource ChipBrush}" ConverterParameter="Text">
-              <Binding Path="IsSelected" />
-              <Binding Path="Color" />
-            </MultiBinding>
-          </TextBlock.Foreground>
-        </TextBlock>
-        <TextBlock Classes="tag-chip-name tag-chip-display" Text="{Binding DisplayName}" FontWeight="SemiBold" VerticalAlignment="Center">
+        <!-- O nome com maiúscula em todo o app (decisão 22) -->
+        <TextBlock Classes="tag-chip-name" Text="{Binding DisplayName}" FontWeight="SemiBold" VerticalAlignment="Center">
           <TextBlock.Foreground>
             <MultiBinding Converter="{StaticResource ChipBrush}" ConverterParameter="Text">
               <Binding Path="IsSelected" />

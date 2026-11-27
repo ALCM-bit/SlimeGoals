@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SlimeGoals.Core.Diagnostics;
@@ -16,9 +15,8 @@ public sealed partial class TagChipViewModel(string name, GoalColor color, bool 
 {
     public string Name { get; } = name;
 
-    /// <summary>O nome com a primeira letra maiúscula ("Saúde"), para os chips do desktop; o nome guardado não muda.</summary>
-    public string DisplayName { get; } = name.Length == 0 ? name
-        : string.Concat(name[..1].ToUpper(CultureInfo.GetCultureInfo("pt-BR")), name[1..]);
+    /// <summary>O nome como aparece ("Saúde"); o nome guardado não muda.</summary>
+    public string DisplayName { get; } = TagText.Display(name);
 
     public GoalColor Color { get; } = color;
 

@@ -448,13 +448,7 @@
       <Setter Property="VerticalAlignment" Value="Top" />
       <Setter Property="Margin" Value="0,24,-2,0" />
     </Style>
-    <!-- Chips do desktop: maiores, cantos de 14, nome capitalizado e sem a contagem. O chip pequeno da linha fica pílula -->
-    <Style Selector="DockPanel.top views|TagChip TextBlock.tag-chip-name, DockPanel.side views|TagChip TextBlock.tag-chip-name">
-      <Setter Property="IsVisible" Value="False" />
-    </Style>
-    <Style Selector="DockPanel.top views|TagChip TextBlock.tag-chip-display, DockPanel.side views|TagChip TextBlock.tag-chip-display">
-      <Setter Property="IsVisible" Value="True" />
-    </Style>
+    <!-- Chips do desktop: maiores, cantos de 14 e sem a contagem. O chip pequeno da linha fica pílula -->
     <Style Selector="DockPanel.top views|TagChip Panel.tag-chip-count-slot, DockPanel.side views|TagChip Panel.tag-chip-count-slot">
       <Setter Property="IsVisible" Value="False" />
     </Style>
