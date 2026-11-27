@@ -897,6 +897,24 @@ public class TodayPageViewModelTests
         page.HasNextNotification.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task Next_notification_stops_ticking_off_the_page_and_resumes_on_return()
+    {
+        await GoalService.CreateAsync(new GoalDraft("Água", Recurrence.Daily, 8, "water", GoalColor.Green, 60,
+            new TimeOnly(8, 0), new TimeOnly(8, 30), WeekDays.All, null, null, Measure.Quantity, "copos"));
+        _time.Advance(TimeSpan.FromHours(19) + TimeSpan.FromMinutes(49)); // quinta, 07:49
+        var page = await Loaded();
+
+        page.Deactivate();
+        _time.Advance(TimeSpan.FromMinutes(1));
+        page.NextNotificationIn.Should().Be("em 11 min", "fora do Hoje o relógio do cartão não anda");
+
+        await page.LoadCommand.ExecuteAsync(null); // o que o Activate faz ao voltar
+        page.NextNotificationIn.Should().Be("em 10 min");
+        _time.Advance(TimeSpan.FromMinutes(1));
+        page.NextNotificationIn.Should().Be("em 9 min");
+    }
+
     [Theory]
     [InlineData(30, "agora")]
     [InlineData(11 * 60, "em 11 min")]

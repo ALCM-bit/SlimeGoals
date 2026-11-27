@@ -203,6 +203,13 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
 
     public override void Activate() => LoadCommand.Execute(null);
 
+    /// <summary>Fora do Hoje, o "em X min" do cartão para; a recarga do <see cref="Activate"/> o põe de volta.</summary>
+    public override void Deactivate()
+    {
+        _minuteTicker?.Dispose();
+        _minuteTicker = null;
+    }
+
     /// <summary>Arquiva as vencidas e monta o instantâneo. Se houver cargas sobrepostas, vale a última.</summary>
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task LoadAsync()
@@ -412,7 +419,7 @@ public sealed partial class TodayPageViewModel(ProgressService progress, Checkin
         IsPaused = paused;
         _upcoming = upcoming;
         UpdateNextNotification();
-        // Um só, pela vida da página (que vive com o app): o "em X min" anda mesmo sem recarga.
+        // Um só enquanto o Hoje está aberto (o Deactivate o para): o "em X min" anda mesmo sem recarga.
         _minuteTicker ??= time.CreateTimer(_ => OnUi(UpdateNextNotification), null,
             TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
         // A hora na linha da meta é só a de hoje; a lista traz também os próximos dias, para o cartão.
