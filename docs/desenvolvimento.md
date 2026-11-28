@@ -81,14 +81,15 @@ A lista dos arquivos de cada modo está em [tools/SlimeGoals.Render/README.md](.
 
 O GitHub Actions (`.github/workflows/ci.yml`) roda a cada Pull Request e a cada commit na `main`. Ele compila em Release, com avisos tratados como erro, e roda todos os testes no Ubuntu 24.04, com Docker, `dbus` e `gnome-keyring`. O fluxo só tem permissão de leitura, e as ações ficam fixadas pelo commit.
 
-O Dependabot (`.github/dependabot.yml`) propõe toda semana as atualizações dos pacotes NuGet, das ações do GitHub e das imagens Docker do servidor e do Compose.
+O Dependabot (`.github/dependabot.yml`) propõe toda semana as atualizações dos pacotes NuGet, das ações do GitHub e das imagens Docker do servidor e do Compose. Ele não propõe versão maior do .NET nem do PostgreSQL: as duas são migrações, e não uma troca de número (veja [Servidor](servidor.md#5-atualizar)). Ele só enxerga os projetos do `SlimeGoals.slnx`. Por isso, os seis pacotes do Avalonia usam uma propriedade só, `AvaloniaVersion`, no `Directory.Packages.props`: ao atualizar um deles, ele troca a propriedade, e o Android e a Render seguem junto.
 
 ## Subir a versão
 
 A versão fica em `<Version>`, no `Directory.Build.props`. Dela saem o nome do pacote do Linux, o APK (o `versionCode` é calculado dela: 0.15.1 vira 1501) e a versão na tela Sobre. Ao subir, troque também a versão escrita nos comandos dos guias:
 
 ```bash
-grep -rn '0\.13\.1' README.md docs/
+# antes de mudar o <Version>: onde a versão atual aparece
+grep -rnF "$(sed -n 's|.*<Version>\(.*\)</Version>.*|\1|p' Directory.Build.props)" README.md docs/
 ```
 
 ## Como contribuir

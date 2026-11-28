@@ -5,7 +5,7 @@ Você cadastra hábitos diários ou metas semanais, recebe lembretes até cumpri
 registra o progresso com um check-in e acompanha relatórios semanais e mensais. Funciona offline,
 com os dados guardados localmente em SQLite. A conta de sincronização é opcional: sem ela, os dados não saem do aparelho; com ela, saem cifrados.
 
-![Tela Hoje no desktop, com o slime e as metas do dia](docs/images/hoje-desktop.png)
+![Tela Hoje no desktop: as metas do dia com as tags, o progresso da semana com o slime e a próxima notificação](docs/images/hoje-desktop.png)
 
 > **Status:** em desenvolvimento, na versão 0.15.1. O app funciona no Linux, com pacote de instalação, e no Android, com APK assinado. O autor já testou num celular de verdade a instalação, as notificações e os lembretes, inclusive depois de religar o aparelho. A sincronização entre aparelhos, cifrada de ponta a ponta, já vem nos dois apps: o servidor fica numa VM sua, alcançável só pela sua tailnet. Veja o [roteiro](#roteiro).
 
@@ -14,7 +14,8 @@ com os dados guardados localmente em SQLite. A conta de sincronização é opcio
 - **Dois tipos de meta:** diária (alvo por dia nos dias escolhidos) e semanal (alvo por semana, de segunda a domingo)
 - **Três medidas por meta:** conclusão, quantidade ou tempo, com cronômetro e contagem em segundos
 - **Lembretes** dentro de uma janela de horário, com a ação da medida (**Feito**, **+1** ou **Iniciar**), **Adiar** e **Ignorar** direto na notificação do sistema
-- **Tela Hoje** com o progresso do período atual e registro rápido
+- **Tela Hoje** com o progresso do período atual, registro rápido, a próxima notificação e o sino para pausar os lembretes
+- **Tags** coloridas para organizar as metas e filtrar o Hoje, com várias tags por meta
 - **Tarefas no cronômetro:** dê nome ao que está fazendo e troque de tarefa sem parar o tempo
 - **Cronômetro à vista fora do app:** numa janela pequena por cima das outras no Linux e numa notificação fixa no Android, com o botão de parar
 - **Pomodoro**, na aba Tempo: uma sequência de blocos de foco e de pausa, com os tempos que você quiser. O app avisa quando cada bloco acaba e espera um toque para começar o próximo; o foco pode contar numa meta de tempo
@@ -63,8 +64,8 @@ As especificações ficam em [`specs/`](specs/):
 
 - [Especificação geral (v1.4)](specs/Planejamento_v3.md): requisitos, modelo de dados, regras de lembrete e design system
 - [Sincronização](specs/Sincronizacao_v1.md), [Endurecimento do servidor](specs/Endurecimento_do_servidor_v1.md), [Publicação na tailnet](specs/Publicacao_na_tailnet_v1.md) e [Segurança segundo a OWASP](specs/Seguranca_OWASP_v1.md)
-- [Cronômetro fora do app](specs/Cronometro_fora_do_app_v1.md), [Tarefas no cronômetro](specs/Tarefas_no_cronometro_v1.md), [Pomodoro](specs/Pomodoro_v1.md) e [Segundos nas metas de tempo](specs/Segundos_nas_metas_de_tempo_v1.md)
-- [Protótipos visuais](specs/design/) (desktop em `v4-bento-desktop.html`, celular em `v3-*-mobile.html`), [planos de implementação](specs/plans/) e [conclusões dos spikes](specs/spikes/)
+- [Cronômetro fora do app](specs/Cronometro_fora_do_app_v1.md), [Tarefas no cronômetro](specs/Tarefas_no_cronometro_v1.md), [Pomodoro](specs/Pomodoro_v1.md), [Segundos nas metas de tempo](specs/Segundos_nas_metas_de_tempo_v1.md) e [Tags](specs/Tags_v1.md)
+- [Protótipos visuais](specs/design/) (desktop em `v4-bento-desktop.html`, celular em `v3-*-mobile.html`; o Hoje do desktop agora segue as decisões 18 a 24 da especificação geral), [planos de implementação](specs/plans/) e [conclusões dos spikes](specs/spikes/)
 
 ## Stack
 
@@ -103,7 +104,7 @@ Os detalhes estão em [Desenvolvimento](docs/desenvolvimento.md#como-contribuir)
 | 8 | Mascote slime | ✅ |
 | 9 | Sincronização cifrada (9.1 modelo local ✅ · 9.2 motor ✅ · 9.3 servidor ✅ · 9.4 criptografia e conta ✅ · 9.5a conta no Linux ✅ · 9.5b conta no Android ✅ · endurecimento do servidor ✅ · 9.6 publicação na tailnet ✅) | ✅ |
 
-Fora das fases, já entregues: cronômetro fora do app, tarefas no cronômetro, Pomodoro e aba Tempo (0.9.0) e segundos nas metas de tempo (0.10.0).
+Fora das fases, já entregues: cronômetro fora do app, tarefas no cronômetro, Pomodoro e aba Tempo (0.9.0), segundos nas metas de tempo (0.10.0), tags (0.13.0) e o Hoje do desktop novo, com o menu lateral que recolhe (0.15.0).
 
 ## Licença
 

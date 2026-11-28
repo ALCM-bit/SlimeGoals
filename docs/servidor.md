@@ -118,6 +118,8 @@ docker compose up -d --build --wait
 
 Nunca use `docker compose down -v` ao atualizar: ele apaga o banco. `down` sem `-v` mantém o volume.
 
+Uma imagem nova do PostgreSQL na mesma versão maior (um novo digest da `18-alpine`, que o Dependabot propõe) entra com esse mesmo comando, e os dados continuam valendo. Já a troca da versão maior (da 18 para a 19) não é uma atualização comum: a imagem guarda os dados numa pasta por versão, e a nova subiria com um banco vazio. Ela pede um dump na versão antiga e a restauração na nova (veja [Backup e restauração](#backup-e-restauração)), e a imagem dos testes (`PostgresFixture`) muda junto. Por isso, o Dependabot não propõe essa troca.
+
 Se a atualização mexeu nas unidades do systemd, rode o `sudo packaging/server/install-systemd.sh` de novo; ele pode repetir sem problema. Depois de atualizar o Docker em si, confira a regra do firewall (passo 3).
 
 ### Conferências na VM
