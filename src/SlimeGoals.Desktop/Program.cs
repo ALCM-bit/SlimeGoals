@@ -20,6 +20,14 @@ internal static class Program
     public static void Main(string[] args)
     {
         var options = AppStartOptions.Parse(args);
+        // Sem ouvinte, o Trace no Linux não sai do processo. Ligado para caçar um defeito, vai para o stderr do terminal.
+        if (TraceText.DetailRequested(Environment.GetEnvironmentVariable))
+        {
+            TraceText.IncludeMessages();
+            Trace.Listeners.Add(new ConsoleTraceListener(useErrorStream: true));
+            Trace.TraceWarning($"{TraceText.DetailVariable}=1: o log grava a mensagem das exceções, que pode ter títulos de metas e caminhos.");
+        }
+
         InputMethodEnvironment.Apply(Environment.GetEnvironmentVariable, Environment.SetEnvironmentVariable);
 
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);

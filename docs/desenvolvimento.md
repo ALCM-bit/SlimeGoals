@@ -55,6 +55,8 @@ O `XDG_CONFIG_HOME` próprio impede que ligar "Iniciar com o sistema" grave a en
 
 Em Debug, Configurações traz a seção de conta. Veja [Sincronização](sincronizacao.md).
 
+Para ver o log no terminal, com a mensagem das exceções, acrescente `SLIMEGOALS_TRACE_DETALHE=1` antes do `dotnet run` (veja [Investigar um erro](linux.md#investigar-um-erro)).
+
 ## Conferir as telas sem abrir o app
 
 ```bash
