@@ -11,7 +11,7 @@ public sealed record PostgresTestDatabase(string App, string Owner);
 /// <summary>Um PostgreSQL descartável por execução; cada teste pede o seu banco novo.</summary>
 public sealed class PostgresFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine").Build();
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:19-alpine").Build();
 
     /// <summary>A cadeia do superusuário do contêiner, no banco padrão.</summary>
     public string ConnectionString => _container.GetConnectionString();

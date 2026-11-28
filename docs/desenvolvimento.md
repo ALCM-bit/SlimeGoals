@@ -30,7 +30,7 @@ dotnet test --solution SlimeGoals.slnx
 **Docker.** Os testes de integração do servidor sobem um PostgreSQL de verdade com Testcontainers, por isso o `dotnet test` precisa do Docker rodando. O Testcontainers pode falhar ao subir o contêiner auxiliar (ryuk), por exemplo por uma credencial antiga do Docker. Nesse caso, baixe as imagens à mão e rode de novo:
 
 ```bash
-docker pull postgres:18-alpine
+docker pull postgres:19-alpine
 docker pull testcontainers/ryuk:0.14.0   # use a versão que o erro indicar
 ```
 
