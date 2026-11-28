@@ -61,7 +61,7 @@ O APK de distribuição (Release) tem a conta e a permissão `INTERNET`, sem tex
 
 ```bash
 packaging/android/build.sh --dev                    # artifacts/slimegoals-<versão>-android-dev.apk
-adb -s <serial> install -r artifacts/slimegoals-0.15.0-android-dev.apk
+adb -s <serial> install -r artifacts/slimegoals-0.15.1-android-dev.apk
 adb -s <serial> reverse tcp:8080 tcp:8080                       # o 127.0.0.1:8080 do celular passa a ser o do computador
 ```
 
