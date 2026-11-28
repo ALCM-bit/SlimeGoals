@@ -5,7 +5,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    # Os pacotes do Avalonia saem juntos e precisam da mesma versão: um PR só para todos.
+    # Os pacotes do Avalonia saem juntos e precisam da mesma versão: um PR só para todos. A versão é uma propriedade
+    # só (AvaloniaVersion, no Directory.Packages.props), que leva junto os pacotes que o Dependabot não enxerga.
     groups:
       avalonia:
         patterns:
