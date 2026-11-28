@@ -118,7 +118,7 @@ docker compose up -d --build --wait
 
 Nunca use `docker compose down -v` ao atualizar: ele apaga o banco. `down` sem `-v` mantém o volume.
 
-Uma imagem nova do PostgreSQL na mesma versão maior (um novo digest da `18-alpine`, que o Dependabot propõe) entra com esse mesmo comando, e os dados continuam valendo. Já a troca da versão maior (da 18 para a 19) não é uma atualização comum: a imagem guarda os dados numa pasta por versão, e a nova subiria com um banco vazio. Ela pede um dump na versão antiga e a restauração na nova (veja [Backup e restauração](#backup-e-restauração)), e a imagem dos testes (`PostgresFixture`) muda junto. Por isso, o Dependabot não propõe essa troca.
+Uma imagem nova do PostgreSQL na mesma versão maior (um novo digest da `19-alpine`, que o Dependabot propõe) entra com esse mesmo comando, e os dados continuam valendo. Já a troca da versão maior não é uma atualização comum: siga [Trocar a versão maior do PostgreSQL](#trocar-a-versão-maior-do-postgresql). Por isso, o Dependabot não propõe essa troca.
 
 Se a atualização mexeu nas unidades do systemd, rode o `sudo packaging/server/install-systemd.sh` de novo; ele pode repetir sem problema. Depois de atualizar o Docker em si, confira a regra do firewall (passo 3).
 
@@ -168,7 +168,7 @@ Os comandos abaixo supõem que o seu usuário está no grupo `docker`; sem isso,
 **Conferir um backup** (sem tocar na pilha). Num PostgreSQL descartável, os papéis precisam existir antes, porque o dump dá permissões ao `slimegoals_app`:
 
 ```bash
-docker run -d --name restore -e POSTGRES_PASSWORD=x postgres:18-alpine
+docker run -d --name restore -e POSTGRES_PASSWORD=x postgres:19-alpine
 docker exec restore psql -U postgres -c "CREATE ROLE slimegoals_owner NOLOGIN" -c "CREATE ROLE slimegoals_app NOLOGIN"
 docker exec restore createdb -U postgres slimegoals
 sudo cat /var/backups/slimegoals/slimegoals-AAAAMMDD-HHMMSS.dump | docker exec -i restore pg_restore -U postgres -d slimegoals
@@ -188,6 +188,66 @@ docker compose exec -T db psql -U postgres -d slimegoals -Atc "select count(*) f
 ```
 
 As contas devem aparecer, e todas as tabelas devem ser de `slimegoals_owner`.
+
+### Trocar a versão maior do PostgreSQL
+
+A imagem guarda os dados numa pasta por versão maior (`/var/lib/postgresql/18/docker`, `/var/lib/postgresql/19/docker`) dentro do mesmo volume. A imagem nova não lê a pasta da antiga e, se a encontrar, **se recusa a subir**. A troca é um dump na versão antiga e uma restauração na nova. A pasta antiga só muda de nome, sem apagar nada, e continua no volume para voltar atrás. Os passos abaixo trocam a 18 pela 19 e foram ensaiados num volume descartável: dump, troca do nome, restauração, mesmas linhas e dono, e a volta para a 18 com os dados de antes.
+
+**1. Na versão antiga, antes do `git pull`**, pare o que escreve no banco e faça um backup. Confira o backup como em [Backup e restauração](#backup-e-restauração) e anote o commit atual, que serve para voltar atrás:
+
+```bash
+sudo systemctl stop slimegoals-backup.timer    # nenhum backup automático no meio da troca
+docker compose stop server caddy               # o banco para de receber escritas
+sudo packaging/server/backup.sh                # anote o nome do .dump que ele gravou
+git rev-parse --short HEAD                     # anote o commit
+```
+
+**2. Troque a imagem e renomeie a pasta antiga.** O `down` não leva `-v`: o volume fica com os dados.
+
+```bash
+docker compose down
+git pull
+docker compose run --rm --no-deps --entrypoint mv db /var/lib/postgresql/18/docker /var/lib/postgresql/18/antes-da-19
+```
+
+**3. Suba a versão nova e restaure.** A primeira partida do `db` num diretório vazio cria os papéis, como num volume novo. Depois vêm a restauração, o servidor e as conferências:
+
+```bash
+docker compose up -d --wait db
+sudo cat /var/backups/slimegoals/slimegoals-AAAAMMDD-HHMMSS.dump | docker compose exec -T db pg_restore -U postgres -d slimegoals --clean --if-exists
+docker compose up -d --build --wait
+curl -fsS https://servidor.exemplo.ts.net/health
+docker compose exec -T db psql -U postgres -d slimegoals -Atc "select version()" -c "select count(*) from accounts" -c "select tablename||' '||tableowner from pg_tables where schemaname='public'"
+sudo systemctl start slimegoals-backup.timer
+sudo packaging/server/backup.sh                # o primeiro backup na versão nova
+```
+
+A versão tem de ser a 19, as contas têm de ser as de antes e todas as tabelas têm de ser de `slimegoals_owner`. Depois, sincronize um aparelho.
+
+**Voltar atrás**, se algo deu errado. O que os aparelhos enviaram depois da troca fica só na versão nova e se perde (eles reenviam o que ainda está na fila local):
+
+```bash
+docker compose down
+git checkout <commit anotado> -- compose.yaml
+docker compose run --rm --no-deps --entrypoint sh db -c 'rm -rf /var/lib/postgresql/19 && mv /var/lib/postgresql/18/antes-da-19 /var/lib/postgresql/18/docker'
+docker compose up -d --build --wait
+sudo systemctl start slimegoals-backup.timer
+```
+
+O `compose.yaml` fica com a 18 como mudança local, e o próximo `git pull` reclama dela de propósito. Antes de tentar a troca de novo, descarte a mudança com `git checkout HEAD -- compose.yaml` e recomece do passo 1.
+
+**Limpar a pasta antiga** depois de algumas semanas de uso na versão nova, com backups da nova conferidos. Isso não tem volta:
+
+```bash
+docker compose run --rm --no-deps --entrypoint rm db -rf /var/lib/postgresql/18
+```
+
+**No desenvolvimento**, o volume do `compose.dev.yaml` passa pelo mesmo problema: com a pasta da 18 no volume, a 19 não sobe. Se as contas de teste não importam, basta renomear a pasta (com os mesmos `-f`) e subir: o servidor recria as tabelas num banco vazio.
+
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml run --rm --no-deps --entrypoint mv db /var/lib/postgresql/18/docker /var/lib/postgresql/18/antes-da-19
+docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait
+```
 
 ### Outros passos na VM e no Umbrel
 
