@@ -47,6 +47,43 @@ public partial class TraceTextTests
         TraceText.Types(thrown).Should().Be("InvalidOperationException");
     }
 
+    [Fact]
+    public void With_detail_each_exception_carries_its_message()
+    {
+        var thrown = Throw(new InvalidOperationException("no such table: goals", new FormatException("data ruim")));
+
+        var text = TraceText.Of(thrown, withMessages: true);
+
+        text.Should().StartWith("InvalidOperationException: no such table: goals <- FormatException: data ruim");
+        text.Should().Contain(nameof(Throw), "a pilha continua");
+    }
+
+    [Fact]
+    public void With_detail_the_http_status_comes_before_the_message()
+    {
+        var failure = new HttpRequestException("recusado", null, HttpStatusCode.BadGateway);
+
+        TraceText.Types(failure, withMessages: true).Should().Be("HttpRequestException (HTTP 502): recusado");
+    }
+
+    [Theory]
+    [InlineData("1", true)]
+    [InlineData(" 1 ", true)]
+    [InlineData("0", false)]
+    [InlineData("", false)]
+    [InlineData("sim", false)]
+    [InlineData(null, false)]
+    public void Detail_is_requested_only_by_the_variable_set_to_1(string? value, bool expected)
+    {
+        TraceText.DetailRequested(name => name == TraceText.DetailVariable ? value : "1").Should().Be(expected);
+    }
+
+    [Fact]
+    public void The_detail_variable_has_a_stable_name()
+    {
+        TraceText.DetailVariable.Should().Be("SLIMEGOALS_TRACE_DETALHE", "é o nome que a documentação ensina");
+    }
+
     /// <summary>
     /// O Trace do app vai para o journal do sistema, que fica gravado. Nenhuma chamada pode interpolar a exceção
     /// inteira nem a mensagem dela: é por onde títulos de metas, caminhos e respostas do servidor chegariam ao log.
