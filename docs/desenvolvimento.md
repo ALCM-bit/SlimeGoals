@@ -85,7 +85,7 @@ O Dependabot (`.github/dependabot.yml`) propõe toda semana as atualizações do
 
 ## Subir a versão
 
-A versão fica em `<Version>`, no `Directory.Build.props`. Dela saem o nome do pacote do Linux, o APK (o `versionCode` é calculado dela: 0.15.0 vira 1500) e a versão na tela Sobre. Ao subir, troque também a versão escrita nos comandos dos guias:
+A versão fica em `<Version>`, no `Directory.Build.props`. Dela saem o nome do pacote do Linux, o APK (o `versionCode` é calculado dela: 0.15.1 vira 1501) e a versão na tela Sobre. Ao subir, troque também a versão escrita nos comandos dos guias:
 
 ```bash
 grep -rn '0\.13\.1' README.md docs/
