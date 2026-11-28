@@ -38,6 +38,18 @@ Os seus dados ficam em `~/.local/share/SlimeGoals/slimegoals.db`. Sem conta, nad
 
 Feche o app com **Sair** (fechar a janela pode só escondê-lo, conforme Configurações), gere o pacote da versão nova e rode o `./install.sh` dela. Ele substitui a versão instalada e mantém os seus dados. Com o app aberto, o script se recusa a instalar.
 
+## Investigar um erro
+
+O app não grava log em disco nem no journal. Para ver o que ele registra ao caçar um defeito, feche-o com **Sair** e abra-o pelo terminal com a variável `SLIMEGOALS_TRACE_DETALHE`:
+
+```bash
+SLIMEGOALS_TRACE_DETALHE=1 slimegoals
+```
+
+O log sai no próprio terminal, com o tipo, a mensagem e a pilha de cada falha. Só o valor `1` liga; sem a variável, nada sai. Com o app já aberto, o comando só traz a janela dele para a frente, sem log.
+
+A mensagem das falhas pode ter títulos de metas, caminhos e respostas do servidor. Leia o log antes de colá-lo num lugar público, como uma issue.
+
 ## Desinstalar
 
 Rode `./uninstall.sh` de dentro da pasta extraída. Ele pergunta se deve apagar também os seus dados (a pasta `~/.local/share/SlimeGoals`, com o banco); a resposta padrão é não. Para apagar sem a pergunta, use `./uninstall.sh --apagar-dados` com o app fechado. **Apagar os dados não tem volta.**
