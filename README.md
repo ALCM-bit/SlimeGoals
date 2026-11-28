@@ -76,7 +76,7 @@ As especificações ficam em [`specs/`](specs/):
 | Dados no aparelho | SQLite (Microsoft.Data.Sqlite + Dapper), migrações por `PRAGMA user_version` |
 | Linux | D-Bus (Tmds.DBus.Protocol): notificações, chaveiro (Secret Service) e suspensão |
 | Sincronização | AES-256-GCM e Argon2id (Konscious) no aparelho, HTTP + JSON |
-| Servidor | ASP.NET Core + PostgreSQL 18 (Npgsql + Dapper), MailKit, Caddy e Docker Compose |
+| Servidor | ASP.NET Core + PostgreSQL 19 (Npgsql + Dapper), MailKit, Caddy e Docker Compose |
 | Testes | xUnit v3 (Microsoft Testing Platform) + AwesomeAssertions + `FakeTimeProvider`; Testcontainers para o PostgreSQL |
 
 A arquitetura é hexagonal pragmática: o **Core** concentra o domínio e as regras e não depende de nada, e a composição acontece só nos executáveis de cada sistema. Veja [Arquitetura](docs/arquitetura.md).

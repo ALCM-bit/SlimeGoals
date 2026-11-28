@@ -88,7 +88,7 @@ O servidor de sincronização (`src/SlimeGoals.Server`) é montado numa imagem D
 | Npgsql | PostgreSQL License |
 | Dapper | Apache-2.0 |
 | MailKit, MimeKit, BouncyCastle.Cryptography e System.Security.Cryptography.Pkcs | MIT |
-| PostgreSQL (imagem `postgres:18-alpine` usada no Compose, não distribuída por este repositório) | PostgreSQL License |
+| PostgreSQL (imagem `postgres:19-alpine` usada no Compose, não distribuída por este repositório) | PostgreSQL License |
 
 ## Onde ver os textos no app
 
